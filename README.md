@@ -9,5 +9,5 @@ particle-flow with ml
 `python -m src.train --data-train /eos/user/m/mgarciam/datasets/pflow/pf_tree.root --data-config config_files/config1.yaml --network-config src/models/wrapper/example_gravnet_model.py --model-prefix models_trained/ --num-workers 0 --gpus 0 --batch-size 100 --start-lr 1e-3 --num-epochs 1000 --optimizer ranger --fetch-step 1 --log logs/train.log --log-wandb --wandb-displayname test --wandb-projectname mlpf --condensation`
 
 ## Envirorment 
-To set up the env create a conda env following the instructions from [Weaver](https://github.com/hqucms/weaver-core/tree/main) and also install the packages in the requirements.txt script above 
+To set up the env create a conda env following the instructions from [Weaver](https://github.com/hqucms/weaver-core/tree/main) and also install the packages in the requirements.sh script above 
 
