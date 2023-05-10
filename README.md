@@ -8,7 +8,7 @@ particle-flow with ml
 - Training: To train a model run the following command 
 `python -m src.train --data-train /eos/user/m/mgarciam/datasets/pflow/tree_mlpf2.root --data-config config_files/config_2_newlinks.yaml --network-config src/models/wrapper/example_gravnet_model.py --model-prefix models_trained/ --num-workers 0 --gpus --batch-size 100 --start-lr 1e-3 --num-epochs 1000 --optimizer ranger --fetch-step 1 --log logs/train.log --log-wandb --wandb-displayname test --wandb-projectname mlpf --condensation`
 
-##Visualization 
+## Visualization 
 Runs for this project can be found in the following work space:[wandb](https://github.com/hqucms/weaver-core/tree/main](https://arxiv.org/abs/2002.03605](https://wandb.ai/imdea_dolo/mlpf?workspace=user-imdea_dolo) 
 
 ## Envirorment 
