@@ -9,7 +9,7 @@ import time
 from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
 from src.logger.logger import _logger, warn_once
-from src.data.tools import _pad, _repeat_pad, _clip
+from src.data.tools import _pad, _repeat_pad, _clip, _pad_vector
 from src.data.fileio import _read_files
 from src.data.config import DataConfig, _md5
 from src.data.preprocess import (
@@ -25,9 +25,6 @@ from src.dataset.functions_graph import create_graph
 def _finalize_inputs(table, data_config):
     # transformation
     output = {}
-    # copy labels
-    # for k in data_config.label_names:
-    #    output[k] = ak.to_numpy(table[k])
     # transformation
     for k, params in data_config.preprocess_params.items():
         if data_config._auto_standardization and params["center"] == "auto":
@@ -35,8 +32,12 @@ def _finalize_inputs(table, data_config):
         # if params['center'] is not None:
         #    table[k] = (table[k] - params['center']) * params['scale']
         if params["length"] is not None:
-            pad_fn = partial(_pad, value=0)
-            table[k] = pad_fn(table[k], params["length"])
+            if k == "hit_genlink":
+                pad_fn = partial(_pad_vector, value=-1)
+                table[k] = pad_fn(table[k])
+            else:
+                pad_fn = partial(_pad, value=0)
+                table[k] = pad_fn(table[k], params["length"])
 
     # stack variables for each input group
     for k, names in data_config.input_dicts.items():
