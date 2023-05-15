@@ -79,24 +79,7 @@ def create_graph(output):
     hit_features_graph = torch.cat(
         (coord_cart_hits_norm, hit_type_one_hot, e_hits), dim=1
     )
-    # inew = g.edges()[0]
-    # jnew = g.edges()[1]
-    # if number_hits < 2:
-    #     print(number_hits)
-    #     number_hits = 1
-    #     g = dgl.graph(([0], [0]))
-    #     inew = g.edges()[0]
-    #     jnew = g.edges()[1]
-    #     n_data_graph = torch.zeros((1, 4))
-    #     n_data_graph[:, 2:4] = y_data_graph
-    #     g.ndata["h"] = n_data_graph
-    #     g.ndata["pos"] = y_data_graph
-    #     pos_hits = y_data_graph
-    #     g.ndata["hit_type"] = torch.Tensor([3]).to(torch.int64)
-    #     x_interactions_m = create_dif_interactions(inew, jnew, pos_hits, number_hits)
-    #     g.edata["h"] = x_interactions_m
-    # else:
-    # x_interactions_m = create_dif_interactions(inew, jnew, pos_hits, number_hits)
+
     g.ndata["h"] = hit_features_graph
     g.ndata["pos_hits"] = coord_cart_hits
     g.ndata["pos_hits_norm"] = coord_cart_hits_norm

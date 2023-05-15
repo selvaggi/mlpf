@@ -36,7 +36,7 @@ preprocess:
 inputs:
    pf_points:
       pad_mode: wrap
-      length: 400
+      length: 800
       vars:
          - [hit_x, null]
          - [hit_y, null]
@@ -45,7 +45,7 @@ inputs:
          - [hit_phi , null]
    pf_features:
       pad_mode: wrap
-      length: 400
+      length: 800
       vars:
       ### [format 1]: var_name (no transformation)
       ### [format 2]: [var_name,
@@ -65,7 +65,7 @@ inputs:
 
 
    pf_vectors:
-      length: 400
+      length: 800
       pad_mode: wrap
       vars:
          - [hit_type_nn, null] #0
@@ -84,7 +84,7 @@ inputs:
 
 
    pf_mask:
-      length: 400
+      length: 800
       pad_mode: constant
       vars:
          - [hit_mask, null]
