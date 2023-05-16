@@ -23,7 +23,7 @@ def _stack(arrays, axis=1):
 
 
 def _pad_vector(a, value=-1, dtype="float32"):
-    maxlen = 800
+    maxlen = 2000
     maxlen2 = 5
 
     x = (np.ones((len(a), maxlen, maxlen2)) * value).astype(dtype)

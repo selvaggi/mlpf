@@ -210,7 +210,7 @@ class GravnetModel(nn.Module):
         energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))
         dev = batch.device
 
-        clustering_index_l = batch.ndata['particle_number']
+        clustering_index_l = batch.ndata["particle_number"]
 
         len_batch = len(batch.batch_num_nodes())
         batch_numbers = torch.repeat_interleave(
@@ -218,21 +218,22 @@ class GravnetModel(nn.Module):
         ).to(dev)
 
         a = calc_LV_Lbeta(
-            batch, 
-            y, 
-            distance_threshold, 
+            batch,
+            y,
+            distance_threshold,
             energy_correction,
             beta=bj.view(-1),
             cluster_space_coords=xj,  # Predicted by model
-            cluster_index_per_event=clustering_index_l.view(-1).long(),  # Truth hit->cluster index
+            cluster_index_per_event=clustering_index_l.view(
+                -1
+            ).long(),  # Truth hit->cluster index
             batch=batch_numbers.long(),
             qmin=0.1,
         )
-        loss = a[0] + a[1] + 20*a[2] + 0.001*a[3]
+        loss = (
+            a[0] + a[1] + 20 * a[2] + 0.001 * a[3]
+        )  ##(L_V/batch_size, L_beta/batch_size, loss_E, loss_x)
         return loss, a
-
-
-
 
 
 # class NoiseFilterModel(nn.Module):

@@ -9,6 +9,7 @@ from src.data.tools import _concat
 from src.logger.logger import _logger
 import wandb
 
+
 def train_regression(
     model,
     loss_func,
@@ -24,7 +25,12 @@ def train_regression(
     local_rank=0,
 ):
     model.train()
-
+    print("starting to train")
+    iterator = iter(train_loader)
+    g, y = next(iterator)
+    iterator = iter(train_loader)
+    print("LEN DATALOADER", g)
+    print(y)
     data_config = train_loader.dataset.config
 
     total_loss = 0
@@ -35,6 +41,8 @@ def train_regression(
     start_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
+            print(batch_g)
+            print(y)
             label = y
             num_examples = label.shape[0]
             label = label.to(dev)
@@ -44,7 +52,7 @@ def train_regression(
                 model_output = model(batch_g)
                 preds = model_output.squeeze()
                 loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y 
+                    batch_g, model_output, y
                 )
             if grad_scaler is None:
                 loss.backward()
@@ -62,7 +70,6 @@ def train_regression(
             num_batches += 1
             count += num_examples
             total_loss += loss
-
 
             tq.set_postfix(
                 {
@@ -107,30 +114,31 @@ def train_regression(
         "Processed %d entries in total (avg. speed %.1f entries/s)"
         % (count, count / time_diff)
     )
-    _logger.info(
-        "Train AvgLoss: %.5f, AvgMSE: %.5f, AvgMAE: %.5f"
-        % (total_loss / num_batches, sum_sqr_err / count, sum_abs_err / count)
-    )
-
-    if tb_helper:
-        tb_helper.write_scalars(
-            [
-                ("Loss/train (epoch)", total_loss / num_batches, epoch),
-                ("MSE/train (epoch)", sum_sqr_err / count, epoch),
-                ("MAE/train (epoch)", sum_abs_err / count, epoch),
-            ]
+    if count > 0 and num_batches > 0:
+        _logger.info(
+            "Train AvgLoss: %.5f, AvgMSE: %.5f, AvgMAE: %.5f"
+            % (total_loss / num_batches, sum_sqr_err / count, sum_abs_err / count)
         )
-        if tb_helper.custom_fn:
-            with torch.no_grad():
-                tb_helper.custom_fn(
-                    model_output=model_output,
-                    model=model,
-                    epoch=epoch,
-                    i_batch=-1,
-                    mode="train",
-                )
-        # update the batch state
-        tb_helper.batch_train_count += num_batches
+
+        if tb_helper:
+            tb_helper.write_scalars(
+                [
+                    ("Loss/train (epoch)", total_loss / num_batches, epoch),
+                    ("MSE/train (epoch)", sum_sqr_err / count, epoch),
+                    ("MAE/train (epoch)", sum_abs_err / count, epoch),
+                ]
+            )
+            if tb_helper.custom_fn:
+                with torch.no_grad():
+                    tb_helper.custom_fn(
+                        model_output=model_output,
+                        model=model,
+                        epoch=epoch,
+                        i_batch=-1,
+                        mode="train",
+                    )
+            # update the batch state
+            tb_helper.batch_train_count += num_batches
 
     if scheduler and not getattr(scheduler, "_update_per_step", False):
         scheduler.step()
@@ -177,17 +185,17 @@ def evaluate_regression(
                 num_examples = label.shape[0]
                 label = label.to(dev)
                 model_output = model(batch_g)
-                
+
                 preds = model_output.squeeze().float()
 
                 loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y 
+                    batch_g, model_output, y
                 )
 
                 num_batches += 1
                 count += num_examples
                 total_loss += loss * num_examples
-    
+
                 tq.set_postfix(
                     {
                         "Loss": "%.5f" % loss,
@@ -212,7 +220,6 @@ def evaluate_regression(
                     wandb.log({"loss val beta": losses[1]})
                     wandb.log({"loss val E": losses[2]})
                     wandb.log({"loss val X": losses[3]})
-
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
@@ -247,13 +254,13 @@ def evaluate_regression(
     # metric_results = evaluate_metrics(labels[data_config.label_names[0]], scores, eval_metrics=eval_metrics)
     # _logger.info('Evaluation metrics: \n%s', '\n'.join(
     #    ['    - %s: \n%s' % (k, str(v)) for k, v in metric_results.items()]))
-
-    if for_training:
-        return total_loss / count
-    else:
-        # convert 2D labels/scores
-        observers = {k: _concat(v) for k, v in observers.items()}
-        return total_loss / count, scores, labels, observers
+    if count > 0:
+        if for_training:
+            return total_loss / count
+        else:
+            # convert 2D labels/scores
+            observers = {k: _concat(v) for k, v in observers.items()}
+            return total_loss / count, scores, labels, observers
 
 
 def _check_scales_centers(iterator):

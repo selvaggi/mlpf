@@ -6,6 +6,9 @@ import dgl
 def create_inputs_from_table(output):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
+    hit_particle_link = torch.permute(
+        torch.tensor(output["pf_vectoronly"][:, 0:number_hits, 0] + 1), (1, 0)
+    )
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
     )
@@ -46,7 +49,7 @@ def create_inputs_from_table(output):
         ),
         dim=1,
     )
-    number_hits = torch.sum(no_tracks)
+
     return (
         number_hits,
         number_part,
@@ -56,6 +59,7 @@ def create_inputs_from_table(output):
         hit_type_one_hot,  # [no_tracks],
         p_hits,  # [no_tracks],
         e_hits,  # [no_tracks],
+        hit_particle_link,
     )
 
 
@@ -69,8 +73,11 @@ def create_graph(output):
         hit_type_one_hot,
         p_hits,
         e_hits,
+        hit_particle_link,
     ) = create_inputs_from_table(output)
     # print("n hits:", number_hits, "number_part", number_part)
+    # this builds fully connected graph
+    # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
     i, j = torch.tril_indices(number_hits, number_hits)
     g = dgl.graph((i, j))
     g = dgl.to_simple(g)
@@ -86,9 +93,13 @@ def create_graph(output):
     g.ndata["hit_type"] = hit_type_one_hot
     g.ndata["p_hits"] = p_hits
     g.ndata["e_hits"] = e_hits
-    g.ndata["particle_number"] = torch.ones_like(e_hits)
+    g.ndata["particle_number"] = hit_particle_link
     # g.edata["h"] = x_interactions_m
-
+    if len(y_data_graph) == 1:
+        y_data_graph = torch.cat(
+            [y_data_graph, y_data_graph * 0 - 10], dim=0
+        )  # this is so that the collator function for dataloader works
+        # TODO think of a better way when we have more particles (currently only 1 or 2)
     return g, y_data_graph
 
 

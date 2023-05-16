@@ -13,27 +13,31 @@ def assert_no_nans(x):
 
 # FIXME: Use a logger instead of this
 DEBUG = False
+
+
 def debug(*args, **kwargs):
-    if DEBUG: print(*args, **kwargs)
+    if DEBUG:
+        print(*args, **kwargs)
 
 
 def calc_LV_Lbeta(
     g,
-    y, 
-    distance_threshold, 
-    energy_correction, 
-    beta: torch.Tensor, cluster_space_coords: torch.Tensor, # Predicted by model
-    cluster_index_per_event: torch.Tensor, # Truth hit->cluster index
+    y,
+    distance_threshold,
+    energy_correction,
+    beta: torch.Tensor,
+    cluster_space_coords: torch.Tensor,  # Predicted by model
+    cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
     batch: torch.Tensor,
     # From here on just parameters
     qmin: float = 0.1,
-    s_B: float = 1.,
-    noise_cluster_index: int = 0, # cluster_index entries with this value are noise/noise
-    beta_stabilizing = 'soft_q_scaling',
-    huberize_norm_for_V_attractive = False,
-    beta_term_option = 'paper',
-    return_components = False
-    ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
+    s_B: float = 1.0,
+    noise_cluster_index: int = 0,  # cluster_index entries with this value are noise/noise
+    beta_stabilizing="soft_q_scaling",
+    huberize_norm_for_V_attractive=False,
+    beta_term_option="paper",
+    return_components=False,
+) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
     Concepts:
@@ -43,7 +47,7 @@ def calc_LV_Lbeta(
       There is typically one noise cluster per event. Any hit in a noise cluster
       is a 'noise hit'. A hit in an object is called a 'signal hit' for lack of a
       better term.
-    - An 'object' is a cluster that is *not* a noise cluster. 
+    - An 'object' is a cluster that is *not* a noise cluster.
     beta_stabilizing: Choices are ['paper', 'clip', 'soft_q_scaling']:
         paper: beta is sigmoid(model_output), q = beta.arctanh()**2 + qmin
         clip:  beta is clipped to 1-1e-4, q = beta.arctanh()**2 + qmin
@@ -55,6 +59,8 @@ def calc_LV_Lbeta(
     Note this function has modifications w.r.t. the implementation in 2002.03605:
     - The norms for V_repulsive are now Gaussian (instead of linear hinge)
     """
+    # remove dummy rows added for dataloader #TODO think of better way to do this
+    y = y[y > -10]
     device = beta.device
 
     assert_no_nans(beta)
@@ -64,10 +70,12 @@ def calc_LV_Lbeta(
     # cluster_index: unique index over events
     # E.g. cluster_index_per_event=[ 0, 0, 1, 2, 0, 0, 1], batch=[0, 0, 0, 0, 1, 1, 1]
     #      -> cluster_index=[ 0, 0, 1, 2, 3, 3, 4 ]
-    cluster_index, n_clusters_per_event = batch_cluster_indices(cluster_index_per_event, batch)
+    cluster_index, n_clusters_per_event = batch_cluster_indices(
+        cluster_index_per_event, batch
+    )
     n_clusters = n_clusters_per_event.sum()
     n_hits, cluster_space_dim = cluster_space_coords.size()
-    batch_size = batch.max()+1
+    batch_size = batch.max() + 1
     n_hits_per_event = scatter_count(batch)
 
     # Index of cluster -> event (n_clusters,)
@@ -85,31 +93,35 @@ def calc_LV_Lbeta(
 
     # FIXME: This assumes noise_cluster_index == 0!!
     # Not sure how to do this in a performant way in case noise_cluster_index != 0
-    if noise_cluster_index != 0: raise NotImplementedError
+    if noise_cluster_index != 0:
+        raise NotImplementedError
     object_index_per_event = cluster_index_per_event[is_sig] - 1
-    object_index, n_objects_per_event = batch_cluster_indices(object_index_per_event, batch[is_sig])
+    object_index, n_objects_per_event = batch_cluster_indices(
+        object_index_per_event, batch[is_sig]
+    )
     n_hits_per_object = scatter_count(object_index)
+    print("n_hits_per_object", n_hits_per_object)
     batch_object = batch_cluster[is_object]
     n_objects = is_object.sum()
 
     assert object_index.size() == (n_hits_sig,)
     assert is_object.size() == (n_clusters,)
     assert torch.all(n_hits_per_object > 0)
-    assert object_index.max()+1 == n_objects
+    assert object_index.max() + 1 == n_objects
 
     # ________________________________
     # L_V term
 
     # Calculate q
-    if beta_stabilizing == 'paper':
-        q = beta.arctanh()**2 + qmin
-    elif beta_stabilizing == 'clip':
-        beta = beta.clip(0., 1-1e-4)
-        q = beta.arctanh()**2 + qmin
-    elif beta_stabilizing == 'soft_q_scaling':
-        q = (beta.clip(0., 1-1e-4)/1.002).arctanh()**2 + qmin
+    if beta_stabilizing == "paper":
+        q = beta.arctanh() ** 2 + qmin
+    elif beta_stabilizing == "clip":
+        beta = beta.clip(0.0, 1 - 1e-4)
+        q = beta.arctanh() ** 2 + qmin
+    elif beta_stabilizing == "soft_q_scaling":
+        q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
     else:
-        raise ValueError(f'beta_stablizing mode {beta_stabilizing} is not known')
+        raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
     assert_no_nans(q)
     assert q.device == device
     assert q.size() == (n_hits,)
@@ -124,18 +136,24 @@ def calc_LV_Lbeta(
     assert x_alpha.size() == (n_objects, cluster_space_dim)
     assert beta_alpha.size() == (n_objects,)
 
+    positions_particles_pred = g.ndata["pos_hits_norm"][is_sig][index_alpha]
+    positions_particles_pred = (
+        positions_particles_pred + distance_threshold[is_sig][index_alpha]
+    )
 
-    positions_particles_pred = g.ndata['pos_hits_norm'][is_sig][index_alpha]
-    positions_particles_pred = positions_particles_pred+distance_threshold[is_sig][index_alpha]
-
-    e_particles_pred = g.ndata['e_hits'][is_sig][index_alpha]
-    e_particles_pred = e_particles_pred*energy_correction[is_sig][index_alpha]
-    x_particles = y[:,0:3]
-    e_particles = y[:,3].unsqueeze(1)
-    loss_E = torch.mean(torch.square((e_particles_pred.to(device) - e_particles.to(device))/e_particles.to(device)))
+    e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
+    e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
+    x_particles = y[:, 0:3]
+    e_particles = y[:, 3].unsqueeze(1)
+    loss_E = torch.mean(
+        torch.square(
+            (e_particles_pred.to(device) - e_particles.to(device))
+            / e_particles.to(device)
+        )
+    )
     loss_mse = torch.nn.MSELoss()
-    loss_x = loss_mse(positions_particles_pred.to(device),x_particles.to(device))
-        # Connectivity matrix from hit (row) -> cluster (column)
+    loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
+    # Connectivity matrix from hit (row) -> cluster (column)
     # Index to matrix, e.g.:
     # [1, 3, 1, 0] --> [
     #     [0, 1, 0, 0],
@@ -149,8 +167,8 @@ def calc_LV_Lbeta(
     M_inv = get_inter_event_norms_mask(batch, n_clusters_per_event) - M
 
     # Throw away noise cluster columns; we never need them
-    M = M[:,is_object]
-    M_inv = M_inv[:,is_object]
+    M = M[:, is_object]
+    M_inv = M_inv[:, is_object]
     assert M.size() == (n_hits, n_objects)
     assert M_inv.size() == (n_hits, n_objects)
 
@@ -175,7 +193,7 @@ def calc_LV_Lbeta(
         # Huberized version (linear but times 4)
         # Be sure to not move 'off-diagonal' away from zero
         # (i.e. norms of hits w.r.t. clusters they do _not_ belong to)
-        norms_att = huber(norms_att+1e-5, 4.)
+        norms_att = huber(norms_att + 1e-5, 4.0)
     else:
         # Paper version is simply norms squared (no need for mask)
         norms_att = norms_att**2
@@ -198,20 +216,22 @@ def calc_LV_Lbeta(
     # -------
     # Repulsive potential term
 
-    # Get all the relevant norms: We want norms of any hit w.r.t. to 
+    # Get all the relevant norms: We want norms of any hit w.r.t. to
     # objects they do *not* belong to, i.e. no noise clusters.
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    norms_rep = torch.exp(-4.*norms**2) * M_inv
-    
+    norms_rep = torch.exp(-4.0 * norms**2) * M_inv
+
     # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
     V_repulsive = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep
     # No need to apply a V = max(0, V); by construction V>=0
     assert V_repulsive.size() == (n_hits, n_objects)
 
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
-    L_V_repulsive = (scatter_add(V_repulsive.sum(dim=0), batch_object)/n_hits_per_event).sum()
+    L_V_repulsive = (
+        scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
+    ).sum()
     L_V = L_V_attractive + L_V_repulsive
 
     # ________________________________
@@ -219,53 +239,68 @@ def calc_LV_Lbeta(
 
     # -------
     # L_beta noise term
-    
+
     n_noise_hits_per_event = scatter_count(batch[is_noise])
-    n_noise_hits_per_event[n_noise_hits_per_event==0]=1
-    L_beta_noise = s_B * ((scatter_add(beta[is_noise], batch[is_noise])) / n_noise_hits_per_event).sum()
+    n_noise_hits_per_event[n_noise_hits_per_event == 0] = 1
+    L_beta_noise = (
+        s_B
+        * (
+            (scatter_add(beta[is_noise], batch[is_noise])) / n_noise_hits_per_event
+        ).sum()
+    )
 
     # -------
     # L_beta signal term
 
-    if beta_term_option == 'paper':
+    if beta_term_option == "paper":
 
-        L_beta_sig = (scatter_add((1-beta_alpha), batch_object) / n_objects_per_event).sum()
+        L_beta_sig = (
+            scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
+        ).sum()
 
-        
-    elif beta_term_option == 'short-range-potential':
-            
+    elif beta_term_option == "short-range-potential":
+
         # First collect the norms: We only want norms of hits w.r.t. the object they
         # belong to (like in V_attractive)
         # Apply transformation first, and then apply mask to keep only the norms we want,
         # then sum over hits, so the result is (n_objects,)
-        norms_beta_sig = (1./(20.*norms[is_sig]**2+1.) * M[is_sig]).sum(dim=0)
-        assert torch.all(norms_beta_sig >= 1.) and torch.all(norms_beta_sig <= n_hits_per_object)
+        norms_beta_sig = (1.0 / (20.0 * norms[is_sig] ** 2 + 1.0) * M[is_sig]).sum(
+            dim=0
+        )
+        assert torch.all(norms_beta_sig >= 1.0) and torch.all(
+            norms_beta_sig <= n_hits_per_object
+        )
         # Subtract from 1. to remove self interaction, divide by number of hits per object
-        norms_beta_sig = (1. - norms_beta_sig) / n_hits_per_object
-        assert torch.all(norms_beta_sig >= -1.) and torch.all(norms_beta_sig <= 0.)
+        norms_beta_sig = (1.0 - norms_beta_sig) / n_hits_per_object
+        assert torch.all(norms_beta_sig >= -1.0) and torch.all(norms_beta_sig <= 0.0)
         norms_beta_sig *= beta_alpha
         # Conclusion:
         # lower beta --> higher loss (less negative)
         # higher norms --> higher loss
 
         # Sum over objects, divide by number of objects per event, then sum over events
-        L_beta_norms_term = (scatter_add(norms_beta_sig, batch_object) / n_objects_per_event).sum()
-        assert L_beta_norms_term >= -batch_size and L_beta_norms_term <= 0.
+        L_beta_norms_term = (
+            scatter_add(norms_beta_sig, batch_object) / n_objects_per_event
+        ).sum()
+        assert L_beta_norms_term >= -batch_size and L_beta_norms_term <= 0.0
 
         # Logbeta term: Take -.2*torch.log(beta_alpha[is_object]+1e-9), sum it over objects,
         # divide by n_objects_per_event, then sum over events (same pattern as above)
         # lower beta --> higher loss
         L_beta_logbeta_term = (
-            scatter_add(-.2*torch.log(beta_alpha+1e-9), batch_object) / n_objects_per_event
-            ).sum()
+            scatter_add(-0.2 * torch.log(beta_alpha + 1e-9), batch_object)
+            / n_objects_per_event
+        ).sum()
 
         # Final L_beta term
         L_beta_sig = L_beta_norms_term + L_beta_logbeta_term
 
     else:
-        valid_options = ['paper', 'short-range-potential']
-        raise ValueError(f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}')
-    
+        valid_options = ["paper", "short-range-potential"]
+        raise ValueError(
+            f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
+        )
+
     L_beta = L_beta_noise + L_beta_sig
 
     # ________________________________
@@ -274,60 +309,67 @@ def calc_LV_Lbeta(
 
     if return_components or DEBUG:
         components = dict(
-            L_V = L_V / batch_size,
-            L_V_attractive = L_V_attractive / batch_size,
-            L_V_repulsive = L_V_repulsive / batch_size,
-            L_beta = L_beta / batch_size,
-            L_beta_noise = L_beta_noise / batch_size,
-            L_beta_sig = L_beta_sig / batch_size,
-            )
-        if beta_term_option == 'short-range-potential':
-            components['L_beta_norms_term'] = L_beta_norms_term / batch_size
-            components['L_beta_logbeta_term'] = L_beta_logbeta_term / batch_size
+            L_V=L_V / batch_size,
+            L_V_attractive=L_V_attractive / batch_size,
+            L_V_repulsive=L_V_repulsive / batch_size,
+            L_beta=L_beta / batch_size,
+            L_beta_noise=L_beta_noise / batch_size,
+            L_beta_sig=L_beta_sig / batch_size,
+        )
+        if beta_term_option == "short-range-potential":
+            components["L_beta_norms_term"] = L_beta_norms_term / batch_size
+            components["L_beta_logbeta_term"] = L_beta_logbeta_term / batch_size
     if DEBUG:
         debug(formatted_loss_components_string(components))
-    if torch.isnan(L_beta/batch_size):
-        print(L_beta,batch_size)
-        print('L_beta_noise',L_beta_noise)
-        print('L_beta_sig',L_beta_sig)
-    return components if return_components else (L_V/batch_size, L_beta/batch_size, loss_E, loss_x)
+    if torch.isnan(L_beta / batch_size):
+        print(L_beta, batch_size)
+        print("L_beta_noise", L_beta_noise)
+        print("L_beta_sig", L_beta_sig)
+    return (
+        components
+        if return_components
+        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x)
+    )
 
 
 def formatted_loss_components_string(components: dict) -> str:
     """
     Formats the components returned by calc_LV_Lbeta
     """
-    total_loss = components['L_V']+components['L_beta']
-    fractions = { k : v/total_loss for k, v in components.items() }
-    fkey = lambda key: f'{components[key]:+.4f} ({100.*fractions[key]:.1f}%)'
+    total_loss = components["L_V"] + components["L_beta"]
+    fractions = {k: v / total_loss for k, v in components.items()}
+    fkey = lambda key: f"{components[key]:+.4f} ({100.*fractions[key]:.1f}%)"
     s = (
-        '  L_V                 = {L_V}'
-        '\n    L_V_attractive      = {L_V_attractive}'
-        '\n    L_V_repulsive       = {L_V_repulsive}'
-        '\n  L_beta              = {L_beta}'
-        '\n    L_beta_noise        = {L_beta_noise}'
-        '\n    L_beta_sig          = {L_beta_sig}'
-        .format(L=total_loss,**{k : fkey(k) for k in components})
+        "  L_V                 = {L_V}"
+        "\n    L_V_attractive      = {L_V_attractive}"
+        "\n    L_V_repulsive       = {L_V_repulsive}"
+        "\n  L_beta              = {L_beta}"
+        "\n    L_beta_noise        = {L_beta_noise}"
+        "\n    L_beta_sig          = {L_beta_sig}".format(
+            L=total_loss, **{k: fkey(k) for k in components}
         )
-    if 'L_beta_norms_term' in components:
+    )
+    if "L_beta_norms_term" in components:
         s += (
-            '\n      L_beta_norms_term   = {L_beta_norms_term}'
-            '\n      L_beta_logbeta_term = {L_beta_logbeta_term}'
-            .format(**{k : fkey(k) for k in components})
+            "\n      L_beta_norms_term   = {L_beta_norms_term}"
+            "\n      L_beta_logbeta_term = {L_beta_logbeta_term}".format(
+                **{k: fkey(k) for k in components}
             )
-    if 'L_noise_filter' in components:
+        )
+    if "L_noise_filter" in components:
         s += f'\n  L_noise_filter = {fkey("L_noise_filter")}'
     return s
 
+
 def calc_simple_clus_space_loss(
-    cluster_space_coords: torch.Tensor, # Predicted by model
-    cluster_index_per_event: torch.Tensor, # Truth hit->cluster index
+    cluster_space_coords: torch.Tensor,  # Predicted by model
+    cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
     batch: torch.Tensor,
     # From here on just parameters
-    noise_cluster_index: int = 0, # cluster_index entries with this value are noise/noise
-    huberize_norm_for_V_attractive = True,
-    pred_edc: torch.Tensor = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    noise_cluster_index: int = 0,  # cluster_index entries with this value are noise/noise
+    huberize_norm_for_V_attractive=True,
+    pred_edc: torch.Tensor = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Isolating just the V_attractive and V_repulsive parts of object condensation,
     w.r.t. the geometrical mean of truth cluster centers (rather than the highest
@@ -347,9 +389,11 @@ def calc_simple_clus_space_loss(
     # cluster_index: unique index over events
     # E.g. cluster_index_per_event=[ 0, 0, 1, 2, 0, 0, 1], batch=[0, 0, 0, 0, 1, 1, 1]
     #      -> cluster_index=[ 0, 0, 1, 2, 3, 3, 4 ]
-    cluster_index, n_clusters_per_event = batch_cluster_indices(cluster_index_per_event, batch)
+    cluster_index, n_clusters_per_event = batch_cluster_indices(
+        cluster_index_per_event, batch
+    )
     n_hits, cluster_space_dim = cluster_space_coords.size()
-    batch_size = batch.max()+1
+    batch_size = batch.max() + 1
     n_hits_per_event = scatter_count(batch)
 
     # Index of cluster -> event (n_clusters,)
@@ -387,8 +431,8 @@ def calc_simple_clus_space_loss(
     M_inv = get_inter_event_norms_mask(batch, n_clusters_per_event) - M
 
     # Throw away noise cluster columns; we never need them
-    M = M[:,is_object]
-    M_inv = M_inv[:,is_object]
+    M = M[:, is_object]
+    M_inv = M_inv[:, is_object]
     assert M.size() == (n_hits, n_objects)
     assert M_inv.size() == (n_hits, n_objects)
 
@@ -404,9 +448,10 @@ def calc_simple_clus_space_loss(
     # Contains norms between hits and objects from different events
     # (n_hits, 1, cluster_space_dim) - (1, n_objects, cluster_space_dim)
     #   gives (n_hits, n_objects, cluster_space_dim)
-    norms = (cluster_space_coords.unsqueeze(1) - object_centers.unsqueeze(0)).norm(dim=-1)
+    norms = (cluster_space_coords.unsqueeze(1) - object_centers.unsqueeze(0)).norm(
+        dim=-1
+    )
     assert norms.size() == (n_hits, n_objects)
-
 
     # -------
     # Attractive loss
@@ -422,7 +467,7 @@ def calc_simple_clus_space_loss(
         # Huberized version (linear but times 4)
         # Be sure to not move 'off-diagonal' away from zero
         # (i.e. norms of hits w.r.t. clusters they do _not_ belong to)
-        norms_att = huber(norms_att+1e-5, 4.)
+        norms_att = huber(norms_att + 1e-5, 4.0)
     else:
         # Paper version is simply norms squared (no need for mask)
         norms_att = norms_att**2
@@ -434,21 +479,25 @@ def calc_simple_clus_space_loss(
 
     # Sum norms_att over hits (dim=0), then sum per event, then divide by n_hits_per_event,
     # then sum over events
-    L_attractive = (scatter_add(norms_att.sum(dim=0), batch_object) / n_hits_per_event).sum()
+    L_attractive = (
+        scatter_add(norms_att.sum(dim=0), batch_object) / n_hits_per_event
+    ).sum()
 
     # -------
     # Repulsive loss
 
-    # Get all the relevant norms: We want norms of any hit w.r.t. to 
+    # Get all the relevant norms: We want norms of any hit w.r.t. to
     # objects they do *not* belong to, i.e. no noise clusters.
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    norms_rep = torch.exp(-4.*norms**2) * M_inv
+    norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
-    L_repulsive = (scatter_add(norms_rep.sum(dim=0), batch_object)/n_hits_per_event).sum()
-    
+    L_repulsive = (
+        scatter_add(norms_rep.sum(dim=0), batch_object) / n_hits_per_event
+    ).sum()
+
     L_attractive /= batch_size
     L_repulsive /= batch_size
 
@@ -461,10 +510,10 @@ def calc_simple_clus_space_loss(
         assert cluster_centers_expanded.size() == (n_hits, cluster_space_dim)
         truth_edc = (cluster_space_coords - cluster_centers_expanded).norm(dim=-1)
         assert pred_edc.size() == (n_hits,)
-        d_per_hit = (pred_edc-truth_edc)**2
+        d_per_hit = (pred_edc - truth_edc) ** 2
         d_per_object = scatter_add(d_per_hit, cluster_index)[is_object]
         assert d_per_object.size() == (n_objects,)
-        L_edc = (scatter_add(d_per_object, batch_object)/n_hits_per_event).sum()
+        L_edc = (scatter_add(d_per_object, batch_object) / n_hits_per_event).sum()
         return L_attractive, L_repulsive, L_edc
 
     return L_attractive, L_repulsive
@@ -475,10 +524,14 @@ def huber(d, delta):
     See: https://en.wikipedia.org/wiki/Huber_loss#Definition
     Multiplied by 2 w.r.t Wikipedia version (aligning with Jan's definition)
     """
-    return torch.where(torch.abs(d)<=delta, d**2, 2.*delta*(torch.abs(d)-delta))
+    return torch.where(
+        torch.abs(d) <= delta, d**2, 2.0 * delta * (torch.abs(d) - delta)
+    )
 
 
-def batch_cluster_indices(cluster_id: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.LongTensor, torch.LongTensor]:
+def batch_cluster_indices(
+    cluster_id: torch.Tensor, batch: torch.Tensor
+) -> Tuple[torch.LongTensor, torch.LongTensor]:
     """
     Turns cluster indices per event to an index in the whole batch
     Example:
@@ -501,7 +554,9 @@ def batch_cluster_indices(cluster_id: torch.Tensor, batch: torch.Tensor) -> Tupl
     return offset + cluster_id, n_clusters_per_event
 
 
-def get_clustering_np(betas: np.array, X: np.array, tbeta: float=.1, td: float=1.) -> np.array:
+def get_clustering_np(
+    betas: np.array, X: np.array, tbeta: float = 0.1, td: float = 1.0
+) -> np.array:
     """
     Returns a clustering of hits -> cluster_index, based on the GravNet model
     output (predicted betas and cluster space coordinates) and the clustering
@@ -527,7 +582,7 @@ def get_clustering_np(betas: np.array, X: np.array, tbeta: float=.1, td: float=1
     return clustering
 
 
-def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=.1, td=1.):
+def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=1.0):
     """
     Returns a clustering of hits -> cluster_index, based on the GravNet model
     output (predicted betas and cluster space coordinates) and the clustering
@@ -573,10 +628,14 @@ def scatter_counts_to_indices(input: torch.LongTensor) -> torch.LongTensor:
     input:  [3, 2, 2]
     output: [0, 0, 0, 1, 1, 2, 2]
     """
-    return torch.repeat_interleave(torch.arange(input.size(0), device=input.device), input).long()
+    return torch.repeat_interleave(
+        torch.arange(input.size(0), device=input.device), input
+    ).long()
 
 
-def get_inter_event_norms_mask(batch: torch.LongTensor, nclusters_per_event: torch.LongTensor):
+def get_inter_event_norms_mask(
+    batch: torch.LongTensor, nclusters_per_event: torch.LongTensor
+):
     """
     Creates mask of (nhits x nclusters) that is only 1 if hit i is in the same event as cluster j
     Example:
@@ -605,13 +664,18 @@ def get_inter_event_norms_mask(batch: torch.LongTensor, nclusters_per_event: tor
     # [[1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     #  [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0],
     #  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]]
-    batch_expanded_as_ones = (batch == torch.arange(batch.max()+1, dtype=torch.long, device=device).unsqueeze(-1) ).long()
+    batch_expanded_as_ones = (
+        batch
+        == torch.arange(batch.max() + 1, dtype=torch.long, device=device).unsqueeze(-1)
+    ).long()
     # Then repeat_interleave it to expand it to nclusters rows, and transpose to get (nhits x nclusters)
     return batch_expanded_as_ones.repeat_interleave(nclusters_per_event, dim=0).T
+
 
 def isin(ar1, ar2):
     """To be replaced by torch.isin for newer releases of torch"""
     return (ar1[..., None] == ar2).any(-1)
+
 
 def reincrementalize(y: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
     """Re-indexes y so that missing clusters are no longer counted.
@@ -632,7 +696,11 @@ def reincrementalize(y: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
     y_offset, n_per_event = batch_cluster_indices(y, batch)
     offset = y_offset - y
     n_clusters = n_per_event.sum()
-    holes = (~isin(torch.arange(n_clusters, device=y.device), y_offset)).nonzero().squeeze(-1)
+    holes = (
+        (~isin(torch.arange(n_clusters, device=y.device), y_offset))
+        .nonzero()
+        .squeeze(-1)
+    )
     n_per_event_without_holes = n_per_event.clone()
     n_per_event_cumsum = n_per_event.cumsum(0)
     for hole in holes.sort(descending=True).values:
@@ -641,8 +709,6 @@ def reincrementalize(y: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         n_per_event_without_holes[i_event] -= 1
     offset_per_event = torch.zeros_like(n_per_event_without_holes)
     offset_per_event[1:] = n_per_event_without_holes.cumsum(0)[:-1]
-    offset_without_holes = torch.gather(offset_per_event,0, batch).long()
+    offset_without_holes = torch.gather(offset_per_event, 0, batch).long()
     reincrementalized = y_offset - offset_without_holes
     return reincrementalized
-
-
