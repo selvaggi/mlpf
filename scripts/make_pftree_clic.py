@@ -66,7 +66,9 @@ def get_genparticle_parents(i, mcparts, parents):
     return parent_positions
 
 
-def find_gen_link(j, id, gen_link_indexreco, gen_link_indexmc, gen_link_weight, genpart_indexes):
+def find_gen_link(
+    j, id, gen_link_indexreco, gen_link_indexmc, gen_link_weight, genpart_indexes
+):
 
     reco_positions = []
     ## extract position of gen particles in the gen-trk trk link collection
@@ -76,17 +78,27 @@ def find_gen_link(j, id, gen_link_indexreco, gen_link_indexmc, gen_link_weight, 
 
     # now extract corresponid mc part position in the gen-trk gen collection
     gen_positions = []
+    gen_weights = []
     for idx in reco_positions:
         gen_positions.append(gen_link_indexmc[idx].index)
+        gen_weights.append(gen_link_weight[idx].weight)
 
     # now make sure that the corresponding gen part exists and will be stored in the tree
+    #print(gen_positions, gen_weights)
     indices = []
-    for pos in gen_positions:
+    
+    for i, pos in enumerate(gen_positions):
         if pos in genpart_indexes:
-            indices.append(genpart_indexes[pos])
+            indices.append(genpart_indexes[pos])     
 
-    # print(id, indices)
-    return indices
+    #print(id, indices, gen_positions, gen_weights)
+    
+    indices += [-1] * (5 - len(indices))
+    gen_weights += [-1] * (5 - len(gen_weights))
+    
+    return indices, gen_weights
+
+    
 
 
 ## global params
@@ -151,6 +163,22 @@ hit_type = ROOT.std.vector("int")()
 ### store here the position of the corresponding gen particles associated to the hit
 hit_genlink = ROOT.std.vector(ROOT.std.vector("int"))()
 
+
+### store here the position of the corresponding gen particles associated to the hit in flat format (same info as above but easier to read)
+hit_genlink0 = ROOT.std.vector("int")()
+hit_genlink1 = ROOT.std.vector("int")()
+hit_genlink2 = ROOT.std.vector("int")()
+hit_genlink3 = ROOT.std.vector("int")()
+hit_genlink4 = ROOT.std.vector("int")()
+
+## this is the fraction of the energy depoisited by that gen particle in this hit
+hit_genweight0 = ROOT.std.vector("float")()
+hit_genweight1 = ROOT.std.vector("float")()
+hit_genweight2 = ROOT.std.vector("float")()
+hit_genweight3 = ROOT.std.vector("float")()
+hit_genweight4 = ROOT.std.vector("float")()
+
+
 ## store here true information
 part_p = ROOT.std.vector("float")()
 part_e = ROOT.std.vector("float")()
@@ -176,18 +204,28 @@ t.Branch("hit_type", hit_type)
 # Create a branch for the hit_genlink_flat
 t.Branch("hit_genlink", hit_genlink)
 
+t.Branch("hit_genlink0", hit_genlink0)
+t.Branch("hit_genlink1", hit_genlink1)
+t.Branch("hit_genlink2", hit_genlink2)
+t.Branch("hit_genlink3", hit_genlink3)
+t.Branch("hit_genlink4", hit_genlink4)
+t.Branch("hit_genweight0", hit_genweight0)
+t.Branch("hit_genweight1", hit_genweight1)
+t.Branch("hit_genweight2", hit_genweight2)
+t.Branch("hit_genweight3", hit_genweight3)
+t.Branch("hit_genweight4", hit_genweight4)
+
 t.Branch("part_p", part_p)
 t.Branch("part_theta", part_theta)
 t.Branch("part_phi", part_phi)
 t.Branch("part_m", part_m)
 t.Branch("part_pid", part_pid)
 
+event_number[0] = 0
 for i, e in enumerate(ev):
     if debug:
         if i == 100:
             break
-
-    event_number[0] = i
 
     number_of_hist_with_no_genlinks = 0
 
@@ -208,6 +246,19 @@ for i, e in enumerate(ev):
     part_phi.clear()
     part_m.clear()
     part_pid.clear()
+    
+    hit_genlink0.clear()
+    hit_genlink1.clear()
+    hit_genlink2.clear()
+    hit_genlink3.clear()
+    hit_genlink4.clear()
+    
+    hit_genweight0.clear() 
+    hit_genweight1.clear()
+    hit_genweight2.clear()
+    hit_genweight3.clear()
+    hit_genweight4.clear()
+    
 
     if (i + 1) % 1000 == 0:
         print(" ... processed {} events ...".format(i + 1))
@@ -217,14 +268,22 @@ for i, e in enumerate(ev):
 
     if debug:
         print("")
-        print(" ----- new event: {} ----------".format(i))
+        print(" ----- new event: {} ----------".format(event_number[0]))
         print("")
 
-    genpart_indexes_pre = dict()  ## key: index in gen particle collection, value: position in stored gen particle array
-    indexes_genpart_pre = dict()  ## key: position in stored gen particle array, value: index in gen particle collection
+    genpart_indexes_pre = (
+        dict()
+    )  ## key: index in gen particle collection, value: position in stored gen particle array
+    indexes_genpart_pre = (
+        dict()
+    )  ## key: position in stored gen particle array, value: index in gen particle collection
 
-    genpart_indexes = dict()  ## key: index in gen particle collection, value: position in stored gen particle array
-    indexes_genpart = dict()  ## key: position in stored gen particle array, value: index in gen particle collection
+    genpart_indexes = (
+        dict()
+    )  ## key: index in gen particle collection, value: position in stored gen particle array
+    indexes_genpart = (
+        dict()
+    )  ## key: position in stored gen particle array, value: index in gen particle collection
 
     gen_parent_link_indexmc = getattr(ev, genparts_parents)
     gen_daughter_link_indexmc = getattr(ev, genparts_daughters)
@@ -233,7 +292,9 @@ for i, e in enumerate(ev):
     n_part_pre = 0
     for j, part in enumerate(gen_part_coll):
 
-        p = math.sqrt(part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2)
+        p = math.sqrt(
+            part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2
+        )
         theta = math.acos(part.momentum.z / p)
         phi = math.atan2(part.momentum.y, part.momentum.x)
 
@@ -265,7 +326,13 @@ for i, e in enumerate(ev):
                 )
             )
             # part.daughters_begin,  part.daughters_end, part.parents_begin,  part.parents_end, D1: {}, D2: {}, M1: {}, M2: {}
+            
+        ## store all gen parts for now
+        genpart_indexes_pre[j] = n_part_pre
+        indexes_genpart_pre[n_part_pre] = j
+        n_part_pre += 1
 
+        """
         # exclude neutrinos (and pi0 for now)
         if part.generatorStatus == 1 and abs(part.PDG) not in [12, 14, 16, 111]:
 
@@ -276,7 +343,9 @@ for i, e in enumerate(ev):
         # extract the photons from the pi0
         elif part.generatorStatus == 1 and part.PDG == 111:
 
-            daughters = get_genparticle_daughters(j, gen_part_coll, gen_daughter_link_indexmc)
+            daughters = get_genparticle_daughters(
+                j, gen_part_coll, gen_daughter_link_indexmc
+            )
 
             if len(daughters) != 2:
                 print("STRANGE PI0 DECAY")
@@ -286,19 +355,24 @@ for i, e in enumerate(ev):
                 genpart_indexes_pre[d] = n_part_pre
                 indexes_genpart_pre[n_part_pre] = d
                 n_part_pre += 1
+        """
 
     # TODO: for now exclude gen particle that have decayed/interacted before the calo
     for j in range(n_part_pre):
 
         part = gen_part_coll[indexes_genpart_pre[j]]
 
-        daughters = get_genparticle_daughters(indexes_genpart_pre[j], gen_part_coll, gen_daughter_link_indexmc)
+        daughters = get_genparticle_daughters(
+            indexes_genpart_pre[j], gen_part_coll, gen_daughter_link_indexmc
+        )
 
         # check if particles has interacted, if it did remove it from the list of gen particles
-        if len(daughters) > 0:
-            continue
+        #if len(daughters) > 0:
+        #    continue
 
-        p = math.sqrt(part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2)
+        p = math.sqrt(
+            part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2
+        )
         theta = math.acos(part.momentum.z / p)
         phi = math.atan2(part.momentum.y, part.momentum.x)
 
@@ -317,7 +391,9 @@ for i, e in enumerate(ev):
         print(genpart_indexes)
         for j in range(n_part[0]):
             part = gen_part_coll[indexes_genpart[j]]
-            p = math.sqrt(part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2)
+            p = math.sqrt(
+                part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2
+            )
             theta = math.acos(part.momentum.z / p)
             phi = math.atan2(part.momentum.y, part.momentum.x)
             print(
@@ -366,7 +442,7 @@ for i, e in enumerate(ev):
 
         hit_type.push_back(0)  # 0 for tracks at vertex
 
-        gen_indices = find_gen_link(
+        gen_indices, gen_weights = find_gen_link(
             j,
             track_collid,
             gen_track_link_indextr,
@@ -391,6 +467,18 @@ for i, e in enumerate(ev):
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
+ 
+        if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
+        if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
+        if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
+        if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
+        if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
+     
+        if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
+        if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
+        if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
+        if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
+        if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
 
         if debug:
             print(
@@ -433,7 +521,7 @@ for i, e in enumerate(ev):
 
         hit_type.push_back(1)  # 0 for tracks at calo
 
-        gen_indices = find_gen_link(
+        gen_indices, gen_weights = find_gen_link(
             j,
             track_collid,
             gen_track_link_indextr,
@@ -458,6 +546,18 @@ for i, e in enumerate(ev):
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
+ 
+        if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
+        if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
+        if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
+        if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
+        if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
+     
+        if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
+        if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
+        if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
+        if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
+        if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
 
         if debug:
             print(
@@ -498,6 +598,7 @@ for i, e in enumerate(ev):
         hcal_other[1],
     ]
 
+    
     for k, calohit_coll in enumerate(calohit_collections):
         if debug:
             print("")
@@ -528,7 +629,7 @@ for i, e in enumerate(ev):
 
             hit_type.push_back(htype)  # 0 for calo hits
 
-            gen_indices = find_gen_link(
+            gen_indices, gen_weights = find_gen_link(
                 j,
                 calohit_collection_ids[k],
                 gen_calohit_link_indexhit,
@@ -548,12 +649,26 @@ for i, e in enumerate(ev):
                 # if debug:
                 #    print("  -> WARNING: this calo hit has no gen-link")
 
-            hit_genlink.push_back(link_vector)  # linked to first particle by default now
+            hit_genlink.push_back(
+                link_vector
+            )  # linked to first particle by default now
 
             genlink = -1
             if ngen > 0:
                 genlink = link_vector[0]
-
+    
+            if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
+            if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
+            if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
+            if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
+            if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
+        
+            if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
+            if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
+            if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
+            if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
+            if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
+            
             if debug:
                 print(
                     "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
@@ -573,13 +688,20 @@ for i, e in enumerate(ev):
 
     if debug:
         print("total number of hits: {}".format(n_hit[0]))
-        print("total number of hits with no gen links: {}".format(number_of_hist_with_no_genlinks))
+        print(
+            "total number of hits with no gen links: {}".format(
+                number_of_hist_with_no_genlinks
+            )
+        )
         print(": {}".format(number_of_hist_with_no_genlinks))
 
     if n_hit[0] <= number_of_hist_with_no_genlinks:
-        print("  --> WARNING: all hists in this event have no gen link associated or simply no hits, skipping event")
+        print(
+            "  --> WARNING: all hists in this event have no gen link associated or simply no hits, skipping event"
+        )
 
     else:
+        event_number[0] +=1
         t.Fill()
 
 t.SetDirectory(out_root)
