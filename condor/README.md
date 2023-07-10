@@ -2,7 +2,7 @@
 
 ### example run 
 
-The config file has to be placed in the ```../gun````directory. 
+The config file has to be placed in the ```../gun```directory. 
  
 e.g. 
 
