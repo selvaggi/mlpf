@@ -33,7 +33,9 @@ def create_inputs_from_table(output):
         torch.tensor(output["pf_features"][0:4, 0:number_hits]), (1, 0)
     )
     p_hits = pf_features_hits[:, 2].unsqueeze(1)
+    p_hits[p_hits == -1] = 0  # correct p  of Hcal hits to be 0
     e_hits = pf_features_hits[:, 3].unsqueeze(1)
+    e_hits[e_hits == -1] = 0  # correct the energy of the tracks to be 0
     theta = pf_features_hits[:, 0]
     phi = pf_features_hits[:, 1]
     r = p_hits.view(-1)
@@ -87,11 +89,11 @@ def create_graph(output):
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
     # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
-    i, j = torch.tril_indices(number_hits, number_hits)
-    g = dgl.graph((i, j))
-    g = dgl.to_simple(g)
-    g = dgl.to_bidirected(g)
-    # g = dgl.knn_graph(coord_cart_hits_norm, 7, exclude_self=True)
+    # i, j = torch.tril_indices(number_hits, number_hits)
+    # g = dgl.graph((i, j))
+    # g = dgl.to_simple(g)
+    # g = dgl.to_bidirected(g)
+    g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
     hit_features_graph = torch.cat(
         (coord_cart_hits_norm, hit_type_one_hot, e_hits), dim=1
     )
