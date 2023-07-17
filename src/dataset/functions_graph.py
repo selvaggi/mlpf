@@ -97,7 +97,7 @@ def create_graph(output):
     hit_features_graph = torch.cat(
         (coord_cart_hits_norm, hit_type_one_hot, e_hits), dim=1
     )
-
+    #! currently we are not doing the pid or mass regression
     g.ndata["h"] = hit_features_graph
     g.ndata["pos_hits"] = coord_cart_hits
     g.ndata["pos_hits_norm"] = coord_cart_hits_norm
