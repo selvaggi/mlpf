@@ -7,7 +7,7 @@ def create_inputs_from_table(output):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     hit_particle_link = torch.permute(
-        torch.tensor(output["pf_vectoronly"][:, 0:number_hits, 0] + 1), (1, 0)
+        torch.tensor(output["pf_vectoronly"][:, 0:number_hits] + 1), (1, 0)
     )
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
@@ -19,7 +19,7 @@ def create_inputs_from_table(output):
     tracks = hit_type_feature == 0
     no_tracks = ~tracks
     no_tracks[0] = True
-    hit_type_one_hot = torch.nn.functional.one_hot(hit_type_feature, num_classes=3)
+    hit_type_one_hot = torch.nn.functional.one_hot(hit_type_feature, num_classes=4)
     # build the features (theta,phi,p)
     pf_features_hits = torch.permute(
         torch.tensor(output["pf_features"][0:4, 0:number_hits]), (1, 0)
@@ -125,7 +125,7 @@ def graph_batch_func(list_graphs):
     list_graphs_g = [el[0] for el in list_graphs]
 
     list_y = [el[1] for el in list_graphs]
-    ys = torch.stack(list_y, dim=0)
+    ys = torch.cat(list_y, dim=0)
     ys = torch.reshape(ys, [-1, 4])
     bg = dgl.batch(list_graphs_g)
 

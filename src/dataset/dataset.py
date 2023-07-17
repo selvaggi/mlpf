@@ -32,12 +32,12 @@ def _finalize_inputs(table, data_config):
         # if params['center'] is not None:
         #    table[k] = (table[k] - params['center']) * params['scale']
         if params["length"] is not None:
-            if k == "hit_genlink":
-                pad_fn = partial(_pad_vector, value=-1)
-                table[k] = pad_fn(table[k])
-            else:
-                pad_fn = partial(_pad, value=0)
-                table[k] = pad_fn(table[k], params["length"])
+            #if k == "hit_genlink":
+            #    pad_fn = partial(_pad_vector, value=-1)
+            #    table[k] = pad_fn(table[k])
+            #else:
+            pad_fn = partial(_pad, value=0)
+            table[k] = pad_fn(table[k], params["length"])
 
     # stack variables for each input group
     for k, names in data_config.input_dicts.items():

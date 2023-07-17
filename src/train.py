@@ -11,8 +11,10 @@ import numpy as np
 import math
 import torch
 import sys
+import os
 
-sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
+sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
+
 from src.logger.logger import _logger, _configLogger
 from src.dataset.dataset import SimpleIterDataset
 from src.utils.import_tools import import_module

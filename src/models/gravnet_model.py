@@ -131,7 +131,7 @@ class GravNetBlock(nn.Module):
 class GravnetModel(nn.Module):
     def __init__(self, dev):
         super(GravnetModel, self).__init__()
-        input_dim: int = 7
+        input_dim: int = 8
         output_dim: int = 8
         n_gravnet_blocks: int = 4
         n_postgn_dense_blocks: int = 4
