@@ -25,12 +25,12 @@ def train_regression(
     local_rank=0,
 ):
     model.train()
-    print("starting to train")
+    # print("starting to train")
     iterator = iter(train_loader)
     g, y = next(iterator)
     iterator = iter(train_loader)
-    print("LEN DATALOADER", g)
-    print(y)
+    # print("LEN DATALOADER", g)
+    # print(y)
     data_config = train_loader.dataset.config
 
     total_loss = 0
@@ -41,8 +41,8 @@ def train_regression(
     start_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
-            print(batch_g)
-            print(y)
+            # print(batch_g)
+            # print(y)
             label = y
             num_examples = label.shape[0]
             label = label.to(dev)

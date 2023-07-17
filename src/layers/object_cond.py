@@ -100,7 +100,7 @@ def calc_LV_Lbeta(
         object_index_per_event, batch[is_sig]
     )
     n_hits_per_object = scatter_count(object_index)
-    print("n_hits_per_object", n_hits_per_object)
+    # print("n_hits_per_object", n_hits_per_object)
     batch_object = batch_cluster[is_object]
     n_objects = is_object.sum()
 
@@ -141,8 +141,10 @@ def calc_LV_Lbeta(
         positions_particles_pred + distance_threshold[is_sig][index_alpha]
     )
 
-    e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
-    e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
+    # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
+    # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
+    #particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
+    e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
     x_particles = y[:, 0:3]
     e_particles = y[:, 3].unsqueeze(1)
     loss_E = torch.mean(
