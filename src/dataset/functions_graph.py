@@ -43,7 +43,7 @@ def create_inputs_from_table(output):
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     features_particles = torch.permute(
-        torch.tensor(output["pf_features"][4:7, unique_list_particles]), (1, 0)
+        torch.tensor(output["pf_features"][4:7, list(unique_list_particles)]), (1, 0)
     )
     particle_coord = spherical_to_cartesian(
         features_particles[:, 0],
