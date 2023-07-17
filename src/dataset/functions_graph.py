@@ -103,12 +103,6 @@ def create_graph(output):
     g.ndata["p_hits"] = p_hits
     g.ndata["e_hits"] = e_hits
     g.ndata["particle_number"] = hit_particle_link
-    # g.edata["h"] = x_interactions_m
-    if len(y_data_graph) == 1:
-        y_data_graph = torch.cat(
-            [y_data_graph, y_data_graph * 0 - 10], dim=0
-        )  # this is so that the collator function for dataloader works
-        # TODO think of a better way when we have more particles (currently only 1 or 2)
     return g, y_data_graph
 
 
