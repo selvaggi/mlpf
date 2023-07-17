@@ -10,8 +10,12 @@ def create_inputs_from_table(output):
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     unique_list_particles = list(np.unique(hit_particle_link))
-    cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-    cluster_id = torch.Tensor(list(cluster_id)) + 1
+    if np.sum(np.array(unique_list_particles) == -1) > 0:
+        cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
+        cluster_id = torch.Tensor(list(cluster_id))
+    else:
+        cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
+        cluster_id = torch.Tensor(list(cluster_id)) + 1
 
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
@@ -37,8 +41,9 @@ def create_inputs_from_table(output):
     coord_cart_hits_norm = spherical_to_cartesian(theta, phi, r, normalized=True)
 
     # features particles
+    unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     features_particles = torch.permute(
-        torch.tensor(output["pf_features"][4:7, 0:number_part]), (1, 0)
+        torch.tensor(output["pf_features"][4:7, unique_list_particles]), (1, 0)
     )
     particle_coord = spherical_to_cartesian(
         features_particles[:, 0],
@@ -99,11 +104,11 @@ def create_graph(output):
     g.ndata["e_hits"] = e_hits
     g.ndata["particle_number"] = hit_particle_link
     # g.edata["h"] = x_interactions_m
-    if len(y_data_graph) == 1:
-        y_data_graph = torch.cat(
-            [y_data_graph, y_data_graph * 0 - 10], dim=0
-        )  # this is so that the collator function for dataloader works
-        # TODO think of a better way when we have more particles (currently only 1 or 2)
+    # if len(y_data_graph) == 1:
+    #     y_data_graph = torch.cat(
+    #         [y_data_graph, y_data_graph * 0 - 10], dim=0
+    #     )  # this is so that the collator function for dataloader works
+    #     # TODO think of a better way when we have more particles (currently only 1 or 2)
     return g, y_data_graph
 
 
