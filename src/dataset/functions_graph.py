@@ -6,23 +6,22 @@ import dgl
 def create_inputs_from_table(output):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
-
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     unique_list_particles = list(np.unique(hit_particle_link))
     if np.sum(np.array(unique_list_particles) == -1) > 0:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-        cluster_id = torch.Tensor(list(cluster_id))
+        cluster_id = torch.Tensor(list(cluster_id)) + 1
     else:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-        cluster_id = torch.Tensor(list(cluster_id)) + 1
+        cluster_id = torch.Tensor(list(cluster_id)) #+ 1
 
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
     )
-    pos_hits = torch.permute(
-        torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
-    )
+    # pos_hits = torch.permute(
+    #     torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
+    # )
     hit_type_feature = features_hits[:, 0].to(torch.int64)
     tracks = hit_type_feature == 0
     no_tracks = ~tracks
