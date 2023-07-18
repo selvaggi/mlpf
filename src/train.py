@@ -46,13 +46,14 @@ def find_free_port():
 
 
 def _main(args):
-
     if args.condensation:
         from src.utils.nn.tools_condensation import train_regression as train
         from src.utils.nn.tools_condensation import evaluate_regression as evaluate
+        from src.utils.nn.tools_condensation import plot_regression_resolution
     else:
         from src.utils.nn.tools import train_regression as train
         from src.utils.nn.tools import evaluate_regression as evaluate
+        from src.utils.nn.tools_condensation import plot_regression_resolution
 
     # training/testing mode
     training_mode = not args.predict
@@ -210,6 +211,7 @@ def _main(args):
             )
 
     if args.data_test:
+        tb = None
         if args.backend is not None and local_rank != 0:
             return
         if training_mode:
@@ -246,14 +248,24 @@ def _main(args):
                     args.model_prefix, test_loader
                 )
             else:
-                test_metric, scores, labels, observers = evaluate(
-                    model,
-                    test_loader,
-                    dev,
-                    epoch=None,
-                    for_training=False,
-                    tb_helper=tb,
-                )
+                if len(args.data_plot):
+                    import matplotlib.pyplot as plt
+                    print("Plotting")
+                    figs = plot_regression_resolution(model, test_loader, dev)
+                    for name, fig in figs.items():
+                        fname = os.path.join(args.data_plot, name + ".pdf")
+                        fig.savefig(fname)
+                        print("Wrote to", fname)
+                        plt.close(fig)
+                else:
+                    test_metric, scores, labels, observers = evaluate(
+                        model,
+                        test_loader,
+                        dev,
+                        epoch=None,
+                        for_training=False,
+                        tb_helper=tb,
+                    )
             _logger.info("Test metric %.5f" % test_metric, color="bold")
             del test_loader
 
@@ -310,15 +322,15 @@ def main():
         import time
 
         model_name = (
-            time.strftime("%Y%m%d-%H%M%S")
-            + "_"
-            + os.path.basename(args.network_config).replace(".py", "")
+                time.strftime("%Y%m%d-%H%M%S")
+                + "_"
+                + os.path.basename(args.network_config).replace(".py", "")
         )
         if len(args.network_option):
             model_name = (
-                model_name
-                + "_"
-                + hashlib.md5(str(args.network_option).encode("utf-8")).hexdigest()
+                    model_name
+                    + "_"
+                    + hashlib.md5(str(args.network_option).encode("utf-8")).hexdigest()
             )
         model_name += "_{optim}_lr{lr}_batch{batch}".format(
             lr=args.start_lr, optim=args.optimizer, batch=args.batch_size

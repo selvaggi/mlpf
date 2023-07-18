@@ -37,6 +37,7 @@ def calc_LV_Lbeta(
     huberize_norm_for_V_attractive=False,
     beta_term_option="paper",
     return_components=False,
+    return_regression_resolution=False,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -60,7 +61,7 @@ def calc_LV_Lbeta(
     - The norms for V_repulsive are now Gaussian (instead of linear hinge)
     """
     # remove dummy rows added for dataloader #TODO think of better way to do this
-    # y = y[y > -10]
+
     device = beta.device
 
     assert_no_nans(beta)
@@ -147,6 +148,12 @@ def calc_LV_Lbeta(
     e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
     x_particles = y[:, 0:3]
     e_particles = y[:, 3].unsqueeze(1)
+    if return_regression_resolution:
+        e_particles_pred = e_particles_pred.detach().flatten()
+        e_particles = e_particles.detach().flatten()
+        positions_particles_pred = positions_particles_pred.detach().flatten()
+        x_particles = x_particles.detach().flatten()
+        return {"e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}
     loss_E = torch.mean(
         torch.square(
             (e_particles_pred.to(device) - e_particles.to(device))

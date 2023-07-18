@@ -202,7 +202,15 @@ class GravnetModel(nn.Module):
         assert x.device == device
         return x
 
-    def object_condensation_loss2(self, batch, pred, y):
+    def object_condensation_loss2(self, batch, pred, y, return_resolution=False):
+        '''
+
+        :param batch:
+        :param pred:
+        :param y:
+        :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
+        :return:
+        '''
         _, S = pred.shape
         xj = torch.nn.functional.normalize(pred[:, 0:3], dim=1)
         bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))
@@ -229,7 +237,10 @@ class GravnetModel(nn.Module):
             ).long(),  # Truth hit->cluster index
             batch=batch_numbers.long(),
             qmin=0.1,
+            return_regression_resolution=return_resolution
         )
+        if return_resolution:
+            return a
         loss = (
             a[0] + a[1] + 20 * a[2] + 0.001 * a[3]
         )  ##(L_V/batch_size, L_beta/batch_size, loss_E, loss_x)

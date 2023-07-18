@@ -8,7 +8,7 @@ from src.utils.metrics import evaluate_metrics
 from src.data.tools import _concat
 from src.logger.logger import _logger
 import wandb
-
+import matplotlib.pyplot as plt
 
 def train_regression(
     model,
@@ -161,8 +161,24 @@ def evaluate_regression(
     tb_helper=None,
     logwandb=False,
     energy_weighted=False,
-    local_rank=0,
+    local_rank=0
 ):
+    '''
+
+    :param model:
+    :param test_loader:
+    :param dev:
+    :param epoch:
+    :param for_training:
+    :param loss_func:
+    :param steps_per_epoch:
+    :param eval_metrics:
+    :param tb_helper:
+    :param logwandb:
+    :param energy_weighted:
+    :param local_rank:
+    :return:
+    '''
     model.eval()
 
     data_config = test_loader.dataset.config
@@ -174,6 +190,7 @@ def evaluate_regression(
     sum_abs_err = 0
     count = 0
     scores = []
+    results = [] # resolution results
     labels = defaultdict(list)
     observers = defaultdict(list)
     start_time = time.time()
@@ -271,3 +288,42 @@ def _check_scales_centers(iterator):
         centers[ii] = iterator._data_config.preprocess_params[item]["center"]
         scales[ii] = iterator._data_config.preprocess_params[item]["scale"]
     return centers, scales
+
+def upd_dict(d, small_dict):
+    for k in small_dict:
+        if k not in d:
+            d[k] = []
+        d[k] += small_dict[k]
+    return d
+
+def plot_regression_resolution(
+    model,
+    test_loader,
+    dev,
+    **kwargs
+):
+    model.eval()
+    results = []  # resolution results
+    count = 0
+    with torch.no_grad():
+        with tqdm.tqdm(test_loader) as tq:
+            for batch_g, y in tq:
+                count += 1
+                if count > 5: break  # TEMPORARY
+                batch_g = batch_g.to(dev)
+                model_output = model(batch_g)
+                results.append(model.mod.object_condensation_loss2(
+                    batch_g, model_output, y, return_resolution=True
+                ))
+    result_dict = {}
+    for key in results[0]:
+        result_dict[key] = np.concatenate([r[key] for r in results])
+    # just plot all for now
+    data = result_dict["e_res"]
+    fig, ax = plt.subplots()
+    ax.hist(data, bins=100, range=(0, 1), histtype="step", label="e_res")
+    ax.set_xlabel("E resolution")
+    ax.set_ylabel("Events")
+    ax.legend()
+    return {"e_res": fig}
+

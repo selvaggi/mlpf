@@ -246,6 +246,7 @@ def test_load(args):
             batch_size=args.batch_size,
             drop_last=False,
             pin_memory=True,
+            collate_fn=graph_batch_func,
         )
         return test_loader
 
