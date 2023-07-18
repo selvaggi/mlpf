@@ -20,6 +20,49 @@ def debug(*args, **kwargs):
         print(*args, **kwargs)
 
 
+def calc_energy_pred(
+    batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction
+):
+    td = 0.1
+    batch_number = torch.max(batch) + 1
+    energies = []
+    for i in range(0, batch_number):
+        mask_batch = batch == i
+        X = g.ndata["pos_hits_norm"][mask_batch]
+        cluster_index_i = cluster_index_per_event[mask_batch] - 1
+        is_sig_i = is_sig[mask_batch]
+
+        q_i = q[mask_batch]
+        betas = beta[mask_batch]
+        q_alpha_i, index_alpha_i = scatter_max(q_i[is_sig_i], cluster_index_i)
+        n_points = betas.size(0)
+        unassigned = torch.arange(n_points)
+        clustering = -1 * torch.ones(n_points, dtype=torch.long)
+        counter = 0
+        for index_condpoint in index_alpha_i:
+            d = torch.norm(X[unassigned] - X[index_condpoint], dim=-1)
+            assigned_to_this_condpoint = unassigned[d < td]
+            clustering[assigned_to_this_condpoint] = counter
+            unassigned = unassigned[~(d < td)]
+            counter = counter + 1
+        counter = 0
+        for index_condpoint in index_alpha_i:
+            clustering[index_condpoint] = counter
+            counter = counter + 1
+        if torch.sum(clustering == -1) > 0:
+            clustering_ = clustering + 1
+        else:
+            clustering_ = clustering
+        clus_values = np.unique(clustering)
+        e_c = g.ndata["e_hits"][mask_batch][is_sig_i].view(-1) * energy_correction[
+            mask_batch
+        ][is_sig_i].view(-1)
+        e_objects = scatter_add(e_c, clustering_.long())
+        e_objects = e_objects[clus_values != -1]
+        energies.append(e_objects)
+    return torch.cat(energies, dim=0)
+
+
 def calc_LV_Lbeta(
     g,
     y,
@@ -144,8 +187,11 @@ def calc_LV_Lbeta(
 
     # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
     # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
-    #particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
-    e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+    # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
+    # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+    e_particles_pred = calc_energy_pred(
+        batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction
+    )
     x_particles = y[:, 0:3]
     e_particles = y[:, 3].unsqueeze(1)
     if return_regression_resolution:
