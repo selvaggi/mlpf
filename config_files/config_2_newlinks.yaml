@@ -61,8 +61,8 @@ inputs:
          - [part_theta , null]
          - [part_phi , null]
          - [part_p , null]
-
-
+         - [part_m, null]
+         - [part_pid, null]
 
    pf_vectors:
       length: 2000

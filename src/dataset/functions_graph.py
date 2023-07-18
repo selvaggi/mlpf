@@ -11,10 +11,10 @@ def create_inputs_from_table(output):
     unique_list_particles = list(np.unique(hit_particle_link))
     if np.sum(np.array(unique_list_particles) == -1) > 0:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-        cluster_id = torch.Tensor(list(cluster_id)) + 1
+        cluster_id = torch.Tensor(list(cluster_id))
     else:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-        cluster_id = torch.Tensor(list(cluster_id)) #+ 1
+        cluster_id = torch.Tensor(list(cluster_id)) + 1
 
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
@@ -44,21 +44,24 @@ def create_inputs_from_table(output):
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     features_particles = torch.permute(
-        torch.tensor(output["pf_features"][4:7, list(unique_list_particles)]), (1, 0)
+        torch.tensor(output["pf_features"][4:9, list(unique_list_particles)]), (1, 0)
     )
     particle_coord = spherical_to_cartesian(
         features_particles[:, 0],
         features_particles[:, 1],
         features_particles[:, 2],
-        normalized=True,
+        normalized=False,
     )
     y_data_graph = torch.cat(
         (
             particle_coord,
-            features_particles[:, 2].view(-1).unsqueeze(1),
+            features_particles[:, 3].view(-1).unsqueeze(1),  # mass
+            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
         ),
         dim=1,
     )
+
+    assert len(y_data_graph) == len(unique_list_particles)
 
     return (
         number_hits,
@@ -130,10 +133,10 @@ def graph_batch_func(list_graphs):
 
     list_y = [el[1] for el in list_graphs]
     ys = torch.cat(list_y, dim=0)
-    ys = torch.reshape(ys, [-1, 4])
+    ys = torch.reshape(ys, [-1, 5])
     bg = dgl.batch(list_graphs_g)
-
-    return bg, ys
+    # reindex particle number
+    return bg, ys  # TODO: REINDEX particle_number! - this won't work out of the box!!!!
 
 
 def spherical_to_cartesian(theta, phi, r, normalized=False):
