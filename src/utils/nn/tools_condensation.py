@@ -304,12 +304,9 @@ def plot_regression_resolution(
 ):
     model.eval()
     results = []  # resolution results
-    count = 0
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
-                count += 1
-                if count > 5: break  # TEMPORARY
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 results.append(model.mod.object_condensation_loss2(
@@ -321,7 +318,7 @@ def plot_regression_resolution(
     # just plot all for now
     data = result_dict["e_res"]
     fig, ax = plt.subplots()
-    ax.hist(data, bins=100, range=(0, 1), histtype="step", label="e_res")
+    ax.hist(data, bins=100, range=(-1.5, 1.5), histtype="step", label="e_res")
     ax.set_xlabel("E resolution")
     ax.set_ylabel("Events")
     ax.legend()
