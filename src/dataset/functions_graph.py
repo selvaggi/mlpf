@@ -10,8 +10,13 @@ def create_inputs_from_table(output):
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     unique_list_particles = list(np.unique(hit_particle_link))
     if np.sum(np.array(unique_list_particles) == -1) > 0:
-        cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
-        cluster_id = torch.Tensor(list(cluster_id))
+        non_noise_idx = torch.where(unique_list_particles != -1)[0]
+        noise_idx = torch.where(unique_list_particles == -1)[0]
+        non_noise_particles = unique_list_particles[non_noise_idx]
+        cluster_id = map(lambda x: non_noise_particles.index(x), hit_particle_link)
+        cluster_id = torch.Tensor(list(cluster_id)) + 1
+        unique_list_particles[non_noise_idx] = cluster_id
+        unique_list_particles[noise_idx] = 0
     else:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
         cluster_id = torch.Tensor(list(cluster_id)) + 1
