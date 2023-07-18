@@ -50,12 +50,15 @@ def create_inputs_from_table(output):
         features_particles[:, 0],
         features_particles[:, 1],
         features_particles[:, 2],
-        normalized=False,
+        normalized=True,
     )
+    y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
+    y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
+    y_energy = torch.sqrt(y_mass ** 2 + y_mom ** 2)
     y_data_graph = torch.cat(
         (
             particle_coord,
-            features_particles[:, 3].view(-1).unsqueeze(1),  # mass
+            y_energy,
             features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
         ),
         dim=1,
