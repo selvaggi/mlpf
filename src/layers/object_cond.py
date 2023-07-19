@@ -67,9 +67,12 @@ def calc_energy_pred(
         e_c = g.ndata["e_hits"][mask_batch][is_sig_i].view(-1) * energy_correction[
             mask_batch
         ][is_sig_i].view(-1)
-        pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
+        #pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
+        pid_results_i = scatter_add(pid_results[mask_batch][is_sig_i], clustering_.long().to(pid_results.device), dim=0)
+        #  aggregated "PID embeddings"
         e_objects = scatter_add(e_c, clustering_.long().to(e_c.device))
         e_objects = e_objects[clus_values != -1]
+        pid_results_i = pid_results_i[clus_values != -1]
         energies.append(e_objects)
         pid_outputs.append(pid_results_i)
     return torch.cat(energies, dim=0), torch.cat(pid_outputs, dim=0)
@@ -96,7 +99,8 @@ def calc_LV_Lbeta(
     cluster_space_coords: torch.Tensor,  # Predicted by model
     cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
     batch: torch.Tensor,
-    predicted_pid: torch.Tensor,  # one-hot encoded predicted PIDs
+    predicted_pid: torch.Tensor,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
+    post_pid_pool_module: torch.nn.Module,  # MLP to apply to the pooled embeddings to get the PID predictions
     # From here on just parameters
     qmin: float = 0.1,
     s_B: float = 1.0,
@@ -217,6 +221,7 @@ def calc_LV_Lbeta(
     e_particles_pred, pid_particles_pred = calc_energy_pred(
         batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, predicted_pid
     )
+    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # project the pooled PID embeddings to the final "one hot encoding" space
     #pid_particles_pred = calc_pred_pid(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
     #)
