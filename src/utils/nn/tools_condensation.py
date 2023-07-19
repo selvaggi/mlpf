@@ -10,19 +10,20 @@ from src.logger.logger import _logger
 import wandb
 import matplotlib.pyplot as plt
 
+
 def train_regression(
-    model,
-    loss_func,
-    opt,
-    scheduler,
-    train_loader,
-    dev,
-    epoch,
-    steps_per_epoch=None,
-    grad_scaler=None,
-    tb_helper=None,
-    logwandb=False,
-    local_rank=0,
+        model,
+        loss_func,
+        opt,
+        scheduler,
+        train_loader,
+        dev,
+        epoch,
+        steps_per_epoch=None,
+        grad_scaler=None,
+        tb_helper=None,
+        logwandb=False,
+        local_rank=0,
 ):
     model.train()
     # print("starting to train")
@@ -38,12 +39,14 @@ def train_regression(
     sum_abs_err = 0
     sum_sqr_err = 0
     count = 0
+    step_count = 0
     start_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             # print(batch_g)
             # print(y)
             label = y
+            step_count += 1
             num_examples = label.shape[0]
             label = label.to(dev)
             opt.zero_grad()
@@ -98,13 +101,12 @@ def train_regression(
                         )
 
             if logwandb and (num_batches % 50):
-                import wandb
-
-                wandb.log({"loss regression": loss})
-                wandb.log({"loss lv": losses[0]})
-                wandb.log({"loss beta": losses[1]})
-                wandb.log({"loss E": losses[2]})
-                wandb.log({"loss X": losses[3]})
+                wandb.log({"loss regression": loss,
+                           "loss lv": losses[0],
+                           "loss beta": losses[1],
+                           "loss E": losses[2],
+                           "loss X": losses[3],
+                           "loss PID": losses[4]}, step=step_count)
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -145,23 +147,23 @@ def train_regression(
 
 
 def evaluate_regression(
-    model,
-    test_loader,
-    dev,
-    epoch,
-    for_training=True,
-    loss_func=None,
-    steps_per_epoch=None,
-    eval_metrics=[
-        "mean_squared_error",
-        "mean_absolute_error",
-        "median_absolute_error",
-        "mean_gamma_deviance",
-    ],
-    tb_helper=None,
-    logwandb=False,
-    energy_weighted=False,
-    local_rank=0
+        model,
+        test_loader,
+        dev,
+        epoch,
+        for_training=True,
+        loss_func=None,
+        steps_per_epoch=None,
+        eval_metrics=[
+            "mean_squared_error",
+            "mean_absolute_error",
+            "median_absolute_error",
+            "mean_gamma_deviance",
+        ],
+        tb_helper=None,
+        logwandb=False,
+        energy_weighted=False,
+        local_rank=0
 ):
     '''
 
@@ -190,7 +192,7 @@ def evaluate_regression(
     sum_abs_err = 0
     count = 0
     scores = []
-    results = [] # resolution results
+    results = []  # resolution results
     labels = defaultdict(list)
     observers = defaultdict(list)
     start_time = time.time()
@@ -232,11 +234,13 @@ def evaluate_regression(
                             )
 
                 if logwandb and (num_batches % 50):
-                    wandb.log({"loss val regression": loss})
-                    wandb.log({"loss val lv": losses[0]})
-                    wandb.log({"loss val beta": losses[1]})
-                    wandb.log({"loss val E": losses[2]})
-                    wandb.log({"loss val X": losses[3]})
+                    wandb.log({
+                        "loss val regression": loss,
+                        "loss val lv": losses[0],
+                        "loss val beta": losses[1],
+                        "loss val E": losses[2],
+                        "loss val X": losses[3]
+                    })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
@@ -289,6 +293,7 @@ def _check_scales_centers(iterator):
         scales[ii] = iterator._data_config.preprocess_params[item]["scale"]
     return centers, scales
 
+
 def upd_dict(d, small_dict):
     for k in small_dict:
         if k not in d:
@@ -296,11 +301,12 @@ def upd_dict(d, small_dict):
         d[k] += small_dict[k]
     return d
 
+
 def plot_regression_resolution(
-    model,
-    test_loader,
-    dev,
-    **kwargs
+        model,
+        test_loader,
+        dev,
+        **kwargs
 ):
     model.eval()
     results = []  # resolution results
@@ -323,4 +329,3 @@ def plot_regression_resolution(
     ax.set_ylabel("Events")
     ax.legend()
     return {"e_res": fig}
-
