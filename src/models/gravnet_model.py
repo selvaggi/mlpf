@@ -179,6 +179,15 @@ class GravnetModel(nn.Module):
             nn.Linear(64, self.output_dim),
         )
 
+        self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
+            nn.Linear(22, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 22),
+            nn.Softmax(dim=-1),
+        )
+
     def forward(self, g):
         x = g.ndata["h"]
         device = x.device
@@ -216,7 +225,7 @@ class GravnetModel(nn.Module):
         bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
         distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])  # 4, 5, 6: distance thresholds
         energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))  # 7: energy correction factor
-        pid_predicted = torch.nn.functional.softmax(pred[:, 8:S], dim=1)  # 8:S: predicted particle one-hot encoding
+        pid_predicted = pred[:, 8:S]  # 8:S: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -238,7 +247,8 @@ class GravnetModel(nn.Module):
             ).long(),  # Truth hit->cluster index
             batch=batch_numbers.long(),
             qmin=0.1,
-            return_regression_resolution=return_resolution
+            return_regression_resolution=return_resolution,
+            post_pid_pool_module=self.post_pid_pool_module
         )
         if return_resolution:
             return a

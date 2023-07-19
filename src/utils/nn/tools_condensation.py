@@ -106,7 +106,7 @@ def train_regression(
                            "loss beta": losses[1],
                            "loss E": losses[2],
                            "loss X": losses[3],
-                           "loss PID": losses[4]}, step=step_count)
+                           "loss PID": losses[4]}, step=num_batches)
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -310,9 +310,13 @@ def plot_regression_resolution(
 ):
     model.eval()
     results = []  # resolution results
+    c = 0
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
+                c += 1
+                if c > 5:
+                    break  # TEMPORARY
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 results.append(model.mod.object_condensation_loss2(
