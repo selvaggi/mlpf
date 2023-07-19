@@ -322,10 +322,14 @@ def plot_regression_resolution(
     for key in results[0]:
         result_dict[key] = np.concatenate([r[key] for r in results])
     # just plot all for now
-    data = result_dict["e_res"]
-    fig, ax = plt.subplots()
-    ax.hist(data, bins=100, range=(-1.5, 1.5), histtype="step", label="e_res")
-    ax.set_xlabel("E resolution")
-    ax.set_ylabel("Events")
-    ax.legend()
-    return {"e_res": fig}
+    result = {}
+    for key in results[0]:
+        data = result_dict[key]
+        fig, ax = plt.subplots()
+        ax.hist(data, bins=100, range=(-1.5, 1.5), histtype="step", label=key)
+        ax.set_xlabel("resolution")
+        ax.set_ylabel("count")
+        ax.legend()
+        result[key] = fig
+    return result
+
