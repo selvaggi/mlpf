@@ -259,7 +259,10 @@ def _main(args):
                         fig.savefig(fname)
                         print("Wrote to", fname)
                         plt.close(fig)
-
+                    # write all cmdline arguments to a txt file
+                    with open(os.path.join(args.data_plot, "args.txt"), "w") as f:
+                        f.write(" ".join(sys.argv))
+                        f.write("\n")
                 else:
                     test_metric, scores, labels, observers = evaluate(
                         model,

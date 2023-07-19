@@ -237,7 +237,7 @@ def calc_LV_Lbeta(
         e_particles = e_particles.detach().flatten()
         positions_particles_pred = positions_particles_pred.detach().flatten()
         x_particles = x_particles.detach().flatten()
-        return {"e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}
+        return {"e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
     loss_E = torch.mean(
         torch.square(
             (e_particles_pred.to(device) - e_particles.to(device))

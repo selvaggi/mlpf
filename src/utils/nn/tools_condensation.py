@@ -9,6 +9,11 @@ from src.data.tools import _concat
 from src.logger.logger import _logger
 import wandb
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+
+
+from src.layers.object_cond import onehot_particles_arr
 
 
 def train_regression(
@@ -310,6 +315,7 @@ def plot_regression_resolution(
 ):
     model.eval()
     results = []  # resolution results
+    pid_classification_results = []
     c = 0
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
@@ -319,12 +325,15 @@ def plot_regression_resolution(
                     break  # TEMPORARY
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
-                results.append(model.mod.object_condensation_loss2(
+                resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
                     batch_g, model_output, y, return_resolution=True
-                ))
+                )
+                results.append(resolutions)
+                pid_classification_results.append((pid_true, pid_pred))
     result_dict = {}
     for key in results[0]:
         result_dict[key] = np.concatenate([r[key] for r in results])
+    result_dict["event_by_event_accuracy"] = [accuracy_score(pid_true.argmax(dim=0), pid_pred.argmax(dim=0)) for pid_true, pid_pred in pid_classification_results]
     # just plot all for now
     result = {}
     for key in results[0]:
@@ -335,5 +344,15 @@ def plot_regression_resolution(
         ax.set_ylabel("count")
         ax.legend()
         result[key] = fig
+    conf_mat = confusion_matrix(pid_true.argmax(dim=0), pid_pred.argmax(dim=0))
+    # confusion matrix
+    fig, ax = plt.subplots(figsize=(7.5, 7.5))
+    # add onehot_particle_arr as class names
+    class_names = onehot_particles_arr
+    im = ax.matshow(conf_mat, cmap=plt.cm.Blues)
+    ax.set_xticks(np.arange(len(class_names)), class_names, rotation=45)
+    ax.set_yticks(np.arange(len(class_names)), class_names)
+    result["PID_confusion_matrix"] = fig
+
     return result
 
