@@ -7,6 +7,7 @@ onehot_particles_arr = [-2212.0, -211.0, -14.0, -13.0, -11.0, 11.0, 12.0, 13.0, 
 onehot_particles_arr = [int(x) for x in onehot_particles_arr]
 
 def safe_index(arr, index):
+    # One-hot index (or zero if it's not in the array)
     if index not in arr:
         return 0
     else:
@@ -220,10 +221,10 @@ def calc_LV_Lbeta(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
     #)
     x_particles = y[:, 0:3]
-    e_particles = y[:, 3].unsqueeze(1)
+    e_particles = y[:, 3]
     pid_id_particles = y[:, 4].unsqueeze(1).long()
     pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
-    part_idx_onehot = [safe_index(onehot_particles_arr, i) for i in pid_id_particles.tolist()]
+    part_idx_onehot = [safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()]
     pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.
 
     if return_regression_resolution:

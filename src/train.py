@@ -249,6 +249,8 @@ def _main(args):
                 )
             else:
                 if len(args.data_plot):
+                    from pathlib import Path
+                    Path(args.data_plot).mkdir(parents=True, exist_ok=True)
                     import matplotlib.pyplot as plt
                     print("Plotting")
                     figs = plot_regression_resolution(model, test_loader, dev)
@@ -257,6 +259,7 @@ def _main(args):
                         fig.savefig(fname)
                         print("Wrote to", fname)
                         plt.close(fig)
+
                 else:
                     test_metric, scores, labels, observers = evaluate(
                         model,
@@ -266,8 +269,8 @@ def _main(args):
                         for_training=False,
                         tb_helper=tb,
                     )
-            _logger.info("Test metric %.5f" % test_metric, color="bold")
-            del test_loader
+                    _logger.info("Test metric %.5f" % test_metric, color="bold")
+                    del test_loader
 
             if args.predict_output:
                 if "/" not in args.predict_output:
