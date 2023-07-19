@@ -129,10 +129,10 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev):
+    def __init__(self, dev, input_dim: int = 8, output_dim: int = 30):
         super(GravnetModel, self).__init__()
-        input_dim: int = 8
-        output_dim: int = 8
+        #input_dim: int = 8
+        #output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
         n_gravnet_blocks: int = 4
         n_postgn_dense_blocks: int = 4
         k = 40
@@ -212,12 +212,12 @@ class GravnetModel(nn.Module):
         :return:
         '''
         _, S = pred.shape
-        xj = torch.nn.functional.normalize(pred[:, 0:3], dim=1)
-        bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))
-        distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])
-        energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))
+        xj = torch.nn.functional.normalize(pred[:, 0:3], dim=1)  # 0, 1, 2: cluster space coords
+        bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
+        distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])  # 4, 5, 6: distance thresholds
+        energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))  # 7: energy correction factor
+        pid_predicted = torch.nn.functional.softmax(pred[:, 8:S], dim=1)  # 8:S: predicted particle one-hot encoding
         dev = batch.device
-
         clustering_index_l = batch.ndata["particle_number"]
 
         len_batch = len(batch.batch_num_nodes())
@@ -230,6 +230,7 @@ class GravnetModel(nn.Module):
             y,
             distance_threshold,
             energy_correction,
+            predicted_pid=pid_predicted,
             beta=bj.view(-1),
             cluster_space_coords=xj,  # Predicted by model
             cluster_index_per_event=clustering_index_l.view(
@@ -242,7 +243,7 @@ class GravnetModel(nn.Module):
         if return_resolution:
             return a
         loss = (
-            a[0] + a[1] + 20 * a[2] + 0.001 * a[3]
+            a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] # TODO: the last term is the PID classification loss, explore this yet
         )  ##(L_V/batch_size, L_beta/batch_size, loss_E, loss_x)
         return loss, a
 
