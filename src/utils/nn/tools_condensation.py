@@ -8,21 +8,27 @@ from src.utils.metrics import evaluate_metrics
 from src.data.tools import _concat
 from src.logger.logger import _logger
 import wandb
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+
+
+from src.layers.object_cond import onehot_particles_arr
 
 
 def train_regression(
-    model,
-    loss_func,
-    opt,
-    scheduler,
-    train_loader,
-    dev,
-    epoch,
-    steps_per_epoch=None,
-    grad_scaler=None,
-    tb_helper=None,
-    logwandb=False,
-    local_rank=0,
+        model,
+        loss_func,
+        opt,
+        scheduler,
+        train_loader,
+        dev,
+        epoch,
+        steps_per_epoch=None,
+        grad_scaler=None,
+        tb_helper=None,
+        logwandb=False,
+        local_rank=0,
 ):
     model.train()
     # print("starting to train")
@@ -38,12 +44,14 @@ def train_regression(
     sum_abs_err = 0
     sum_sqr_err = 0
     count = 0
+    step_count = 0
     start_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             # print(batch_g)
             # print(y)
             label = y
+            step_count += 1
             num_examples = label.shape[0]
             label = label.to(dev)
             opt.zero_grad()
@@ -98,13 +106,12 @@ def train_regression(
                         )
 
             if logwandb and (num_batches % 50):
-                import wandb
-
-                wandb.log({"loss regression": loss})
-                wandb.log({"loss lv": losses[0]})
-                wandb.log({"loss beta": losses[1]})
-                wandb.log({"loss E": losses[2]})
-                wandb.log({"loss X": losses[3]})
+                wandb.log({"loss regression": loss,
+                           "loss lv": losses[0],
+                           "loss beta": losses[1],
+                           "loss E": losses[2],
+                           "loss X": losses[3],
+                           "loss PID": losses[4]}, step=num_batches)
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -145,24 +152,40 @@ def train_regression(
 
 
 def evaluate_regression(
-    model,
-    test_loader,
-    dev,
-    epoch,
-    for_training=True,
-    loss_func=None,
-    steps_per_epoch=None,
-    eval_metrics=[
-        "mean_squared_error",
-        "mean_absolute_error",
-        "median_absolute_error",
-        "mean_gamma_deviance",
-    ],
-    tb_helper=None,
-    logwandb=False,
-    energy_weighted=False,
-    local_rank=0,
+        model,
+        test_loader,
+        dev,
+        epoch,
+        for_training=True,
+        loss_func=None,
+        steps_per_epoch=None,
+        eval_metrics=[
+            "mean_squared_error",
+            "mean_absolute_error",
+            "median_absolute_error",
+            "mean_gamma_deviance",
+        ],
+        tb_helper=None,
+        logwandb=False,
+        energy_weighted=False,
+        local_rank=0
 ):
+    '''
+
+    :param model:
+    :param test_loader:
+    :param dev:
+    :param epoch:
+    :param for_training:
+    :param loss_func:
+    :param steps_per_epoch:
+    :param eval_metrics:
+    :param tb_helper:
+    :param logwandb:
+    :param energy_weighted:
+    :param local_rank:
+    :return:
+    '''
     model.eval()
 
     data_config = test_loader.dataset.config
@@ -174,6 +197,7 @@ def evaluate_regression(
     sum_abs_err = 0
     count = 0
     scores = []
+    results = []  # resolution results
     labels = defaultdict(list)
     observers = defaultdict(list)
     start_time = time.time()
@@ -215,11 +239,13 @@ def evaluate_regression(
                             )
 
                 if logwandb and (num_batches % 50):
-                    wandb.log({"loss val regression": loss})
-                    wandb.log({"loss val lv": losses[0]})
-                    wandb.log({"loss val beta": losses[1]})
-                    wandb.log({"loss val E": losses[2]})
-                    wandb.log({"loss val X": losses[3]})
+                    wandb.log({
+                        "loss val regression": loss,
+                        "loss val lv": losses[0],
+                        "loss val beta": losses[1],
+                        "loss val E": losses[2],
+                        "loss val X": losses[3]
+                    })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
@@ -271,3 +297,62 @@ def _check_scales_centers(iterator):
         centers[ii] = iterator._data_config.preprocess_params[item]["center"]
         scales[ii] = iterator._data_config.preprocess_params[item]["scale"]
     return centers, scales
+
+
+def upd_dict(d, small_dict):
+    for k in small_dict:
+        if k not in d:
+            d[k] = []
+        d[k] += small_dict[k]
+    return d
+
+
+def plot_regression_resolution(
+        model,
+        test_loader,
+        dev,
+        **kwargs
+):
+    model.eval()
+    results = []  # resolution results
+    pid_classification_results = []
+    c = 0
+    with torch.no_grad():
+        with tqdm.tqdm(test_loader) as tq:
+            for batch_g, y in tq:
+                c += 1
+                if c > 5:
+                    break  # TEMPORARY
+                batch_g = batch_g.to(dev)
+                model_output = model(batch_g)
+                resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
+                    batch_g, model_output, y, return_resolution=True
+                )
+                results.append(resolutions)
+                pid_classification_results.append((pid_true, pid_pred))
+    result_dict = {}
+    for key in results[0]:
+        result_dict[key] = np.concatenate([r[key] for r in results])
+    result_dict["event_by_event_accuracy"] = [accuracy_score(pid_true.argmax(dim=0), pid_pred.argmax(dim=0)) for pid_true, pid_pred in pid_classification_results]
+    # just plot all for now
+    result = {}
+    for key in results[0]:
+        data = result_dict[key]
+        fig, ax = plt.subplots()
+        ax.hist(data, bins=100, range=(-1.5, 1.5), histtype="step", label=key)
+        ax.set_xlabel("resolution")
+        ax.set_ylabel("count")
+        ax.legend()
+        result[key] = fig
+    conf_mat = confusion_matrix(pid_true.argmax(dim=0), pid_pred.argmax(dim=0))
+    # confusion matrix
+    fig, ax = plt.subplots(figsize=(7.5, 7.5))
+    # add onehot_particle_arr as class names
+    class_names = onehot_particles_arr
+    im = ax.matshow(conf_mat, cmap=plt.cm.Blues)
+    ax.set_xticks(np.arange(len(class_names)), class_names, rotation=45)
+    ax.set_yticks(np.arange(len(class_names)), class_names)
+    result["PID_confusion_matrix"] = fig
+
+    return result
+

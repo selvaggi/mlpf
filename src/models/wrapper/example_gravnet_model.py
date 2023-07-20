@@ -5,7 +5,7 @@ from src.models.gravnet_model import GravnetModel
 class GraphTransformerNetWrapper(torch.nn.Module):
     def __init__(self, dev, **kwargs) -> None:
         super().__init__()
-        self.mod = GravnetModel(dev)
+        self.mod = GravnetModel(dev, **kwargs)
 
     def forward(self, g):
         return self.mod(g)
