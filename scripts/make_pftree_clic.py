@@ -3,13 +3,14 @@ import math
 import ROOT
 from array import array
 from ROOT import TFile, TTree
+import numpy as np
 
 # TODO
 # is last track state position at calo?
 # Bz should be stored in the in the tree
 # should allow for multiple gen links to hit (probablyhas to be done in the previous edm4hep formation stage)
 
-debug = False
+debug = True
 
 """
 source /cvmfs/fcc.cern.ch/sw/latest/setup.sh
@@ -66,8 +67,36 @@ def get_genparticle_parents(i, mcparts, parents):
     return parent_positions
 
 
+def find_mother_particle(j, gen_part_coll, gen_parent_link_indexmc):
+    parent_p = j
+    counter = 0
+    while len(np.reshape(np.array(parent_p), -1)) < 1.5:
+        if type(parent_p) == list:
+            parent_p = parent_p[0]
+        parent_p_r = get_genparticle_parents(
+            parent_p,
+            gen_part_coll,
+            gen_parent_link_indexmc,
+        )
+        pp_old = parent_p
+        counter = counter + 1
+        if len(np.reshape(np.array(parent_p_r), -1)) < 1.5:
+            print(parent_p, parent_p_r)
+        parent_p = parent_p_r
+
+    return pp_old
+
+
 def find_gen_link(
-    j, id, gen_link_indexreco, gen_link_indexmc, gen_link_weight, genpart_indexes
+    j,
+    id,
+    gen_link_indexreco,
+    gen_link_indexmc,
+    gen_link_weight,
+    genpart_indexes,
+    calo=False,
+    gen_part_coll=None,
+    gen_parent_link_indexmc=None,
 ):
 
     reco_positions = []
@@ -84,21 +113,25 @@ def find_gen_link(
         gen_weights.append(gen_link_weight[idx].weight)
 
     # now make sure that the corresponding gen part exists and will be stored in the tree
-    #print(gen_positions, gen_weights)
+    # print(gen_positions, gen_weights)
     indices = []
-    
+
     for i, pos in enumerate(gen_positions):
         if pos in genpart_indexes:
-            indices.append(genpart_indexes[pos])     
+            if calo:
+                mother = find_mother_particle(
+                    genpart_indexes[pos], gen_part_coll, gen_parent_link_indexmc
+                )
+                indices.append(mother)
+            else:
+                indices.append(genpart_indexes[pos])
 
-    #print(id, indices, gen_positions, gen_weights)
-    
+    # print(id, indices, gen_positions, gen_weights)
+
     indices += [-1] * (5 - len(indices))
     gen_weights += [-1] * (5 - len(gen_weights))
-    
-    return indices, gen_weights
 
-    
+    return indices, gen_weights
 
 
 ## global params
@@ -246,19 +279,18 @@ for i, e in enumerate(ev):
     part_phi.clear()
     part_m.clear()
     part_pid.clear()
-    
+
     hit_genlink0.clear()
     hit_genlink1.clear()
     hit_genlink2.clear()
     hit_genlink3.clear()
     hit_genlink4.clear()
-    
-    hit_genweight0.clear() 
+
+    hit_genweight0.clear()
     hit_genweight1.clear()
     hit_genweight2.clear()
     hit_genweight3.clear()
     hit_genweight4.clear()
-    
 
     if (i + 1) % 1000 == 0:
         print(" ... processed {} events ...".format(i + 1))
@@ -285,9 +317,9 @@ for i, e in enumerate(ev):
         dict()
     )  ## key: position in stored gen particle array, value: index in gen particle collection
 
-    gen_parent_link_indexmc = getattr(ev, genparts_parents)
-    gen_daughter_link_indexmc = getattr(ev, genparts_daughters)
-    gen_part_coll = getattr(ev, genparts)
+    gen_parent_link_indexmc = getattr(e, genparts_parents)
+    gen_daughter_link_indexmc = getattr(e, genparts_daughters)
+    gen_part_coll = getattr(e, genparts)
 
     n_part_pre = 0
     for j, part in enumerate(gen_part_coll):
@@ -326,7 +358,7 @@ for i, e in enumerate(ev):
                 )
             )
             # part.daughters_begin,  part.daughters_end, part.parents_begin,  part.parents_end, D1: {}, D2: {}, M1: {}, M2: {}
-            
+
         ## store all gen parts for now
         genpart_indexes_pre[j] = n_part_pre
         indexes_genpart_pre[n_part_pre] = j
@@ -367,7 +399,7 @@ for i, e in enumerate(ev):
         )
 
         # check if particles has interacted, if it did remove it from the list of gen particles
-        #if len(daughters) > 0:
+        # if len(daughters) > 0:
         #    continue
 
         p = math.sqrt(
@@ -405,22 +437,22 @@ for i, e in enumerate(ev):
     n_hit[0] = 0
     ## STORE ALL RECONSTRUCTED TRACKS
 
-    gen_track_link_indextr = getattr(ev, gen_track_links0)
-    gen_track_link_indexmc = getattr(ev, gen_track_links1)
-    gen_track_link_weight = getattr(ev, gen_track_weights)
+    gen_track_link_indextr = getattr(e, gen_track_links0)
+    gen_track_link_indexmc = getattr(e, gen_track_links1)
+    gen_track_link_weight = getattr(e, gen_track_weights)
 
     track_coll = tracks[0]
     track_collid = tracks[1]
 
     if debug:
         print("")
-    for j, track in enumerate(getattr(ev, track_coll)):
+    for j, track in enumerate(getattr(e, track_coll)):
 
         # there are 4 track states , accessible via 4*j, 4*j+1, 4*j+2, 4*j+3
         # TODO check that this is the last track state, presumably, the one that gives coordinates at calo
 
         # first store track state at vertex
-        trackstate = getattr(ev, trackstates)[4 * j]
+        trackstate = getattr(e, trackstates)[4 * j]
 
         x = trackstate.referencePoint.x
         y = trackstate.referencePoint.y
@@ -467,18 +499,28 @@ for i, e in enumerate(ev):
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
- 
-        if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
-        if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
-        if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
-        if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
-        if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
-     
-        if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
-        if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
-        if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
-        if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
-        if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
+
+        if len(gen_indices) > 0:
+            hit_genlink0.push_back(gen_indices[0])
+        if len(gen_indices) > 1:
+            hit_genlink1.push_back(gen_indices[1])
+        if len(gen_indices) > 2:
+            hit_genlink2.push_back(gen_indices[2])
+        if len(gen_indices) > 3:
+            hit_genlink3.push_back(gen_indices[3])
+        if len(gen_indices) > 4:
+            hit_genlink4.push_back(gen_indices[4])
+
+        if len(gen_indices) > 0:
+            hit_genweight0.push_back(gen_weights[0])
+        if len(gen_indices) > 1:
+            hit_genweight1.push_back(gen_weights[1])
+        if len(gen_indices) > 2:
+            hit_genweight2.push_back(gen_weights[2])
+        if len(gen_indices) > 3:
+            hit_genweight3.push_back(gen_weights[3])
+        if len(gen_indices) > 4:
+            hit_genweight4.push_back(gen_weights[4])
 
         if debug:
             print(
@@ -499,7 +541,7 @@ for i, e in enumerate(ev):
         n_hit[0] += 1
 
         ## now access trackstate at calo
-        trackstate = getattr(ev, trackstates)[4 * j + 3]
+        trackstate = getattr(e, trackstates)[4 * j + 3]
 
         x = trackstate.referencePoint.x
         y = trackstate.referencePoint.y
@@ -546,18 +588,28 @@ for i, e in enumerate(ev):
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
- 
-        if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
-        if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
-        if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
-        if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
-        if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
-     
-        if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
-        if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
-        if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
-        if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
-        if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
+
+        if len(gen_indices) > 0:
+            hit_genlink0.push_back(gen_indices[0])
+        if len(gen_indices) > 1:
+            hit_genlink1.push_back(gen_indices[1])
+        if len(gen_indices) > 2:
+            hit_genlink2.push_back(gen_indices[2])
+        if len(gen_indices) > 3:
+            hit_genlink3.push_back(gen_indices[3])
+        if len(gen_indices) > 4:
+            hit_genlink4.push_back(gen_indices[4])
+
+        if len(gen_indices) > 0:
+            hit_genweight0.push_back(gen_weights[0])
+        if len(gen_indices) > 1:
+            hit_genweight1.push_back(gen_weights[1])
+        if len(gen_indices) > 2:
+            hit_genweight2.push_back(gen_weights[2])
+        if len(gen_indices) > 3:
+            hit_genweight3.push_back(gen_weights[3])
+        if len(gen_indices) > 4:
+            hit_genweight4.push_back(gen_weights[4])
 
         if debug:
             print(
@@ -577,9 +629,9 @@ for i, e in enumerate(ev):
 
         n_hit[0] += 1
 
-    gen_calohit_link_indexhit = getattr(ev, gen_calo_links0)
-    gen_calohit_link_indexmc = getattr(ev, gen_calo_links1)
-    gen_calohit_link_weight = getattr(ev, gen_calo_weights)
+    gen_calohit_link_indexhit = getattr(e, gen_calo_links0)
+    gen_calohit_link_indexmc = getattr(e, gen_calo_links1)
+    gen_calohit_link_weight = getattr(e, gen_calo_weights)
 
     calohit_collections = [
         ecal_barrel[0],
@@ -598,11 +650,10 @@ for i, e in enumerate(ev):
         hcal_other[1],
     ]
 
-    
     for k, calohit_coll in enumerate(calohit_collections):
         if debug:
             print("")
-        for j, calohit in enumerate(getattr(ev, calohit_coll)):
+        for j, calohit in enumerate(getattr(e, calohit_coll)):
 
             x = calohit.position.x
             y = calohit.position.y
@@ -636,6 +687,9 @@ for i, e in enumerate(ev):
                 gen_calohit_link_indexmc,
                 gen_calohit_link_weight,
                 genpart_indexes,
+                calo=True,
+                gen_part_coll=gen_part_coll,
+                gen_parent_link_indexmc=gen_parent_link_indexmc,
             )
 
             link_vector = ROOT.std.vector("int")()
@@ -656,33 +710,43 @@ for i, e in enumerate(ev):
             genlink = -1
             if ngen > 0:
                 genlink = link_vector[0]
-    
-            if len(gen_indices) > 0: hit_genlink0.push_back(gen_indices[0])
-            if len(gen_indices) > 1: hit_genlink1.push_back(gen_indices[1])
-            if len(gen_indices) > 2: hit_genlink2.push_back(gen_indices[2])
-            if len(gen_indices) > 3: hit_genlink3.push_back(gen_indices[3])
-            if len(gen_indices) > 4: hit_genlink4.push_back(gen_indices[4])
-        
-            if len(gen_indices) > 0: hit_genweight0.push_back(gen_weights[0])
-            if len(gen_indices) > 1: hit_genweight1.push_back(gen_weights[1])
-            if len(gen_indices) > 2: hit_genweight2.push_back(gen_weights[2])
-            if len(gen_indices) > 3: hit_genweight3.push_back(gen_weights[3])
-            if len(gen_indices) > 4: hit_genweight4.push_back(gen_weights[4])
-            
-            if debug:
-                print(
-                    "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-                        htype,
-                        n_hit[0],
-                        calohit.energy,
-                        x * 1e-03,
-                        y * 1e-03,
-                        R * 1e-03,
-                        z * 1e-03,
-                        r * 1e-03,
-                        list(link_vector),
-                    )
-                )
+
+            if len(gen_indices) > 0:
+                hit_genlink0.push_back(gen_indices[0])
+            if len(gen_indices) > 1:
+                hit_genlink1.push_back(gen_indices[1])
+            if len(gen_indices) > 2:
+                hit_genlink2.push_back(gen_indices[2])
+            if len(gen_indices) > 3:
+                hit_genlink3.push_back(gen_indices[3])
+            if len(gen_indices) > 4:
+                hit_genlink4.push_back(gen_indices[4])
+
+            if len(gen_indices) > 0:
+                hit_genweight0.push_back(gen_weights[0])
+            if len(gen_indices) > 1:
+                hit_genweight1.push_back(gen_weights[1])
+            if len(gen_indices) > 2:
+                hit_genweight2.push_back(gen_weights[2])
+            if len(gen_indices) > 3:
+                hit_genweight3.push_back(gen_weights[3])
+            if len(gen_indices) > 4:
+                hit_genweight4.push_back(gen_weights[4])
+
+            # if debug:
+            #     print(
+            #         "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+            #             htype,
+            #             n_hit[0],
+            #             calohit.energy,
+            #             x * 1e-03,
+            #             y * 1e-03,
+            #             R * 1e-03,
+            #             z * 1e-03,
+            #             r * 1e-03,
+            #             list(link_vector),
+            #         )
+            #     )
 
             n_hit[0] += 1
 
@@ -701,7 +765,7 @@ for i, e in enumerate(ev):
         )
 
     else:
-        event_number[0] +=1
+        event_number[0] += 1
         t.Fill()
 
 t.SetDirectory(out_root)
