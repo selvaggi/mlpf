@@ -5,6 +5,8 @@ from torch_scatter import scatter_max, scatter_add, scatter_mean
 
 onehot_particles_arr = [-2212.0, -211.0, -14.0, -13.0, -11.0, 11.0, 12.0, 13.0, 14.0, 22.0, 111.0, 130.0, 211.0, 2112.0, 2212.0, 1000010048.0, 1000020032.0, 1000040064.0, 1000050112.0, 1000060096.0, 1000080128.0]
 onehot_particles_arr = [int(x) for x in onehot_particles_arr]
+pid_dict = {i+1: onehot_particles_arr[i] for i in range(len(onehot_particles_arr))}
+pid_dict[0] = "other"
 
 def safe_index(arr, index):
     # One-hot index (or zero if it's not in the array)
@@ -255,8 +257,8 @@ def calc_LV_Lbeta(
 
     loss_E = torch.mean(
         torch.square(
-            (e_particles_pred.to(device) - e_particles.to(device))
-            / e_particles.to(device)
+            ((e_particles_pred.to(device) - e_particles.to(device))
+            / e_particles.to(device))[particles_mask.to(device) == 1]
         )
     )
     loss_momentum = torch.mean(
@@ -268,6 +270,10 @@ def calc_LV_Lbeta(
     loss_mse = torch.nn.MSELoss()
     loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
     loss_particle_ids = loss_ce(pid_particles_pred.to(device), pid_particles_true.to(device))
+    pid_true = pid_particles_true.argmax(dim=1)
+    pid_pred = pid_particles_pred.argmax(dim=1)
+    pid_true = [pid_dict[i] for i in pid_true]
+    pid_pred = [pid_dict[i] for i in pid_pred]
     # Connectivity matrix from hit (row) -> cluster (column)
     # Index to matrix, e.g.:
     # [1, 3, 1, 0] --> [
@@ -443,7 +449,8 @@ def calc_LV_Lbeta(
     return (
         components
         if return_components
-        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
+        # also return pid_true and pid_pred here to log the confusion matrix at each validation step
+        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred)
     )
 
 
