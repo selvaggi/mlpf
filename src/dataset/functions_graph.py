@@ -113,6 +113,7 @@ def create_inputs_from_table(output):
         number_hits,
         number_part,
         y_data_graph,
+        #torch.concatenate([y_data_graph, 1-mask_particles.unsqueeze(1)], dim=1),
         coord_cart_hits,  # [no_tracks],
         coord_cart_hits_norm,  # [no_tracks],
         hit_type_one_hot,  # [no_tracks],
