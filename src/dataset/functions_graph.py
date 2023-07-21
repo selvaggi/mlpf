@@ -9,18 +9,13 @@ def find_mask_no_energy(hit_particle_link, hit_type_a):
     for p in list_p:
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        print(hit_types)
         if np.array_equal(hit_types, [0, 1]):
             list_remove.append(p)
-    print(list_remove)
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
             mask1 = hit_particle_link == p
-            print(mask1)
-            print(mask)
             mask = mask1 + mask
-            print(mask)
 
     else:
         mask = np.full((len(hit_particle_link)), False, dtype=bool)
@@ -112,14 +107,14 @@ def create_inputs_from_table(output):
     return (
         number_hits,
         number_part,
-        y_data_graph,
-        coord_cart_hits,  # [no_tracks],
-        coord_cart_hits_norm,  # [no_tracks],
-        hit_type_one_hot,  # [no_tracks],
-        p_hits,  # [no_tracks],
-        e_hits,  # [no_tracks],
-        cluster_id,
-        hit_particle_link,
+        y_data_graph[~mask_particles],
+        coord_cart_hits[~mask_hits],  # [no_tracks],
+        coord_cart_hits_norm[~mask_hits],  # [no_tracks],
+        hit_type_one_hot[~mask_hits],  # [no_tracks],
+        p_hits[~mask_hits],  # [no_tracks],
+        e_hits[~mask_hits],  # [no_tracks],
+        cluster_id[~mask_hits],
+        hit_particle_link[~mask_hits],
     )
 
 
@@ -143,20 +138,26 @@ def create_graph(output):
     # g = dgl.graph((i, j))
     # g = dgl.to_simple(g)
     # g = dgl.to_bidirected(g)
-    g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
-    hit_features_graph = torch.cat(
-        (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
-    )
-    #! currently we are not doing the pid or mass regression
-    g.ndata["h"] = hit_features_graph
-    g.ndata["pos_hits"] = coord_cart_hits
-    g.ndata["pos_hits_norm"] = coord_cart_hits_norm
-    g.ndata["hit_type"] = hit_type_one_hot
-    g.ndata["p_hits"] = p_hits
-    g.ndata["e_hits"] = e_hits
-    g.ndata["particle_number"] = cluster_id
-    g.ndata["particle_number_nomap"] = hit_particle_link
-    return g, y_data_graph
+    if coord_cart_hits.shape[0] > 0:
+        graph_empty = False
+        g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
+        hit_features_graph = torch.cat(
+            (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
+        )
+        #! currently we are not doing the pid or mass regression
+        g.ndata["h"] = hit_features_graph
+        g.ndata["pos_hits"] = coord_cart_hits
+        g.ndata["pos_hits_norm"] = coord_cart_hits_norm
+        g.ndata["hit_type"] = hit_type_one_hot
+        g.ndata["p_hits"] = p_hits
+        g.ndata["e_hits"] = e_hits
+        g.ndata["particle_number"] = cluster_id
+        g.ndata["particle_number_nomap"] = hit_particle_link
+    else:
+        graph_empty = True
+        g = 0
+        y_data_graph = 0
+    return [g, y_data_graph], graph_empty
 
 
 def create_dif_interactions(i, j, pos, number_p):

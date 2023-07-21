@@ -32,10 +32,10 @@ def _finalize_inputs(table, data_config):
         # if params['center'] is not None:
         #    table[k] = (table[k] - params['center']) * params['scale']
         if params["length"] is not None:
-            #if k == "hit_genlink":
+            # if k == "hit_genlink":
             #    pad_fn = partial(_pad_vector, value=-1)
             #    table[k] = pad_fn(table[k])
-            #else:
+            # else:
             pad_fn = partial(_pad, value=0)
             table[k] = pad_fn(table[k], params["length"])
 
@@ -189,40 +189,43 @@ class _SimpleIter(object):
 
     def __next__(self):
         # print(self.ipos, self.cursor)
-        if len(self.filelist) == 0:
-            raise StopIteration
-        try:
-            i = self.indices[self.cursor]
-        except IndexError:
-            # case 1: first entry, `self.indices` is still empty
-            # case 2: running out of entries, `self.indices` is not empty
-            while True:
-                if self._in_memory and len(self.indices) > 0:
-                    # only need to re-shuffle the indices, if this is not the first entry
-                    if self._sampler_options["shuffle"]:
-                        np.random.shuffle(self.indices)
-                    break
-                if self.prefetch is None:
-                    # reaching the end as prefetch got nothing
-                    self.table = None
+        graph_empty = True
+        while graph_empty:
+            if len(self.filelist) == 0:
+                raise StopIteration
+            try:
+                i = self.indices[self.cursor]
+            except IndexError:
+                # case 1: first entry, `self.indices` is still empty
+                # case 2: running out of entries, `self.indices` is not empty
+                while True:
+                    if self._in_memory and len(self.indices) > 0:
+                        # only need to re-shuffle the indices, if this is not the first entry
+                        if self._sampler_options["shuffle"]:
+                            np.random.shuffle(self.indices)
+                        break
+                    if self.prefetch is None:
+                        # reaching the end as prefetch got nothing
+                        self.table = None
+                        if self._async_load:
+                            self.executor.shutdown(wait=False)
+                        raise StopIteration
+                    # get result from prefetch
                     if self._async_load:
-                        self.executor.shutdown(wait=False)
-                    raise StopIteration
-                # get result from prefetch
-                if self._async_load:
-                    self.table, self.indices = self.prefetch.result()
-                else:
-                    self.table, self.indices = self.prefetch
-                # try to load the next ones asynchronously
-                self._try_get_next()
-                # check if any entries are fetched (i.e., passing selection) -- if not, do another fetch
-                if len(self.indices) > 0:
-                    break
-            # reset cursor
-            self.cursor = 0
-            i = self.indices[self.cursor]
-        self.cursor += 1
-        return self.get_data(i)
+                        self.table, self.indices = self.prefetch.result()
+                    else:
+                        self.table, self.indices = self.prefetch
+                    # try to load the next ones asynchronously
+                    self._try_get_next()
+                    # check if any entries are fetched (i.e., passing selection) -- if not, do another fetch
+                    if len(self.indices) > 0:
+                        break
+                # reset cursor
+                self.cursor = 0
+                i = self.indices[self.cursor]
+            self.cursor += 1
+            data, graph_empty = self.get_data(i)
+        return data
 
     def _try_get_next(self, init=False):
         end_of_list = (
@@ -273,8 +276,8 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
 
-        g, features_partnn = create_graph(X)
-        return g, features_partnn
+        [g, features_partnn], graph_empty = create_graph(X)
+        return [g, features_partnn], graph_empty
 
 
 class SimpleIterDataset(torch.utils.data.IterableDataset):
