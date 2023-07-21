@@ -2,29 +2,39 @@ import numpy as np
 import torch
 import dgl
 
+
 def find_mask_no_energy(hit_particle_link, hit_type_a):
     list_p = np.unique(hit_particle_link)
     list_remove = []
-    for p in list_p: 
-        mask = hit_particle_link==p
+    for p in list_p:
+        mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        if np.array_equal(hit_types, [0,1]):
+        print(hit_types)
+        if np.array_equal(hit_types, [0, 1]):
             list_remove.append(p)
-    if len(list_remove)>0:
+    print(list_remove)
+    if len(list_remove) > 0:
+        mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
-            mask = hit_particle_link == p
-            mask = mask + mask
+            mask1 = hit_particle_link == p
+            print(mask1)
+            print(mask)
+            mask = mask1 + mask
+            print(mask)
+
     else:
         mask = np.full((len(hit_particle_link)), False, dtype=bool)
 
-    if len(list_remove)>0:
+    if len(list_remove) > 0:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
         for p in list_remove:
-            mask_particles = list_p == p
-            mask_particles = mask_particles+mask_particles
+            mask_particles1 = list_p == p
+            mask_particles = mask_particles1 + mask_particles
+
     else:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
 
-    return mask,mask_particles
+    return mask, mask_particles
 
 
 def create_inputs_from_table(output):
@@ -96,20 +106,20 @@ def create_inputs_from_table(output):
     )
 
     assert len(y_data_graph) == len(unique_list_particles)
-    
+
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
 
     return (
         number_hits,
         number_part,
-        y_data_graph[~mask_particles],
-        coord_cart_hits[~mask_hits],  # [no_tracks],
-        coord_cart_hits_norm[~mask_hits],  # [no_tracks],
-        hit_type_one_hot[~mask_hits],  # [no_tracks],
-        p_hits[~mask_hits],  # [no_tracks],
-        e_hits[~mask_hits],  # [no_tracks],
-        cluster_id[~mask_hits],
-        hit_particle_link[~mask_hits],
+        y_data_graph,
+        coord_cart_hits,  # [no_tracks],
+        coord_cart_hits_norm,  # [no_tracks],
+        hit_type_one_hot,  # [no_tracks],
+        p_hits,  # [no_tracks],
+        e_hits,  # [no_tracks],
+        cluster_id,
+        hit_particle_link,
     )
 
 
