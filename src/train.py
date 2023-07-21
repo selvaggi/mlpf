@@ -226,13 +226,14 @@ def _main(args):
                 gpus = None
                 dev = torch.device("cpu")
             model = orig_model.to(dev)
-            model_path = (
-                args.model_prefix
-                if args.model_prefix.endswith(".pt")
-                else args.model_prefix + "_best_epoch_state.pt"
-            )
-            _logger.info("Loading model %s for eval" % model_path)
-            model.load_state_dict(torch.load(model_path, map_location=dev))
+            if args.model_prefix:
+                model_path = (
+                    args.model_prefix
+                    if args.model_prefix.endswith(".pt")
+                    else args.model_prefix + "_best_epoch_state.pt"
+                )
+                _logger.info("Loading model %s for eval" % model_path)
+                model.load_state_dict(torch.load(model_path, map_location=dev))
             if gpus is not None and len(gpus) > 1:
                 model = torch.nn.DataParallel(model, device_ids=gpus)
             model = model.to(dev)

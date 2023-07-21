@@ -64,6 +64,8 @@ def create_inputs_from_table(output):
         (
             particle_coord,
             y_energy,
+            y_mom,
+            y_mass,
             features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
         ),
         dim=1,
@@ -105,7 +107,7 @@ def create_graph(output):
     # g = dgl.to_bidirected(g)
     g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
     hit_features_graph = torch.cat(
-        (coord_cart_hits_norm, hit_type_one_hot, e_hits), dim=1
+        (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
     )
     #! currently we are not doing the pid or mass regression
     g.ndata["h"] = hit_features_graph
@@ -141,7 +143,7 @@ def graph_batch_func(list_graphs):
 
     list_y = [el[1] for el in list_graphs]
     ys = torch.cat(list_y, dim=0)
-    ys = torch.reshape(ys, [-1, 5])
+    ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
     bg = dgl.batch(list_graphs_g)
     # reindex particle number
     return bg, ys  # TODO: REINDEX particle_number! - this won't work out of the box!!!!
