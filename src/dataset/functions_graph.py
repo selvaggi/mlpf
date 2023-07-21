@@ -2,6 +2,30 @@ import numpy as np
 import torch
 import dgl
 
+def find_mask_no_energy(hit_particle_link, hit_type_a):
+    list_p = np.unique(hit_particle_link)
+    list_remove = []
+    for p in list_p: 
+        mask = hit_particle_link==p
+        hit_types = np.unique(hit_type_a[mask])
+        if np.array_equal(hit_types, [0,1]):
+            list_remove.append(p)
+    if len(list_remove)>0:
+        for p in list_remove:
+            mask = hit_particle_link == p
+            mask = mask + mask
+    else:
+        mask = np.full((len(hit_particle_link)), False, dtype=bool)
+
+    if len(list_remove)>0:
+        for p in list_remove:
+            mask_particles = list_p == p
+            mask_particles = mask_particles+mask_particles
+    else:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+
+    return mask,mask_particles
+
 
 def create_inputs_from_table(output):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
@@ -59,28 +83,31 @@ def create_inputs_from_table(output):
     )
     y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
     y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
-    y_energy = torch.sqrt(y_mass ** 2 + y_mom ** 2)
+    y_energy = torch.sqrt(y_mass**2 + y_mom**2)
     y_data_graph = torch.cat(
         (
             particle_coord,
             y_energy,
-            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
+            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete), 
         ),
         dim=1,
     )
 
     assert len(y_data_graph) == len(unique_list_particles)
+    
+    mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
 
     return (
         number_hits,
         number_part,
-        y_data_graph,
-        coord_cart_hits,  # [no_tracks],
-        coord_cart_hits_norm,  # [no_tracks],
-        hit_type_one_hot,  # [no_tracks],
-        p_hits,  # [no_tracks],
-        e_hits,  # [no_tracks],
-        cluster_id,
+        y_data_graph[~mask_particles],
+        coord_cart_hits[~mask_hits],  # [no_tracks],
+        coord_cart_hits_norm[~mask_hits],  # [no_tracks],
+        hit_type_one_hot[~mask_hits],  # [no_tracks],
+        p_hits[~mask_hits],  # [no_tracks],
+        e_hits[~mask_hits],  # [no_tracks],
+        cluster_id[~mask_hits],
+        hit_particle_link[~mask_hits],
     )
 
 
@@ -94,6 +121,7 @@ def create_graph(output):
         hit_type_one_hot,
         p_hits,
         e_hits,
+        cluster_id,
         hit_particle_link,
     ) = create_inputs_from_table(output)
     # print("n hits:", number_hits, "number_part", number_part)
@@ -105,7 +133,7 @@ def create_graph(output):
     # g = dgl.to_bidirected(g)
     g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
     hit_features_graph = torch.cat(
-        (coord_cart_hits_norm, hit_type_one_hot, e_hits), dim=1
+        (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
     )
     #! currently we are not doing the pid or mass regression
     g.ndata["h"] = hit_features_graph
@@ -114,7 +142,8 @@ def create_graph(output):
     g.ndata["hit_type"] = hit_type_one_hot
     g.ndata["p_hits"] = p_hits
     g.ndata["e_hits"] = e_hits
-    g.ndata["particle_number"] = hit_particle_link
+    g.ndata["particle_number"] = cluster_id
+    g.ndata["particle_number_nomap"] = hit_particle_link
     return g, y_data_graph
 
 
