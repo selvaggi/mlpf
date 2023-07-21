@@ -88,7 +88,9 @@ def create_inputs_from_table(output):
         (
             particle_coord,
             y_energy,
-            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete), 
+            y_mom,
+            y_mass,
+            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
         ),
         dim=1,
     )
@@ -170,7 +172,7 @@ def graph_batch_func(list_graphs):
 
     list_y = [el[1] for el in list_graphs]
     ys = torch.cat(list_y, dim=0)
-    ys = torch.reshape(ys, [-1, 5])
+    ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
     bg = dgl.batch(list_graphs_g)
     # reindex particle number
     return bg, ys  # TODO: REINDEX particle_number! - this won't work out of the box!!!!

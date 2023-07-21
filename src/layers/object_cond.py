@@ -30,12 +30,13 @@ def debug(*args, **kwargs):
 
 
 def calc_energy_pred(
-    batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, pid_results
+    batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, pid_results, hit_mom
 ):
     td = 0.1
     batch_number = torch.max(batch) + 1
     energies = []
     pid_outputs = []
+    momenta = []
     for i in range(0, batch_number):
         mask_batch = batch == i
         X = g.ndata["pos_hits_norm"][mask_batch]
@@ -67,15 +68,19 @@ def calc_energy_pred(
         e_c = g.ndata["e_hits"][mask_batch][is_sig_i].view(-1) * energy_correction[
             mask_batch
         ][is_sig_i].view(-1)
+        mom_c = hit_mom[mask_batch][is_sig_i].view(-1)
         #pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
         pid_results_i = scatter_add(pid_results[mask_batch][is_sig_i], clustering_.long().to(pid_results.device), dim=0)
         #  aggregated "PID embeddings"
         e_objects = scatter_add(e_c, clustering_.long().to(e_c.device))
+        mom_objects = scatter_add(mom_c, clustering_.long().to(mom_c.device))
         e_objects = e_objects[clus_values != -1]
         pid_results_i = pid_results_i[clus_values != -1]
+        mom_objects = mom_objects[clus_values != -1]
         energies.append(e_objects)
         pid_outputs.append(pid_results_i)
-    return torch.cat(energies, dim=0), torch.cat(pid_outputs, dim=0)
+        momenta.append(mom_objects)
+    return torch.cat(energies, dim=0), torch.cat(pid_outputs, dim=0), torch.cat(momenta, dim=0)
 
 def calc_pred_pid(
     batch, g, cluster_index_per_event, is_sig, q, beta, pred_pid
@@ -95,6 +100,7 @@ def calc_LV_Lbeta(
     y,
     distance_threshold,
     energy_correction,
+    momentum: torch.Tensor,
     beta: torch.Tensor,
     cluster_space_coords: torch.Tensor,  # Predicted by model
     cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
@@ -218,8 +224,8 @@ def calc_LV_Lbeta(
     # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
     # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
     # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
-    e_particles_pred, pid_particles_pred = calc_energy_pred(
-        batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, predicted_pid
+    e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
+        batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, predicted_pid, momentum
     )
     pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # project the pooled PID embeddings to the final "one hot encoding" space
     #pid_particles_pred = calc_pred_pid(
@@ -227,7 +233,15 @@ def calc_LV_Lbeta(
     #)
     x_particles = y[:, 0:3]
     e_particles = y[:, 3]
-    pid_id_particles = y[:, 4].unsqueeze(1).long()
+    mom_particles_true = y[:, 4]
+    mass_particles_true = y[:, 5]
+    mom_particles_true = mom_particles_true.to(device)
+    mass_particles_pred = mom_particles_true**2-mom_particles_pred**2
+    mass_particles_true = mass_particles_true.to(device)
+    mass_particles_pred[mass_particles_pred < 0] = 0.
+    mass_particles_pred = torch.sqrt(mass_particles_pred)
+    loss_mass = torch.nn.MSELoss()(mass_particles_true, mass_particles_pred) # only logging this, not using it in the loss func
+    pid_id_particles = y[:, 6].unsqueeze(1).long()
     pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
     part_idx_onehot = [safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()]
     pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.
@@ -237,11 +251,17 @@ def calc_LV_Lbeta(
         e_particles = e_particles.detach().flatten()
         positions_particles_pred = positions_particles_pred.detach().flatten()
         x_particles = x_particles.detach().flatten()
-        return {"e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
+        return {"momentum_res": (()) , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
+
     loss_E = torch.mean(
         torch.square(
             (e_particles_pred.to(device) - e_particles.to(device))
             / e_particles.to(device)
+        )
+    )
+    loss_momentum = torch.mean(
+        torch.square(
+            (mom_particles_pred.to(device) - mom_particles_true.to(device)) / mom_particles_true.to(device)
         )
     )
     loss_ce = torch.nn.BCELoss()
@@ -423,7 +443,7 @@ def calc_LV_Lbeta(
     return (
         components
         if return_components
-        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids)
+        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
     )
 
 

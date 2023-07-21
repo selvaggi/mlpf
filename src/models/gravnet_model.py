@@ -129,7 +129,7 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev, input_dim: int = 8, output_dim: int = 30):
+    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31):
         super(GravnetModel, self).__init__()
         #input_dim: int = 8
         #output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
@@ -225,7 +225,8 @@ class GravnetModel(nn.Module):
         bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
         distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])  # 4, 5, 6: distance thresholds
         energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))  # 7: energy correction factor
-        pid_predicted = pred[:, 8:S]  # 8:S: predicted particle one-hot encoding
+        momentum = torch.nn.functional.relu(torch.reshape(pred[:, 30], [-1, 1]))
+        pid_predicted = pred[:, 8:30]  # 8:30: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -239,6 +240,7 @@ class GravnetModel(nn.Module):
             y,
             distance_threshold,
             energy_correction,
+            momentum=momentum,
             predicted_pid=pid_predicted,
             beta=bj.view(-1),
             cluster_space_coords=xj,  # Predicted by model
@@ -253,8 +255,8 @@ class GravnetModel(nn.Module):
         if return_resolution:
             return a
         loss = (
-            a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] # TODO: the last term is the PID classification loss, explore this yet
-        )  ##(L_V/batch_size, L_beta/batch_size, loss_E, loss_x)
+            a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] + 0.001 * a[5] # TODO: the last term is the PID classification loss, explore this yet
+        )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         return loss, a
 
 
