@@ -46,10 +46,12 @@ def train_regression(
     count = 0
     step_count = 0
     start_time = time.time()
+    prev_time = time.time()
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             # print(batch_g)
             # print(y)
+            load_end_time = time.time()
             label = y
             step_count += 1
             num_examples = label.shape[0]
@@ -69,10 +71,11 @@ def train_regression(
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(opt)
                 grad_scaler.update()
-
+            step_end_time = time.time()
             if scheduler and getattr(scheduler, "_update_per_step", False):
                 scheduler.step()
-
+            if logwandb:
+                wandb.log({"load_time": load_end_time - prev_time, "step_time": step_end_time - load_end_time}, step=step_count)
             loss = loss.item()
 
             num_batches += 1
@@ -118,6 +121,7 @@ def train_regression(
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
+            prev_time = time.time()
 
     time_diff = time.time() - start_time
     _logger.info(
