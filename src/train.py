@@ -90,6 +90,7 @@ def _main(args):
 
     model, model_info, loss_func = model_setup(args, data_config)
 
+
     # note: we should always save/load the state_dict of the original model, not the one wrapped by nn.DataParallel
     # so we do not convert it to nn.DataParallel now
     orig_model = model
@@ -102,6 +103,7 @@ def _main(args):
             wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
             wandb.run.name = args.wandb_displayname
             log_wandb_init(args)
+            wandb.watch(model)
 
         model = orig_model.to(dev)
         print("MODEL DEVICE", next(model.parameters()).is_cuda)
