@@ -259,17 +259,18 @@ def calc_LV_Lbeta(
     loss_E = torch.mean(
         torch.square(
             (e_particles_pred.to(device) - e_particles.to(device))
-            #/ e_particles.to(device))#[particles_mask.to(device) == 1]
+            / e_particles.to(device)
         )
     )
     loss_momentum = torch.mean(
         torch.square(
-            (mom_particles_pred.to(device) - mom_particles_true.to(device)) #/ mom_particles_true.to(device)
+            (mom_particles_pred.to(device) - mom_particles_true.to(device)) / mom_particles_true.to(device)
         )
     )
     loss_ce = torch.nn.BCELoss()
     loss_mse = torch.nn.MSELoss()
     loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
+    #loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
     loss_particle_ids = loss_ce(pid_particles_pred.to(device), pid_particles_true.to(device))
     pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
     pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
