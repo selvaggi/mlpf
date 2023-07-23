@@ -14,6 +14,7 @@ from sklearn.metrics import confusion_matrix
 
 
 from src.layers.object_cond import onehot_particles_arr
+class_names = ["other"] + [str(i) for i in onehot_particles_arr]
 
 
 def train_regression(
@@ -109,6 +110,7 @@ def train_regression(
                         )
 
             if logwandb and (num_batches % 50):
+                pid_true, pid_pred = losses[7], losses[8]
                 wandb.log({"loss regression": loss,
                            "loss lv": losses[0],
                            "loss beta": losses[1],
@@ -116,8 +118,11 @@ def train_regression(
                            "loss X": losses[3],
                            "loss PID": losses[4],
                            "loss momentum": losses[5],
-                           "loss mass (not us. for opt.)": losses[6]
+                           "loss mass (not us. for opt.)": losses[6],
+                           "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                                         class_names=class_names)
                            }, step=num_batches)
+
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -246,12 +251,15 @@ def evaluate_regression(
                             )
 
                 if logwandb and (num_batches % 50):
+                    pid_true, pid_pred = losses[7], losses[8]
                     wandb.log({
                         "loss val regression": loss,
                         "loss val lv": losses[0],
                         "loss val beta": losses[1],
                         "loss val E": losses[2],
-                        "loss val X": losses[3]
+                        "loss val X": losses[3],
+                        "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                                    class_names=class_names)
                     })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:

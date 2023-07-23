@@ -237,6 +237,7 @@ def calc_LV_Lbeta(
     e_particles = y[:, 3]
     mom_particles_true = y[:, 4]
     mass_particles_true = y[:, 5]
+    # particles_mask = y[:, 6]
     mom_particles_true = mom_particles_true.to(device)
     mass_particles_pred = mom_particles_true**2-mom_particles_pred**2
     mass_particles_true = mass_particles_true.to(device)
@@ -253,12 +254,12 @@ def calc_LV_Lbeta(
         e_particles = e_particles.detach().flatten()
         positions_particles_pred = positions_particles_pred.detach().flatten()
         x_particles = x_particles.detach().flatten()
-        return {"momentum_res": (()) , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
+        return {"momentum_res": ((mom_particles_pred-mom_particles_true) / mom_particles_true) , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
 
     loss_E = torch.mean(
         torch.square(
             ((e_particles_pred.to(device) - e_particles.to(device))
-            / e_particles.to(device))[particles_mask.to(device) == 1]
+            / e_particles.to(device))#[particles_mask.to(device) == 1]
         )
     )
     loss_momentum = torch.mean(
@@ -270,10 +271,10 @@ def calc_LV_Lbeta(
     loss_mse = torch.nn.MSELoss()
     loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
     loss_particle_ids = loss_ce(pid_particles_pred.to(device), pid_particles_true.to(device))
-    pid_true = pid_particles_true.argmax(dim=1)
-    pid_pred = pid_particles_pred.argmax(dim=1)
-    pid_true = [pid_dict[i] for i in pid_true]
-    pid_pred = [pid_dict[i] for i in pid_pred]
+    pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
+    pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
+    #pid_true = [pid_dict[i.long().item()] for i in pid_true]
+    #pid_pred = [pid_dict[i.long().item()] for i in pid_pred]
     # Connectivity matrix from hit (row) -> cluster (column)
     # Index to matrix, e.g.:
     # [1, 3, 1, 0] --> [
@@ -443,6 +444,7 @@ def calc_LV_Lbeta(
     if DEBUG:
         debug(formatted_loss_components_string(components))
     if torch.isnan(L_beta / batch_size):
+        print("isnan!!!")
         print(L_beta, batch_size)
         print("L_beta_noise", L_beta_noise)
         print("L_beta_sig", L_beta_sig)
