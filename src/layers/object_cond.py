@@ -448,17 +448,16 @@ def calc_LV_Lbeta(
         print(L_beta, batch_size)
         print("L_beta_noise", L_beta_noise)
         print("L_beta_sig", L_beta_sig)
-    e_particles_pred = e_particles_pred.detach().flatten()
-    e_particles = e_particles.detach().flatten()
-    positions_particles_pred = positions_particles_pred.detach().flatten()
-    x_particles = x_particles.detach().flatten()
+    e_particles_pred = e_particles_pred.detach().to("cpu").flatten()
+    e_particles = e_particles.detach().to("cpu").flatten()
+    positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
+    x_particles = x_particles.detach().to("cpu").flatten()
     resolutions = {"momentum_res": ((mom_particles_pred - mom_particles_true) / mom_particles_true),
                     "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
-    return (
+                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
         components
         if return_components
-        # also return pid_true and pid_pred here to log the confusion matrix at each validation step
+        # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
         else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
     )
 

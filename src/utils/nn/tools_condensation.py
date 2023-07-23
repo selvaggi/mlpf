@@ -123,7 +123,7 @@ def train_regression(
                                                                          class_names=class_names)
                            }, step=num_batches)
                 wandb.log({
-                    key: wandb.plot.histogram(val, title="train " + key) for key, val in losses[8]
+                    key: wandb.plot.histogram(val, title="train " + key) for key, val in losses[8].items()
                 })
 
 
@@ -265,7 +265,7 @@ def evaluate_regression(
                                                                     class_names=class_names)
                     })
                     wandb.log({
-                        key: wandb.plot.histogram(val, title="val " + key) for key, val in losses[8]
+                        key: wandb.plot.histogram(val, title="val " + key) for key, val in losses[8].items()
                     })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
