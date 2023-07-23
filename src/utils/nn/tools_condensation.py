@@ -122,11 +122,14 @@ def train_regression(
                            "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
                                                                          class_names=class_names)
                            }, step=num_batches)
+                ks = sorted(list(losses[9].keys()))
+                tables = {}
+                for key in ks:
+                    tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
+
                 wandb.log({
-                    key: wandb.plot.histogram(val, title="train " + key) for key, val in losses[8].items()
+                    key: wandb.plot.histogram(tables[key], key, title="train " + key) for key, val in losses[9].items()
                 })
-
-
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
@@ -264,8 +267,12 @@ def evaluate_regression(
                         "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
                                                                     class_names=class_names)
                     })
+                    ks = sorted(list(losses[9].keys()))
+                    tables = {}
+                    for key in ks:
+                        tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
                     wandb.log({
-                        key: wandb.plot.histogram(val, title="val " + key) for key, val in losses[8].items()
+                        key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
                     })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:

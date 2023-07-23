@@ -453,13 +453,10 @@ def calc_LV_Lbeta(
     positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
     x_particles = x_particles.detach().to("cpu").flatten()
     resolutions = {"momentum_res": ((mom_particles_pred - mom_particles_true) / mom_particles_true),
-                    "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
-        components
-        if return_components
-        # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
-        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
-    )
+                   "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+                   "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
+    # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
+    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
 
 
 def formatted_loss_components_string(components: dict) -> str:

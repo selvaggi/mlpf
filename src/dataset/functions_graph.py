@@ -180,13 +180,12 @@ def graph_batch_func(list_graphs):
         batch dgl: dgl batch of graphs
     """
     list_graphs_g = [el[0] for el in list_graphs]
-
     list_y = [el[1] for el in list_graphs]
     ys = torch.cat(list_y, dim=0)
     ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
     bg = dgl.batch(list_graphs_g)
     # reindex particle number
-    return bg, ys  # TODO: REINDEX particle_number! - this won't work out of the box!!!!
+    return bg, ys
 
 
 def spherical_to_cartesian(theta, phi, r, normalized=False):
