@@ -122,6 +122,9 @@ def train_regression(
                            "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
                                                                          class_names=class_names)
                            }, step=num_batches)
+                wandb.log({
+                    key: wandb.plot.histogram(val, title="train " + key) for key, val in losses[8]
+                })
 
 
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
@@ -260,6 +263,9 @@ def evaluate_regression(
                         "loss val X": losses[3],
                         "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
                                                                     class_names=class_names)
+                    })
+                    wandb.log({
+                        key: wandb.plot.histogram(val, title="val " + key) for key, val in losses[8]
                     })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:

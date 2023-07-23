@@ -258,13 +258,13 @@ def calc_LV_Lbeta(
 
     loss_E = torch.mean(
         torch.square(
-            ((e_particles_pred.to(device) - e_particles.to(device))
-            / e_particles.to(device))#[particles_mask.to(device) == 1]
+            (e_particles_pred.to(device) - e_particles.to(device))
+            #/ e_particles.to(device))#[particles_mask.to(device) == 1]
         )
     )
     loss_momentum = torch.mean(
         torch.square(
-            (mom_particles_pred.to(device) - mom_particles_true.to(device)) / mom_particles_true.to(device)
+            (mom_particles_pred.to(device) - mom_particles_true.to(device)) #/ mom_particles_true.to(device)
         )
     )
     loss_ce = torch.nn.BCELoss()
@@ -448,11 +448,18 @@ def calc_LV_Lbeta(
         print(L_beta, batch_size)
         print("L_beta_noise", L_beta_noise)
         print("L_beta_sig", L_beta_sig)
+    e_particles_pred = e_particles_pred.detach().flatten()
+    e_particles = e_particles.detach().flatten()
+    positions_particles_pred = positions_particles_pred.detach().flatten()
+    x_particles = x_particles.detach().flatten()
+    resolutions = {"momentum_res": ((mom_particles_pred - mom_particles_true) / mom_particles_true),
+                    "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
     return (
         components
         if return_components
         # also return pid_true and pid_pred here to log the confusion matrix at each validation step
-        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred)
+        else (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
     )
 
 
