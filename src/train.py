@@ -132,6 +132,7 @@ def _main(args):
         best_valid_metric = np.inf if args.regression_mode else 0
         grad_scaler = torch.cuda.amp.GradScaler() if args.use_amp else None
         tb = None
+        steps = 0  # for wandb logging
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
                 if epoch <= args.load_epoch:
@@ -139,7 +140,7 @@ def _main(args):
             _logger.info("-" * 50)
             _logger.info("Epoch #%d training" % epoch)
 
-            train(
+            steps += train(
                 model,
                 loss_func,
                 opt,
@@ -152,6 +153,7 @@ def _main(args):
                 tb_helper=tb,
                 logwandb=args.log_wandb,
                 local_rank=local_rank,
+                current_step=steps
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):

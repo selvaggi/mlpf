@@ -30,6 +30,7 @@ def train_regression(
         tb_helper=None,
         logwandb=False,
         local_rank=0,
+        current_step=0,  # current_step: used for logging correctly
 ):
     model.train()
     # print("starting to train")
@@ -45,9 +46,10 @@ def train_regression(
     sum_abs_err = 0
     sum_sqr_err = 0
     count = 0
-    step_count = 0
+    step_count = current_step
     start_time = time.time()
     prev_time = time.time()
+    loss_epoch_total, losses_epoch_total = [], []
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             # print(batch_g)
@@ -111,6 +113,8 @@ def train_regression(
 
             if logwandb and (num_batches % 50):
                 pid_true, pid_pred = losses[7], losses[8]
+                loss_epoch_total.append(loss)
+                losses_epoch_total.append(losses)
                 wandb.log({"loss regression": loss,
                            "loss lv": losses[0],
                            "loss beta": losses[1],
@@ -119,17 +123,16 @@ def train_regression(
                            "loss PID": losses[4],
                            "loss momentum": losses[5],
                            "loss mass (not us. for opt.)": losses[6],
-                           "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                                         class_names=class_names)
-                           }, step=num_batches)
+                           #"conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                           #                                              class_names=class_names)
+                           }, step=step_count)
                 ks = sorted(list(losses[9].keys()))
                 tables = {}
                 for key in ks:
                     tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-
                 wandb.log({
                     key: wandb.plot.histogram(tables[key], key, title="train " + key) for key, val in losses[9].items()
-                })
+                }, step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
@@ -167,6 +170,98 @@ def train_regression(
 
     if scheduler and not getattr(scheduler, "_update_per_step", False):
         scheduler.step()
+    return step_count
+
+# TODO finish this function
+def inference(
+        model,
+        test_loader,
+        dev,
+        epoch,
+        for_training=True,
+        loss_func=None,
+        steps_per_epoch=None,
+        eval_metrics=[
+            "mean_squared_error",
+            "mean_absolute_error",
+            "median_absolute_error",
+            "mean_gamma_deviance",
+        ],
+        tb_helper=None,
+        logwandb=False,
+        energy_weighted=False,
+        local_rank=0
+):
+    '''
+    TODO.
+    Similar to evaluate_regression, but without the ground truth labels.
+    '''
+    model.eval()
+    num_batches = 0
+    count = 0
+    results = []
+    start_time = time.time()
+    with torch.no_grad():
+        with tqdm.tqdm(test_loader) as tq:
+            for batch_g, _ in tq:
+                # We don't have y!
+                batch_g = batch_g.to(dev)
+                num_examples = label.shape[0]
+                label = label.to(dev)
+                model_output = model(batch_g)
+                preds = model_output.squeeze().float()
+                loss, losses = model.mod.object_condensation_loss2(
+                    batch_g, model_output, y
+                )
+                num_batches += 1
+                count += num_examples
+
+                tq.set_postfix(
+                    {
+                        "Loss": "%.5f" % loss,
+                        "AvgLoss": "%.5f" % (total_loss / count),
+                    }
+                )
+
+                if tb_helper:
+                    if tb_helper.custom_fn:
+                        with torch.no_grad():
+                            tb_helper.custom_fn(
+                                model_output=model_output,
+                                model=model,
+                                epoch=epoch,
+                                i_batch=num_batches,
+                                mode="eval" if for_training else "test",
+                            )
+
+                if logwandb and (num_batches % 50):
+                    pid_true, pid_pred = losses[7], losses[8]
+                    wandb.log({
+                        "loss val regression": loss,
+                        "loss val lv": losses[0],
+                        "loss val beta": losses[1],
+                        "loss val E": losses[2],
+                        "loss val X": losses[3],
+                        "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                                    class_names=class_names)
+                    }, step=current)
+                    ks = sorted(list(losses[9].keys()))
+                    tables = {}
+                    for key in ks:
+                        tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
+                    wandb.log({
+                        key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
+                    })
+
+                if steps_per_epoch is not None and num_batches >= steps_per_epoch:
+                    break
+
+    time_diff = time.time() - start_time
+    _logger.info(
+        "Processed %d entries in total (avg. speed %.1f entries/s)"
+        % (count, count / time_diff)
+    )
+
 
 
 def evaluate_regression(
@@ -219,6 +314,8 @@ def evaluate_regression(
     labels = defaultdict(list)
     observers = defaultdict(list)
     start_time = time.time()
+    all_val_loss, all_val_losses = [], []
+
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
@@ -227,13 +324,10 @@ def evaluate_regression(
                 num_examples = label.shape[0]
                 label = label.to(dev)
                 model_output = model(batch_g)
-
                 preds = model_output.squeeze().float()
-
                 loss, losses = model.mod.object_condensation_loss2(
                     batch_g, model_output, y
                 )
-
                 num_batches += 1
                 count += num_examples
                 total_loss += loss * num_examples
@@ -255,28 +349,33 @@ def evaluate_regression(
                                 i_batch=num_batches,
                                 mode="eval" if for_training else "test",
                             )
-
-                if logwandb and (num_batches % 50):
-                    pid_true, pid_pred = losses[7], losses[8]
-                    wandb.log({
-                        "loss val regression": loss,
-                        "loss val lv": losses[0],
-                        "loss val beta": losses[1],
-                        "loss val E": losses[2],
-                        "loss val X": losses[3],
-                        "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                                    class_names=class_names)
-                    })
-                    ks = sorted(list(losses[9].keys()))
-                    tables = {}
-                    for key in ks:
-                        tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-                    wandb.log({
-                        key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
-                    })
-
+                all_val_losses.append(losses)
+                all_val_loss.append(loss)
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
+
+    if logwandb:
+        pid_true, pid_pred = torch.cat([x[7] for x in all_val_losses]), torch.cat([x[8] for x in all_val_losses])
+        all_val_losses = np.array(all_val_losses)
+        wandb.log({
+            "loss val regression": np.mean(all_val_loss),
+            "loss val lv": np.mean([x[0] for x in all_val_losses]),
+            "loss val beta": np.mean([x[1] for x in all_val_losses]),
+            "loss val E": np.mean([x[2] for x in all_val_losses]),
+            "loss val X": np.mean([x[3] for x in all_val_losses]),
+            "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                        class_names=class_names)
+         }, step=epoch)
+        ks = sorted(list(all_val_losses[0][9].keys()))
+        concatenated = {}
+        for key in ks:
+            concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
+        tables = {}
+        for key in ks:
+            tables[key] = wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
+        wandb.log({
+            key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
+        }, step=epoch)
 
     time_diff = time.time() - start_time
     _logger.info(
