@@ -14,8 +14,11 @@ from sklearn.metrics import confusion_matrix
 
 
 from src.layers.object_cond import onehot_particles_arr, get_clustering, calc_LV_Lbeta_inference
-class_names = ["other"] + [str(i) for i in onehot_particles_arr]
+class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
+
+def clip_list(l, clip_val=4.):
+    return [min(clip_val, i) for i in l]
 
 def train_regression(
         model,
@@ -112,7 +115,7 @@ def train_regression(
                             mode="train",
                         )
 
-            if logwandb and (num_batches % 50):
+            if logwandb: #and (num_batches % 50):
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
@@ -133,7 +136,7 @@ def train_regression(
                 for key in ks:
                     tables[key] = losses[9][key]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
                 wandb.log({
-                    key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses_cpu[9].items()
+                    key: wandb.Histogram(clip_list(tables[key]), num_bins=100) for key, val in losses_cpu[9].items()
                 }, step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -326,7 +329,7 @@ def evaluate_regression(
         for key in ks:
             tables[key] = concatenated[key] #wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
         wandb.log({
-            key: wandb.Histogram(tables[key], num_bins=100) for key, val in all_val_losses[9].items()
+            "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100) for key in ks
         }, step=epoch)
 
     time_diff = time.time() - start_time
