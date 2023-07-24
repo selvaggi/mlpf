@@ -258,6 +258,41 @@ class GravnetModel(nn.Module):
             a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] + 0.001 * a[5] # TODO: the last term is the PID classification loss, explore this yet
         )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         return loss, a
+    def object_condensation_inference(self, batch, pred):
+        '''
+        Similar to object_condensation_loss, but made for inference
+        '''
+        _, S = pred.shape
+        xj = torch.nn.functional.normalize(pred[:, 0:3], dim=1)  # 0, 1, 2: cluster space coords
+        bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
+        distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])  # 4, 5, 6: distance thresholds
+        energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))  # 7: energy correction factor
+        momentum = torch.nn.functional.relu(torch.reshape(pred[:, 30], [-1, 1]))  # momentum magnitude
+        pid_predicted = pred[:, 8:30]  # 8:30: predicted particle PID
+        clustering_index = get_clustering(bj, xj)
+        dev = batch.device
+        len_batch = len(batch.batch_num_nodes())
+        batch_numbers = torch.repeat_interleave(
+            torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
+        ).to(dev)
+
+        pred = calc_LV_Lbeta_inference(
+            batch,
+            distance_threshold,
+            energy_correction,
+            momentum=momentum,
+            predicted_pid=pid_predicted,
+            beta=bj.view(-1),
+            cluster_space_coords=xj,  # Predicted by model
+            cluster_index_per_event=clustering_index.view(
+                -1
+            ).long(),  # Predicted hit->cluster index, determined by the clustering
+            batch=batch_numbers.long(),
+            qmin=0.1,
+            post_pid_pool_module=self.post_pid_pool_module
+        )
+        return pred
+
 
 
 # class NoiseFilterModel(nn.Module):

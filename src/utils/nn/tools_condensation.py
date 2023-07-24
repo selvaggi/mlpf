@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 
 
-from src.layers.object_cond import onehot_particles_arr
+from src.layers.object_cond import onehot_particles_arr, get_clustering, calc_LV_Lbeta_inference
 class_names = ["other"] + [str(i) for i in onehot_particles_arr]
 
 
@@ -179,18 +179,8 @@ def inference(
         dev,
         epoch,
         for_training=True,
-        loss_func=None,
         steps_per_epoch=None,
-        eval_metrics=[
-            "mean_squared_error",
-            "mean_absolute_error",
-            "median_absolute_error",
-            "mean_gamma_deviance",
-        ],
-        tb_helper=None,
         logwandb=False,
-        energy_weighted=False,
-        local_rank=0
 ):
     '''
     TODO.
@@ -204,54 +194,14 @@ def inference(
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, _ in tq:
-                # We don't have y!
                 batch_g = batch_g.to(dev)
                 num_examples = label.shape[0]
                 label = label.to(dev)
                 model_output = model(batch_g)
                 preds = model_output.squeeze().float()
-                loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y
-                )
+                preds = model.mod.object_condensation_inference(batch_g, model_output)
                 num_batches += 1
                 count += num_examples
-
-                tq.set_postfix(
-                    {
-                        "Loss": "%.5f" % loss,
-                        "AvgLoss": "%.5f" % (total_loss / count),
-                    }
-                )
-
-                if tb_helper:
-                    if tb_helper.custom_fn:
-                        with torch.no_grad():
-                            tb_helper.custom_fn(
-                                model_output=model_output,
-                                model=model,
-                                epoch=epoch,
-                                i_batch=num_batches,
-                                mode="eval" if for_training else "test",
-                            )
-
-                if logwandb and (num_batches % 50):
-                    pid_true, pid_pred = losses[7], losses[8]
-                    wandb.log({
-                        "loss val regression": loss,
-                        "loss val lv": losses[0],
-                        "loss val beta": losses[1],
-                        "loss val E": losses[2],
-                        "loss val X": losses[3],
-                        "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                                    class_names=class_names)
-                    }, step=current)
-                    ks = sorted(list(losses[9].keys()))
-                    tables = {}
-                    for key in ks:
-                        tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-                    wandb.log({
-                        key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
-                    })
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
@@ -261,7 +211,6 @@ def inference(
         "Processed %d entries in total (avg. speed %.1f entries/s)"
         % (count, count / time_diff)
     )
-
 
 
 def evaluate_regression(

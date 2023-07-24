@@ -460,6 +460,139 @@ def calc_LV_Lbeta(
     return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
 
 
+def calc_LV_Lbeta_inference(
+    g,
+    distance_threshold,
+    energy_correction,
+    momentum: torch.Tensor,
+    beta: torch.Tensor,
+    cluster_space_coords: torch.Tensor,  # Predicted by model
+    cluster_index_per_event: torch.Tensor,  # inferred cluster_index_per_event
+    batch: torch.Tensor,
+    predicted_pid: torch.Tensor,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
+    post_pid_pool_module: torch.nn.Module,  # MLP to apply to the pooled embeddings to get the PID predictions
+    # From here on just parameters
+    qmin: float = 0.1,
+    s_B: float = 1.0,
+    beta_stabilizing="soft_q_scaling",
+    huberize_norm_for_V_attractive=False,
+    beta_term_option="paper",
+) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
+    """
+    Calculates the L_V and L_beta object condensation losses.
+    Concepts:
+    - A hit belongs to exactly one cluster (cluster_index_per_event is (n_hits,)),
+      and to exactly one event (batch is (n_hits,))
+    - A cluster index of `noise_cluster_index` means the cluster is a noise cluster.
+      There is typically one noise cluster per event. Any hit in a noise cluster
+      is a 'noise hit'. A hit in an object is called a 'signal hit' for lack of a
+      better term.
+    - An 'object' is a cluster that is *not* a noise cluster.
+    beta_stabilizing: Choices are ['paper', 'clip', 'soft_q_scaling']:
+        paper: beta is sigmoid(model_output), q = beta.arctanh()**2 + qmin
+        clip:  beta is clipped to 1-1e-4, q = beta.arctanh()**2 + qmin
+        soft_q_scaling: beta is sigmoid(model_output), q = (clip(beta)/1.002).arctanh()**2 + qmin
+    huberize_norm_for_V_attractive: Huberizes the norms when used in the attractive potential
+    beta_term_option: Choices are ['paper', 'short-range-potential']:
+        Choosing 'short-range-potential' introduces a short range potential around high
+        beta points, acting like V_attractive.
+    Note this function has modifications w.r.t. the implementation in 2002.03605:
+    - The norms for V_repulsive are now Gaussian (instead of linear hinge)
+    """
+    # remove dummy rows added for dataloader  # TODO think of better way to do this
+
+    device = beta.device
+    assert_no_nans(beta)
+    # ________________________________
+    # Calculate a bunch of needed counts and indices locally
+
+    # cluster_index: unique index over events
+    # E.g. cluster_index_per_event=[ 0, 0, 1, 2, 0, 0, 1], batch=[0, 0, 0, 0, 1, 1, 1]
+    #      -> cluster_index=[ 0, 0, 1, 2, 3, 3, 4 ]
+
+    cluster_index, n_clusters_per_event = batch_cluster_indices(
+        cluster_index_per_event, batch
+    )
+    n_clusters = n_clusters_per_event.sum()
+    n_hits, cluster_space_dim = cluster_space_coords.size()
+    batch_size = batch.max() + 1
+    n_hits_per_event = scatter_count(batch)
+
+    # Index of cluster -> event (n_clusters,)
+    # batch_cluster = scatter_counts_to_indices(n_clusters_per_event)
+
+    # Per-hit boolean, indicating whether hit is sig or noise
+    #is_noise = cluster_index_per_event == noise_cluster_index
+    ##is_sig = ~is_noise
+    #n_hits_sig = is_sig.sum()
+    #n_sig_hits_per_event = scatter_count(batch[is_sig])
+
+    # Per-cluster boolean, indicating whether cluster is an object or noise
+    #is_object = scatter_max(is_sig.long(), cluster_index)[0].bool()
+    #is_noise_cluster = ~is_object
+
+    # FIXME: This assumes noise_cluster_index == 0!!
+    # Not sure how to do this in a performant way in case noise_cluster_index != 0
+    #if noise_cluster_index != 0:
+    #    raise NotImplementedError
+    #object_index_per_event = cluster_index_per_event[is_sig] - 1
+    #object_index, n_objects_per_event = batch_cluster_indices(
+    #    object_index_per_event, batch[is_sig]
+    #)
+    #n_hits_per_object = scatter_count(object_index)
+    # print("n_hits_per_object", n_hits_per_object)
+    #batch_object = batch_cluster[is_object]
+    #n_objects = is_object.sum()
+
+    #assert object_index.size() == (n_hits_sig,)
+    #assert is_object.size() == (n_clusters,)
+    #assert torch.all(n_hits_per_object > 0)
+    #assert object_index.max() + 1 == n_objects
+
+    # ________________________________
+    # L_V term
+
+    # Calculate q
+    if beta_stabilizing == "paper":
+        q = beta.arctanh() ** 2 + qmin
+    elif beta_stabilizing == "clip":
+        beta = beta.clip(0.0, 1 - 1e-4)
+        q = beta.arctanh() ** 2 + qmin
+    elif beta_stabilizing == "soft_q_scaling":
+        q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
+    else:
+        raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
+    assert_no_nans(q)
+    assert q.device == device
+    assert q.size() == (n_hits,)
+    # TODO:  continue here
+    # Calculate q_alpha, the max q per object, and the indices of said maxima
+    q_alpha, index_alpha = scatter_max(q, cluster_index)
+    assert q_alpha.size() == (n_clusters,)
+
+    # Get the cluster space coordinates and betas for these maxima hits too
+    x_alpha = cluster_space_coords[index_alpha]
+    beta_alpha = beta[index_alpha]
+
+    positions_particles_pred = g.ndata["pos_hits_norm"][index_alpha]
+    positions_particles_pred = (
+        positions_particles_pred + distance_threshold[index_alpha]
+    )
+
+    is_sig_everything = torch.ones_like(index_alpha).bool()
+    e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
+        batch, g, cluster_index_per_event, is_sig_everything, q, beta, energy_correction, predicted_pid, momentum
+    )
+    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # project the pooled PID embeddings to the final "one hot encoding" space
+
+    mass_particles_pred = e_particles_pred**2-mom_particles_pred**2
+    mass_particles_pred[mass_particles_pred < 0] = 0.
+    mass_particles_pred = torch.sqrt(mass_particles_pred)
+
+    pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
+    return pid_pred, pid_particles_pred, mass_particles_pred, e_particles_pred, mom_particles_pred
+
+
 def formatted_loss_components_string(components: dict) -> str:
     """
     Formats the components returned by calc_LV_Lbeta
