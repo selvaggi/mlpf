@@ -18,7 +18,17 @@ class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
 
 def clip_list(l, clip_val=4.):
-    return [min(clip_val, i) for i in l]
+    result = []
+    for item in l:
+        if abs(item) > clip_val:
+            if item > 0:
+                result.append(clip_val)
+            else:
+                result.append(-clip_val)
+        else:
+            result.append(item)
+    return result
+
 
 def train_regression(
         model,
@@ -127,8 +137,8 @@ def train_regression(
                            "loss PID": losses[4],
                            "loss momentum": losses[5],
                            "loss mass (not us. for opt.)": losses[6],
-                           #"conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                           #                                              class_names=class_names)
+                           "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                                         class_names=class_names)
                            }, step=step_count)
                 ks = sorted(list(losses[9].keys()))
                 losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
