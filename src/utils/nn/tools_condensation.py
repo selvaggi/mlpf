@@ -129,9 +129,9 @@ def train_regression(
                 ks = sorted(list(losses[9].keys()))
                 tables = {}
                 for key in ks:
-                    tables[key] = wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
+                    tables[key] = losses[9][key]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
                 wandb.log({
-                    key: wandb.plot.histogram(tables[key], key, title="train " + key) for key, val in losses[9].items()
+                    key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses[9].items()
                 }, step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -321,9 +321,9 @@ def evaluate_regression(
             concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
         tables = {}
         for key in ks:
-            tables[key] = wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
+            tables[key] = concatenated[key] #wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
         wandb.log({
-            key: wandb.plot.histogram(tables[key], key, title="val " + key) for key, val in losses[9].items()
+            key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses[9].items()
         }, step=epoch)
 
     time_diff = time.time() - start_time
