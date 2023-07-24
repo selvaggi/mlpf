@@ -245,7 +245,8 @@ def evaluate_regression(
         tb_helper=None,
         logwandb=False,
         energy_weighted=False,
-        local_rank=0
+        local_rank=0,
+        step=0
 ):
     '''
 
@@ -330,7 +331,7 @@ def evaluate_regression(
             "loss val X": np.mean([x[3] for x in all_val_losses]),
             "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
                                                         class_names=class_names)
-         }, step=epoch)
+         }, step=step)
         ks = sorted(list(all_val_losses[0][9].keys()))
         concatenated = {}
         for key in ks:
@@ -340,7 +341,7 @@ def evaluate_regression(
             tables[key] = concatenated[key] #wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
         wandb.log({
             "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100) for key in ks
-        }, step=epoch)
+        }, step=step)
 
     time_diff = time.time() - start_time
     _logger.info(

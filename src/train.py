@@ -90,7 +90,6 @@ def _main(args):
 
     model, model_info, loss_func = model_setup(args, data_config)
 
-
     # note: we should always save/load the state_dict of the original model, not the one wrapped by nn.DataParallel
     # so we do not convert it to nn.DataParallel now
     orig_model = model
@@ -99,11 +98,9 @@ def _main(args):
         if args.log_wandb and local_rank == 0:
             import wandb
             from src.utils.logger_wandb import log_wandb_init
-
             wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
             wandb.run.name = args.wandb_displayname
             log_wandb_init(args)
-            wandb.watch(model)
 
         model = orig_model.to(dev)
         print("MODEL DEVICE", next(model.parameters()).is_cuda)
@@ -126,6 +123,8 @@ def _main(args):
             if gpus is not None and len(gpus) > 1:
                 # model becomes `torch.nn.DataParallel` w/ model.module being the original `torch.nn.Module`
                 model = torch.nn.DataParallel(model, device_ids=gpus)
+        if args.log_wandb and local_rank == 0:
+            wandb.watch(model, log="all", log_freq=10)
             # model = model.to(dev)
 
         # training loop
@@ -194,6 +193,7 @@ def _main(args):
                 logwandb=args.log_wandb,
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
+                step=steps
             )
             is_best_epoch = (
                 (valid_metric < best_valid_metric)
@@ -201,6 +201,7 @@ def _main(args):
                 else (valid_metric > best_valid_metric)
             )
             if is_best_epoch:
+                print("Best epoch!")
                 best_valid_metric = valid_metric
                 if args.model_prefix and (args.backend is None or local_rank == 0):
                     shutil.copy2(
