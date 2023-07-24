@@ -355,7 +355,7 @@ def evaluate_regression(
                     break
 
     if logwandb:
-        pid_true, pid_pred = torch.cat([x[7] for x in all_val_losses]), torch.cat([x[8] for x in all_val_losses])
+        pid_true, pid_pred = torch.cat([torch.tensor(x[7]) for x in all_val_losses]), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
         all_val_losses = np.array(all_val_losses)
         wandb.log({
             "loss val regression": np.mean(all_val_loss),
