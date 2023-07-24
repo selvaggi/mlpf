@@ -349,14 +349,14 @@ def evaluate_regression(
                                 i_batch=num_batches,
                                 mode="eval" if for_training else "test",
                             )
-                all_val_losses.append(losses)
-                all_val_loss.append(loss)
+                losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
+                all_val_losses.append(losses_cpu)
+                all_val_loss.append(loss.detach().to("cpu").item())
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
 
     if logwandb:
         pid_true, pid_pred = torch.cat([torch.tensor(x[7]) for x in all_val_losses]), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
-        all_val_losses = np.array(all_val_losses)
         wandb.log({
             "loss val regression": np.mean(all_val_loss),
             "loss val lv": np.mean([x[0] for x in all_val_losses]),
