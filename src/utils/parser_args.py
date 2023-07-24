@@ -62,6 +62,8 @@ parser.add_argument('-m', '--model-prefix', type=str, default='models/{auto}/net
                          'including the suffix, otherwise the one with the best validation metric will be used; '
                          'for training, `{auto}` can be used as part of the path to auto-generate a name, '
                          'based on the timestamp and network configuration')
+parser.add_argument('-p', '--model-pretrained', type=str, default='',
+                    help='Path to load the model from when training. Useful if your training has crashed in the middle.')
 parser.add_argument('--load-model-weights', type=str, default=None,
                     help='initialize model with pre-trained weights')
 parser.add_argument('--num-epochs', type=int, default=20,

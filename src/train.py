@@ -103,6 +103,10 @@ def _main(args):
             log_wandb_init(args)
 
         model = orig_model.to(dev)
+        if args.model_pretrained:
+            model_path = args.model_pretrained
+            _logger.info("Loading model %s for training from there on" % model_path)
+            model.load_state_dict(torch.load(model_path, map_location=dev))
         print("MODEL DEVICE", next(model.parameters()).is_cuda)
 
         # DistributedDataParallel
