@@ -95,7 +95,7 @@ def create_inputs_from_table(output):
             y_energy,
             y_mom,
             y_mass,
-            features_particles[:, 4].view(-1).unsqueeze(1),  # particle type (discrete)
+            features_particles[:, 4].view(-1).unsqueeze(1),  # particle ID (discrete)
         ),
         dim=1,
     )

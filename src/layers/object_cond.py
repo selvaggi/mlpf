@@ -254,7 +254,9 @@ def calc_LV_Lbeta(
         e_particles = e_particles.detach().flatten()
         positions_particles_pred = positions_particles_pred.detach().flatten()
         x_particles = x_particles.detach().flatten()
-        return {"momentum_res": ((mom_particles_pred-mom_particles_true) / mom_particles_true) , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
+        mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+        mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
+        return {"momentum_res": ((mom_particles_pred-mom_particles_true) / mom_particles_true).tolist() , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
 
     loss_E = torch.mean(
         torch.square(
@@ -453,6 +455,8 @@ def calc_LV_Lbeta(
     e_particles = e_particles.detach().to("cpu").flatten()
     positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
     x_particles = x_particles.detach().to("cpu").flatten()
+    mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+    mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
     resolutions = {"momentum_res": ((mom_particles_pred - mom_particles_true) / mom_particles_true),
                    "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}

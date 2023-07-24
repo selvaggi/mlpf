@@ -96,6 +96,7 @@ def train_regression(
             )
 
             if tb_helper:
+                print("tb_helper!", tb_helper)
                 tb_helper.write_scalars(
                     [
                         ("Loss/train", loss, tb_helper.batch_train_count + num_batches),
@@ -127,11 +128,12 @@ def train_regression(
                            #                                              class_names=class_names)
                            }, step=step_count)
                 ks = sorted(list(losses[9].keys()))
+                losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
                 tables = {}
                 for key in ks:
                     tables[key] = losses[9][key]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
                 wandb.log({
-                    key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses[9].items()
+                    key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses_cpu[9].items()
                 }, step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
@@ -306,6 +308,7 @@ def evaluate_regression(
 
     if logwandb:
         pid_true, pid_pred = torch.cat([torch.tensor(x[7]) for x in all_val_losses]), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
+        pid_true, pid_pred = pid_true.tolist(), pid_pred.tolist()
         wandb.log({
             "loss val regression": np.mean(all_val_loss),
             "loss val lv": np.mean([x[0] for x in all_val_losses]),
@@ -323,7 +326,7 @@ def evaluate_regression(
         for key in ks:
             tables[key] = concatenated[key] #wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
         wandb.log({
-            key: wandb.Histogram(tables[key], num_bins=100) for key, val in losses[9].items()
+            key: wandb.Histogram(tables[key], num_bins=100) for key, val in all_val_losses[9].items()
         }, step=epoch)
 
     time_diff = time.time() - start_time
