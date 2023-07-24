@@ -239,7 +239,7 @@ def calc_LV_Lbeta(
     mass_particles_true = y[:, 5]
     # particles_mask = y[:, 6]
     mom_particles_true = mom_particles_true.to(device)
-    mass_particles_pred = mom_particles_true**2-mom_particles_pred**2
+    mass_particles_pred = e_particles_pred**2-mom_particles_pred**2
     mass_particles_true = mass_particles_true.to(device)
     mass_particles_pred[mass_particles_pred < 0] = 0.
     mass_particles_pred = torch.sqrt(mass_particles_pred)
