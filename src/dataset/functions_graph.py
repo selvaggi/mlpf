@@ -145,7 +145,7 @@ def create_graph(output):
     # g = dgl.to_bidirected(g)
     if coord_cart_hits.shape[0] > 0:
         graph_empty = False
-        g = dgl.knn_graph(coord_cart_hits, 7, exclude_self=True)
+        g = dgl.knn_graph(coord_cart_hits_norm, 7, exclude_self=True)
         hit_features_graph = torch.cat(
             (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
         )
