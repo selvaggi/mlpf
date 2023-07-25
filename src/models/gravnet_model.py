@@ -129,12 +129,12 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31):
+    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31, n_postgn_dense_blocks: int=  4, n_gravnet_blocks: int = 4):
         super(GravnetModel, self).__init__()
         #input_dim: int = 8
         #output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
-        n_gravnet_blocks: int = 4
-        n_postgn_dense_blocks: int = 4
+        #n_gravnet_blocks: int = 4
+        # n_postgn_dense_blocks: int = 4
         k = 40
         self.input_dim = input_dim
         self.output_dim = output_dim

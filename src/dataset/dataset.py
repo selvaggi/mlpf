@@ -276,7 +276,7 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
 
-        [g, features_partnn], graph_empty = create_graph(X)
+        [g, features_partnn], graph_empty = create_graph(X, self._data_config)
         return [g, features_partnn], graph_empty
 
 

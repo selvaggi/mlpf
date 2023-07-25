@@ -41,6 +41,8 @@ class DataConfig(object):
             'observers': [],
             'monitor_variables': [],
             'weights': None,
+            'graph_config': {},
+            'custom_model_kwargs': {}
         }
         for k, v in kwargs.items():
             if v is not None:
@@ -213,3 +215,4 @@ class DataConfig(object):
                 }
         with open(fp, 'w') as f:
             json.dump(j, f, indent=2)
+
