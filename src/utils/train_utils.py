@@ -575,6 +575,7 @@ def model_setup(args, data_config):
         network_options["for_inference"] = True
     if args.use_amp:
         network_options["use_amp"] = True
+    network_options["output_dim"] = args.clustering_space_dim + 28
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
         dev = torch.device(gpus[0])

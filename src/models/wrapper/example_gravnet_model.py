@@ -15,7 +15,7 @@ def get_model(data_config, dev, **kwargs):
 
     # pf_features_dims = len(data_config.input_dicts['pf_features'])
     # num_classes = len(data_config.label_value)
-    model = GraphTransformerNetWrapper(dev)
+    model = GraphTransformerNetWrapper(dev, **kwargs)
 
     model_info = {
         "input_names": list(data_config.input_names),

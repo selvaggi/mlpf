@@ -118,6 +118,7 @@ def calc_LV_Lbeta(
     beta_term_option="paper",
     return_components=False,
     return_regression_resolution=False,
+    clust_space_dim=3,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -866,9 +867,9 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=1.0):
     unassigned = torch.arange(n_points)
     clustering = -1 * torch.ones(n_points, dtype=torch.long)
     for index_condpoint in indices_condpoints:
-        d = torch.norm(X[unassigned] - X[index_condpoint], dim=-1)
+        d = torch.norm(X[unassigned] - X[index_condpoint][0], dim=-1)
         assigned_to_this_condpoint = unassigned[d < td]
-        clustering[assigned_to_this_condpoint] = index_condpoint
+        clustering[assigned_to_this_condpoint] = index_condpoint[0]
         unassigned = unassigned[~(d < td)]
     return clustering
 

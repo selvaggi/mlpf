@@ -156,7 +156,8 @@ def _main(args):
                 tb_helper=tb,
                 logwandb=args.log_wandb,
                 local_rank=local_rank,
-                current_step=steps
+                current_step=steps,
+                clust_loss_only=args.clustering_loss_only,
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):
