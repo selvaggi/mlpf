@@ -45,7 +45,7 @@ def find_cluster_id(hit_particle_link):
     else:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
         cluster_id = torch.Tensor(list(cluster_id)) + 1
-    return cluster_id
+    return cluster_id, unique_list_particles
 
 def create_inputs_from_table(output):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
@@ -53,7 +53,7 @@ def create_inputs_from_table(output):
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
 
-    cluster_id = find_cluster_id(hit_particle_link)
+    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
     )
@@ -107,7 +107,7 @@ def create_inputs_from_table(output):
     assert len(y_data_graph) == len(unique_list_particles)
 
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
-    cluster_id = find_cluster_id(hit_particle_link[~mask_hits])
+    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
     return (
         number_hits,
