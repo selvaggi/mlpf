@@ -2,6 +2,7 @@ import wandb
 import numpy as np
 import torch
 from sklearn.metrics import roc_curve, roc_auc_score
+import json
 
 def log_wandb_init(args):
     """log information about the run in the config section of wandb
@@ -15,6 +16,7 @@ def log_wandb_init(args):
     else:
         wandb.config.classification_mode = True
     wandb.config.num_epochs = args.num_epochs
+    wandb.config.args = json.dumps(vars(args))
 
 def log_confussion_matrix_wandb(y_true, y_score, epoch):
     """function to log confussion matrix in the wandb.ai website 
