@@ -32,11 +32,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a):
     return mask, mask_particles
 
 
-def create_inputs_from_table(output):
-    number_hits = np.int32(np.sum(output["pf_mask"][0]))
-    number_part = np.int32(np.sum(output["pf_mask"][1]))
-    #! idx of particle does not start at 1
-    hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
+def find_cluster_id(hit_particle_link):
     unique_list_particles = list(np.unique(hit_particle_link))
     if np.sum(np.array(unique_list_particles) == -1) > 0:
         non_noise_idx = torch.where(unique_list_particles != -1)[0]
@@ -49,7 +45,15 @@ def create_inputs_from_table(output):
     else:
         cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
         cluster_id = torch.Tensor(list(cluster_id)) + 1
+    return cluster_id
 
+def create_inputs_from_table(output):
+    number_hits = np.int32(np.sum(output["pf_mask"][0]))
+    number_part = np.int32(np.sum(output["pf_mask"][1]))
+    #! idx of particle does not start at 1
+    hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
+
+    cluster_id = find_cluster_id(hit_particle_link)
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
     )
@@ -103,6 +107,7 @@ def create_inputs_from_table(output):
     assert len(y_data_graph) == len(unique_list_particles)
 
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
+    cluster_id = find_cluster_id(hit_particle_link[~mask_hits])
 
     return (
         number_hits,
@@ -113,7 +118,7 @@ def create_inputs_from_table(output):
         hit_type_one_hot[~mask_hits],  # [no_tracks],
         p_hits[~mask_hits],  # [no_tracks],
         e_hits[~mask_hits],  # [no_tracks],
-        cluster_id[~mask_hits],
+        cluster_id,
         hit_particle_link[~mask_hits],
     )
 
