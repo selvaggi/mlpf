@@ -1,6 +1,7 @@
 graph_config:
-   only_hits: true
-   k: 7
+   only_hits: false
+   fully_connected: true
+
 
 custom_model_kwargs:
    # add custom model kwargs here

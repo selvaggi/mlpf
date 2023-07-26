@@ -1,10 +1,10 @@
 graph_config:
-   only_hits: true
-   k: 7
+   only_hits: false
+   k: 0
 
 custom_model_kwargs:
    # add custom model kwargs here
-   n_postgn_dense_blocks: 4
+   n_postgn_dense_blocks: 1
 
 #treename:
 selection:
