@@ -47,7 +47,7 @@ def find_cluster_id(hit_particle_link):
         cluster_id = torch.Tensor(list(cluster_id)) + 1
     return cluster_id, unique_list_particles
 
-def create_inputs_from_table(output):
+def create_inputs_from_table(output, hits_only):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
@@ -107,6 +107,9 @@ def create_inputs_from_table(output):
     assert len(y_data_graph) == len(unique_list_particles)
 
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
+    if hits_only:
+        energy_hits_mask = no_tracks
+        mask_hits = mask_hits & energy_hits_mask.numpy().flatten()
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
     return (
@@ -123,7 +126,8 @@ def create_inputs_from_table(output):
     )
 
 
-def create_graph(output):
+def create_graph(output, config=None):
+    hits_only =  config.graph_config.get("only_hits", False) # whether to only include hits in the graph
     (
         number_hits,
         number_part,
@@ -135,7 +139,7 @@ def create_graph(output):
         e_hits,
         cluster_id,
         hit_particle_link,
-    ) = create_inputs_from_table(output)
+    ) = create_inputs_from_table(output, hits_only=hits_only)
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
     # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
@@ -159,9 +163,11 @@ def create_graph(output):
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
     else:
+        #print("graph empty")
         graph_empty = True
         g = 0
         y_data_graph = 0
+    #print("found non-empty graph")
     return [g, y_data_graph], graph_empty
 
 

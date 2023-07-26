@@ -137,7 +137,7 @@ def train_load(args):
         laplace=args.laplace,
         diffs=args.diffs,
         edges=args.class_edges,
-        name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
+        name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank)
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -576,6 +576,7 @@ def model_setup(args, data_config):
     if args.use_amp:
         network_options["use_amp"] = True
     network_options["output_dim"] = args.clustering_space_dim + 28
+    network_options.update(data_config.custom_model_kwargs)
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
         dev = torch.device(gpus[0])
