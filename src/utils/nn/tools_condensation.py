@@ -143,9 +143,11 @@ def train_regression(
                            "loss PID": losses[4],
                            "loss momentum": losses[5],
                            "loss mass (not us. for opt.)": losses[6],
-                           "conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                                         class_names=class_names)
+
                            })#, step=step_count)
+                if num_batches % 200 == 0:
+                    wandb.log({"conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
+                                                                  class_names=class_names)})
                 ks = sorted(list(losses[9].keys()))
                 losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
                 tables = {}
