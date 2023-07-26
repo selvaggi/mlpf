@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import dgl
-
+from torch_scatter import scatter_add
 
 def find_mask_no_energy(hit_particle_link, hit_type_a):
     list_p = np.unique(hit_particle_link)
@@ -47,6 +47,10 @@ def find_cluster_id(hit_particle_link):
         cluster_id = torch.Tensor(list(cluster_id)) + 1
     return cluster_id, unique_list_particles
 
+
+def scatter_count(input: torch.Tensor):
+    return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
+
 def create_inputs_from_table(output, hits_only):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
@@ -61,9 +65,9 @@ def create_inputs_from_table(output, hits_only):
     #     torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
     # )
     hit_type_feature = features_hits[:, 0].to(torch.int64)
-    tracks = hit_type_feature == 0
+    tracks = (hit_type_feature == 0) | (hit_type_feature == 1)
     no_tracks = ~tracks
-    no_tracks[0] = True
+    # no_tracks[0] = True
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type_feature, num_classes=4)
     # build the features (theta,phi,p)
     pf_features_hits = torch.permute(
@@ -103,16 +107,22 @@ def create_inputs_from_table(output, hits_only):
         ),
         dim=1,
     )
-
     assert len(y_data_graph) == len(unique_list_particles)
-
+    # old_cluster_id = cluster_id
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
-    if hits_only:
-        energy_hits_mask = no_tracks
-        mask_hits = mask_hits & energy_hits_mask.numpy().flatten()
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
-    return (
+    #if hits_only:
+    #    energy_hits_mask = no_tracks
+    #    #idx = ~mask_hits
+    #    mask_hits = (mask_hits) | ((~energy_hits_mask).numpy().flatten())
+    #    #mask2 = no_tracks[idx]
+    #    #cluster_id = cluster_id[mask2]
+    #print("clust.id", scatter_count(cluster_id))
+    #for i in range(len(scatter_count(cluster_id))-1):
+    #    if scatter_count(cluster_id-1)[i] == 0:
+    #        print("hit type", i,  hit_type_one_hot[cluster_id==i])
+    result = [
         number_hits,
         number_part,
         y_data_graph[~mask_particles],
@@ -123,11 +133,17 @@ def create_inputs_from_table(output, hits_only):
         e_hits[~mask_hits],  # [no_tracks],
         cluster_id,
         hit_particle_link[~mask_hits],
-    )
-
+    ]
+    hit_type = result[5].argmax(dim=1)
+    hit_mask = (hit_type == 0) | (hit_type == 1)
+    hit_mask = ~hit_mask
+    result[0] = hit_mask.sum()
+    for i in [3, 4, 5, 6, 7, 8, 9]:
+        result[i] = result[i][hit_mask]
+    return result
 
 def create_graph(output, config=None):
-    hits_only =  config.graph_config.get("only_hits", False) # whether to only include hits in the graph
+    hits_only = config.graph_config.get("only_hits", False)   # Whether to only include hits in the graph
     (
         number_hits,
         number_part,
@@ -149,7 +165,17 @@ def create_graph(output, config=None):
     # g = dgl.to_bidirected(g)
     if coord_cart_hits.shape[0] > 0:
         graph_empty = False
-        g = dgl.knn_graph(coord_cart_hits_norm, 7, exclude_self=True)
+        if config.graph_config.get("fully_connected", False):
+            n_nodes = coord_cart_hits_norm.shape[0]
+            if n_nodes > 1:
+                i, j = torch.tril_indices(n_nodes, n_nodes, offset=-1)
+                g = dgl.graph((i, j))  # create fully connected graph
+                g = dgl.to_simple(g)  # remove repeated edges
+                g = dgl.to_bidirected(g)
+            else:
+                g = dgl.knn_graph(coord_cart_hits_norm, 0, exclude_self=True)
+        else:
+            g = dgl.knn_graph(coord_cart_hits_norm, config.graph_config.get("k", 7), exclude_self=True)
         hit_features_graph = torch.cat(
             (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
         )

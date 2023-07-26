@@ -140,6 +140,11 @@ parser.add_argument('--laplace', action='store_true', default=False,
                     help='use laplace eigenvects with graph transformer')
 parser.add_argument('--diffs', action='store_true', default=False,
                     help='use model with edge information')
+
+parser.add_argument('--train_cap', '-train_cap', type=int, default=None, help='Cap the number of training events')
+parser.add_argument('--val_cap', '-val_cap', type=int, default=None, help='Cap the number of validation events')
+
+
 parser.add_argument(
     "--condensation",
     action="store_true",

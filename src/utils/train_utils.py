@@ -137,7 +137,8 @@ def train_load(args):
         laplace=args.laplace,
         diffs=args.diffs,
         edges=args.class_edges,
-        name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank)
+        name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
+        dataset_cap=args.train_cap
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -154,6 +155,7 @@ def train_load(args):
         diffs=args.diffs,
         edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
+        dataset_cap=args.val_cap
     )
 
     if args.class_edges:

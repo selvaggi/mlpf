@@ -109,6 +109,14 @@ class _SimpleIter(object):
     def __init__(self, **kwargs):
         # inherit all properties from SimpleIterDataset
         self.__dict__.update(**kwargs)
+        self.iter_count = 0  # to raise StopIteration when dataset_cap is reached
+        if "dataset_cap" in kwargs and kwargs["dataset_cap"] is not None:
+            self.dataset_cap = kwargs["dataset_cap"]
+            self._sampler_options["shuffle"] = False
+            print("!!! Dataset_cap flag set, disabling shuffling")
+        else:
+            self.dataset_cap = None
+
 
         # executor to read files and run preprocessing asynchronously
         self.executor = ThreadPoolExecutor(max_workers=1) if self._async_load else None
@@ -190,6 +198,9 @@ class _SimpleIter(object):
     def __next__(self):
         # print(self.ipos, self.cursor)
         graph_empty = True
+        self.iter_count += 1
+        if self.dataset_cap is not None and self.iter_count > self.dataset_cap:
+            raise StopIteration
         while graph_empty:
             if len(self.filelist) == 0:
                 raise StopIteration
@@ -323,6 +334,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         laplace=False,
         edges=False,
         diffs=False,
+        dataset_cap=None
     ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
@@ -338,6 +350,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self.laplace = laplace
         self.edges = edges
         self.diffs = diffs
+        self.dataset_cap = dataset_cap  # used to cap the dataset to some fixed number of events - used for debugging purposes
 
         # ==== sampling parameters ====
         self._sampler_options = {
