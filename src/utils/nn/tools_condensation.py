@@ -85,7 +85,7 @@ def train_regression(
                 betas = torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1])).detach().cpu().numpy()
                 # wandb log betas hist
                 if logwandb:
-                    wandb.log({"betas": wandb.Histogram(betas)})#, step=step_count)
+                    wandb.log({"betas": wandb.Histogram(betas), "qs":  wandb.Histogram(np.arctanh(betas)**2+0.1)}) #, step=step_count)
             if grad_scaler is None:
                 loss.backward()
                 opt.step()
