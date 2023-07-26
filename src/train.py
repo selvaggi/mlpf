@@ -198,7 +198,8 @@ def _main(args):
                 logwandb=args.log_wandb,
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
-                step=steps
+                step=steps,
+                clust_loss_only=args.clustering_loss_only,
             )
             is_best_epoch = (
                 (valid_metric < best_valid_metric)

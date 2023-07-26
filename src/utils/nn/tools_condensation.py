@@ -243,7 +243,8 @@ def evaluate_regression(
         logwandb=False,
         energy_weighted=False,
         local_rank=0,
-        step=0
+        step=0,
+        clust_loss_only=False
 ):
     '''
 
@@ -288,7 +289,7 @@ def evaluate_regression(
                 model_output = model(batch_g)
                 preds = model_output.squeeze().float()
                 loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y
+                    batch_g, model_output, y, clust_loss_only=clust_loss_only
                 )
                 num_batches += 1
                 count += num_examples
