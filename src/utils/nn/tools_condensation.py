@@ -131,7 +131,7 @@ def train_regression(
                             mode="train",
                         )
 
-            if logwandb: #and (num_batches % 50):
+            if logwandb and (num_batches % 10) == 0:
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
