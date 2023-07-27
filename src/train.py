@@ -136,13 +136,19 @@ def _main(args):
         grad_scaler = torch.cuda.amp.GradScaler() if args.use_amp else None
         tb = None
         steps = 0  # for wandb logging
+        add_energy_loss = False
+        if args.clustering_and_energy_loss:
+            add_energy_loss = True
+            if args.energy_loss_delay > 0:
+                add_energy_loss = False
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
                 if epoch <= args.load_epoch:
                     continue
             _logger.info("-" * 50)
             _logger.info("Epoch #%d training" % epoch)
-
+            if args.clustering_and_energy_loss and epoch > args.energy_loss_delay:
+                add_energy_loss = True
             steps += train(
                 model,
                 loss_func,
@@ -157,7 +163,7 @@ def _main(args):
                 logwandb=args.log_wandb,
                 local_rank=local_rank,
                 current_step=steps,
-                loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss]
+                loss_terms=[args.clustering_loss_only, add_energy_loss],
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):

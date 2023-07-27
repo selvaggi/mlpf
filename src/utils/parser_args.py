@@ -145,11 +145,20 @@ parser.add_argument('--diffs', action='store_true', default=False,
 parser.add_argument('--train_cap', '-train_cap', type=int, default=None, help='Cap the number of training events')
 parser.add_argument('--val_cap', '-val_cap', type=int, default=None, help='Cap the number of validation events')
 
-
 parser.add_argument(
     "--condensation",
     action="store_true",
     default=False,
     help="use condensation loss and training",
 )
+
+parser.add_argument(
+    "--energy_loss_delay",
+    "-energy_loss_delay",
+    default=0,
+    type=int,
+    help="Number of epochs before energy loss is active"
+)
+
+
 
