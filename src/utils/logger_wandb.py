@@ -17,8 +17,8 @@ def log_wandb_init(args, data_config={}):
         wandb.config.classification_mode = True
     wandb.config.num_epochs = args.num_epochs
     wandb.config.args = vars(args)
-    wandb.config.data_config.graph_config = data_config.graph_config
-    wandb.config.data_config.custom_model_kwargs = data_config.custom_model_kwargs
+    wandb.config.graph_config = data_config.graph_config
+    wandb.config.custom_model_kwargs = data_config.custom_model_kwargs
 
 def log_confussion_matrix_wandb(y_true, y_score, epoch):
     """function to log confussion matrix in the wandb.ai website 
