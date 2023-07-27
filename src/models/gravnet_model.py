@@ -100,23 +100,38 @@ class GravNetBlock(nn.Module):
         space_dimensions: int = 4,
         propagate_dimensions: int = 22,
         k: int = 40,
+        batchnorm: bool = True
     ):
         super(GravNetBlock, self).__init__()
+        self.batchnorm = batchnorm
         # Includes all layers up to the global_exchange
         self.gravnet_layer = GravNetConv(
             in_channels, out_channels, space_dimensions, propagate_dimensions, k
         ).jittable()
-        self.post_gravnet = nn.Sequential(
-            nn.BatchNorm1d(out_channels),
-            nn.Linear(out_channels, 128),
-            nn.Tanh(),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 96),
-            nn.Tanh(),
-        )
-        self.output = nn.Sequential(
-            nn.Linear(4 * 96, 96), nn.Tanh(), nn.BatchNorm1d(96)
-        )
+        if self.batchnorm:
+            self.post_gravnet = nn.Sequential(
+                nn.Linear(out_channels, 128),
+                nn.Tanh(),
+                nn.Linear(128, 96),
+                nn.Tanh(),
+            )
+        else:
+            self.post_gravnet = nn.Sequential(
+                nn.BatchNorm1d(out_channels),
+                nn.Linear(out_channels, 128),
+                nn.Tanh(),
+                nn.BatchNorm1d(128),
+                nn.Linear(128, 96),
+                nn.Tanh(),
+            )
+        if self.batchnorm:
+            self.output = nn.Sequential(
+                nn.Linear(4 * 96, 96), nn.Tanh(), nn.BatchNorm1d(96)
+            )
+        else:
+            self.output = nn.Sequential(
+                nn.Linear(4 * 96, 96), nn.Tanh()
+            )
 
     def forward(self, x: Tensor, batch: Tensor) -> Tensor:
         x = self.gravnet_layer(x, batch)
@@ -129,7 +144,7 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31, n_postgn_dense_blocks: int=  4, n_gravnet_blocks: int = 4):
+    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31, n_postgn_dense_blocks: int=  4, n_gravnet_blocks: int = 4, batchnorm: bool = True):
         super(GravnetModel, self).__init__()
         #input_dim: int = 8
         #output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
@@ -140,8 +155,11 @@ class GravnetModel(nn.Module):
         self.output_dim = output_dim
         self.n_gravnet_blocks = n_gravnet_blocks
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
-
-        self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
+        self.batchnorm = batchnorm
+        if self.batchnorm:
+            self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
+        else:
+            self.batchnorm1 = nn.Identity()
         self.input = nn.Linear(4 * input_dim, 64)
 
         # if isinstance(k, int):
@@ -153,7 +171,7 @@ class GravnetModel(nn.Module):
         # not clearly specified in paper
         self.gravnet_blocks = nn.ModuleList(
             [
-                GravNetBlock(64 if i == 0 else 96, k=k)
+                GravNetBlock(64 if i == 0 else 96, k=k, batchnorm=self.batchnorm)
                 for i in range(self.n_gravnet_blocks)
             ]
         )
@@ -211,7 +229,7 @@ class GravnetModel(nn.Module):
         assert x.device == device
         return x
 
-    def object_condensation_loss2(self, batch, pred, y, return_resolution=False, clust_loss_only=False):
+    def object_condensation_loss2(self, batch, pred, y, return_resolution=False, clust_loss_only=False, add_energy_loss=False):
         '''
 
         :param batch:
@@ -261,6 +279,8 @@ class GravnetModel(nn.Module):
             return a
         if clust_loss_only:
             loss = a[0] + a[1]
+            if add_energy_loss:
+                loss += a[2]  # TODO add weight as argument
         else:
             loss = (
                 a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] + 0.001 * a[5] # TODO: the last term is the PID classification loss, explore this yet
