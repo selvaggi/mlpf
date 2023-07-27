@@ -4,7 +4,7 @@ import torch
 from sklearn.metrics import roc_curve, roc_auc_score
 import json
 
-def log_wandb_init(args):
+def log_wandb_init(args, data_config={}):
     """log information about the run in the config section of wandb
     Currently wandb is only initialized in training mode
 
@@ -17,6 +17,7 @@ def log_wandb_init(args):
         wandb.config.classification_mode = True
     wandb.config.num_epochs = args.num_epochs
     wandb.config.args = vars(args)
+    wandb.config.data_config = vars(data_config)
 
 def log_confussion_matrix_wandb(y_true, y_score, epoch):
     """function to log confussion matrix in the wandb.ai website 

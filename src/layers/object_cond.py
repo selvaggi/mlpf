@@ -52,6 +52,7 @@ def calc_energy_pred(
         unassigned = torch.arange(n_points).to(betas.device)
         clustering = -1 * torch.ones(n_points, dtype=torch.long)
         counter = 0
+        # index_alpha_i -= 1
         for index_condpoint in index_alpha_i:
             d = torch.norm(X[unassigned] - X[index_condpoint], dim=-1)
             assigned_to_this_condpoint = unassigned[d < td]
@@ -576,6 +577,7 @@ def calc_LV_Lbeta_inference(
     assert q_alpha.size() == (n_clusters,)
 
     # Get the cluster space coordinates and betas for these maxima hits too
+    index_alpha -= 1  # why do we need this?
     x_alpha = cluster_space_coords[index_alpha]
     beta_alpha = beta[index_alpha]
 
@@ -584,7 +586,7 @@ def calc_LV_Lbeta_inference(
         positions_particles_pred + distance_threshold[index_alpha]
     )
 
-    is_sig_everything = torch.ones_like(index_alpha).bool()
+    is_sig_everything = torch.ones_like(batch).bool()
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
         batch, g, cluster_index_per_event, is_sig_everything, q, beta, energy_correction, predicted_pid, momentum
     )

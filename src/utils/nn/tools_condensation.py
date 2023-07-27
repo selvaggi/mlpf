@@ -44,7 +44,7 @@ def train_regression(
         logwandb=False,
         local_rank=0,
         current_step=0,  # current_step: used for logging correctly
-        clust_loss_only=False  # whether to only optimize the clustering loss
+        loss_terms=[]  # whether to only optimize the clustering loss
 ):
     model.train()
     # print("starting to train")
@@ -54,7 +54,8 @@ def train_regression(
     # print("LEN DATALOADER", g)
     # print(y)
     data_config = train_loader.dataset.config
-
+    clust_loss_only = loss_terms[0]
+    add_energy_loss = loss_terms[1]  # whether to add energy loss to the clustering loss
     total_loss = 0
     num_batches = 0
     sum_abs_err = 0
@@ -68,7 +69,6 @@ def train_regression(
         for batch_g, y in tq:
             # print(batch_g)
             # print(y)
-
             load_end_time = time.time()
             label = y
             step_count += 1
@@ -80,7 +80,7 @@ def train_regression(
                 model_output = model(batch_g)
                 preds = model_output.squeeze()
                 loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, clust_loss_only=clust_loss_only
+                    batch_g, model_output, y, clust_loss_only=clust_loss_only, add_energy_loss=add_energy_loss
                 )
                 betas = torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1])).detach().cpu().numpy()
                 # wandb log betas hist
@@ -244,7 +244,7 @@ def evaluate_regression(
         energy_weighted=False,
         local_rank=0,
         step=0,
-        clust_loss_only=False
+        loss_terms=[]
 ):
     '''
 
@@ -271,6 +271,8 @@ def evaluate_regression(
     num_batches = 0
     sum_sqr_err = 0
     sum_abs_err = 0
+    clust_loss_only = loss_terms[0]
+    add_energy_loss = loss_terms[1]  # whether to add energy loss to the clustering loss
     count = 0
     scores = []
     results = []  # resolution results
@@ -289,7 +291,7 @@ def evaluate_regression(
                 model_output = model(batch_g)
                 preds = model_output.squeeze().float()
                 loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, clust_loss_only=clust_loss_only
+                    batch_g, model_output, y, clust_loss_only=clust_loss_only, add_energy_loss=add_energy_loss
                 )
                 num_batches += 1
                 count += num_examples

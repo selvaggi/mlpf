@@ -133,6 +133,7 @@ parser.add_argument('--wandb-projectname', type=str,
 parser.add_argument('--wandb-entity', type=str,
                     help='username or team name where you are sending runs')
 parser.add_argument('--clustering_loss_only', '-clust', action='store_true', default=False)
+parser.add_argument('--clustering_and_energy_loss', '-clust_en', action='store_true', default=False)
 parser.add_argument('--clustering_space_dim', '-clust_dim', type=int, default=2)
 parser.add_argument('--energy-loss', action='store_true', default=False,
                     help='use energy loss of dij for edge importance, for now only implemented for the edge classification problem')

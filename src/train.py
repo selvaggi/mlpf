@@ -100,7 +100,7 @@ def _main(args):
             from src.utils.logger_wandb import log_wandb_init
             wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
             wandb.run.name = args.wandb_displayname
-            log_wandb_init(args)
+            log_wandb_init(args, data_config)
 
         model = orig_model.to(dev)
         if args.model_pretrained:
@@ -157,7 +157,7 @@ def _main(args):
                 logwandb=args.log_wandb,
                 local_rank=local_rank,
                 current_step=steps,
-                clust_loss_only=args.clustering_loss_only,
+                loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss]
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):
@@ -199,7 +199,7 @@ def _main(args):
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
                 step=steps,
-                clust_loss_only=args.clustering_loss_only,
+                loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
             )
             is_best_epoch = (
                 (valid_metric < best_valid_metric)

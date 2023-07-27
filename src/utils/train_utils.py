@@ -158,11 +158,17 @@ def train_load(args):
         dataset_cap=args.val_cap
     )
 
+
     if args.class_edges:
         collator_func = graph_batch_func_edges
     else:
         collator_func = graph_batch_func
-
+    #train_data_arg = train_data
+    #val_data_arg = val_data
+    #if args.train_cap == 1:
+    #    train_data_arg = [next(iter(train_data_arg))]
+    #if args.val_cap == 1:
+    #    val_data_arg = [next(iter(val_data_arg))]
     train_loader = DataLoader(
         train_data,
         batch_size=args.batch_size,
@@ -182,6 +188,7 @@ def train_load(args):
         persistent_workers=args.num_workers > 0
         and args.steps_per_epoch_val is not None,
     )
+
     data_config = train_data.config
     train_input_names = train_data.config.input_names
     train_label_names = 0  # train_data.config.label_names
