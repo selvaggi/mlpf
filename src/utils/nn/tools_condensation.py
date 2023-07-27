@@ -43,8 +43,8 @@ def train_regression(
         tb_helper=None,
         logwandb=False,
         local_rank=0,
-        current_step=0,  # current_step: used for logging correctly
-        loss_terms=[]  # whether to only optimize the clustering loss
+        current_step=0, # current_step: used for logging correctly
+        loss_terms=[], # whether to only optimize the clustering loss
 ):
     model.train()
     # print("starting to train")
