@@ -148,6 +148,7 @@ def _main(args):
             _logger.info("-" * 50)
             _logger.info("Epoch #%d training" % epoch)
             if args.clustering_and_energy_loss and epoch > args.energy_loss_delay:
+                print("Switching on energy loss!")
                 add_energy_loss = True
             steps += train(
                 model,

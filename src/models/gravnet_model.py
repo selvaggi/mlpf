@@ -231,6 +231,7 @@ class GravnetModel(nn.Module):
         return_resolution=False,
         clust_loss_only=False,
         add_energy_loss=False,
+        calc_e_frac_loss=False,
     ):
         """
 
@@ -290,7 +291,8 @@ class GravnetModel(nn.Module):
             return a
         if clust_loss_only:
             loss = a[0] + a[1]
-            loss_E_frac, loss_E_frac_true = calc_energy_loss(batch, xj, bj.view(-1))
+            if calc_e_frac_loss:
+                loss_E_frac, loss_E_frac_true = calc_energy_loss(batch, xj, bj.view(-1))
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
 
@@ -307,7 +309,10 @@ class GravnetModel(nn.Module):
                 ]  # TODO: the last term is the PID classification loss, explore this yet
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
-            return loss, a, loss_E_frac, loss_E_frac_true
+            if calc_e_frac_loss:
+                return loss, a, loss_E_frac, loss_E_frac_true
+            else:
+                return loss, a, 0, 0
         return loss, a, 0, 0
 
     def object_condensation_inference(self, batch, pred):

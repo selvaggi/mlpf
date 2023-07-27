@@ -82,6 +82,7 @@ def train_regression(
             opt.zero_grad()
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
                 batch_g = batch_g.to(dev)
+                calc_e_frac_loss = (num_batches % 250) == 0
                 model_output = model(batch_g)
                 preds = model_output.squeeze()
                 (
@@ -95,6 +96,7 @@ def train_regression(
                     y,
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
+                    calc_e_frac_loss=calc_e_frac_loss,
                 )
                 betas = (
                     torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1]))
@@ -120,7 +122,14 @@ def train_regression(
             step_end_time = time.time()
             if scheduler and getattr(scheduler, "_update_per_step", False):
                 scheduler.step()
-            if logwandb:
+            if clust_loss_only and calc_e_frac_loss and logwandb:
+                wandb.log(
+                    {
+                        "loss e frac": loss_E_frac,
+                        "loss e frac true": loss_E_frac_true,
+                    }
+                )
+            if logwandb and (num_batches % 10) == 0:
                 wandb.log(
                     {
                         "load_time": load_end_time - prev_time,
@@ -176,14 +185,8 @@ def train_regression(
                         "loss mass (not us. for opt.)": losses[6],
                     }
                 )  # , step=step_count)
-                if clust_loss_only:
-                    wandb.log(
-                        {
-                            "loss e frac": loss_E_frac,
-                            "loss e frac true": loss_E_frac_true,
-                        }
-                    )
-                if num_batches % 200 == 0:
+
+                if num_batches % 500 == 0:
                     wandb.log(
                         {
                             "conf_mat_train": wandb.plot.confusion_matrix(
@@ -191,6 +194,7 @@ def train_regression(
                             )
                         }
                     )
+
                 ks = sorted(list(losses[9].keys()))
                 losses_cpu = [
                     x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
@@ -332,6 +336,7 @@ def evaluate_regression(
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
+                calc_e_frac_loss = (num_batches % 10 == 0)
                 batch_g = batch_g.to(dev)
                 label = y
                 num_examples = label.shape[0]
@@ -349,6 +354,7 @@ def evaluate_regression(
                     y,
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
+                    calc_e_frac_loss=calc_e_frac_loss,
                 )
                 num_batches += 1
                 count += num_examples
@@ -397,7 +403,7 @@ def evaluate_regression(
                 ),
             }
         )  # , step=step)
-        if clust_loss_only:
+        if clust_loss_only and calc_e_frac_loss:
             wandb.log(
                 {
                     "loss e frac val": loss_E_frac,
