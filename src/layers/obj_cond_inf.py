@@ -25,18 +25,19 @@ def calc_energy_loss(
     loss_E_frac_true = []
     for g in list_graphs:
         particle_id = g.ndata["particle_number"]
-        number_of_objects = len(np.unique(particle_id))
+        number_of_objects = len(particle_id.unique())
         non = g.number_of_nodes()
         q_g = q[node_counter : non + node_counter]
         betas = beta[node_counter : non + node_counter]
         sorted, indices = torch.sort(q_g, descending=False)
         selected_centers = indices[0:number_of_objects]
-        if len(np.unique(particle_id[selected_centers])) < number_of_objects:
+        if len((particle_id[selected_centers]).unique()) < number_of_objects:
             print("there are two or more clusters for one GT object")
             print("objects have ids:", particle_id[selected_centers])
             print("there are", number_of_objects, "objects")
         X = cluster_space_coords[node_counter : non + node_counter]
         clusterings = get_clustering(selected_centers, X, betas, td=0.7)
+        clusterings = clusterings.to(g.device)
         counter = 0
         frac_energy = []
         frac_energy_true = []
