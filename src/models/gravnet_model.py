@@ -8,7 +8,12 @@ from src.layers.GravNetConv import GravNetConv
 from typing import Tuple, Union, List
 import dgl
 
-from src.layers.object_cond import calc_LV_Lbeta, get_clustering, calc_LV_Lbeta_inference
+from src.layers.object_cond import (
+    calc_LV_Lbeta,
+    get_clustering,
+    calc_LV_Lbeta_inference,
+)
+from src.layers.obj_cond_inf import calc_energy_loss
 
 
 def scatter_count(input: torch.Tensor):
@@ -135,9 +140,9 @@ class GravnetModel(nn.Module):
         #if not batchnorm:
         #    print("!!!! no batchnorm !!!")
         super(GravnetModel, self).__init__()
-        #input_dim: int = 8
-        #output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
-        #n_gravnet_blocks: int = 4
+        # input_dim: int = 8
+        # output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
+        # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
         k = 40
         self.input_dim = input_dim
@@ -218,8 +223,16 @@ class GravnetModel(nn.Module):
         assert x.device == device
         return x
 
-    def object_condensation_loss2(self, batch, pred, y, return_resolution=False, clust_loss_only=False, add_energy_loss=False):
-        '''
+    def object_condensation_loss2(
+        self,
+        batch,
+        pred,
+        y,
+        return_resolution=False,
+        clust_loss_only=False,
+        add_energy_loss=False,
+    ):
+        """
 
         :param batch:
         :param pred:
@@ -227,16 +240,26 @@ class GravnetModel(nn.Module):
         :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
         :param clust_loss_only: If True, it will only add the clustering terms to the loss
         :return:
-        '''
+        """
         _, S = pred.shape
         clust_space_dim = self.output_dim - 28
 
-        xj = torch.nn.functional.normalize(pred[:, 0:clust_space_dim], dim=1)  # 0, 1, 2: cluster space coords
+        xj = torch.nn.functional.normalize(
+            pred[:, 0:clust_space_dim], dim=1
+        )  # 0, 1, 2: cluster space coords
         bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-        distance_threshold = torch.reshape(pred[:, 1+clust_space_dim:4+clust_space_dim], [-1, 3])  # 4, 5, 6: distance thresholds
-        energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 4+clust_space_dim], [-1, 1]))  # 7: energy correction factor
-        momentum = torch.nn.functional.relu(torch.reshape(pred[:, 27+clust_space_dim], [-1, 1]))
-        pid_predicted = pred[:, 5+clust_space_dim:27+clust_space_dim]  # 8:30: predicted particle one-hot encoding
+        distance_threshold = torch.reshape(
+            pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
+        )  # 4, 5, 6: distance thresholds
+        energy_correction = torch.nn.functional.relu(
+            torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
+        )  # 7: energy correction factor
+        momentum = torch.nn.functional.relu(
+            torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
+        )
+        pid_predicted = pred[
+            :, 5 + clust_space_dim : 27 + clust_space_dim
+        ]  # 8:30: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -244,7 +267,6 @@ class GravnetModel(nn.Module):
         batch_numbers = torch.repeat_interleave(
             torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
         ).to(dev)
-
 
         a = calc_LV_Lbeta(
             batch,
@@ -268,13 +290,26 @@ class GravnetModel(nn.Module):
             return a
         if clust_loss_only:
             loss = a[0] + a[1]
+            loss_E_frac, loss_E_frac_true = calc_energy_loss(batch, xj, bj.view(-1))
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
+
         else:
             loss = (
-                a[0] + a[1] + 20 * a[2] + 0.001 * a[3] + 0.001 * a[4] + 0.001 * a[5] # TODO: the last term is the PID classification loss, explore this yet
+                a[0]
+                + a[1]
+                + 20 * a[2]
+                + 0.001 * a[3]
+                + 0.001 * a[4]
+                + 0.001
+                * a[
+                    5
+                ]  # TODO: the last term is the PID classification loss, explore this yet
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
-        return loss, a
+        if clust_loss_only:
+            return loss, a, loss_E_frac, loss_E_frac_true
+        return loss, a, 0, 0
+
     def object_condensation_inference(self, batch, pred):
         '''
         Similar to object_condensation_loss, but made for inference
@@ -309,7 +344,6 @@ class GravnetModel(nn.Module):
             post_pid_pool_module=self.post_pid_pool_module
         )
         return pred
-
 
 
 # class NoiseFilterModel(nn.Module):

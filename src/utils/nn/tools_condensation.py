@@ -13,11 +13,16 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 
 
-from src.layers.object_cond import onehot_particles_arr, get_clustering, calc_LV_Lbeta_inference
+from src.layers.object_cond import (
+    onehot_particles_arr,
+    get_clustering,
+    calc_LV_Lbeta_inference,
+)
+
 class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
 
-def clip_list(l, clip_val=4.):
+def clip_list(l, clip_val=4.0):
     result = []
     for item in l:
         if abs(item) > clip_val:
@@ -31,20 +36,20 @@ def clip_list(l, clip_val=4.):
 
 
 def train_regression(
-        model,
-        loss_func,
-        opt,
-        scheduler,
-        train_loader,
-        dev,
-        epoch,
-        steps_per_epoch=None,
-        grad_scaler=None,
-        tb_helper=None,
-        logwandb=False,
-        local_rank=0,
-        current_step=0, # current_step: used for logging correctly
-        loss_terms=[], # whether to only optimize the clustering loss
+    model,
+    loss_func,
+    opt,
+    scheduler,
+    train_loader,
+    dev,
+    epoch,
+    steps_per_epoch=None,
+    grad_scaler=None,
+    tb_helper=None,
+    logwandb=False,
+    local_rank=0,
+    current_step=0,  # current_step: used for logging correctly
+    loss_terms=[],  # whether to only optimize the clustering loss
 ):
     model.train()
     # print("starting to train")
@@ -79,13 +84,32 @@ def train_regression(
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 preds = model_output.squeeze()
-                loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, clust_loss_only=clust_loss_only, add_energy_loss=add_energy_loss
+                (
+                    loss,
+                    losses,
+                    loss_E_frac,
+                    loss_E_frac_true,
+                ) = model.mod.object_condensation_loss2(
+                    batch_g,
+                    model_output,
+                    y,
+                    clust_loss_only=clust_loss_only,
+                    add_energy_loss=add_energy_loss,
                 )
-                betas = torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1])).detach().cpu().numpy()
+                betas = (
+                    torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1]))
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
                 # wandb log betas hist
                 if logwandb:
-                    wandb.log({"betas": wandb.Histogram(betas), "qs":  wandb.Histogram(np.arctanh(betas)**2+0.1)}) #, step=step_count)
+                    wandb.log(
+                        {
+                            "betas": wandb.Histogram(betas),
+                            "qs": wandb.Histogram(np.arctanh(betas) ** 2 + 0.1),
+                        }
+                    )  # , step=step_count)
             if grad_scaler is None:
                 loss.backward()
                 opt.step()
@@ -97,7 +121,12 @@ def train_regression(
             if scheduler and getattr(scheduler, "_update_per_step", False):
                 scheduler.step()
             if logwandb:
-                wandb.log({"load_time": load_end_time - prev_time, "step_time": step_end_time - load_end_time})#, step=step_count)
+                wandb.log(
+                    {
+                        "load_time": load_end_time - prev_time,
+                        "step_time": step_end_time - load_end_time,
+                    }
+                )  # , step=step_count)
             loss = loss.item()
 
             num_batches += 1
@@ -135,27 +164,49 @@ def train_regression(
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
-                wandb.log({"loss regression": loss,
-                           "loss lv": losses[0],
-                           "loss beta": losses[1],
-                           "loss E": losses[2],
-                           "loss X": losses[3],
-                           "loss PID": losses[4],
-                           "loss momentum": losses[5],
-                           "loss mass (not us. for opt.)": losses[6],
-
-                           })#, step=step_count)
+                wandb.log(
+                    {
+                        "loss regression": loss,
+                        "loss lv": losses[0],
+                        "loss beta": losses[1],
+                        "loss E": losses[2],
+                        "loss X": losses[3],
+                        "loss PID": losses[4],
+                        "loss momentum": losses[5],
+                        "loss mass (not us. for opt.)": losses[6],
+                    }
+                )  # , step=step_count)
+                if clust_loss_only:
+                    wandb.log(
+                        {
+                            "loss e frac": loss_E_frac,
+                            "loss e frac true": loss_E_frac_true,
+                        }
+                    )
                 if num_batches % 200 == 0:
-                    wandb.log({"conf_mat_train": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                                  class_names=class_names)})
+                    wandb.log(
+                        {
+                            "conf_mat_train": wandb.plot.confusion_matrix(
+                                y_true=pid_true, preds=pid_pred, class_names=class_names
+                            )
+                        }
+                    )
                 ks = sorted(list(losses[9].keys()))
-                losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
+                losses_cpu = [
+                    x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
+                    for x in losses
+                ]
                 tables = {}
                 for key in ks:
-                    tables[key] = losses[9][key]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-                wandb.log({
-                    key: wandb.Histogram(clip_list(tables[key]), num_bins=100) for key, val in losses_cpu[9].items()
-                })#, step=step_count)
+                    tables[key] = losses[9][
+                        key
+                    ]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
+                wandb.log(
+                    {
+                        key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
+                        for key, val in losses_cpu[9].items()
+                    }
+                )  # , step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
@@ -195,14 +246,11 @@ def train_regression(
         scheduler.step()
     return step_count
 
-def inference(
-        model,
-        test_loader,
-        dev
-):
-    '''
+
+def inference(model, test_loader, dev):
+    """
     Similar to evaluate_regression, but without the ground truth labels.
-    '''
+    """
     model.eval()
     num_batches = 0
     count = 0
@@ -213,7 +261,7 @@ def inference(
             for batch_g, _ in tq:
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
-                #preds = model_output.squeeze().float()
+                # preds = model_output.squeeze().float()
                 preds = model.mod.object_condensation_inference(batch_g, model_output)
                 num_batches += 1
                 results.append(preds)
@@ -226,27 +274,27 @@ def inference(
 
 
 def evaluate_regression(
-        model,
-        test_loader,
-        dev,
-        epoch,
-        for_training=True,
-        loss_func=None,
-        steps_per_epoch=None,
-        eval_metrics=[
-            "mean_squared_error",
-            "mean_absolute_error",
-            "median_absolute_error",
-            "mean_gamma_deviance",
-        ],
-        tb_helper=None,
-        logwandb=False,
-        energy_weighted=False,
-        local_rank=0,
-        step=0,
-        loss_terms=[]
+    model,
+    test_loader,
+    dev,
+    epoch,
+    for_training=True,
+    loss_func=None,
+    steps_per_epoch=None,
+    eval_metrics=[
+        "mean_squared_error",
+        "mean_absolute_error",
+        "median_absolute_error",
+        "mean_gamma_deviance",
+    ],
+    tb_helper=None,
+    logwandb=False,
+    energy_weighted=False,
+    local_rank=0,
+    step=0,
+    loss_terms=[],
 ):
-    '''
+    """
 
     :param model:
     :param test_loader:
@@ -261,7 +309,7 @@ def evaluate_regression(
     :param energy_weighted:
     :param local_rank:
     :return:
-    '''
+    """
     model.eval()
 
     data_config = test_loader.dataset.config
@@ -290,8 +338,17 @@ def evaluate_regression(
                 label = label.to(dev)
                 model_output = model(batch_g)
                 preds = model_output.squeeze().float()
-                loss, losses = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, clust_loss_only=clust_loss_only, add_energy_loss=add_energy_loss
+                (
+                    loss,
+                    losses,
+                    loss_E_frac,
+                    loss_E_frac_true,
+                ) = model.mod.object_condensation_loss2(
+                    batch_g,
+                    model_output,
+                    y,
+                    clust_loss_only=clust_loss_only,
+                    add_energy_loss=add_energy_loss,
                 )
                 num_batches += 1
                 count += num_examples
@@ -314,34 +371,54 @@ def evaluate_regression(
                                 i_batch=num_batches,
                                 mode="eval" if for_training else "test",
                             )
-                losses_cpu = [x.detach().to("cpu") if isinstance(x, torch.Tensor) else x for x in losses]
+                losses_cpu = [
+                    x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
+                    for x in losses
+                ]
                 all_val_losses.append(losses_cpu)
                 all_val_loss.append(loss.detach().to("cpu").item())
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
 
     if logwandb:
-        pid_true, pid_pred = torch.cat([torch.tensor(x[7]) for x in all_val_losses]), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
+        pid_true, pid_pred = torch.cat(
+            [torch.tensor(x[7]) for x in all_val_losses]
+        ), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
         pid_true, pid_pred = pid_true.tolist(), pid_pred.tolist()
-        wandb.log({
-            "loss val regression": np.mean(all_val_loss),
-            "loss val lv": np.mean([x[0] for x in all_val_losses]),
-            "loss val beta": np.mean([x[1] for x in all_val_losses]),
-            "loss val E": np.mean([x[2] for x in all_val_losses]),
-            "loss val X": np.mean([x[3] for x in all_val_losses]),
-            "conf_mat_val": wandb.plot.confusion_matrix(y_true=pid_true, preds=pid_pred,
-                                                        class_names=class_names)
-         })#, step=step)
+        wandb.log(
+            {
+                "loss val regression": np.mean(all_val_loss),
+                "loss val lv": np.mean([x[0] for x in all_val_losses]),
+                "loss val beta": np.mean([x[1] for x in all_val_losses]),
+                "loss val E": np.mean([x[2] for x in all_val_losses]),
+                "loss val X": np.mean([x[3] for x in all_val_losses]),
+                "conf_mat_val": wandb.plot.confusion_matrix(
+                    y_true=pid_true, preds=pid_pred, class_names=class_names
+                ),
+            }
+        )  # , step=step)
+        if clust_loss_only:
+            wandb.log(
+                {
+                    "loss e frac val": loss_E_frac,
+                    "loss e frac true val": loss_E_frac_true,
+                }
+            )
         ks = sorted(list(all_val_losses[0][9].keys()))
         concatenated = {}
         for key in ks:
             concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
         tables = {}
         for key in ks:
-            tables[key] = concatenated[key] #wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
-        wandb.log({
-            "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100) for key in ks
-        })#, step=step)
+            tables[key] = concatenated[
+                key
+            ]  # wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
+        wandb.log(
+            {
+                "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
+                for key in ks
+            }
+        )  # , step=step)
 
     time_diff = time.time() - start_time
     _logger.info(
@@ -400,12 +477,7 @@ def upd_dict(d, small_dict):
     return d
 
 
-def plot_regression_resolution(
-        model,
-        test_loader,
-        dev,
-        **kwargs
-):
+def plot_regression_resolution(model, test_loader, dev, **kwargs):
     model.eval()
     results = []  # resolution results
     pid_classification_results = []
@@ -422,7 +494,10 @@ def plot_regression_resolution(
     result_dict = {}
     for key in results[0]:
         result_dict[key] = np.concatenate([r[key] for r in results])
-    result_dict["event_by_event_accuracy"] = [accuracy_score(pid_true.argmax(dim=0), pid_pred.argmax(dim=0)) for pid_true, pid_pred in pid_classification_results]
+    result_dict["event_by_event_accuracy"] = [
+        accuracy_score(pid_true.argmax(dim=0), pid_pred.argmax(dim=0))
+        for pid_true, pid_pred in pid_classification_results
+    ]
     # just plot all for now
     result = {}
     for key in results[0]:
@@ -444,4 +519,3 @@ def plot_regression_resolution(
     result["PID_confusion_matrix"] = fig
 
     return result
-
