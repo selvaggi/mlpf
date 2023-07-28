@@ -54,8 +54,8 @@ class MultiHeadAttentionLayer(nn.Module):
         g.apply_edges(scaled_exp('score', np.sqrt(self.out_dim)))
         # Send weighted values to target nodes
         eids = g.edges()
-        g.send_and_recv(eids, fn.src_mul_edge('V_h', 'score', 'V_h'), fn.sum('V_h', 'wV'))
-        g.send_and_recv(eids, fn.copy_edge('score', 'score'), fn.sum('score', 'z'))
+        g.send_and_recv(eids, fn.u_mul_e('V_h', 'score', 'V_h'), fn.sum('V_h', 'wV'))
+        g.send_and_recv(eids, fn.copy_e('score', 'score'), fn.sum('score', 'z'))
     
     def forward(self, g, h):
         
