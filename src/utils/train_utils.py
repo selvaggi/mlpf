@@ -53,7 +53,7 @@ def to_filelist(args, mode="train"):
                 np.random.shuffle(new_files)
                 new_file_dict[name] = new_files
             file_dict = new_file_dict
-            #print(file_dict)
+            # print(file_dict)
 
     if args.copy_inputs:
         import tempfile
@@ -138,7 +138,7 @@ def train_load(args):
         diffs=args.diffs,
         edges=args.class_edges,
         name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
-        dataset_cap=args.train_cap
+        dataset_cap=args.train_cap,
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -155,19 +155,18 @@ def train_load(args):
         diffs=args.diffs,
         edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
-        dataset_cap=args.val_cap
+        dataset_cap=args.val_cap,
     )
-
 
     if args.class_edges:
         collator_func = graph_batch_func_edges
     else:
         collator_func = graph_batch_func
-    #train_data_arg = train_data
-    #val_data_arg = val_data
-    #if args.train_cap == 1:
+    # train_data_arg = train_data
+    # val_data_arg = val_data
+    # if args.train_cap == 1:
     #    train_data_arg = [next(iter(train_data_arg))]
-    #if args.val_cap == 1:
+    # if args.val_cap == 1:
     #    val_data_arg = [next(iter(val_data_arg))]
     train_loader = DataLoader(
         train_data,
@@ -584,7 +583,10 @@ def model_setup(args, data_config):
         network_options["for_inference"] = True
     if args.use_amp:
         network_options["use_amp"] = True
-    network_options["output_dim"] = args.clustering_space_dim + 28
+    if args.clustering_loss_only:
+        network_options["output_dim"] = args.clustering_space_dim + 1
+    else:
+        network_options["output_dim"] = args.clustering_space_dim + 28
     network_options.update(data_config.custom_model_kwargs)
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
