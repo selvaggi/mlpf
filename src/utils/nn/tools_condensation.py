@@ -98,6 +98,7 @@ def train_regression(
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
                     calc_e_frac_loss=calc_e_frac_loss,
+                    q_min=args.qmin,
                 )
                 betas = (
                     torch.sigmoid(
@@ -300,6 +301,7 @@ def evaluate_regression(
     local_rank=0,
     step=0,
     loss_terms=[],
+    args=None,
 ):
     """
 
@@ -358,6 +360,7 @@ def evaluate_regression(
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
                     calc_e_frac_loss=calc_e_frac_loss,
+                    q_min=args.qmin,
                 )
                 num_batches += 1
                 count += num_examples
@@ -496,7 +499,7 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, return_resolution=True
+                    batch_g, model_output, y, return_resolution=True, q_min=args.qmin
                 )
                 results.append(resolutions)
                 pid_classification_results.append((pid_true, pid_pred))

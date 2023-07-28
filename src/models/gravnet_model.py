@@ -114,18 +114,18 @@ class GravNetBlock(nn.Module):
             in_channels, out_channels, space_dimensions, propagate_dimensions, k
         ).jittable()
         self.post_gravnet = nn.Sequential(
-            #nn.BatchNorm1d(out_channels),
+            # nn.BatchNorm1d(out_channels),
             nn.Linear(out_channels, 128),
             nn.Tanh(),
-            #nn.BatchNorm1d(128),
+            # nn.BatchNorm1d(128),
             nn.Linear(128, 96),
             nn.Tanh(),
         )
         self.output = nn.Sequential(
-            nn.Linear(4 * 96, 96), nn.Tanh()#, nn.BatchNorm1d(96)
+            nn.Linear(4 * 96, 96), nn.Tanh()  # , nn.BatchNorm1d(96)
         )
 
-    def forward(self,g, x: Tensor, batch: Tensor) -> Tensor:
+    def forward(self, g, x: Tensor, batch: Tensor) -> Tensor:
         x, graph = self.gravnet_layer(g, x, batch)
         x = self.post_gravnet(x)
         assert x.size(1) == 96
@@ -136,8 +136,16 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31, n_postgn_dense_blocks: int=  4, n_gravnet_blocks: int = 4, clust_space_norm: str = "twonorm"):
-        #if not batchnorm:
+    def __init__(
+        self,
+        dev,
+        input_dim: int = 9,
+        output_dim: int = 31,
+        n_postgn_dense_blocks: int = 4,
+        n_gravnet_blocks: int = 4,
+        clust_space_norm: str = "twonorm",
+    ):
+        # if not batchnorm:
         #    print("!!!! no batchnorm !!!")
         super(GravnetModel, self).__init__()
         # input_dim: int = 8
@@ -178,8 +186,8 @@ class GravnetModel(nn.Module):
             postgn_dense_modules.extend(
                 [
                     nn.Linear(4 * 96 if i == 0 else 128, 128),
-                    nn.ReLU()#,
-                    #nn.BatchNorm1d(128),
+                    nn.ReLU()  # ,
+                    # nn.BatchNorm1d(128),
                 ]
             )
         self.postgn_dense = nn.Sequential(*postgn_dense_modules)
@@ -207,7 +215,7 @@ class GravnetModel(nn.Module):
         device = x.device
         batch = obtain_batch_numbers(x, g)
         # print('forward called on device', device)
-        #x = self.batchnorm1(x)
+        # x = self.batchnorm1(x)
         x = global_exchange(x, batch)
         x = self.input(x)
         assert x.device == device
@@ -239,6 +247,7 @@ class GravnetModel(nn.Module):
         clust_loss_only=False,
         add_energy_loss=False,
         calc_e_frac_loss=False,
+        q_min=0.1,
     ):
         """
 
@@ -310,7 +319,7 @@ class GravnetModel(nn.Module):
                 -1
             ).long(),  # Truth hit->cluster index
             batch=batch_numbers.long(),
-            qmin=0.1,
+            qmin=q_min,
             return_regression_resolution=return_resolution,
             post_pid_pool_module=self.post_pid_pool_module,
             clust_space_dim=clust_space_dim,
@@ -320,7 +329,9 @@ class GravnetModel(nn.Module):
         if clust_loss_only:
             loss = a[0] + a[1]
             if calc_e_frac_loss:
-                loss_E_frac, loss_E_frac_true = calc_energy_loss(batch, xj, bj.view(-1))
+                loss_E_frac, loss_E_frac_true = calc_energy_loss(
+                    batch, xj, bj.view(-1, qmin=q_min)
+                )
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
 
