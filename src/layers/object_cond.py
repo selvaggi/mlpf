@@ -395,7 +395,7 @@ def calc_LV_Lbeta(
         scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
     ).sum()
     L_V = L_V_attractive + L_V_repulsive + L_clusters
-    print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V")
+    print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V. L_clusters value:", L_clusters.detach().cpu().item())
     # ________________________________
     # L_beta term
 
