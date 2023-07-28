@@ -306,41 +306,47 @@ def calc_LV_Lbeta(
     #   gives (n_hits, n_objects, cluster_space_dim)
     norms = (cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)).norm(dim=-1)
     assert norms.size() == (n_hits, n_objects)
+    L_clusters = 0
+    for batch_id in batch.unique():
+        bmask = batch == batch_id
+        #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
+        pos_idx, neg_idx = [], []
+        for cluster in cluster_index[bmask].unique():
+            clust_idx = (cluster_index == cluster)[bmask]
+            perm = torch.randperm(clust_idx.sum())
+            perm1 = torch.randperm((~clust_idx).sum())
+            perm2 = torch.randperm(clust_idx.sum())
+            #cutoff = clust_idx.sum()//2
+            pos_lst = clust_idx.nonzero()[perm]
+            neg_lst = (~clust_idx).nonzero()[perm1]
+            neg_lst_second = clust_idx.nonzero()[perm2]
+            if len(pos_lst) % 2:
+                pos_lst = pos_lst[:-1]
+            if len(neg_lst) % 2:
+                neg_lst = neg_lst[:-1]
+            len_cap = min(len(pos_lst), len(neg_lst), len(neg_lst_second))
+            if len_cap % 2:
+                len_cap -= 1
+            pos_lst = pos_lst[:len_cap]
+            neg_lst = neg_lst[:len_cap]
+            neg_lst_second = neg_lst_second[:len_cap]
+            pos_pairs = pos_lst.reshape(-1, 2)
+            neg_pairs = torch.cat([neg_lst, neg_lst_second], dim=1)
+            neg_pairs = neg_pairs[:pos_lst.shape[0]//2, :]
+            pos_idx.append(pos_pairs)
+            neg_idx.append(neg_pairs)
+        pos_idx = torch.cat(pos_idx)
+        neg_idx = torch.cat(neg_idx)
+        assert pos_idx.shape == neg_idx.shape
+        cluster_space_coords_filtered = cluster_space_coords[bmask]
+        pos_norms = (cluster_space_coords_filtered[pos_idx[:, 0]] - cluster_space_coords_filtered[pos_idx[:, 1]]).norm(dim=-1)
+        neg_norms = (cluster_space_coords_filtered[neg_idx[:, 0]] - cluster_space_coords_filtered[neg_idx[:, 1]]).norm(dim=-1)
+        norms_pos = torch.cat([pos_norms, neg_norms])
+        ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
+        if len(ys) == 0:
+            continue
 
-    #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
-    pos_idx, neg_idx = [], []
-    for cluster in cluster_index.unique():
-        clust_idx = cluster_index == cluster
-        perm = torch.randperm(clust_idx.sum())
-        perm1 = torch.randperm((~clust_idx).sum())
-        perm2 = torch.randperm(clust_idx.sum())
-        #cutoff = clust_idx.sum()//2
-        pos_lst = clust_idx.nonzero()[perm]
-        neg_lst = (~clust_idx).nonzero()[perm1]
-        neg_lst_second = clust_idx.nonzero()[perm2]
-        if len(pos_lst) % 2:
-            pos_lst = pos_lst[:-1]
-        if len(neg_lst) % 2:
-            neg_lst = neg_lst[:-1]
-        len_cap = min(len(pos_lst), len(neg_lst), len(neg_lst_second))
-        if len_cap % 2:
-            len_cap -= 1
-        pos_lst = pos_lst[:len_cap]
-        neg_lst = neg_lst[:len_cap]
-        neg_lst_second = neg_lst_second[:len_cap]
-        pos_pairs = pos_lst.reshape(-1, 2)
-        neg_pairs = torch.cat([neg_lst, neg_lst_second], dim=1)
-        neg_pairs = neg_pairs[:pos_lst.shape[0]//2, :]
-        pos_idx.append(pos_pairs)
-        neg_idx.append(neg_pairs)
-    pos_idx = torch.cat(pos_idx)
-    neg_idx = torch.cat(neg_idx)
-    assert pos_idx.shape == neg_idx.shape
-    pos_norms = (cluster_space_coords[pos_idx[:, 0]] - cluster_space_coords[pos_idx[:, 1]]).norm(dim=-1)
-    neg_norms = (cluster_space_coords[neg_idx[:, 0]] - cluster_space_coords[neg_idx[:, 1]]).norm(dim=-1)
-    norms_pos = torch.cat([pos_norms, neg_norms])
-    ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-    L_clusters = torch.nn.HingeEmbeddingLoss()(norms_pos, ys)
+        L_clusters += torch.nn.HingeEmbeddingLoss()(norms_pos, ys)
 
     # -------
     # Attractive potential term
@@ -395,7 +401,10 @@ def calc_LV_Lbeta(
         scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
     ).sum()
     L_V = L_V_attractive + L_V_repulsive + L_clusters
-    print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V. L_clusters value:", L_clusters.detach().cpu().item())
+    if L_clusters != 0:
+        print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V. L_clusters value:", L_clusters.detach().cpu().item())
+    else:
+        print("L-clusters is ZERO")
     # ________________________________
     # L_beta term
 
