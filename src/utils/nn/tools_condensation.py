@@ -50,6 +50,7 @@ def train_regression(
     local_rank=0,
     current_step=0,  # current_step: used for logging correctly
     loss_terms=[],  # whether to only optimize the clustering loss
+    args=None,
 ):
     model.train()
     # print("starting to train")
@@ -99,7 +100,9 @@ def train_regression(
                     calc_e_frac_loss=calc_e_frac_loss,
                 )
                 betas = (
-                    torch.sigmoid(torch.reshape(preds[:, 3], [-1, 1]))
+                    torch.sigmoid(
+                        torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
+                    )
                     .detach()
                     .cpu()
                     .numpy()
@@ -336,7 +339,7 @@ def evaluate_regression(
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
-                calc_e_frac_loss = (num_batches % 10 == 0)
+                calc_e_frac_loss = num_batches % 10 == 0
                 batch_g = batch_g.to(dev)
                 label = y
                 num_examples = label.shape[0]

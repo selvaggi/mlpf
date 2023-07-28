@@ -105,10 +105,10 @@ class GravNetBlock(nn.Module):
         space_dimensions: int = 4,
         propagate_dimensions: int = 22,
         k: int = 40,
-        #batchnorm: bool = True
+        # batchnorm: bool = True
     ):
         super(GravNetBlock, self).__init__()
-        #self.batchnorm = batchnorm
+        # self.batchnorm = batchnorm
         # Includes all layers up to the global_exchange
         self.gravnet_layer = GravNetConv(
             in_channels, out_channels, space_dimensions, propagate_dimensions, k
@@ -136,23 +136,30 @@ class GravNetBlock(nn.Module):
 
 
 class GravnetModel(nn.Module):
-    def __init__(self, dev, input_dim: int = 9, output_dim: int = 31, n_postgn_dense_blocks: int=  4, n_gravnet_blocks: int = 4):
-        #if not batchnorm:
+    def __init__(
+        self,
+        dev,
+        input_dim: int = 9,
+        output_dim: int = 31,
+        n_postgn_dense_blocks: int = 4,
+        n_gravnet_blocks: int = 4,
+    ):
+        # if not batchnorm:
         #    print("!!!! no batchnorm !!!")
         super(GravnetModel, self).__init__()
         # input_dim: int = 8
         # output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
         # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
-        k = 40
+        k = 7  # changed this so that the graphs are not FC
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.n_gravnet_blocks = n_gravnet_blocks
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
-        #self.batchnorm = batchnorm
-        #if self.batchnorm:
+        # self.batchnorm = batchnorm
+        # if self.batchnorm:
         self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
-        #else:
+        # else:
         #    self.batchnorm1 = nn.Identity()
         self.input = nn.Linear(4 * input_dim, 64)
 
@@ -243,24 +250,36 @@ class GravnetModel(nn.Module):
         :return:
         """
         _, S = pred.shape
-        clust_space_dim = self.output_dim - 28
+        if clust_loss_only:
+            clust_space_dim = self.output_dim - 1
+        else:
+            clust_space_dim = self.output_dim - 28
 
-        xj = torch.nn.functional.normalize(
-            pred[:, 0:clust_space_dim], dim=1
-        )  # 0, 1, 2: cluster space coords
+        # xj = torch.nn.functional.normalize(
+        #     pred[:, 0:clust_space_dim], dim=1
+        # )  # 0, 1, 2: cluster space coords
+        xj = torch.tanh(pred[:, 0:clust_space_dim])  # 0, 1, 2: cluster space coords
         bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-        distance_threshold = torch.reshape(
-            pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
-        )  # 4, 5, 6: distance thresholds
-        energy_correction = torch.nn.functional.relu(
-            torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
-        )  # 7: energy correction factor
-        momentum = torch.nn.functional.relu(
-            torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
-        )
-        pid_predicted = pred[
-            :, 5 + clust_space_dim : 27 + clust_space_dim
-        ]  # 8:30: predicted particle one-hot encoding
+        if clust_loss_only:
+            distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
+            energy_correction = torch.zeros_like(bj)
+            momentum = torch.zeros_like(bj)
+            pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
+                momentum.device
+            )
+        else:
+            distance_threshold = torch.reshape(
+                pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
+            )  # 4, 5, 6: distance thresholds
+            energy_correction = torch.nn.functional.relu(
+                torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
+            )  # 7: energy correction factor
+            momentum = torch.nn.functional.relu(
+                torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
+            )
+            pid_predicted = pred[
+                :, 5 + clust_space_dim : 27 + clust_space_dim
+            ]  # 8:30: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -316,15 +335,23 @@ class GravnetModel(nn.Module):
         return loss, a, 0, 0
 
     def object_condensation_inference(self, batch, pred):
-        '''
+        """
         Similar to object_condensation_loss, but made for inference
-        '''
+        """
         _, S = pred.shape
-        xj = torch.nn.functional.normalize(pred[:, 0:3], dim=1)  # 0, 1, 2: cluster space coords
+        xj = torch.nn.functional.normalize(
+            pred[:, 0:3], dim=1
+        )  # 0, 1, 2: cluster space coords
         bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
-        distance_threshold = torch.reshape(pred[:, 4:7], [-1, 3])  # 4, 5, 6: distance thresholds
-        energy_correction = torch.nn.functional.relu(torch.reshape(pred[:, 7], [-1, 1]))  # 7: energy correction factor
-        momentum = torch.nn.functional.relu(torch.reshape(pred[:, 30], [-1, 1]))  # momentum magnitude
+        distance_threshold = torch.reshape(
+            pred[:, 4:7], [-1, 3]
+        )  # 4, 5, 6: distance thresholds
+        energy_correction = torch.nn.functional.relu(
+            torch.reshape(pred[:, 7], [-1, 1])
+        )  # 7: energy correction factor
+        momentum = torch.nn.functional.relu(
+            torch.reshape(pred[:, 30], [-1, 1])
+        )  # momentum magnitude
         pid_predicted = pred[:, 8:30]  # 8:30: predicted particle PID
         clustering_index = get_clustering(bj, xj)
         dev = batch.device
@@ -346,7 +373,7 @@ class GravnetModel(nn.Module):
             ).long(),  # Predicted hit->cluster index, determined by the clustering
             batch=batch_numbers.long(),
             qmin=0.1,
-            post_pid_pool_module=self.post_pid_pool_module
+            post_pid_pool_module=self.post_pid_pool_module,
         )
         return pred
 

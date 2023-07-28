@@ -98,6 +98,7 @@ def _main(args):
         if args.log_wandb and local_rank == 0:
             import wandb
             from src.utils.logger_wandb import log_wandb_init
+
             wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
             wandb.run.name = args.wandb_displayname
             log_wandb_init(args, data_config)
@@ -165,6 +166,7 @@ def _main(args):
                 local_rank=local_rank,
                 current_step=steps,
                 loss_terms=[args.clustering_loss_only, add_energy_loss],
+                args=args,
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):
@@ -269,8 +271,10 @@ def _main(args):
             else:
                 if len(args.data_plot):
                     from pathlib import Path
+
                     Path(args.data_plot).mkdir(parents=True, exist_ok=True)
                     import matplotlib.pyplot as plt
+
                     print("Plotting")
                     figs = plot_regression_resolution(model, test_loader, dev)
                     for name, fig in figs.items():
@@ -347,15 +351,15 @@ def main():
         import time
 
         model_name = (
-                time.strftime("%Y%m%d-%H%M%S")
-                + "_"
-                + os.path.basename(args.network_config).replace(".py", "")
+            time.strftime("%Y%m%d-%H%M%S")
+            + "_"
+            + os.path.basename(args.network_config).replace(".py", "")
         )
         if len(args.network_option):
             model_name = (
-                    model_name
-                    + "_"
-                    + hashlib.md5(str(args.network_option).encode("utf-8")).hexdigest()
+                model_name
+                + "_"
+                + hashlib.md5(str(args.network_option).encode("utf-8")).hexdigest()
             )
         model_name += "_{optim}_lr{lr}_batch{batch}".format(
             lr=args.start_lr, optim=args.optimizer, batch=args.batch_size
