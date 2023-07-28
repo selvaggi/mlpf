@@ -125,8 +125,8 @@ class GravNetBlock(nn.Module):
             nn.Linear(4 * 96, 96), nn.Tanh()#, nn.BatchNorm1d(96)
         )
 
-    def forward(self, x: Tensor, batch: Tensor) -> Tensor:
-        x, graph = self.gravnet_layer(x, batch)
+    def forward(self,g, x: Tensor, batch: Tensor) -> Tensor:
+        x, graph = self.gravnet_layer(g, x, batch)
         x = self.post_gravnet(x)
         assert x.size(1) == 96
         x = global_exchange(x, batch)
@@ -215,7 +215,7 @@ class GravnetModel(nn.Module):
         x_gravnet_per_block = []  # To store intermediate outputs
         graphs = []
         for gravnet_block in self.gravnet_blocks:
-            x, graph = gravnet_block(x, batch)
+            x, graph = gravnet_block(g, x, batch)
             x_gravnet_per_block.append(x)
             graphs.append(graph)
         x = torch.cat(x_gravnet_per_block, dim=-1)

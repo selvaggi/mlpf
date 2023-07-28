@@ -64,7 +64,7 @@ class GravNetConv(MessagePassing):
         self.lin_h.reset_parameters()
         self.lin.reset_parameters()
 
-    def forward(self, x: Tensor, batch: OptTensor = None) -> Tensor:
+    def forward(self, g, x: Tensor, batch: OptTensor = None) -> Tensor:
         """"""
 
         assert x.dim() == 2, "Static graphs not supported in `GravNetConv`."
@@ -77,7 +77,7 @@ class GravNetConv(MessagePassing):
 
         s_l: Tensor = self.lin_s(x)
 
-        graph = knn_per_graph(batch, s_l, self.k)
+        graph = knn_per_graph(g, s_l, self.k)
         graph.ndata['s_l'] = s_l
         row = graph.edges()[0]
         col = graph.edges()[0]
@@ -116,7 +116,7 @@ class GravNetConv(MessagePassing):
         )
 
 def knn_per_graph(g, sl, k):
-    graphs_list = dgl.batch(g)
+    graphs_list = dgl.unbatch(g)
     node_counter = 0
     new_graphs =[]
     for graph in graphs_list:
