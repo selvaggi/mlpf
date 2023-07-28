@@ -145,7 +145,7 @@ class GravnetModel(nn.Module):
         # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
         k = 7  # changed this so that the graphs are not FC
-        self.return_graphs = True
+        self.return_graphs = False
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.n_gravnet_blocks = n_gravnet_blocks
