@@ -1,11 +1,12 @@
 graph_config:
-   only_hits: false
+   only_hits: true
    fully_connected: true
 
 
 custom_model_kwargs:
    # add custom model kwargs here
    n_postgn_dense_blocks: 4
+   clust_space_norm: tanh
 
 #treename:
 selection:
