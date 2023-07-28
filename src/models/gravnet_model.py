@@ -330,7 +330,7 @@ class GravnetModel(nn.Module):
             loss = a[0] + a[1]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
-                    batch, xj, bj.view(-1, qmin=q_min)
+                    batch, xj, bj.view(-1), qmin=q_min
                 )
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
