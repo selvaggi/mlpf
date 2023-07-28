@@ -77,7 +77,8 @@ class GravNetConv(MessagePassing):
 
         s_l: Tensor = self.lin_s(x)
 
-        graph = dgl.knn_graph(s_l, self.k, exclude_self=True)
+        graph = knn_per_graph(batch, s_l, self.k)
+        graph.ndata['s_l'] = s_l
         row = graph.edges()[0]
         col = graph.edges()[0]
         edge_index = torch.stack([row, col], dim=0)
@@ -93,7 +94,7 @@ class GravNetConv(MessagePassing):
             size=(s_l.size(0), s_l.size(0)),
         )
 
-        return self.lin(torch.cat([out, x], dim=-1))
+        return self.lin(torch.cat([out, x], dim=-1)), graph
 
     def message(self, x_j: Tensor, edge_weight: Tensor) -> Tensor:
         return x_j * edge_weight.unsqueeze(1)
@@ -113,3 +114,18 @@ class GravNetConv(MessagePassing):
         return "{}({}, {}, k={})".format(
             self.__class__.__name__, self.in_channels, self.out_channels, self.k
         )
+
+def knn_per_graph(g, sl, k):
+    graphs_list = dgl.batch(g)
+    node_counter = 0
+    new_graphs =[]
+    for graph in graphs_list:
+        non = graph.number_of_nodes()
+        sls_graph = sl[node_counter:node_counter+non]
+        new_graph = dgl.knn_graph(sls_graph, k, exclude_self=True)
+        new_graphs.append(new_graph)
+        node_counter = node_counter+non
+    return dgl.batch(new_graphs)
+    
+
+        

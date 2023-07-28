@@ -126,13 +126,13 @@ class GravNetBlock(nn.Module):
         )
 
     def forward(self, x: Tensor, batch: Tensor) -> Tensor:
-        x = self.gravnet_layer(x, batch)
+        x, graph = self.gravnet_layer(x, batch)
         x = self.post_gravnet(x)
         assert x.size(1) == 96
         x = global_exchange(x, batch)
         x = self.output(x)
         assert x.size(1) == 96
-        return x
+        return x, graph
 
 
 class GravnetModel(nn.Module):
@@ -145,6 +145,7 @@ class GravnetModel(nn.Module):
         # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
         k = 7  # changed this so that the graphs are not FC
+        self.return_graphs = True
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.n_gravnet_blocks = n_gravnet_blocks
@@ -212,9 +213,11 @@ class GravnetModel(nn.Module):
         assert x.device == device
 
         x_gravnet_per_block = []  # To store intermediate outputs
+        graphs = []
         for gravnet_block in self.gravnet_blocks:
-            x = gravnet_block(x, batch)
+            x, graph = gravnet_block(x, batch)
             x_gravnet_per_block.append(x)
+            graphs.append(graph)
         x = torch.cat(x_gravnet_per_block, dim=-1)
         assert x.size() == (x.size(0), 4 * 96)
         assert x.device == device
@@ -222,7 +225,10 @@ class GravnetModel(nn.Module):
         x = self.postgn_dense(x)
         x = self.output(x)
         assert x.device == device
-        return x
+        if self.return_graphs:
+            return x, graphs
+        else:
+            return x
 
     def object_condensation_loss2(
         self,
