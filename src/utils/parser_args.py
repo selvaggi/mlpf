@@ -397,3 +397,12 @@ parser.add_argument(
     type=int,
     help="Number of epochs before energy loss is active",
 )
+
+parser.add_argument(
+    "--fill_loss_weight",
+    default=0.1,
+    type=float,
+    help="weight for the fill loss to try to prevent mode collapse"
+)
+
+

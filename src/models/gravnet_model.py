@@ -253,6 +253,7 @@ class GravnetModel(nn.Module):
         frac_clustering_loss=0.1,
         attr_weight=1.0,
         repul_weight=1.0,
+        fill_loss_weight=1.0,
     ):
         """
 
@@ -334,6 +335,7 @@ class GravnetModel(nn.Module):
             frac_combinations=frac_clustering_loss,
             attr_weight=attr_weight,
             repul_weight=repul_weight,
+            fill_loss_weight=fill_loss_weight,
         )
         if return_resolution:
             return a

@@ -2,6 +2,8 @@ from typing import Tuple, Union
 import numpy as np
 import torch
 from torch_scatter import scatter_max, scatter_add, scatter_mean
+from src.layers.loss_fill_space_torch import LLFillSpace
+
 
 
 onehot_particles_arr = [-2212.0, -211.0, -14.0, -13.0, -11.0, 11.0, 12.0, 13.0, 14.0, 22.0, 111.0, 130.0, 211.0, 2112.0, 2212.0, 1000010048.0, 1000020032.0, 1000040064.0, 1000050112.0, 1000060096.0, 1000080128.0]
@@ -124,6 +126,7 @@ def calc_LV_Lbeta(
     frac_combinations=0.1,  # fraction of the all possible pairs to be used for the clustering loss
     attr_weight=1.0,
     repul_weight=1.0,
+    fill_loss_weight=1.0,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -219,6 +222,7 @@ def calc_LV_Lbeta(
 
     # Get the cluster space coordinates and betas for these maxima hits too
     x_alpha = cluster_space_coords[is_sig][index_alpha]
+
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
     assert beta_alpha.size() == (n_objects,)
@@ -235,7 +239,12 @@ def calc_LV_Lbeta(
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
         batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, predicted_pid, momentum
     )
-    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # project the pooled PID embeddings to the final "one hot encoding" space
+
+    if fill_loss_weight > 0:
+        fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
+    else:
+        fill_loss = 0
+    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # Project the pooled PID embeddings to the final "one hot encoding" space
     #pid_particles_pred = calc_pred_pid(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
     #)
@@ -434,7 +443,7 @@ def calc_LV_Lbeta(
     L_V_repulsive = (
         scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
     ).sum()
-    L_V = attr_weight * L_V_attractive + repul_weight * L_V_repulsive + L_clusters
+    L_V = attr_weight * L_V_attractive + repul_weight * L_V_repulsive + L_clusters + fill_loss
     if L_clusters != 0:
         print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V. L_clusters value:", L_clusters.detach().cpu().item())
     else:
@@ -545,7 +554,7 @@ def calc_LV_Lbeta(
         L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
     except:
         pass
-    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters)
+    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters, fill_loss)
 
 
 def calc_LV_Lbeta_inference(

@@ -12,7 +12,7 @@ import math
 import torch
 import sys
 import os
-
+torch.autograd.set_detect_anomaly(True)
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
 from src.logger.logger import _logger, _configLogger
