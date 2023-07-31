@@ -205,6 +205,7 @@ def train_regression(
                     xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
                     #assert len(bj) == len(xj)
                     xj = xj.tanh()
+                    bj = bj.clip(0.0, 1 - 1e-4)
                     q = bj.arctanh() ** 2 + args.qmin
                     assert q.shape[0] == xj.shape[0]
                     assert batch_g.ndata["h"].shape[0] == xj.shape[0]
