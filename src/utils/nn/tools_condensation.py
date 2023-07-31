@@ -201,9 +201,12 @@ def train_regression(
                         clust_space_dim = model.mod.output_dim - 28
                     bj = torch.sigmoid(torch.reshape(model_output[:, clust_space_dim], [-1, 1]))  # 3: betas
                     xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
+                    #assert len(bj) == len(xj)
                     xj = xj.tanh()
                     q = bj.arctanh() ** 2 + args.qmin
-                    fig, ax = plot_clust(g, q, xj, title_prefix="train ep. {}, batch {}".format(epoch, num_batches))
+                    assert q.shape[0] == xj.shape[0]
+                    assert batch_g.ndata["h"].shape[0] == xj.shape[0]
+                    fig, ax = plot_clust(batch_g, q, xj, title_prefix="train ep. {}, batch {}".format(epoch, num_batches))
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
                     wandb.log(

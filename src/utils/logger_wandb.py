@@ -221,30 +221,32 @@ def calculate_and_log_tpr_1_10_percent(fpr,tpr, name_pos, name_neg):
 def plot_clust(g, q, xj, title_prefix=""):
     graph_list = dgl.unbatch(g)
     node_counter = 0
-    how_many_to_plot = 10
-    fig, ax = plt.subplots(len(graph_list), 2, figsize=(14, 5))
-    for i in range(how_many_to_plot):
+    fig, ax = plt.subplots(len(graph_list), 2, figsize=(9, 28))
+    for i in range(len(graph_list)):
         graph_eval = graph_list[i]
-        print([g.num_nodes() for g in graph_list])
+        #print([g.num_nodes() for g in graph_list])
         non = graph_eval.number_of_nodes()
         assert non == graph_eval.ndata['h'].shape[0]
         particle_number = graph_eval.ndata['particle_number']
         #if particle_number.max() > 1:
         #    print("skipping one, only plotting events with 2 particles")
         #    continue
-        q_graph = q[node_counter:node_counter + non]
+        q_graph = q[node_counter:node_counter + non].flatten()
         hit_type = torch.argmax(graph_eval.ndata['hit_type'], dim=1).view(-1)
-        PCA_2d_node_feats = PCA(n_components=2).fit_transform(graph_eval.ndata['h'].detach().numpy())
+
         part_num = graph_eval.ndata['particle_number'].view(-1).to(torch.long)
-        q_alpha, index_alpha = scatter_max(q_graph.view(-1), part_num - 1)
+        q_alpha, index_alpha = scatter_max(q_graph.cpu().view(-1), part_num.cpu() - 1)
         #print(part_num.unique())
-        xj_graph = xj[node_counter:node_counter + non, :]
+        xj_graph = xj[node_counter:node_counter + non, :].detach().cpu()
         if len(index_alpha) == 1:
             index_alpha = index_alpha.item()
         clr = graph_eval.ndata["particle_number"]
-        ax[i, 0].set_title(title_prefix + " " + str(np.unique(part_num)) + " " + str(len(np.unique(part_num))))
+        ax[i, 0].set_title(title_prefix + " " + str(np.unique(part_num.cpu())) + " " + str(len(np.unique(part_num.cpu()))))
+        ax[i, 1].set_title("PCA of node features")
         ax[i, 0].scatter(xj_graph[:, 0], xj_graph[:, 1], c=clr.tolist(), alpha=0.2)
-        ax[i, 1].scatter(PCA_2d_node_feats[:, 0], PCA_2d_node_feats[:, 1], c=clr.tolist(), alpha=0.2)
+        if non > 1:
+            PCA_2d_node_feats = PCA(n_components=2).fit_transform(graph_eval.ndata['h'].detach().cpu().numpy())
+            ax[i, 1].scatter(PCA_2d_node_feats[:, 0], PCA_2d_node_feats[:, 1], c=clr.tolist(), alpha=0.2)
         ax[i, 0].scatter(xj_graph[index_alpha, 0], xj_graph[index_alpha, 1], marker='*', c="r", alpha=1.)
         pos = graph_eval.ndata['pos_hits_norm']
         node_counter += non

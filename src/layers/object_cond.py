@@ -538,7 +538,11 @@ def calc_LV_Lbeta(
                    "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
-    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters.detach().cpu().item())
+    try:
+        L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
+    except:
+        pass
+    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters)
 
 
 def calc_LV_Lbeta_inference(
