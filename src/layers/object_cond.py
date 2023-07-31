@@ -34,7 +34,7 @@ def debug(*args, **kwargs):
 def calc_energy_pred(
     batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, pid_results, hit_mom
 ):
-    td = 0.1
+    td = 0.7
     batch_number = torch.max(batch) + 1
     energies = []
     pid_outputs = []

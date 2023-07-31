@@ -209,6 +209,7 @@ def _main(args):
                 local_rank=local_rank,
                 step=steps,
                 loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
+                args = args
             )
             is_best_epoch = (
                 (valid_metric < best_valid_metric)
