@@ -18,6 +18,8 @@ from src.layers.object_cond import (
     get_clustering,
     calc_LV_Lbeta_inference,
 )
+from src.utils.logger_wandb import plot_clust
+
 
 class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
@@ -99,6 +101,7 @@ def train_regression(
                     add_energy_loss=add_energy_loss,
                     calc_e_frac_loss=calc_e_frac_loss,
                     q_min=args.qmin,
+                    frac_clustering_loss=args.frac_cluster_loss,
                 )
                 betas = (
                     torch.sigmoid(
@@ -173,7 +176,7 @@ def train_regression(
                             mode="train",
                         )
 
-            if logwandb and (num_batches % 10) == 0:
+            if logwandb and ((num_batches-1) % 10) == 0:
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
@@ -187,10 +190,22 @@ def train_regression(
                         "loss PID": losses[4],
                         "loss momentum": losses[5],
                         "loss mass (not us. for opt.)": losses[6],
+                        "inter-clustering loss": losses[10]
                     }
                 )  # , step=step_count)
 
-                if num_batches % 500 == 0:
+                if (num_batches-1) % 500 == 0:
+                    if clust_loss_only:
+                        clust_space_dim = model.mod.output_dim - 1
+                    else:
+                        clust_space_dim = model.mod.output_dim - 28
+                    bj = torch.sigmoid(torch.reshape(model_output[:, clust_space_dim], [-1, 1]))  # 3: betas
+                    xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
+                    xj = xj.tanh()
+                    q = bj.arctanh() ** 2 + args.qmin
+                    fig, ax = plot_clust(g, q, xj, title_prefix="train ep. {}, batch {}".format(epoch, num_batches))
+                    wandb.log({"clust": wandb.Image(fig)})
+                    fig.clf()
                     wandb.log(
                         {
                             "conf_mat_train": wandb.plot.confusion_matrix(

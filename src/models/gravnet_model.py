@@ -248,6 +248,7 @@ class GravnetModel(nn.Module):
         add_energy_loss=False,
         calc_e_frac_loss=False,
         q_min=0.1,
+        frac_clustering_loss=0.1
     ):
         """
 
@@ -324,6 +325,7 @@ class GravnetModel(nn.Module):
             return_regression_resolution=return_resolution,
             post_pid_pool_module=self.post_pid_pool_module,
             clust_space_dim=clust_space_dim,
+            frac_combinations=frac_clustering_loss
         )
         if return_resolution:
             return a

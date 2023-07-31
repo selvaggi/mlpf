@@ -121,6 +121,7 @@ def calc_LV_Lbeta(
     return_components=False,
     return_regression_resolution=False,
     clust_space_dim=3,
+    frac_combinations=0.1  # fraction of the all possible pairs to be used for the clustering loss
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -314,6 +315,8 @@ def calc_LV_Lbeta(
         clust_space_filt = cluster_space_coords[bmask]
         pos_pairs_all = []
         neg_pairs_all = []
+        if len(cluster_index[bmask].unique()) <= 1:
+            continue
         for cluster in cluster_index[bmask].unique():
             coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
             coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
@@ -321,7 +324,12 @@ def calc_LV_Lbeta(
                 continue
             clust_idx = (cluster_index[bmask] == cluster)
             #all_ones = torch.ones_like((clust_idx, clust_idx))
-            pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
+            #pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
+            total_num = (len(coords_pos)**2) / 2
+            num = int(frac_combinations * total_num)
+            pos_pairs = []
+            for i in range(num):
+                pos_pairs.append([np.random.randint(len(coords_pos)), np.random.randint(len(coords_pos))])
             neg_pairs = []
             for i in range(len(pos_pairs)):
                 neg_pairs.append([np.random.randint(len(coords_pos)), np.random.randint(len(coords_neg))])
@@ -369,8 +377,6 @@ def calc_LV_Lbeta(
         neg_norms = (cluster_space_coords_filtered[neg_pairs[:, 0]] - cluster_space_coords_filtered[neg_pairs[:, 1]]).norm(dim=-1)
         norms_pos = torch.cat([pos_norms, neg_norms])
         ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-
-
         L_clusters += torch.nn.HingeEmbeddingLoss()(norms_pos, ys)
 
     # -------
@@ -532,7 +538,7 @@ def calc_LV_Lbeta(
                    "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
                    "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
-    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions)
+    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters.detach().cpu().item())
 
 
 def calc_LV_Lbeta_inference(

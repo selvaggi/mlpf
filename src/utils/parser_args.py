@@ -372,6 +372,10 @@ parser.add_argument(
 parser.add_argument(
     "--qmin", type=float, default=0.1, help="define qmin for condensation"
 )
+
+parser.add_argument(
+    "--frac_cluster_loss", type=float, default=0.1, help="Fraction of total pairs to use for the clustering loss"
+)
 parser.add_argument(
     "--condensation",
     action="store_true",
