@@ -193,7 +193,8 @@ def train_regression(
                         "loss PID": losses[4],
                         "loss momentum": losses[5],
                         "loss mass (not us. for opt.)": losses[6],
-                        "inter-clustering loss": losses[10]
+                        "inter-clustering loss": losses[10],
+                        "filling loss": losses[11]
                     }
                 )  # , step=step_count)
 

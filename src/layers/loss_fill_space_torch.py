@@ -6,7 +6,7 @@ class LLFillSpace(torch.nn.Module):
     def __init__(self,
                  maxhits: int = 1000,
                  runevery: int = -1):
-        print('INFO: LLFillSpace: this is actually a regulariser: move to right file soon.')
+        #print('INFO: LLFillSpace: this is actually a regulariser: move to right file soon.')
         assert maxhits > 0
         self.maxhits = maxhits
         self.runevery = runevery
@@ -30,6 +30,7 @@ class LLFillSpace(torch.nn.Module):
             sel = torch.randint(low=0, high=coords.shape[0] - 1, size=(maxhits,), dtype=torch.int32)
         else:
             sel = torch.arange(coords.shape[0], dtype=torch.int32)
+        sel = sel.to(coords.device)
         sel = torch.unsqueeze(sel, dim=1).flatten()
         coords_selected = torch.index_select(coords, 0, sel).clone()  # V' x C
         # print('coords',coords.shape)

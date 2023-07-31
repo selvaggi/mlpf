@@ -15,7 +15,7 @@ class LLFillSpace(LossLayerBase):
         Outputs:
          - coordinates (unchanged)
         '''
-        print('INFO: LLFillSpace: this is actually a regulariser: move to right file soon.')
+        #print('INFO: LLFillSpace: this is actually a regulariser: move to right file soon.')
         assert maxhits > 0
         self.maxhits = maxhits
         self.runevery = runevery
