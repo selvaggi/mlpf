@@ -196,7 +196,7 @@ def train_regression(
                     }
                 )  # , step=step_count)
 
-                if (num_batches-1) % 500 == 0:
+                if (num_batches-1) % 100 == 0:
                     if clust_loss_only:
                         clust_space_dim = model.mod.output_dim - 1
                     else:
@@ -211,13 +211,14 @@ def train_regression(
                     fig, ax = plot_clust(batch_g, q, xj, title_prefix="train ep. {}, batch {}".format(epoch, num_batches))
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
-                    wandb.log(
-                        {
-                            "conf_mat_train": wandb.plot.confusion_matrix(
-                                y_true=pid_true, preds=pid_pred, class_names=class_names
-                            )
-                        }
-                    )
+                    if (num_batches - 1) % 500 == 0:
+                        wandb.log(
+                            {
+                                "conf_mat_train": wandb.plot.confusion_matrix(
+                                    y_true=pid_true, preds=pid_pred, class_names=class_names
+                                )
+                            }
+                        )
 
                 ks = sorted(list(losses[9].keys()))
                 losses_cpu = [
