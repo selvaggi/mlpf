@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 
+
 onehot_particles_arr = [-2212.0, -211.0, -14.0, -13.0, -11.0, 11.0, 12.0, 13.0, 14.0, 22.0, 111.0, 130.0, 211.0, 2112.0, 2212.0, 1000010048.0, 1000020032.0, 1000040064.0, 1000050112.0, 1000060096.0, 1000080128.0]
 onehot_particles_arr = [int(x) for x in onehot_particles_arr]
 pid_dict = {i+1: onehot_particles_arr[i] for i in range(len(onehot_particles_arr))}
@@ -308,8 +309,31 @@ def calc_LV_Lbeta(
     assert norms.size() == (n_hits, n_objects)
     L_clusters = 0
     for batch_id in batch.unique():
+        # do all possible pairs...
         bmask = batch == batch_id
+        clust_space_filt = cluster_space_coords[bmask]
+        pos_pairs_all = []
+        neg_pairs_all = []
+        for cluster in cluster_index[bmask].unique():
+            coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
+            coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
+            if len(coords_neg) == 0:
+                continue
+            clust_idx = (cluster_index[bmask] == cluster)
+            #all_ones = torch.ones_like((clust_idx, clust_idx))
+            pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
+            neg_pairs = []
+            for i in range(len(pos_pairs)):
+                neg_pairs.append([np.random.randint(len(coords_pos)), np.random.randint(len(coords_neg))])
+            pos_pairs_all += pos_pairs
+            neg_pairs_all += neg_pairs
+        pos_pairs = torch.tensor(pos_pairs_all)
+        neg_pairs = torch.tensor(neg_pairs_all)
+        '''# do just a small sample of the pairs. ...
+        bmask = batch == batch_id
+
         #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
+
         pos_idx, neg_idx = [], []
         for cluster in cluster_index[bmask].unique():
             clust_idx = (cluster_index == cluster)[bmask]
@@ -336,15 +360,16 @@ def calc_LV_Lbeta(
             pos_idx.append(pos_pairs)
             neg_idx.append(neg_pairs)
         pos_idx = torch.cat(pos_idx)
-        neg_idx = torch.cat(neg_idx)
-        assert pos_idx.shape == neg_idx.shape
+        neg_idx = torch.cat(neg_idx)'''
+        assert pos_pairs.shape == neg_pairs.shape
+        if len(pos_pairs) == 0:
+            continue
         cluster_space_coords_filtered = cluster_space_coords[bmask]
-        pos_norms = (cluster_space_coords_filtered[pos_idx[:, 0]] - cluster_space_coords_filtered[pos_idx[:, 1]]).norm(dim=-1)
-        neg_norms = (cluster_space_coords_filtered[neg_idx[:, 0]] - cluster_space_coords_filtered[neg_idx[:, 1]]).norm(dim=-1)
+        pos_norms = (cluster_space_coords_filtered[pos_pairs[:, 0]] - cluster_space_coords_filtered[pos_pairs[:, 1]]).norm(dim=-1)
+        neg_norms = (cluster_space_coords_filtered[neg_pairs[:, 0]] - cluster_space_coords_filtered[neg_pairs[:, 1]]).norm(dim=-1)
         norms_pos = torch.cat([pos_norms, neg_norms])
         ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-        if len(ys) == 0:
-            continue
+
 
         L_clusters += torch.nn.HingeEmbeddingLoss()(norms_pos, ys)
 

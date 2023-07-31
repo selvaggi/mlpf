@@ -38,7 +38,7 @@ def obtain_batch_numbers(x, g):
         gj = graphs_eval[index]
         num_nodes = gj.number_of_nodes()
         batch_numbers.append(index * torch.ones(num_nodes).to(dev))
-        num_nodes = gj.number_of_nodes()
+        #num_nodes = gj.number_of_nodes()
 
     batch = torch.cat(batch_numbers, dim=0)
     return batch
@@ -267,17 +267,18 @@ class GravnetModel(nn.Module):
         # xj = torch.nn.functional.normalize(
         #     pred[:, 0:clust_space_dim], dim=1
         # )  # 0, 1, 2: cluster space coords
-        xj = torch.tanh(pred[:, 0:clust_space_dim])  # 0, 1, 2: cluster space coords
+
         bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
 
-        xj = pred[:, 0:clust_space_dim]
+        xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
         if self.clust_space_norm == "twonorm":
             xj = torch.nn.functional.normalize(
                 xj, dim=1
             )  # 0, 1, 2: cluster space coords
         elif self.clust_space_norm == "tanh":
             xj = torch.tanh(xj)
-
+        else:
+            raise NotImplementedError
         if clust_loss_only:
             distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
             energy_correction = torch.zeros_like(bj)
