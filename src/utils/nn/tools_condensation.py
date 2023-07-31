@@ -102,6 +102,8 @@ def train_regression(
                     calc_e_frac_loss=calc_e_frac_loss,
                     q_min=args.qmin,
                     frac_clustering_loss=args.frac_cluster_loss,
+                    attr_weight=args.L_attractive_weight,
+                    repul_weight=args.L_repulsive_weight,
                 )
                 betas = (
                     torch.sigmoid(

@@ -86,7 +86,7 @@ class GraphTransformerLayer(nn.Module):
         self.num_heads = num_heads
         self.dropout = dropout
         self.residual = residual
-        self.layer_norm = layer_norm        
+        self.layer_norm = layer_norm
         self.batch_norm = batch_norm
         
         self.attention = MultiHeadAttentionLayer(in_dim, out_dim//num_heads, num_heads, use_bias)
@@ -110,7 +110,7 @@ class GraphTransformerLayer(nn.Module):
             self.batch_norm2 = nn.BatchNorm1d(out_dim)
         
     def forward(self, g, h):
-        h_in1 = h # for first residual connection
+        h_in1 = h   # for first residual connection
         
         # multi-head attention out
         attn_out = self.attention(g, h)

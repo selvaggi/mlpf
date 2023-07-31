@@ -144,15 +144,17 @@ class GravnetModel(nn.Module):
         n_postgn_dense_blocks: int = 4,
         n_gravnet_blocks: int = 4,
         clust_space_norm: str = "twonorm",
+        k_gravnet: int = 7
     ):
         # if not batchnorm:
         #    print("!!!! no batchnorm !!!")
         super(GravnetModel, self).__init__()
+        print("k_gravnet:", k_gravnet)
         # input_dim: int = 8
         # output_dim: int = 8 + 22  # 3x cluster positions, 1x beta, 3x position correction factor, 1x energy correction factor, 22x one-hot encoded particles (0th is the "OTHER" category)
         # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
-        k = 7  # changed this so that the graphs are not FC
+        k = k_gravnet
         self.return_graphs = False
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -164,7 +166,7 @@ class GravnetModel(nn.Module):
         # else:
         #    self.batchnorm1 = nn.Identity()
         self.input = nn.Linear(4 * input_dim, 64)
-        assert clust_space_norm in ["twonorm", "tanh"]
+        assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
         # if isinstance(k, int):
         #     k = n_gravnet_blocks * [k]
@@ -248,7 +250,9 @@ class GravnetModel(nn.Module):
         add_energy_loss=False,
         calc_e_frac_loss=False,
         q_min=0.1,
-        frac_clustering_loss=0.1
+        frac_clustering_loss=0.1,
+        attr_weight=1.0,
+        repul_weight=1.0,
     ):
         """
 
@@ -278,6 +282,8 @@ class GravnetModel(nn.Module):
             )  # 0, 1, 2: cluster space coords
         elif self.clust_space_norm == "tanh":
             xj = torch.tanh(xj)
+        elif self.clust_space_norm == "none":
+            pass
         else:
             raise NotImplementedError
         if clust_loss_only:
@@ -325,7 +331,9 @@ class GravnetModel(nn.Module):
             return_regression_resolution=return_resolution,
             post_pid_pool_module=self.post_pid_pool_module,
             clust_space_dim=clust_space_dim,
-            frac_combinations=frac_clustering_loss
+            frac_combinations=frac_clustering_loss,
+            attr_weight=attr_weight,
+            repul_weight=repul_weight,
         )
         if return_resolution:
             return a

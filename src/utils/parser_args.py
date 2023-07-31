@@ -374,6 +374,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--L_attractive_weight", type=float, default=1.0, help="Attractitve term of the potential weight"
+)
+parser.add_argument(
+    "--L_repulsive_weight", type=float, default=1.0, help="Repulsive term of the potential weight"
+)
+
+parser.add_argument(
     "--frac_cluster_loss", type=float, default=0.1, help="Fraction of total pairs to use for the clustering loss"
 )
 parser.add_argument(
