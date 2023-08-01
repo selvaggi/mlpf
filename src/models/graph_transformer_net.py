@@ -22,12 +22,13 @@ from src.layers.object_cond import (
 )
 from src.layers.obj_cond_inf import calc_energy_loss
 
+
 class GraphTransformerNet(nn.Module):
     def __init__(self, dev):
         super().__init__()
 
         in_dim_node = 9  # node_dim (feat is an integer)
-        
+        self.clust_space_norm = "none"
         hidden_dim = 80  # before 80
         out_dim = 80
         n_classes = 4
@@ -47,7 +48,6 @@ class GraphTransformerNet(nn.Module):
         max_wl_role_index = 100
         self.readout = "sum"
         self.output_dim = n_classes
-        
 
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
         self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
@@ -103,7 +103,7 @@ class GraphTransformerNet(nn.Module):
             h = conv(g, h)
 
         return self.MLP_layer(h)
-    
+
     def object_condensation_loss2(
         self,
         batch,
@@ -113,6 +113,11 @@ class GraphTransformerNet(nn.Module):
         clust_loss_only=False,
         add_energy_loss=False,
         calc_e_frac_loss=False,
+        q_min=0.1,
+        frac_clustering_loss=0.1,
+        attr_weight=1.0,
+        repul_weight=1.0,
+        fill_loss_weight=1.0,
     ):
         """
 
@@ -132,8 +137,20 @@ class GraphTransformerNet(nn.Module):
         # xj = torch.nn.functional.normalize(
         #     pred[:, 0:clust_space_dim], dim=1
         # )  # 0, 1, 2: cluster space coords
-        xj = torch.tanh(pred[:, 0:clust_space_dim])  # 0, 1, 2: cluster space coords
+
         bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
+
+        xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
+        if self.clust_space_norm == "twonorm":
+            xj = torch.nn.functional.normalize(
+                xj, dim=1
+            )  # 0, 1, 2: cluster space coords
+        elif self.clust_space_norm == "tanh":
+            xj = torch.tanh(xj)
+        elif self.clust_space_norm == "none":
+            pass
+        else:
+            raise NotImplementedError
         if clust_loss_only:
             distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
             energy_correction = torch.zeros_like(bj)
@@ -175,17 +192,23 @@ class GraphTransformerNet(nn.Module):
                 -1
             ).long(),  # Truth hit->cluster index
             batch=batch_numbers.long(),
-            qmin=0.1,
+            qmin=q_min,
             return_regression_resolution=return_resolution,
             post_pid_pool_module=self.post_pid_pool_module,
             clust_space_dim=clust_space_dim,
+            frac_combinations=frac_clustering_loss,
+            attr_weight=attr_weight,
+            repul_weight=repul_weight,
+            fill_loss_weight=fill_loss_weight,
         )
         if return_resolution:
             return a
         if clust_loss_only:
             loss = a[0] + a[1]
             if calc_e_frac_loss:
-                loss_E_frac, loss_E_frac_true = calc_energy_loss(batch, xj, bj.view(-1))
+                loss_E_frac, loss_E_frac_true = calc_energy_loss(
+                    batch, xj, bj.view(-1), qmin=q_min
+                )
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
 
