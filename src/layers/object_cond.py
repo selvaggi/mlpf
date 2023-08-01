@@ -5,11 +5,33 @@ from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.loss_fill_space_torch import LLFillSpace
 
 
-
-onehot_particles_arr = [-2212.0, -211.0, -14.0, -13.0, -11.0, 11.0, 12.0, 13.0, 14.0, 22.0, 111.0, 130.0, 211.0, 2112.0, 2212.0, 1000010048.0, 1000020032.0, 1000040064.0, 1000050112.0, 1000060096.0, 1000080128.0]
+onehot_particles_arr = [
+    -2212.0,
+    -211.0,
+    -14.0,
+    -13.0,
+    -11.0,
+    11.0,
+    12.0,
+    13.0,
+    14.0,
+    22.0,
+    111.0,
+    130.0,
+    211.0,
+    2112.0,
+    2212.0,
+    1000010048.0,
+    1000020032.0,
+    1000040064.0,
+    1000050112.0,
+    1000060096.0,
+    1000080128.0,
+]
 onehot_particles_arr = [int(x) for x in onehot_particles_arr]
-pid_dict = {i+1: onehot_particles_arr[i] for i in range(len(onehot_particles_arr))}
+pid_dict = {i + 1: onehot_particles_arr[i] for i in range(len(onehot_particles_arr))}
 pid_dict[0] = "other"
+
 
 def safe_index(arr, index):
     # One-hot index (or zero if it's not in the array)
@@ -17,6 +39,7 @@ def safe_index(arr, index):
         return 0
     else:
         return arr.index(index) + 1
+
 
 def assert_no_nans(x):
     """
@@ -35,7 +58,15 @@ def debug(*args, **kwargs):
 
 
 def calc_energy_pred(
-    batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, pid_results, hit_mom
+    batch,
+    g,
+    cluster_index_per_event,
+    is_sig,
+    q,
+    beta,
+    energy_correction,
+    pid_results,
+    hit_mom,
 ):
     td = 0.7
     batch_number = torch.max(batch) + 1
@@ -75,8 +106,12 @@ def calc_energy_pred(
             mask_batch
         ][is_sig_i].view(-1)
         mom_c = hit_mom[mask_batch][is_sig_i].view(-1)
-        #pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
-        pid_results_i = scatter_add(pid_results[mask_batch][is_sig_i], clustering_.long().to(pid_results.device), dim=0)
+        # pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
+        pid_results_i = scatter_add(
+            pid_results[mask_batch][is_sig_i],
+            clustering_.long().to(pid_results.device),
+            dim=0,
+        )
         #  aggregated "PID embeddings"
         e_objects = scatter_add(e_c, clustering_.long().to(e_c.device))
         mom_objects = scatter_add(mom_c, clustering_.long().to(mom_c.device))
@@ -86,11 +121,14 @@ def calc_energy_pred(
         energies.append(e_objects)
         pid_outputs.append(pid_results_i)
         momenta.append(mom_objects)
-    return torch.cat(energies, dim=0), torch.cat(pid_outputs, dim=0), torch.cat(momenta, dim=0)
+    return (
+        torch.cat(energies, dim=0),
+        torch.cat(pid_outputs, dim=0),
+        torch.cat(momenta, dim=0),
+    )
 
-def calc_pred_pid(
-    batch, g, cluster_index_per_event, is_sig, q, beta, pred_pid
-):
+
+def calc_pred_pid(batch, g, cluster_index_per_event, is_sig, q, beta, pred_pid):
     outputs = []
     batch_number = torch.max(batch) + 1
     for i in range(0, batch_number):
@@ -237,32 +275,46 @@ def calc_LV_Lbeta(
     # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
     # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
-        batch, g, cluster_index_per_event, is_sig, q, beta, energy_correction, predicted_pid, momentum
+        batch,
+        g,
+        cluster_index_per_event,
+        is_sig,
+        q,
+        beta,
+        energy_correction,
+        predicted_pid,
+        momentum,
     )
 
     if fill_loss_weight > 0:
         fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
     else:
         fill_loss = 0
-    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # Project the pooled PID embeddings to the final "one hot encoding" space
-    #pid_particles_pred = calc_pred_pid(
+    pid_particles_pred = post_pid_pool_module(
+        pid_particles_pred
+    )  # Project the pooled PID embeddings to the final "one hot encoding" space
+    # pid_particles_pred = calc_pred_pid(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
-    #)
+    # )
     x_particles = y[:, 0:3]
     e_particles = y[:, 3]
     mom_particles_true = y[:, 4]
     mass_particles_true = y[:, 5]
     # particles_mask = y[:, 6]
     mom_particles_true = mom_particles_true.to(device)
-    mass_particles_pred = e_particles_pred**2-mom_particles_pred**2
+    mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
     mass_particles_true = mass_particles_true.to(device)
-    mass_particles_pred[mass_particles_pred < 0] = 0.
+    mass_particles_pred[mass_particles_pred < 0] = 0.0
     mass_particles_pred = torch.sqrt(mass_particles_pred)
-    loss_mass = torch.nn.MSELoss()(mass_particles_true, mass_particles_pred) # only logging this, not using it in the loss func
+    loss_mass = torch.nn.MSELoss()(
+        mass_particles_true, mass_particles_pred
+    )  # only logging this, not using it in the loss func
     pid_id_particles = y[:, 6].unsqueeze(1).long()
     pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
-    part_idx_onehot = [safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()]
-    pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.
+    part_idx_onehot = [
+        safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()
+    ]
+    pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.0
 
     if return_regression_resolution:
         e_particles_pred = e_particles_pred.detach().flatten()
@@ -271,7 +323,19 @@ def calc_LV_Lbeta(
         x_particles = x_particles.detach().flatten()
         mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
         mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-        return {"momentum_res": ((mom_particles_pred-mom_particles_true) / mom_particles_true).tolist() , "e_res": ((e_particles_pred - e_particles)/e_particles).tolist(), "pos_res": ((positions_particles_pred-x_particles) / x_particles).tolist()}, pid_particles_true, pid_particles_pred
+        return (
+            {
+                "momentum_res": (
+                    (mom_particles_pred - mom_particles_true) / mom_particles_true
+                ).tolist(),
+                "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+                "pos_res": (
+                    (positions_particles_pred - x_particles) / x_particles
+                ).tolist(),
+            },
+            pid_particles_true,
+            pid_particles_pred,
+        )
 
     loss_E = torch.mean(
         torch.square(
@@ -281,18 +345,21 @@ def calc_LV_Lbeta(
     )
     loss_momentum = torch.mean(
         torch.square(
-            (mom_particles_pred.to(device) - mom_particles_true.to(device)) / mom_particles_true.to(device)
+            (mom_particles_pred.to(device) - mom_particles_true.to(device))
+            / mom_particles_true.to(device)
         )
     )
     loss_ce = torch.nn.BCELoss()
     loss_mse = torch.nn.MSELoss()
     loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
-    #loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
-    loss_particle_ids = loss_ce(pid_particles_pred.to(device), pid_particles_true.to(device))
+    # loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
+    loss_particle_ids = loss_ce(
+        pid_particles_pred.to(device), pid_particles_true.to(device)
+    )
     pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
     pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
-    #pid_true = [pid_dict[i.long().item()] for i in pid_true]
-    #pid_pred = [pid_dict[i.long().item()] for i in pid_pred]
+    # pid_true = [pid_dict[i.long().item()] for i in pid_true]
+    # pid_pred = [pid_dict[i.long().item()] for i in pid_pred]
     # Connectivity matrix from hit (row) -> cluster (column)
     # Index to matrix, e.g.:
     # [1, 3, 1, 0] --> [
@@ -321,6 +388,7 @@ def calc_LV_Lbeta(
     assert norms.size() == (n_hits, n_objects)
     L_clusters = 0
     if frac_combinations != 0:
+        number_of_pairs = 0
         for batch_id in batch.unique():
             # do all possible pairs...
             bmask = batch == batch_id
@@ -334,22 +402,32 @@ def calc_LV_Lbeta(
                 coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
                 if len(coords_neg) == 0:
                     continue
-                clust_idx = (cluster_index[bmask] == cluster)
-                #all_ones = torch.ones_like((clust_idx, clust_idx))
-                #pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
-                total_num = (len(coords_pos)**2) / 2
+                clust_idx = cluster_index[bmask] == cluster
+                # all_ones = torch.ones_like((clust_idx, clust_idx))
+                # pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
+                total_num = (len(coords_pos) ** 2) / 2
                 num = int(frac_combinations * total_num)
                 pos_pairs = []
                 for i in range(num):
-                    pos_pairs.append([np.random.randint(len(coords_pos)), np.random.randint(len(coords_pos))])
+                    pos_pairs.append(
+                        [
+                            np.random.randint(len(coords_pos)),
+                            np.random.randint(len(coords_pos)),
+                        ]
+                    )
                 neg_pairs = []
                 for i in range(len(pos_pairs)):
-                    neg_pairs.append([np.random.randint(len(coords_pos)), np.random.randint(len(coords_neg))])
+                    neg_pairs.append(
+                        [
+                            np.random.randint(len(coords_pos)),
+                            np.random.randint(len(coords_neg)),
+                        ]
+                    )
                 pos_pairs_all += pos_pairs
                 neg_pairs_all += neg_pairs
             pos_pairs = torch.tensor(pos_pairs_all)
             neg_pairs = torch.tensor(neg_pairs_all)
-            '''# do just a small sample of the pairs. ...
+            """# do just a small sample of the pairs. ...
             bmask = batch == batch_id
     
             #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
@@ -380,17 +458,27 @@ def calc_LV_Lbeta(
                 pos_idx.append(pos_pairs)
                 neg_idx.append(neg_pairs)
             pos_idx = torch.cat(pos_idx)
-            neg_idx = torch.cat(neg_idx)'''
+            neg_idx = torch.cat(neg_idx)"""
             assert pos_pairs.shape == neg_pairs.shape
             if len(pos_pairs) == 0:
                 continue
             cluster_space_coords_filtered = cluster_space_coords[bmask]
-            pos_norms = (cluster_space_coords_filtered[pos_pairs[:, 0]] - cluster_space_coords_filtered[pos_pairs[:, 1]]).norm(dim=-1)
-            neg_norms = (cluster_space_coords_filtered[neg_pairs[:, 0]] - cluster_space_coords_filtered[neg_pairs[:, 1]]).norm(dim=-1)
+            pos_norms = (
+                cluster_space_coords_filtered[pos_pairs[:, 0]]
+                - cluster_space_coords_filtered[pos_pairs[:, 1]]
+            ).norm(dim=-1)
+
+            neg_norms = (
+                cluster_space_coords_filtered[neg_pairs[:, 0]]
+                - cluster_space_coords_filtered[neg_pairs[:, 1]]
+            ).norm(dim=-1)
+
             norms_pos = torch.cat([pos_norms, neg_norms])
             ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-            L_clusters += torch.nn.HingeEmbeddingLoss()(norms_pos, ys)
-
+            L_clusters += torch.nn.HingeEmbeddingLoss(reduction="sum")(norms_pos, ys)
+            number_of_pairs += norms_pos.shape[0]
+        if number_of_pairs > 0:
+            L_clusters = L_clusters / number_of_pairs
     # -------
     # Attractive potential term
 
@@ -443,9 +531,19 @@ def calc_LV_Lbeta(
     L_V_repulsive = (
         scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
     ).sum()
-    L_V = attr_weight * L_V_attractive + repul_weight * L_V_repulsive + L_clusters + fill_loss
+    L_V = (
+        attr_weight * L_V_attractive
+        + repul_weight * L_V_repulsive
+        + L_clusters
+        + fill_loss
+    )
     if L_clusters != 0:
-        print("L-clusters is", 100*(L_clusters/L_V).detach().cpu().item(), "% of L_V. L_clusters value:", L_clusters.detach().cpu().item())
+        print(
+            "L-clusters is",
+            100 * (L_clusters / L_V).detach().cpu().item(),
+            "% of L_V. L_clusters value:",
+            L_clusters.detach().cpu().item(),
+        )
     else:
         print("L-clusters is ZERO")
     # ________________________________
@@ -546,15 +644,32 @@ def calc_LV_Lbeta(
     x_particles = x_particles.detach().to("cpu").flatten()
     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-    resolutions = {"momentum_res": ((mom_particles_pred - mom_particles_true) / mom_particles_true),
-                   "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-                   "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist()}
+    resolutions = {
+        "momentum_res": (
+            (mom_particles_pred - mom_particles_true) / mom_particles_true
+        ),
+        "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+        "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist(),
+    }
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
     try:
         L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
     except:
         pass
-    return (L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass, pid_true, pid_pred, resolutions, L_clusters, fill_loss)
+    return (
+        L_V / batch_size,
+        L_beta / batch_size,
+        loss_E,
+        loss_x,
+        loss_particle_ids,
+        loss_momentum,
+        loss_mass,
+        pid_true,
+        pid_pred,
+        resolutions,
+        L_clusters,
+        fill_loss,
+    )
 
 
 def calc_LV_Lbeta_inference(
@@ -619,32 +734,32 @@ def calc_LV_Lbeta_inference(
     # batch_cluster = scatter_counts_to_indices(n_clusters_per_event)
 
     # Per-hit boolean, indicating whether hit is sig or noise
-    #is_noise = cluster_index_per_event == noise_cluster_index
+    # is_noise = cluster_index_per_event == noise_cluster_index
     ##is_sig = ~is_noise
-    #n_hits_sig = is_sig.sum()
-    #n_sig_hits_per_event = scatter_count(batch[is_sig])
+    # n_hits_sig = is_sig.sum()
+    # n_sig_hits_per_event = scatter_count(batch[is_sig])
 
     # Per-cluster boolean, indicating whether cluster is an object or noise
-    #is_object = scatter_max(is_sig.long(), cluster_index)[0].bool()
-    #is_noise_cluster = ~is_object
+    # is_object = scatter_max(is_sig.long(), cluster_index)[0].bool()
+    # is_noise_cluster = ~is_object
 
     # FIXME: This assumes noise_cluster_index == 0!!
     # Not sure how to do this in a performant way in case noise_cluster_index != 0
-    #if noise_cluster_index != 0:
+    # if noise_cluster_index != 0:
     #    raise NotImplementedError
-    #object_index_per_event = cluster_index_per_event[is_sig] - 1
-    #object_index, n_objects_per_event = batch_cluster_indices(
+    # object_index_per_event = cluster_index_per_event[is_sig] - 1
+    # object_index, n_objects_per_event = batch_cluster_indices(
     #    object_index_per_event, batch[is_sig]
-    #)
-    #n_hits_per_object = scatter_count(object_index)
+    # )
+    # n_hits_per_object = scatter_count(object_index)
     # print("n_hits_per_object", n_hits_per_object)
-    #batch_object = batch_cluster[is_object]
-    #n_objects = is_object.sum()
+    # batch_object = batch_cluster[is_object]
+    # n_objects = is_object.sum()
 
-    #assert object_index.size() == (n_hits_sig,)
-    #assert is_object.size() == (n_clusters,)
-    #assert torch.all(n_hits_per_object > 0)
-    #assert object_index.max() + 1 == n_objects
+    # assert object_index.size() == (n_hits_sig,)
+    # assert is_object.size() == (n_clusters,)
+    # assert torch.all(n_hits_per_object > 0)
+    # assert object_index.max() + 1 == n_objects
 
     # ________________________________
     # L_V term
@@ -679,16 +794,32 @@ def calc_LV_Lbeta_inference(
 
     is_sig_everything = torch.ones_like(batch).bool()
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
-        batch, g, cluster_index_per_event, is_sig_everything, q, beta, energy_correction, predicted_pid, momentum
+        batch,
+        g,
+        cluster_index_per_event,
+        is_sig_everything,
+        q,
+        beta,
+        energy_correction,
+        predicted_pid,
+        momentum,
     )
-    pid_particles_pred = post_pid_pool_module(pid_particles_pred)  # project the pooled PID embeddings to the final "one hot encoding" space
+    pid_particles_pred = post_pid_pool_module(
+        pid_particles_pred
+    )  # project the pooled PID embeddings to the final "one hot encoding" space
 
-    mass_particles_pred = e_particles_pred**2-mom_particles_pred**2
-    mass_particles_pred[mass_particles_pred < 0] = 0.
+    mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
+    mass_particles_pred[mass_particles_pred < 0] = 0.0
     mass_particles_pred = torch.sqrt(mass_particles_pred)
 
     pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
-    return pid_pred, pid_particles_pred, mass_particles_pred, e_particles_pred, mom_particles_pred
+    return (
+        pid_pred,
+        pid_particles_pred,
+        mass_particles_pred,
+        e_particles_pred,
+        mom_particles_pred,
+    )
 
 
 def formatted_loss_components_string(components: dict) -> str:
