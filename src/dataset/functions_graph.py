@@ -3,6 +3,7 @@ import torch
 import dgl
 from torch_scatter import scatter_add
 
+
 def find_mask_no_energy(hit_particle_link, hit_type_a):
     list_p = np.unique(hit_particle_link)
     list_remove = []
@@ -50,6 +51,7 @@ def find_cluster_id(hit_particle_link):
 
 def scatter_count(input: torch.Tensor):
     return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
+
 
 def create_inputs_from_table(output, hits_only):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
@@ -112,16 +114,6 @@ def create_inputs_from_table(output, hits_only):
     mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
-    #if hits_only:
-    #    energy_hits_mask = no_tracks
-    #    #idx = ~mask_hits
-    #    mask_hits = (mask_hits) | ((~energy_hits_mask).numpy().flatten())
-    #    #mask2 = no_tracks[idx]
-    #    #cluster_id = cluster_id[mask2]
-    #print("clust.id", scatter_count(cluster_id))
-    #for i in range(len(scatter_count(cluster_id))-1):
-    #    if scatter_count(cluster_id-1)[i] == 0:
-    #        print("hit type", i,  hit_type_one_hot[cluster_id==i])
     result = [
         number_hits,
         number_part,
@@ -135,15 +127,20 @@ def create_inputs_from_table(output, hits_only):
         hit_particle_link[~mask_hits],
     ]
     hit_type = result[5].argmax(dim=1)
-    hit_mask = (hit_type == 0) | (hit_type == 1)
-    hit_mask = ~hit_mask
-    result[0] = hit_mask.sum()
-    for i in [3, 4, 5, 6, 7, 8, 9]:
-        result[i] = result[i][hit_mask]
+    if hits_only:
+        hit_mask = (hit_type == 0) | (hit_type == 1)
+        hit_mask = ~hit_mask
+        result[0] = hit_mask.sum()
+        for i in [3, 4, 5, 6, 7, 8, 9]:
+            result[i] = result[i][hit_mask]
+
     return result
 
+
 def create_graph(output, config=None):
-    hits_only = config.graph_config.get("only_hits", False)   # Whether to only include hits in the graph
+    hits_only = config.graph_config.get(
+        "only_hits", False
+    )  # Whether to only include hits in the graph
     (
         number_hits,
         number_part,
@@ -175,7 +172,13 @@ def create_graph(output, config=None):
             else:
                 g = dgl.knn_graph(coord_cart_hits_norm, 0, exclude_self=True)
         else:
-            g = dgl.knn_graph(coord_cart_hits_norm, config.graph_config.get("k", 7), exclude_self=True)
+            g = dgl.knn_graph(
+                coord_cart_hits,
+                config.graph_config.get("k", 7),
+                exclude_self=True,
+            )
+            if coord_cart_hits_norm.shape[0] < 10:
+                print(coord_cart_hits_norm.shape)
         hit_features_graph = torch.cat(
             (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
         )
@@ -189,11 +192,14 @@ def create_graph(output, config=None):
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
     else:
-        #print("graph empty")
+        # print("graph empty")
         graph_empty = True
         g = 0
         y_data_graph = 0
-    #print("found non-empty graph")
+    # print("found non-empty graph")
+    if coord_cart_hits_norm.shape[0] < 10:
+        graph_empty = True
+
     return [g, y_data_graph], graph_empty
 
 
