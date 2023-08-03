@@ -53,11 +53,12 @@ class GravNetConv(MessagePassing):
         self.k = k
         self.num_workers = num_workers
 
-        self.lin_s = Linear(in_channels, space_dimensions)
+        self.lin_s = Linear(in_channels, space_dimensions, bias=False)
+        self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
 
-        self.reset_parameters()
+        #self.reset_parameters()
 
     def reset_parameters(self):
         self.lin_s.reset_parameters()
@@ -72,15 +73,15 @@ class GravNetConv(MessagePassing):
         b: OptTensor = None
         if isinstance(batch, Tensor):
             b = batch
-
         h_l: Tensor = self.lin_h(x)
 
         s_l: Tensor = self.lin_s(x)
 
-        graph = knn_per_graph(g, s_l, self.k)
-        graph.ndata['s_l'] = s_l
+        #graph = knn_per_graph(g, s_l, self.k)
+        #graph.ndata['s_l'] = s_l
+        graph = g
         row = graph.edges()[0]
-        col = graph.edges()[0]
+        col = graph.edges()[1]
         edge_index = torch.stack([row, col], dim=0)
 
         edge_weight = (s_l[edge_index[1]] - s_l[edge_index[0]]).pow(2).sum(-1)

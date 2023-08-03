@@ -53,6 +53,7 @@ def train_regression(
     current_step=0,  # current_step: used for logging correctly
     loss_terms=[],  # whether to only optimize the clustering loss
     args=None,
+    args_model=None,
 ):
     model.train()
     # print("starting to train")
@@ -119,7 +120,7 @@ def train_regression(
                     wandb.log(
                         {
                             "betas": wandb.Histogram(betas),
-                            "qs": wandb.Histogram(np.arctanh(betas) ** 2 + 0.1),
+                            "qs": wandb.Histogram(np.arctanh(betas) ** 2 + args.qmin),
                         }
                     )  # , step=step_count)
             if grad_scaler is None:
@@ -179,7 +180,7 @@ def train_regression(
                             mode="train",
                         )
 
-            if logwandb and ((num_batches-1) % 10) == 0:
+            if logwandb and ((num_batches - 1) % 10) == 0:
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
@@ -194,31 +195,52 @@ def train_regression(
                         "loss momentum": losses[5],
                         "loss mass (not us. for opt.)": losses[6],
                         "inter-clustering loss": losses[10],
-                        "filling loss": losses[11]
+                        "filling loss": losses[11],
+                        "loss attractive": losses[12],
+                        "loss repulsive": losses[13],
                     }
                 )  # , step=step_count)
 
-                if (num_batches-1) % 100 == 0:
+                if (num_batches - 1) % 100 == 0:
                     if clust_loss_only:
                         clust_space_dim = model.mod.output_dim - 1
                     else:
                         clust_space_dim = model.mod.output_dim - 28
-                    bj = torch.sigmoid(torch.reshape(model_output[:, clust_space_dim], [-1, 1]))  # 3: betas
+                    bj = torch.sigmoid(
+                        torch.reshape(model_output[:, clust_space_dim], [-1, 1])
+                    )  # 3: betas
                     xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
-                    #assert len(bj) == len(xj)
-                    xj = xj.tanh()
+                    # assert len(bj) == len(xj)
+                    if model.mod.clust_space_norm == "twonorm":
+                        xj = torch.nn.functional.normalize(
+                            xj, dim=1
+                        )  # 0, 1, 2: cluster space coords
+                    elif model.mod.clust_space_norm == "tanh":
+                        xj = torch.tanh(xj)
+                    elif model.mod.clust_space_norm == "none":
+                        pass
+
                     bj = bj.clip(0.0, 1 - 1e-4)
                     q = bj.arctanh() ** 2 + args.qmin
                     assert q.shape[0] == xj.shape[0]
                     assert batch_g.ndata["h"].shape[0] == xj.shape[0]
-                    fig, ax = plot_clust(batch_g, q, xj, title_prefix="train ep. {}, batch {}".format(epoch, num_batches))
+                    fig, ax = plot_clust(
+                        batch_g,
+                        q,
+                        xj,
+                        title_prefix="train ep. {}, batch {}".format(
+                            epoch, num_batches
+                        ),
+                    )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
                     if (num_batches - 1) % 500 == 0:
                         wandb.log(
                             {
                                 "conf_mat_train": wandb.plot.confusion_matrix(
-                                    y_true=pid_true, preds=pid_pred, class_names=class_names
+                                    y_true=pid_true,
+                                    preds=pid_pred,
+                                    class_names=class_names,
                                 )
                             }
                         )
@@ -381,10 +403,9 @@ def evaluate_regression(
                     batch_g,
                     model_output,
                     y,
-                    clust_loss_only=clust_loss_only,
-                    add_energy_loss=add_energy_loss,
-                    calc_e_frac_loss=calc_e_frac_loss,
+                    frac_clustering_loss=0,
                     q_min=args.qmin,
+                    clust_loss_only = args.clustering_loss_only
                 )
                 num_batches += 1
                 count += num_examples
@@ -523,7 +544,7 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, return_resolution=True, q_min=args.qmin
+                    batch_g, model_output, y, return_resolution=True, q_min=args.qmin, frac_clustering_loss = 0
                 )
                 results.append(resolutions)
                 pid_classification_results.append((pid_true, pid_pred))

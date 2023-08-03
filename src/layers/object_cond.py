@@ -45,6 +45,8 @@ def assert_no_nans(x):
     """
     Raises AssertionError if there is a nan in the tensor
     """
+    if torch.isnan(x).any():
+        print(x)
     assert not torch.isnan(x).any()
 
 
@@ -161,7 +163,7 @@ def calc_LV_Lbeta(
     return_components=False,
     return_regression_resolution=False,
     clust_space_dim=3,
-    frac_combinations=0.1,  # fraction of the all possible pairs to be used for the clustering loss
+    frac_combinations=0,  # fraction of the all possible pairs to be used for the clustering loss
     attr_weight=1.0,
     repul_weight=1.0,
     fill_loss_weight=1.0,
@@ -463,6 +465,7 @@ def calc_LV_Lbeta(
             if len(pos_pairs) == 0:
                 continue
             cluster_space_coords_filtered = cluster_space_coords[bmask]
+            qs_filtered = q[bmask]
             pos_norms = (
                 cluster_space_coords_filtered[pos_pairs[:, 0]]
                 - cluster_space_coords_filtered[pos_pairs[:, 1]]
@@ -472,10 +475,14 @@ def calc_LV_Lbeta(
                 cluster_space_coords_filtered[neg_pairs[:, 0]]
                 - cluster_space_coords_filtered[neg_pairs[:, 1]]
             ).norm(dim=-1)
-
+            q_pos = qs_filtered[pos_pairs[:, 0]]
+            q_neg = qs_filtered[neg_pairs[:, 0]]
+            q_s = torch.cat([q_pos, q_neg])
             norms_pos = torch.cat([pos_norms, neg_norms])
             ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-            L_clusters += torch.nn.HingeEmbeddingLoss(reduction="sum")(norms_pos, ys)
+            L_clusters += torch.sum(
+                q_s * torch.nn.HingeEmbeddingLoss(reduce=None)(norms_pos, ys)
+            )
             number_of_pairs += norms_pos.shape[0]
         if number_of_pairs > 0:
             L_clusters = L_clusters / number_of_pairs
@@ -528,14 +535,16 @@ def calc_LV_Lbeta(
     assert V_repulsive.size() == (n_hits, n_objects)
 
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
+    nope = n_objects_per_event - 1
+    nope[nope == 0] = 1
     L_V_repulsive = (
-        scatter_add(V_repulsive.sum(dim=0), batch_object) / n_hits_per_event
+        scatter_add(V_repulsive.sum(dim=0), batch_object) / (n_hits_per_event * nope)
     ).sum()
     L_V = (
         attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
-        + L_clusters
-        + fill_loss
+        # + L_clusters
+        # + fill_loss
     )
     if L_clusters != 0:
         print(
@@ -569,6 +578,10 @@ def calc_LV_Lbeta(
         L_beta_sig = (
             scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
         ).sum()
+
+        beta_exp = beta[is_sig]
+        beta_exp[index_alpha] = 0
+        #L_exp = torch.mean(scatter_add(torch.exp(15*beta_exp)-1,  batch)/ n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
 
@@ -613,7 +626,7 @@ def calc_LV_Lbeta(
             f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
         )
 
-    L_beta = L_beta_noise + L_beta_sig
+    L_beta = L_beta_noise +  L_beta_sig 
 
     # ________________________________
     # Returning
@@ -669,6 +682,8 @@ def calc_LV_Lbeta(
         resolutions,
         L_clusters,
         fill_loss,
+        L_V_attractive / batch_size,
+        L_V_repulsive / batch_size,
     )
 
 

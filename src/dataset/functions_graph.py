@@ -179,9 +179,16 @@ def create_graph(output, config=None):
             )
             if coord_cart_hits_norm.shape[0] < 10:
                 print(coord_cart_hits_norm.shape)
+
+
+        # i,j = g.edges()
+        # edge_attr = torch.norm(coord_cart_hits_norm[i]-coord_cart_hits_norm[j], p=2, dim=1).view(-1,1)
         hit_features_graph = torch.cat(
             (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
         )
+        # hit_features_graph = torch.cat(
+        #     (hit_type_one_hot, e_hits, p_hits), dim=1
+        # )
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits"] = coord_cart_hits
@@ -191,6 +198,7 @@ def create_graph(output, config=None):
         g.ndata["e_hits"] = e_hits
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
+        # g.edata['h']= edge_attr
     else:
         # print("graph empty")
         graph_empty = True

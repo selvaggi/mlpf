@@ -38,7 +38,7 @@ def obtain_batch_numbers(x, g):
         gj = graphs_eval[index]
         num_nodes = gj.number_of_nodes()
         batch_numbers.append(index * torch.ones(num_nodes).to(dev))
-        #num_nodes = gj.number_of_nodes()
+        # num_nodes = gj.number_of_nodes()
 
     batch = torch.cat(batch_numbers, dim=0)
     return batch
@@ -69,7 +69,7 @@ def global_exchange(x, batch):
     meanminmax = torch.repeat_interleave(meanminmax, n_hits_per_event, dim=0)
     assert list(meanminmax.size()) == [n_hits, 3 * n_features]
 
-    out = torch.cat((meanminmax, x), dim=1)
+    out = torch.cat((x, meanminmax), dim=1)
     assert out.size() == (n_hits, 4 * n_features)
     assert out.device == x.device
     return out
@@ -102,7 +102,7 @@ class GravNetBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: int = 96,
-        space_dimensions: int = 4,
+        space_dimensions: int = 3,
         propagate_dimensions: int = 22,
         k: int = 40,
         # batchnorm: bool = True
@@ -144,7 +144,7 @@ class GravnetModel(nn.Module):
         n_postgn_dense_blocks: int = 4,
         n_gravnet_blocks: int = 4,
         clust_space_norm: str = "twonorm",
-        k_gravnet: int = 7
+        k_gravnet: int = 7,
     ):
         # if not batchnorm:
         #    print("!!!! no batchnorm !!!")
@@ -165,7 +165,9 @@ class GravnetModel(nn.Module):
         self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
         # else:
         #    self.batchnorm1 = nn.Identity()
-        self.input = nn.Linear(4 * input_dim, 64)
+        self.input = nn.Linear(4 * input_dim, 64, bias=False)
+        self.input.weight.data.copy_(torch.eye(64, 4 * input_dim))
+        print("clust_space_norm", clust_space_norm)
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
         # if isinstance(k, int):
@@ -200,7 +202,7 @@ class GravnetModel(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(64, self.output_dim),
+            nn.Linear(64, 64),
         )
 
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
@@ -211,6 +213,8 @@ class GravnetModel(nn.Module):
             nn.Linear(64, 22),
             nn.Softmax(dim=-1),
         )
+        self.clustering = nn.Linear(64, self.output_dim - 1)
+        self.beta = nn.Linear(64, 1)
 
     def forward(self, g):
         x = g.ndata["h"]
@@ -234,6 +238,10 @@ class GravnetModel(nn.Module):
 
         x = self.postgn_dense(x)
         x = self.output(x)
+
+        x_cluster_coord = self.clustering(x)
+        beta = self.beta(x)
+        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         assert x.device == device
         if self.return_graphs:
             return x, graphs
@@ -340,7 +348,7 @@ class GravnetModel(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]
+            loss = a[0] + 2 * a[1]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min

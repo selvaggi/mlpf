@@ -1,85 +1,68 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
-import dgl.function as fn
-import sys
-from functools import partial
-import os.path as osp
-import time
-import numpy as np
 
-"""
-    Graph Transformer
-    
-"""
-from src.layers.graph_transformer_layer import GraphTransformerLayer
-from src.layers.mlp_readout_layer import MLPReadout
+import dgl
+import numpy as np
+from torch import Tensor
+from torch_scatter import scatter_min, scatter_max, scatter_mean, scatter_add
+
+from src.layers.GravNetConv import GravNetConv
+
+from typing import Tuple, Union, List
+import dgl
+
 from src.layers.object_cond import (
     calc_LV_Lbeta,
     get_clustering,
     calc_LV_Lbeta_inference,
 )
 from src.layers.obj_cond_inf import calc_energy_loss
+"""
+    ResGatedGCN: Residual Gated Graph ConvNets
+    An Experimental Study of Neural Networks for Variable Graphs (Xavier Bresson and Thomas Laurent, ICLR 2018)
+    https://arxiv.org/pdf/1711.07553v2.pdf
+"""
+from src.layers.gated_gcn_layer import GatedGCNLayer
+from src.layers.mlp_readout_layer import MLPReadout
+
+from torch_scatter import scatter_max, scatter_add, scatter_mean
+from src.layers.object_cond import calc_LV_Lbeta
 
 
-class GraphTransformerNet(nn.Module):
+class GatedGCNNet(nn.Module):
     def __init__(self, dev):
         super().__init__()
 
         in_dim_node = 9  # node_dim (feat is an integer)
-        self.clust_space_norm = "twonorm"
-        hidden_dim = 80  # before 80
-        out_dim = 80
+        in_dim_edge = 1  # edge_dim (feat is a float)
+        hidden_dim = 80
         n_classes = 4
-        num_heads = 8
-        in_feat_dropout = 0.0
+        self.output_dim = n_classes
         dropout = 0.0
         n_layers = 10
-        self.n_layers = n_layers
-        self.layer_norm = False
-        self.batch_norm = False
+        self.clust_space_norm = "tanh"
+        self.readout = "mean"
+        self.batch_norm = True
         self.residual = True
-        self.dropout = dropout
         self.n_classes = n_classes
         self.device = dev
-        self.lap_pos_enc = False
-        self.wl_pos_enc = False
-        max_wl_role_index = 100
-        self.readout = "sum"
-        self.output_dim = n_classes
+        self.pos_enc = False
+        if self.pos_enc:
+            pos_enc_dim = 2
+            self.embedding_pos_enc = nn.Linear(pos_enc_dim, hidden_dim)
 
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
-        self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
-        self.in_feat_dropout = nn.Dropout(in_feat_dropout)
-
+        self.embedding_e = nn.Linear(in_dim_edge, hidden_dim)  # edge feat is a float
         self.layers = nn.ModuleList(
             [
-                GraphTransformerLayer(
-                    hidden_dim,
-                    hidden_dim,
-                    num_heads,
-                    dropout,
-                    self.layer_norm,
-                    self.batch_norm,
-                    self.residual,
+                GatedGCNLayer(
+                    hidden_dim, hidden_dim, dropout, self.batch_norm, self.residual
                 )
-                for _ in range(n_layers - 1)
+                for _ in range(n_layers)
             ]
         )
-        self.layers.append(
-            GraphTransformerLayer(
-                hidden_dim,
-                out_dim,
-                num_heads,
-                dropout,
-                self.layer_norm,
-                self.batch_norm,
-                self.residual,
-            )
-        )
-        self.MLP_layer = MLPReadout(out_dim, 4)
-
+        self.MLP_layer = MLPReadout(hidden_dim, n_classes)
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
             nn.Linear(22, 64),
             nn.ReLU(),
@@ -88,21 +71,26 @@ class GraphTransformerNet(nn.Module):
             nn.Linear(64, 22),
             nn.Softmax(dim=-1),
         )
-
-    def forward(self, g_batch):
-        g = g_batch
-
-        ############################## Embeddings #############################################
+    def forward(self, g):
         h = g.ndata["h"]
+        e = g.edata["h"]
         # input embedding
         h = self.embedding_h(h)
-        h = self.in_feat_dropout(h)
+        if self.pos_enc:
+            h_pos_enc = g.ndata["pos_enc"]
+            h_pos_enc = self.embedding_pos_enc(h_pos_enc.float())
+            h = h + h_pos_enc
+        e = self.embedding_e(e)
 
-        # GraphTransformer Layers
+        # res gated convnets
         for conv in self.layers:
-            h = conv(g, h)
+            h, e = conv(g, h, e)
 
-        return self.MLP_layer(h)
+        # output
+        h_out = self.MLP_layer(h)
+        h_out = torch.nn.functional.normalize(h_out, dim=1)
+
+        return h_out
 
     def object_condensation_loss2(
         self,
@@ -204,7 +192,7 @@ class GraphTransformerNet(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]
+            loss = a[0] + 2 * a[1]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min

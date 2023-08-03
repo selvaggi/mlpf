@@ -12,6 +12,7 @@ import math
 import torch
 import sys
 import os
+
 torch.autograd.set_detect_anomaly(True)
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
@@ -167,6 +168,7 @@ def _main(args):
                 current_step=steps,
                 loss_terms=[args.clustering_loss_only, add_energy_loss],
                 args=args,
+                args_model=data_config,
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):
@@ -209,7 +211,7 @@ def _main(args):
                 local_rank=local_rank,
                 step=steps,
                 loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
-                args = args
+                args=args,
             )
             is_best_epoch = (
                 (valid_metric < best_valid_metric)
