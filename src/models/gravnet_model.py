@@ -211,7 +211,7 @@ class GravnetModel(nn.Module):
             self.act,
             nn.Linear(64, 64),
             self.act,
-            nn.Linear(64, self.output_dim),
+            nn.Linear(64, 64),
         )
 
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space

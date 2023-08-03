@@ -77,9 +77,8 @@ class GravNetConv(MessagePassing):
 
         s_l: Tensor = self.lin_s(x)
 
-        #graph = knn_per_graph(g, s_l, self.k)
-        #graph.ndata['s_l'] = s_l
-        graph = g
+        graph = knn_per_graph(g, s_l, self.k)
+        graph.ndata['s_l'] = s_l
         row = graph.edges()[0]
         col = graph.edges()[1]
         edge_index = torch.stack([row, col], dim=0)
