@@ -145,6 +145,7 @@ class GravnetModel(nn.Module):
         n_gravnet_blocks: int = 4,
         clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
+        activation: str = "relu",
     ):
         # if not batchnorm:
         #    print("!!!! no batchnorm !!!")
@@ -155,6 +156,14 @@ class GravnetModel(nn.Module):
         # n_gravnet_blocks: int = 4
         # n_postgn_dense_blocks: int = 4
         k = k_gravnet
+        assert activation in ["relu", "tanh", "sigmoid"]
+        acts = {
+            "relu": nn.ReLU(),
+            "tanh": nn.Tanh(),
+            "sigmoid": nn.Sigmoid()
+        }
+        self.act = acts[activation]
+
         self.return_graphs = False
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -190,7 +199,7 @@ class GravnetModel(nn.Module):
             postgn_dense_modules.extend(
                 [
                     nn.Linear(4 * 96 if i == 0 else 128, 128),
-                    nn.ReLU()  # ,
+                    self.act,  # ,
                     # nn.BatchNorm1d(128),
                 ]
             )
@@ -199,17 +208,17 @@ class GravnetModel(nn.Module):
         # Output block
         self.output = nn.Sequential(
             nn.Linear(128, 64),
-            nn.ReLU(),
+            self.act,
             nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
+            self.act,
+            nn.Linear(64, self.output_dim),
         )
 
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
             nn.Linear(22, 64),
-            nn.ReLU(),
+            self.act,
             nn.Linear(64, 64),
-            nn.ReLU(),
+            self.act,
             nn.Linear(64, 22),
             nn.Softmax(dim=-1),
         )
