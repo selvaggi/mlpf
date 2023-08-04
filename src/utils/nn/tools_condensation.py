@@ -120,7 +120,7 @@ def train_regression(
                     wandb.log(
                         {
                             "betas": wandb.Histogram(betas),
-                            "qs": wandb.Histogram(np.arctanh(betas) ** 2 + args.qmin),
+                            "qs": wandb.Histogram((betas.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + args.qmin),
                         }
                     )  # , step=step_count)
             if grad_scaler is None:
