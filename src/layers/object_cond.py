@@ -249,7 +249,7 @@ def calc_LV_Lbeta(
         beta = beta.clip(0.0, 1 - 1e-4)
         q = beta.arctanh() ** 2 + qmin
     elif beta_stabilizing == "soft_q_scaling":
-        q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
+        q = np.arctanh(beta.clip(0.0, 1 - 1e-4) / 1.002) ** 2 + qmin
     else:
         raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
     assert_no_nans(q)
