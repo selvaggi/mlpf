@@ -179,6 +179,8 @@ def create_graph(output, config=None):
         if scaler_norm is not None:
             y_coords_std = scaler_norm.transform(y_data_graph[:, :3])
             y_data_graph[:, :3] = torch.tensor(y_coords_std).float()
+
+    graph_coordinates = pos_xyz_hits
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
     # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
@@ -189,29 +191,29 @@ def create_graph(output, config=None):
     if coord_cart_hits.shape[0] > 0:
         graph_empty = False
         if config.graph_config.get("fully_connected", False):
-            n_nodes = coord_cart_hits_norm.shape[0]
+            n_nodes = graph_coordinates.shape[0]
             if n_nodes > 1:
                 i, j = torch.tril_indices(n_nodes, n_nodes, offset=-1)
                 g = dgl.graph((i, j))  # create fully connected graph
                 g = dgl.to_simple(g)  # remove repeated edges
                 g = dgl.to_bidirected(g)
             else:
-                g = dgl.knn_graph(coord_cart_hits_norm, 0, exclude_self=True)
+                g = dgl.knn_graph(graph_coordinates, 0, exclude_self=True)
         else:
             g = dgl.knn_graph(
-                coord_cart_hits,
+                graph_coordinates,
                 config.graph_config.get("k", 7),
                 exclude_self=True,
             )
-            if coord_cart_hits_norm.shape[0] < 10:
-                print(coord_cart_hits_norm.shape)
+            if graph_coordinates.shape[0] < 10:
+                print(graph_coordinates.shape)
 
         i, j = g.edges()
         edge_attr = torch.norm(
-            coord_cart_hits_norm[i] - coord_cart_hits_norm[j], p=2, dim=1
+            graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
         ).view(-1, 1)
         hit_features_graph = torch.cat(
-            (pos_xyz_hits, hit_type_one_hot, e_hits, p_hits), dim=1
+            (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
         )
         # hit_features_graph = torch.cat(
         #     (hit_type_one_hot, e_hits, p_hits), dim=1
