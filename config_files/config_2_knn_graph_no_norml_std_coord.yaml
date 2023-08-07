@@ -1,12 +1,15 @@
 graph_config:
    only_hits: true
-   k: 64
+   fully_connected: false
+   k: 7
    standardize_coords: true
+
 
 custom_model_kwargs:
    # add custom model kwargs here
    n_postgn_dense_blocks: 4
    clust_space_norm: tanh
+   k_gravnet: 10
 
 
 #treename:
