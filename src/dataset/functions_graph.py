@@ -63,9 +63,9 @@ def create_inputs_from_table(output, hits_only):
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
     )
-    # pos_hits = torch.permute(
-    #     torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
-    # )
+    pos_hits = torch.permute(
+        torch.tensor(output["pf_points"][0:3, 0:number_hits]), (1, 0)
+    )
     hit_type_feature = features_hits[:, 0].to(torch.int64)
     tracks = (hit_type_feature == 0) | (hit_type_feature == 1)
     no_tracks = ~tracks
@@ -83,6 +83,7 @@ def create_inputs_from_table(output, hits_only):
     phi = pf_features_hits[:, 1]
     r = p_hits.view(-1)
     coord_cart_hits = spherical_to_cartesian(theta, phi, r, normalized=False)
+    pos_xyz_hits = pos_hits
     coord_cart_hits_norm = spherical_to_cartesian(theta, phi, r, normalized=True)
 
     # features particles
@@ -125,13 +126,14 @@ def create_inputs_from_table(output, hits_only):
         e_hits[~mask_hits],  # [no_tracks],
         cluster_id,
         hit_particle_link[~mask_hits],
+        pos_xyz_hits[~mask_hits],
     ]
     hit_type = result[5].argmax(dim=1)
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
         result[0] = hit_mask.sum()
-        for i in [3, 4, 5, 6, 7, 8, 9]:
+        for i in [3, 4, 5, 6, 7, 8, 9, 10]:
             result[i] = result[i][hit_mask]
 
     return result
@@ -152,6 +154,7 @@ def create_graph(output, config=None):
         e_hits,
         cluster_id,
         hit_particle_link,
+        pos_xyz_hits,
     ) = create_inputs_from_table(output, hits_only=hits_only)
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
@@ -180,11 +183,12 @@ def create_graph(output, config=None):
             if coord_cart_hits_norm.shape[0] < 10:
                 print(coord_cart_hits_norm.shape)
 
-
-        # i,j = g.edges()
-        # edge_attr = torch.norm(coord_cart_hits_norm[i]-coord_cart_hits_norm[j], p=2, dim=1).view(-1,1)
+        i, j = g.edges()
+        edge_attr = torch.norm(
+            coord_cart_hits_norm[i] - coord_cart_hits_norm[j], p=2, dim=1
+        ).view(-1, 1)
         hit_features_graph = torch.cat(
-            (coord_cart_hits_norm, hit_type_one_hot, e_hits, p_hits), dim=1
+            (pos_xyz_hits / 3330, hit_type_one_hot, e_hits, p_hits), dim=1
         )
         # hit_features_graph = torch.cat(
         #     (hit_type_one_hot, e_hits, p_hits), dim=1
@@ -192,13 +196,16 @@ def create_graph(output, config=None):
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits"] = coord_cart_hits
+        g.ndata["pos_hits_xyz"] = pos_xyz_hits
         g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type_one_hot
         g.ndata["p_hits"] = p_hits
         g.ndata["e_hits"] = e_hits
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
-        # g.edata['h']= edge_attr
+        g.edata["h"] = edge_attr
+        if len(y_data_graph) < 2:
+            graph_empty = True
     else:
         # print("graph empty")
         graph_empty = True
