@@ -141,7 +141,7 @@ def standardize_coordinates(coord_cart_hits):
         return coord_cart_hits
     std_scaler = StandardScaler()
     coord_cart_hits = std_scaler.fit_transform(coord_cart_hits)
-    return torch.tensor(coord_cart_hits).float()
+    return torch.tensor(coord_cart_hits).float(), std_scaler
 
 def create_graph(output, config=None):
     hits_only = config.graph_config.get(
@@ -164,8 +164,10 @@ def create_graph(output, config=None):
     ) = create_inputs_from_table(output, hits_only=hits_only)
     if standardize_coords:
         # Standardize the coordinates of the hits
-        coord_cart_hits = standardize_coordinates(coord_cart_hits)
-        coord_cart_hits_norm = standardize_coordinates(coord_cart_hits_norm)
+        coord_cart_hits, scaler = standardize_coordinates(coord_cart_hits)
+        coord_cart_hits_norm, scaler_norm = standardize_coordinates(coord_cart_hits_norm)
+        y_coords_std = scaler_norm.transform(y_data_graph[:, :3])
+        y_data_graph[:, :3] = torch.tensor(y_coords_std).float()
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
     # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
@@ -192,7 +194,6 @@ def create_graph(output, config=None):
             )
             if coord_cart_hits_norm.shape[0] < 10:
                 print(coord_cart_hits_norm.shape)
-
 
         # i,j = g.edges()
         # edge_attr = torch.norm(coord_cart_hits_norm[i]-coord_cart_hits_norm[j], p=2, dim=1).view(-1,1)
