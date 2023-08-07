@@ -252,11 +252,11 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
     wandb.log({name_10: tpr_10_percent, name_1: tpr_1_percent})
 
 
-def plot_clust(g, q, xj, title_prefix=""):
+def plot_clust(g, q, xj, title_prefix="", y=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(len(graph_list), 2, figsize=(9, 40))
+        fig, ax = plt.subplots(len(graph_list), 3, figsize=(12, 40))
         for i in range(len(graph_list)):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
@@ -278,6 +278,9 @@ def plot_clust(g, q, xj, title_prefix=""):
             if len(index_alpha) == 1:
                 index_alpha = index_alpha.item()
             clr = graph_eval.ndata["particle_number"]
+            ax[i, 2].set_title("x and y of hits")
+            xhits, yhits = graph_eval.ndata["h"][:, 0].detach().cpu(), graph_eval.ndata["h"][:, 1].detach().cpu()
+            ax[i, 2].scatter(xhits, yhits, c=clr.tolist(), alpha=0.2)
             ax[i, 0].set_title(
                 title_prefix
                 + " "
