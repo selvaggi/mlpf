@@ -4,6 +4,7 @@ import dgl
 from torch_scatter import scatter_add
 from sklearn.preprocessing import StandardScaler
 
+
 def find_mask_no_energy(hit_particle_link, hit_type_a):
     list_p = np.unique(hit_particle_link)
     list_remove = []
@@ -138,12 +139,14 @@ def create_inputs_from_table(output, hits_only):
 
     return result
 
+
 def standardize_coordinates(coord_cart_hits):
     if len(coord_cart_hits) == 0:
         return coord_cart_hits, None
     std_scaler = StandardScaler()
     coord_cart_hits = std_scaler.fit_transform(coord_cart_hits)
     return torch.tensor(coord_cart_hits).float(), std_scaler
+
 
 def create_graph(output, config=None):
     hits_only = config.graph_config.get(
@@ -165,10 +168,14 @@ def create_graph(output, config=None):
         hit_particle_link,
         pos_xyz_hits,
     ) = create_inputs_from_table(output, hits_only=hits_only)
+    pos_xyz_hits = pos_xyz_hits / 3330  # divide by detector size
     if standardize_coords:
         # Standardize the coordinates of the hits
         coord_cart_hits, scaler = standardize_coordinates(coord_cart_hits)
-        coord_cart_hits_norm, scaler_norm = standardize_coordinates(coord_cart_hits_norm)
+        coord_cart_hits_norm, scaler_norm = standardize_coordinates(
+            coord_cart_hits_norm
+        )
+        pos_xyz_hits, scaler_norm_xyz = standardize_coordinates(pos_xyz_hits)
         if scaler_norm is not None:
             y_coords_std = scaler_norm.transform(y_data_graph[:, :3])
             y_data_graph[:, :3] = torch.tensor(y_coords_std).float()
@@ -204,7 +211,7 @@ def create_graph(output, config=None):
             coord_cart_hits_norm[i] - coord_cart_hits_norm[j], p=2, dim=1
         ).view(-1, 1)
         hit_features_graph = torch.cat(
-            (pos_xyz_hits / 3330, hit_type_one_hot, e_hits, p_hits), dim=1
+            (pos_xyz_hits, hit_type_one_hot, e_hits, p_hits), dim=1
         )
         # hit_features_graph = torch.cat(
         #     (hit_type_one_hot, e_hits, p_hits), dim=1
