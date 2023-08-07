@@ -120,7 +120,10 @@ def train_regression(
                     wandb.log(
                         {
                             "betas": wandb.Histogram(betas),
-                            "qs": wandb.Histogram(np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002)** 2 + args.qmin),
+                            "qs": wandb.Histogram(
+                                np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2
+                                + args.qmin
+                            ),
                         }
                     )  # , step=step_count)
             if grad_scaler is None:
@@ -405,7 +408,7 @@ def evaluate_regression(
                     y,
                     frac_clustering_loss=0,
                     q_min=args.qmin,
-                    clust_loss_only = args.clustering_loss_only
+                    clust_loss_only=args.clustering_loss_only,
                 )
                 num_batches += 1
                 count += num_examples
@@ -544,7 +547,12 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
                 batch_g = batch_g.to(dev)
                 model_output = model(batch_g)
                 resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
-                    batch_g, model_output, y, return_resolution=True, q_min=args.qmin, frac_clustering_loss = 0
+                    batch_g,
+                    model_output,
+                    y,
+                    return_resolution=True,
+                    q_min=args.qmin,
+                    frac_clustering_loss=0,
                 )
                 results.append(resolutions)
                 pid_classification_results.append((pid_true, pid_pred))
