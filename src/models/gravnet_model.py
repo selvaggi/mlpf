@@ -247,7 +247,6 @@ class GravnetModel(nn.Module):
 
         x = self.postgn_dense(x)
         x = self.output(x)
-
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)

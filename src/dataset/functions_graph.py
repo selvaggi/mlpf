@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import dgl
 from torch_scatter import scatter_add
-
+from sklearn.preprocessing import StandardScaler
 
 def find_mask_no_energy(hit_particle_link, hit_type_a):
     list_p = np.unique(hit_particle_link)
@@ -136,11 +136,20 @@ def create_inputs_from_table(output, hits_only):
 
     return result
 
+def standardize_coordinates(coord_cart_hits):
+    if len(coord_cart_hits) == 0:
+        return coord_cart_hits
+    std_scaler = StandardScaler()
+    coord_cart_hits = std_scaler.fit_transform(coord_cart_hits)
+    return torch.tensor(coord_cart_hits).float()
 
 def create_graph(output, config=None):
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
+    standardize_coords = config.graph_config.get(
+        "standardize_coords", False
+    )  # Whether to standardize the coordinates of the hits
     (
         number_hits,
         number_part,
@@ -153,6 +162,10 @@ def create_graph(output, config=None):
         cluster_id,
         hit_particle_link,
     ) = create_inputs_from_table(output, hits_only=hits_only)
+    if standardize_coords:
+        # Standardize the coordinates of the hits
+        coord_cart_hits = standardize_coordinates(coord_cart_hits)
+        coord_cart_hits_norm = standardize_coordinates(coord_cart_hits_norm)
     # print("n hits:", number_hits, "number_part", number_part)
     # this builds fully connected graph
     # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to

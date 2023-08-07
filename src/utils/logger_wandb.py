@@ -256,7 +256,7 @@ def plot_clust(g, q, xj, title_prefix=""):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(len(graph_list), 3, figsize=(9, 40))
+        fig, ax = plt.subplots(len(graph_list), 3, figsize=(12, 40))
         for i in range(len(graph_list)):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
