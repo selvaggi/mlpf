@@ -252,7 +252,7 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
     wandb.log({name_10: tpr_10_percent, name_1: tpr_1_percent})
 
 
-def plot_clust(g, q, xj, title_prefix=""):
+def plot_clust(g, q, xj, title_prefix="", y=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
