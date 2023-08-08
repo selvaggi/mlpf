@@ -697,3 +697,7 @@ def save_parquet(args, output_path, scores, labels, observers):
     output.update(labels)
     output.update(observers)
     ak.to_parquet(ak.Array(output), output_path, compression="LZ4", compression_level=4)
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.mod.parameters() if p.requires_grad)
