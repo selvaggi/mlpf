@@ -580,7 +580,6 @@ def model_setup(args, data_config):
     """
     network_module = import_module(args.network_config, name="_network_module")
     network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
-    _logger.info("Network options: %s" % str(network_options))
     if args.export_onnx:
         network_options["for_inference"] = True
     if args.use_amp:
@@ -591,6 +590,7 @@ def model_setup(args, data_config):
         network_options["output_dim"] = args.clustering_space_dim + 28
     network_options["input_dim"] = 9 + args.n_noise
     network_options.update(data_config.custom_model_kwargs)
+    _logger.info("Network options: %s" % str(network_options))
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
         dev = torch.device(gpus[0])

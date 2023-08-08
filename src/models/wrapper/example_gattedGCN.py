@@ -5,19 +5,18 @@ from src.models.GattedGCN import GatedGCNNet
 class GatedGCNNetWrapper(torch.nn.Module):
     def __init__(self, dev, **kwargs) -> None:
         super().__init__()
-        self.mod = GatedGCNNet(dev)
+        self.mod = GatedGCNNet(dev, **kwargs)
 
     def forward(self, g):
         return self.mod(g)
 
 
 def get_model(data_config, dev,  **kwargs):
-    
-
     #pf_features_dims = len(data_config.input_dicts['pf_features'])
     #num_classes = len(data_config.label_value)
-    model = GatedGCNNetWrapper(dev
+    model = GatedGCNNetWrapper(dev, **kwargs
     )
+
 
     model_info = {
         'input_names': list(data_config.input_names),

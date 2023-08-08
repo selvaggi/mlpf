@@ -33,13 +33,13 @@ from src.layers.object_cond_infonet import infonet_updated
 
 
 class GatedGCNNet(nn.Module):
-    def __init__(self, dev):
+    def __init__(self, dev, input_dim: int = 9, output_dim: int = 4, **kwargs):
         super().__init__()
 
-        in_dim_node = 9  # node_dim (feat is an integer)
+        in_dim_node = input_dim  # node_dim (feat is an integer)
         in_dim_edge = 1  # edge_dim (feat is a float)
         hidden_dim = 80
-        n_classes = 4
+        n_classes = output_dim
         self.output_dim = n_classes
         dropout = 0.0
         n_layers = 10
