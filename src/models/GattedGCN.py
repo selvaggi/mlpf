@@ -18,6 +18,7 @@ from src.layers.object_cond import (
     calc_LV_Lbeta_inference,
 )
 from src.layers.obj_cond_inf import calc_energy_loss
+
 """
     ResGatedGCN: Residual Gated Graph ConvNets
     An Experimental Study of Neural Networks for Variable Graphs (Xavier Bresson and Thomas Laurent, ICLR 2018)
@@ -28,6 +29,7 @@ from src.layers.mlp_readout_layer import MLPReadout
 
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
+from src.layers.object_cond_infonet import infonet_updated
 
 
 class GatedGCNNet(nn.Module):
@@ -41,7 +43,7 @@ class GatedGCNNet(nn.Module):
         self.output_dim = n_classes
         dropout = 0.0
         n_layers = 10
-        self.clust_space_norm = "tanh"
+        self.clust_space_norm = "none"
         self.readout = "mean"
         self.batch_norm = True
         self.residual = True
@@ -71,6 +73,7 @@ class GatedGCNNet(nn.Module):
             nn.Linear(64, 22),
             nn.Softmax(dim=-1),
         )
+
     def forward(self, g):
         h = g.ndata["h"]
         e = g.edata["h"]
@@ -91,6 +94,21 @@ class GatedGCNNet(nn.Module):
         h_out = torch.nn.functional.normalize(h_out, dim=1)
 
         return h_out
+
+    def loss_nce(self, batch, pred, y, q_min=0.1):
+        _, S = pred.shape
+
+        clust_space_dim = self.output_dim - 1
+
+        bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
+
+        relu = torch.nn.ReLU()  # xj: cluster space coords
+        xj = torch.nn.functional.normalize(pred[:, 0:clust_space_dim])
+
+        loss_total_, Loss_beta, Loss_beta2, loss_total = infonet_updated(
+            batch, q_min, xj, bj
+        )
+        return loss_total_, Loss_beta, Loss_beta2, loss_total
 
     def object_condensation_loss2(
         self,

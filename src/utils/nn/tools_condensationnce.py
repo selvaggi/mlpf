@@ -89,24 +89,13 @@ def train_regression(
                 calc_e_frac_loss = (num_batches % 250) == 0
                 model_output = model(batch_g)
                 preds = model_output.squeeze()
-                (
-                    loss,
-                    losses,
-                    loss_E_frac,
-                    loss_E_frac_true,
-                ) = model.mod.object_condensation_loss2(
+                (loss, Loss_beta, Loss_beta2, loss_total) = model.mod.loss_nce(
                     batch_g,
                     model_output,
                     y,
-                    clust_loss_only=clust_loss_only,
-                    add_energy_loss=add_energy_loss,
-                    calc_e_frac_loss=calc_e_frac_loss,
                     q_min=args.qmin,
-                    frac_clustering_loss=args.frac_cluster_loss,
-                    attr_weight=args.L_attractive_weight,
-                    repul_weight=args.L_repulsive_weight,
-                    fill_loss_weight=args.fill_loss_weight,
                 )
+
                 betas = (
                     torch.sigmoid(
                         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
@@ -120,10 +109,7 @@ def train_regression(
                     wandb.log(
                         {
                             "betas": wandb.Histogram(betas),
-                            "qs": wandb.Histogram(
-                                np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2
-                                + args.qmin
-                            ),
+                            "qs": wandb.Histogram(np.arctanh(betas) ** 2 + args.qmin),
                         }
                     )  # , step=step_count)
             if grad_scaler is None:
@@ -136,13 +122,6 @@ def train_regression(
             step_end_time = time.time()
             if scheduler and getattr(scheduler, "_update_per_step", False):
                 scheduler.step()
-            if clust_loss_only and calc_e_frac_loss and logwandb:
-                wandb.log(
-                    {
-                        "loss e frac": loss_E_frac,
-                        "loss e frac true": loss_E_frac_true,
-                    }
-                )
             if logwandb and (num_batches % 10) == 0:
                 wandb.log(
                     {
@@ -184,23 +163,12 @@ def train_regression(
                         )
 
             if logwandb and ((num_batches - 1) % 10) == 0:
-                pid_true, pid_pred = losses[7], losses[8]
-                loss_epoch_total.append(loss)
-                losses_epoch_total.append(losses)
                 wandb.log(
                     {
                         "loss regression": loss,
-                        "loss lv": losses[0],
-                        "loss beta": losses[1],
-                        "loss E": losses[2],
-                        "loss X": losses[3],
-                        "loss PID": losses[4],
-                        "loss momentum": losses[5],
-                        "loss mass (not us. for opt.)": losses[6],
-                        "inter-clustering loss": losses[10],
-                        "filling loss": losses[11],
-                        "loss attractive": losses[12],
-                        "loss repulsive": losses[13],
+                        "loss lv": loss_total,
+                        "loss beta": Loss_beta,
+                        "loss beta zero": Loss_beta2,
                     }
                 )  # , step=step_count)
 
@@ -214,14 +182,7 @@ def train_regression(
                     )  # 3: betas
                     xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
                     # assert len(bj) == len(xj)
-                    if model.mod.clust_space_norm == "twonorm":
-                        xj = torch.nn.functional.normalize(
-                            xj, dim=1
-                        )  # 0, 1, 2: cluster space coords
-                    elif model.mod.clust_space_norm == "tanh":
-                        xj = torch.tanh(xj)
-                    elif model.mod.clust_space_norm == "none":
-                        pass
+                    xj = torch.nn.functional.normalize(xj)
 
                     bj = bj.clip(0.0, 1 - 1e-4)
                     q = bj.arctanh() ** 2 + args.qmin
@@ -234,37 +195,10 @@ def train_regression(
                         title_prefix="train ep. {}, batch {}".format(
                             epoch, num_batches
                         ),
-                        y=y
                     )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
-                    if (num_batches - 1) % 500 == 0:
-                        wandb.log(
-                            {
-                                "conf_mat_train": wandb.plot.confusion_matrix(
-                                    y_true=pid_true,
-                                    preds=pid_pred,
-                                    class_names=class_names,
-                                )
-                            }
-                        )
 
-                ks = sorted(list(losses[9].keys()))
-                losses_cpu = [
-                    x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
-                    for x in losses
-                ]
-                tables = {}
-                for key in ks:
-                    tables[key] = losses[9][
-                        key
-                    ]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-                wandb.log(
-                    {
-                        key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
-                        for key, val in losses_cpu[9].items()
-                    }
-                )  # , step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
@@ -303,32 +237,6 @@ def train_regression(
     if scheduler and not getattr(scheduler, "_update_per_step", False):
         scheduler.step()
     return step_count
-
-
-def inference(model, test_loader, dev):
-    """
-    Similar to evaluate_regression, but without the ground truth labels.
-    """
-    model.eval()
-    num_batches = 0
-    count = 0
-    results = []
-    start_time = time.time()
-    with torch.no_grad():
-        with tqdm.tqdm(test_loader) as tq:
-            for batch_g, _ in tq:
-                batch_g = batch_g.to(dev)
-                model_output = model(batch_g)
-                # preds = model_output.squeeze().float()
-                preds = model.mod.object_condensation_inference(batch_g, model_output)
-                num_batches += 1
-                results.append(preds)
-    time_diff = time.time() - start_time
-    _logger.info(
-        "Processed %d entries in total (avg. speed %.1f entries/s)"
-        % (count, count / time_diff)
-    )
-    return results
 
 
 def evaluate_regression(
@@ -398,18 +306,8 @@ def evaluate_regression(
                 label = label.to(dev)
                 model_output = model(batch_g)
                 preds = model_output.squeeze().float()
-                (
-                    loss,
-                    losses,
-                    loss_E_frac,
-                    loss_E_frac_true,
-                ) = model.mod.object_condensation_loss2(
-                    batch_g,
-                    model_output,
-                    y,
-                    frac_clustering_loss=0,
-                    q_min=args.qmin,
-                    clust_loss_only=args.clustering_loss_only,
+                (loss, Loss_beta, Loss_beta2, loss_total) = model.mod.loss_nce(
+                    batch_g, model_output, y, q_min=args.qmin
                 )
                 num_batches += 1
                 count += num_examples
@@ -432,52 +330,17 @@ def evaluate_regression(
                                 i_batch=num_batches,
                                 mode="eval" if for_training else "test",
                             )
-                losses_cpu = [
-                    x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
-                    for x in losses
-                ]
-                all_val_losses.append(losses_cpu)
-                all_val_loss.append(loss.detach().to("cpu").item())
+
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
 
     if logwandb:
-        pid_true, pid_pred = torch.cat(
-            [torch.tensor(x[7]) for x in all_val_losses]
-        ), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
-        pid_true, pid_pred = pid_true.tolist(), pid_pred.tolist()
         wandb.log(
             {
-                "loss val regression": np.mean(all_val_loss),
-                "loss val lv": np.mean([x[0] for x in all_val_losses]),
-                "loss val beta": np.mean([x[1] for x in all_val_losses]),
-                "loss val E": np.mean([x[2] for x in all_val_losses]),
-                "loss val X": np.mean([x[3] for x in all_val_losses]),
-                "conf_mat_val": wandb.plot.confusion_matrix(
-                    y_true=pid_true, preds=pid_pred, class_names=class_names
-                ),
-            }
-        )  # , step=step)
-        if clust_loss_only and calc_e_frac_loss:
-            wandb.log(
-                {
-                    "loss e frac val": loss_E_frac,
-                    "loss e frac true val": loss_E_frac_true,
-                }
-            )
-        ks = sorted(list(all_val_losses[0][9].keys()))
-        concatenated = {}
-        for key in ks:
-            concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
-        tables = {}
-        for key in ks:
-            tables[key] = concatenated[
-                key
-            ]  # wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
-        wandb.log(
-            {
-                "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
-                for key in ks
+                "loss val regression": loss,
+                "loss val lv": loss_total,
+                "loss val beta": Loss_beta,
+                "loss val beta zero": Loss_beta2,
             }
         )  # , step=step)
 
