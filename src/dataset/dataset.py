@@ -287,7 +287,7 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
 
-        [g, features_partnn], graph_empty = create_graph(X, self._data_config)
+        [g, features_partnn], graph_empty = create_graph(X, self._data_config, n_noise=self.n_noise)
         return [g, features_partnn], graph_empty
 
 
@@ -334,7 +334,8 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         laplace=False,
         edges=False,
         diffs=False,
-        dataset_cap=None
+        dataset_cap=None,
+        n_noise=0,
     ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
@@ -351,7 +352,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self.edges = edges
         self.diffs = diffs
         self.dataset_cap = dataset_cap  # used to cap the dataset to some fixed number of events - used for debugging purposes
-
+        self.n_noise = n_noise
         # ==== sampling parameters ====
         self._sampler_options = {
             "up_sample": up_sample,

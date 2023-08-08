@@ -148,7 +148,7 @@ def standardize_coordinates(coord_cart_hits):
     return torch.tensor(coord_cart_hits).float(), std_scaler
 
 
-def create_graph(output, config=None):
+def create_graph(output, config=None, n_noise=0):
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
@@ -212,9 +212,16 @@ def create_graph(output, config=None):
         edge_attr = torch.norm(
             graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
         ).view(-1, 1)
-        hit_features_graph = torch.cat(
-            (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-        )
+        if n_noise > 0:
+            noise = torch.zeros((p_hits.shape[0], n_noise)).float()
+            noise.normal_(mean=0, std=1)
+            hit_features_graph = torch.cat(
+                (graph_coordinates, hit_type_one_hot, e_hits, p_hits, noise), dim=1
+            )
+        else:
+            hit_features_graph = torch.cat(
+                (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
+            )
         # hit_features_graph = torch.cat(
         #     (hit_type_one_hot, e_hits, p_hits), dim=1
         # )

@@ -336,6 +336,8 @@ parser.add_argument(
     "--clustering_and_energy_loss", "-clust_en", action="store_true", default=False
 )
 parser.add_argument("--clustering_space_dim", "-clust_dim", type=int, default=2)
+parser.add_argument("--n_noise", "-n_noise", type=int, default=0,
+                    help="Number of random features that get added to the input")
 parser.add_argument(
     "--energy-loss",
     action="store_true",

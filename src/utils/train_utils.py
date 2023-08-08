@@ -139,6 +139,7 @@ def train_load(args):
         edges=args.class_edges,
         name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.train_cap,
+        n_noise=args.n_noise
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -156,6 +157,7 @@ def train_load(args):
         edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.val_cap,
+        n_noise=args.n_noise
     )
 
     if args.class_edges:
@@ -587,6 +589,7 @@ def model_setup(args, data_config):
         network_options["output_dim"] = args.clustering_space_dim + 1
     else:
         network_options["output_dim"] = args.clustering_space_dim + 28
+    network_options["input_dim"] = 9 + args.n_noise
     network_options.update(data_config.custom_model_kwargs)
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
