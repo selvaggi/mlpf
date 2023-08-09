@@ -189,6 +189,14 @@ def train_regression(
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
+                fig, ax = plt.subplots()
+                repulsive, attractive = losses[16].detach().cpu().flatten(), losses[17].detach().cpu().flatten()
+                #print("rep", repulsive.shape)
+                ax.hist(repulsive, bins=100, alpha=0.5, label="repulsive", color="r")
+                ax.hist(attractive, bins=100, alpha=0.5, label="attractive", color="b")
+                ax.legend()
+                wandb.log({"rep. and att. norms": wandb.Image(fig)})
+                plt.close(fig)
                 wandb.log(
                     {
                         "loss regression": loss,

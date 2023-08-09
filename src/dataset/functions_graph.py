@@ -149,7 +149,7 @@ def standardize_coordinates(coord_cart_hits):
 
 
 def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
-    num_hits_per_particle = 15
+    num_hits_per_particle = 60
     num_part = np.random.randint(npart_min, npart_max)
     # create a synthetic graph - random hits uniformly between -4 and 4, distribution of hits is gaussian
     y_coords = torch.zeros((num_part, 3)).float()
@@ -165,8 +165,8 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     )  # to avoid nans
     for i in range(num_part):
         index = i * num_hits_per_particle
-        graph_coordinates[index : index + num_hits_per_particle] = (
-            torch.randn((num_hits_per_particle, 3)).float() * 0.1 + y_coords[i]
+        graph_coordinates[index: index + num_hits_per_particle] = (
+            torch.randn((num_hits_per_particle, 3)).float() * torch.tensor([0.6, 0.1, 0.1]) + y_coords[i]
         )
         hit_type_one_hot[index : index + num_hits_per_particle, 3] = 1.0
     g = dgl.knn_graph(

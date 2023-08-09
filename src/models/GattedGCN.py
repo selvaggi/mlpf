@@ -210,7 +210,7 @@ class GatedGCNNet(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + 2 * a[1]
+            loss = a[0] + a[1]
             #loss = a[0] + 2. * a[1] #+ a[10] # temporarily add inter-clustering loss too
             #loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
             if calc_e_frac_loss:
@@ -219,7 +219,6 @@ class GatedGCNNet(nn.Module):
                 )
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
-
         else:
             loss = (
                 a[0]

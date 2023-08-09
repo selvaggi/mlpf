@@ -17,7 +17,7 @@ class EGNN(nn.Module):
 
         in_node_nf = 6
         hidden_nf = 128
-        out_node_nf = 3
+        out_node_nf = 4
         self.output_dim = out_node_nf
         self.clust_space_norm = "none"
         in_edge_nf = 0
@@ -174,8 +174,8 @@ class EGNN(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]  # + a[10] # temporarily add inter-clustering loss too
-            # loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
+            loss = a[0] + a[1]   #  Temporarily disable beta loss
+            # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
 
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument

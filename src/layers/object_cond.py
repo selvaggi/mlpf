@@ -674,22 +674,24 @@ def calc_LV_Lbeta(
     # except:
     #    pass
     return (
-        L_V / batch_size,
+        L_V / batch_size, # 0
         L_beta / batch_size,
         loss_E,
         loss_x,
-        loss_particle_ids,
+        loss_particle_ids, # 4
         loss_momentum,
         loss_mass,
         pid_true,
         pid_pred,
         resolutions,
-        L_clusters,
+        L_clusters,   # 10
         fill_loss,
         L_V_attractive / batch_size,
         L_V_repulsive / batch_size,
         L_alpha_coordinates,
-        L_exp
+        L_exp,
+        norms_rep,  # 16
+        norms_att   # 17
     )
 
 
