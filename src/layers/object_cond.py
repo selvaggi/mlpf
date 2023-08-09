@@ -390,7 +390,7 @@ def calc_LV_Lbeta(
     #   gives (n_hits, n_objects, cluster_space_dim)
     norms = (cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)).norm(dim=-1)
     assert norms.size() == (n_hits, n_objects)
-    L_clusters = torch.tensor(0.).to(device)
+    L_clusters = torch.tensor(0.0).to(device)
     if frac_combinations != 0:
         number_of_pairs = 0
         for batch_id in batch.unique():
@@ -543,8 +543,7 @@ def calc_LV_Lbeta(
         scatter_add(V_repulsive.sum(dim=0), batch_object) / (n_hits_per_event * nope)
     ).sum()
     L_V = (
-        attr_weight
-        * L_V_attractive
+        attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
         + L_clusters
         + fill_loss
@@ -634,7 +633,6 @@ def calc_LV_Lbeta(
     L_alpha_coordinates = torch.mean(
         torch.norm(x_alpha_original - x_alpha, p=2, dim=1)
     ) / torch.sum(n_objects_per_event)
-    print(L_alpha_coordinates)
     # ________________________________
     # Returning
     # Also divide by batch size here
@@ -672,9 +670,9 @@ def calc_LV_Lbeta(
         "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist(),
     }
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
-    #try:
+    # try:
     #    L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
-    #except:
+    # except:
     #    pass
     return (
         L_V / batch_size,

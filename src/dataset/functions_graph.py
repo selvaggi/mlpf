@@ -159,15 +159,19 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     y_coords[:, 2] = torch.rand((num_part)).float() * 8 - 4
     graph_coordinates = torch.zeros((num_part * num_hits_per_particle, 3)).float()
     hit_type_one_hot = torch.zeros((num_part * num_hits_per_particle, 4)).float()
-    e_hits = torch.zeros((num_part * num_hits_per_particle, 1)).float() + 1.
-    p_hits = torch.zeros((num_part * num_hits_per_particle, 1)).float() + 1.  # to avoid nans
+    e_hits = torch.zeros((num_part * num_hits_per_particle, 1)).float() + 1.0
+    p_hits = (
+        torch.zeros((num_part * num_hits_per_particle, 1)).float() + 1.0
+    )  # to avoid nans
     for i in range(num_part):
         index = i * num_hits_per_particle
         graph_coordinates[index : index + num_hits_per_particle] = (
             torch.randn((num_hits_per_particle, 3)).float() * 0.1 + y_coords[i]
         )
-        hit_type_one_hot[index : index + num_hits_per_particle, 3] = 1.
-    g = dgl.knn_graph(graph_coordinates, config.graph_config.get("k", 7), exclude_self=True)
+        hit_type_one_hot[index : index + num_hits_per_particle, 3] = 1.0
+    g = dgl.knn_graph(
+        graph_coordinates, config.graph_config.get("k", 7), exclude_self=True
+    )
 
     i, j = g.edges()
     edge_attr = torch.norm(
@@ -179,7 +183,9 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     hit_particle_link = torch.zeros((num_part * num_hits_per_particle, 1)).float()
     for i in range(num_part):
         index = i * num_hits_per_particle
-        hit_particle_link[index : index + num_hits_per_particle] = i + 1  # 0 is for noise
+        hit_particle_link[index : index + num_hits_per_particle] = (
+            i + 1
+        )  # 0 is for noise
     if n_noise > 0:
         noise = torch.zeros((p_hits.shape[0], n_noise)).float()
         noise.normal_(mean=0, std=1)

@@ -8,14 +8,18 @@ import dgl
 
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
+from src.layers.obj_cond_inf import calc_energy_loss
 
 
 class EGNN(nn.Module):
-    def __init__(self, args, dev):
+    def __init__(self, dev, activation: str = ("relu",)):
         super().__init__()
+
         in_node_nf = 6
         hidden_nf = 128
         out_node_nf = 3
+        self.output_dim = out_node_nf
+        self.clust_space_norm = "none"
         in_edge_nf = 0
         device = dev
         act_fn = nn.SiLU()
@@ -29,7 +33,7 @@ class EGNN(nn.Module):
         self.n_layers = n_layers
         self.embedding_in = nn.Linear(in_node_nf, self.hidden_nf)
         # self.embedding_in_coords = nn.Linear(6, self.hidden_nf)
-        self.embedding_out = nn.Linear(self.hidden_nf + 7, out_node_nf)
+        self.embedding_out = nn.Linear(self.hidden_nf + 3, out_node_nf)
         self.layers = nn.ModuleList()
         for i in range(0, n_layers):
             self.layers.append(
@@ -46,10 +50,17 @@ class EGNN(nn.Module):
                 )
             )
 
+        self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
+            nn.Linear(22, 64),
+            nn.Linear(64, 64),
+            nn.Linear(64, 22),
+            nn.Softmax(dim=-1),
+        )
+
     def forward(self, g):
-        h = g.ndata["h"]
+        h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
-        g.ndata["x"] = g.ndata["c"]
+        g.ndata["x"] = g.ndata["h"][:, 0:3]
         h = self.embedding_in(h)  # NBx80
         g.ndata["hh"] = h
 
@@ -67,7 +78,7 @@ class EGNN(nn.Module):
         pred,
         y,
         return_resolution=False,
-        clust_loss_only=False,
+        clust_loss_only=True,
         add_energy_loss=False,
         calc_e_frac_loss=False,
         q_min=0.1,
@@ -85,6 +96,7 @@ class EGNN(nn.Module):
         :param clust_loss_only: If True, it will only add the clustering terms to the loss
         :return:
         """
+        clust_loss_only = True
         _, S = pred.shape
         if clust_loss_only:
             clust_space_dim = self.output_dim - 1
@@ -166,10 +178,7 @@ class EGNN(nn.Module):
                 a[0] + 2.0 * a[1]
             )  # + a[10] # temporarily add inter-clustering loss too
             # loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
-            if calc_e_frac_loss:
-                loss_E_frac, loss_E_frac_true = calc_energy_loss(
-                    batch, xj, bj.view(-1), qmin=q_min
-                )
+
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
 
@@ -187,7 +196,7 @@ class EGNN(nn.Module):
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
             if calc_e_frac_loss:
-                return loss, a, loss_E_frac, loss_E_frac_true
+                return loss, a, 0, 0
             else:
                 return loss, a, 0, 0
         return loss, a, 0, 0
@@ -348,11 +357,6 @@ def update_knn(batch):
         g = graphs_eval[index]
         g_temp = dgl.knn_graph(g.ndata["x"], 11, exclude_self=True)
         g_temp.ndata["x"] = g.ndata["x"]
-        g_temp.ndata["masso"] = g.ndata["masso"]
-        g_temp.ndata["jet"] = g.ndata["jet"]
-        g_temp.ndata["y"] = g.ndata["y"]
-        g_temp.ndata["pos"] = g.ndata["pos"]
-        g_temp.ndata["e_rel"] = g.ndata["e_rel"]
         g_temp.ndata["hh"] = g.ndata["hh"]
         graphs.append(g_temp)
     bg = dgl.batch(graphs)
