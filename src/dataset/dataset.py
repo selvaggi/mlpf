@@ -358,6 +358,9 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self.laplace = laplace
         self.edges = edges
         self.diffs = diffs
+        self.synthetic = synthetic
+        self.synthetic_npart_min = synthetic_npart_min
+        self.synthetic_npart_max = synthetic_npart_max
         self.dataset_cap = dataset_cap  # used to cap the dataset to some fixed number of events - used for debugging purposes
         self.n_noise = n_noise
         # ==== sampling parameters ====

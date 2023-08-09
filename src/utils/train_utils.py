@@ -166,7 +166,10 @@ def train_load(args):
         edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.val_cap,
-        n_noise=args.n_noise
+        n_noise=args.n_noise,
+        synthetic=synthetic,
+        synthetic_npart_min=minp,
+        synthetic_npart_max=maxp,
     )
 
     if args.class_edges:

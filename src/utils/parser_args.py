@@ -410,7 +410,7 @@ parser.add_argument(
 parser.add_argument(
     "--synthetic-graph-npart-range",
     "-synthetic",
-    type="str",
+    type=str,
     default="",
     help="Range of number of particles to use for synthetic graph generation: e.g. '3, 5'"
 )

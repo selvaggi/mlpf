@@ -180,6 +180,7 @@ class GraphTransformerNet(nn.Module):
         ).to(dev)
 
         a = calc_LV_Lbeta(
+            original_coords,
             batch,
             y,
             distance_threshold,

@@ -254,6 +254,7 @@ class GravnetModel(nn.Module):
 
     def object_condensation_loss2(
         self,
+        original_coords,
         batch,
         pred,
         y,
@@ -328,6 +329,7 @@ class GravnetModel(nn.Module):
         ).to(dev)
 
         a = calc_LV_Lbeta(
+            original_coords,
             batch,
             y,
             distance_threshold,
