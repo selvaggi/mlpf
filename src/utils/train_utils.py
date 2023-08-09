@@ -121,6 +121,12 @@ def train_load(args):
         args.steps_per_epoch is None or args.steps_per_epoch_val is None
     ):
         raise RuntimeError("Must set --steps-per-epoch when using --in-memory!")
+    syn_str = args.synthetic_graph_npart_range
+    synthetic = syn_str != ""
+    minp, maxp = 0, 0,
+    if synthetic:
+        minp = int(syn_str.split("-")[0])
+        maxp = int(syn_str.split("-")[1])
 
     train_data = SimpleIterDataset(
         train_file_dict,
@@ -139,7 +145,10 @@ def train_load(args):
         edges=args.class_edges,
         name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.train_cap,
-        n_noise=args.n_noise
+        n_noise=args.n_noise,
+        synthetic=synthetic,
+        synthetic_npart_min=minp,
+        synthetic_npart_max=maxp,
     )
     val_data = SimpleIterDataset(
         val_file_dict,

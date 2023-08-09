@@ -407,4 +407,11 @@ parser.add_argument(
     help="weight for the fill loss to try to prevent mode collapse"
 )
 
+parser.add_argument(
+    "--synthetic-graph-npart-range",
+    "-synthetic",
+    type="str",
+    default="",
+    help="Range of number of particles to use for synthetic graph generation: e.g. '3, 5'"
+)
 

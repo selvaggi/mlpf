@@ -32,6 +32,8 @@ def clip_list(l, clip_val=4.0):
                 result.append(clip_val)
             else:
                 result.append(-clip_val)
+        elif np.isnan(item):
+            result.append(0.) # i don't know why the hell we need this
         else:
             result.append(item)
     return result

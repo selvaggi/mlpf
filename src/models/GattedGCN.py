@@ -209,8 +209,9 @@ class GatedGCNNet(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
+            loss = a[0] + 2 * a[1]
             #loss = a[0] + 2. * a[1] #+ a[10] # temporarily add inter-clustering loss too
-            loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
+            #loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min
