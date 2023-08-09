@@ -33,16 +33,15 @@ from src.layers.object_cond_infonet import infonet_updated
 
 
 class GatedGCNNet(nn.Module):
-    def __init__(self, dev, input_dim: int = 9, output_dim: int = 4, **kwargs):
+    def __init__(self, dev, input_dim: int = 9, output_dim: int = 4, hidden_dim: int = 80, n_layers: int = 10, **kwargs):
         super().__init__()
-
+        print("GatedGCN with params:", input_dim, output_dim, hidden_dim, n_layers, kwargs)
         in_dim_node = input_dim  # node_dim (feat is an integer)
         in_dim_edge = 1  # edge_dim (feat is a float)
-        hidden_dim = 80
         n_classes = output_dim
         self.output_dim = n_classes
         dropout = 0.0
-        n_layers = 10
+        # n_layers = 10
         self.clust_space_norm = "none"
         self.readout = "mean"
         self.batch_norm = True
@@ -211,7 +210,8 @@ class GatedGCNNet(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]
+            # loss = a[0] + 2. * a[1] #+ a[10] # temporarily add inter-clustering loss too
+            loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min
