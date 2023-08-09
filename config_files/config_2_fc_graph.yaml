@@ -1,6 +1,7 @@
 graph_config:
    only_hits: true
    fully_connected: true
+   k: 50
 
 
 custom_model_kwargs:
