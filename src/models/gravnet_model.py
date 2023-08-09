@@ -157,11 +157,7 @@ class GravnetModel(nn.Module):
         # n_postgn_dense_blocks: int = 4
         k = k_gravnet
         assert activation in ["relu", "tanh", "sigmoid"]
-        acts = {
-            "relu": nn.ReLU(),
-            "tanh": nn.Tanh(),
-            "sigmoid": nn.Sigmoid()
-        }
+        acts = {"relu": nn.ReLU(), "tanh": nn.Tanh(), "sigmoid": nn.Sigmoid()}
         self.act = acts[activation]
 
         self.return_graphs = False
@@ -356,7 +352,7 @@ class GravnetModel(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + 2 * a[1]
+            loss = a[0] + a[1]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min
