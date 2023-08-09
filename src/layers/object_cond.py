@@ -142,6 +142,7 @@ def calc_pred_pid(batch, g, cluster_index_per_event, is_sig, q, beta, pred_pid):
 
 
 def calc_LV_Lbeta(
+    original_coords,
     g,
     y,
     distance_threshold,
@@ -262,6 +263,7 @@ def calc_LV_Lbeta(
 
     # Get the cluster space coordinates and betas for these maxima hits too
     x_alpha = cluster_space_coords[is_sig][index_alpha]
+    x_alpha_original = original_coords[is_sig][index_alpha]
 
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
@@ -541,10 +543,11 @@ def calc_LV_Lbeta(
         scatter_add(V_repulsive.sum(dim=0), batch_object) / (n_hits_per_event * nope)
     ).sum()
     L_V = (
-        attr_weight * L_V_attractive
+        attr_weight
+        * L_V_attractive
         + repul_weight * L_V_repulsive
-        # + L_clusters
-        # + fill_loss
+        + L_clusters
+        + fill_loss
     )
     if L_clusters != 0:
         print(
@@ -581,7 +584,7 @@ def calc_LV_Lbeta(
 
         beta_exp = beta[is_sig]
         beta_exp[index_alpha] = 0
-        #L_exp = torch.mean(scatter_add(torch.exp(15*beta_exp)-1,  batch)/ n_hits_per_event)
+        # L_exp = torch.mean(scatter_add(torch.exp(15*beta_exp)-1,  batch)/ n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
 
@@ -626,8 +629,12 @@ def calc_LV_Lbeta(
             f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
         )
 
-    L_beta = L_beta_noise +  L_beta_sig 
+    L_beta = L_beta_noise + L_beta_sig
 
+    L_alpha_coordinates = torch.mean(
+        torch.norm(x_alpha_original - x_alpha, p=2, dim=1)
+    ) / torch.sum(n_objects_per_event)
+    print(L_alpha_coordinates)
     # ________________________________
     # Returning
     # Also divide by batch size here
@@ -684,6 +691,7 @@ def calc_LV_Lbeta(
         fill_loss,
         L_V_attractive / batch_size,
         L_V_repulsive / batch_size,
+        L_alpha_coordinates,
     )
 
 

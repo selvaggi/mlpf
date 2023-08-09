@@ -90,6 +90,10 @@ def _main(args):
         dev = torch.device("cpu")
 
     model, model_info, loss_func = model_setup(args, data_config)
+    from src.utils.train_utils import count_parameters
+
+    num_parameters_counted = count_parameters(model)
+    print(num_parameters_counted)
 
     # note: we should always save/load the state_dict of the original model, not the one wrapped by nn.DataParallel
     # so we do not convert it to nn.DataParallel now

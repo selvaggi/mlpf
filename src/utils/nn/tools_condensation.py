@@ -201,6 +201,7 @@ def train_regression(
                         "filling loss": losses[11],
                         "loss attractive": losses[12],
                         "loss repulsive": losses[13],
+                        "loss alpha coord": losses[14],
                     }
                 )  # , step=step_count)
 
@@ -234,7 +235,7 @@ def train_regression(
                         title_prefix="train ep. {}, batch {}".format(
                             epoch, num_batches
                         ),
-                        y=y
+                        y=y,
                     )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()

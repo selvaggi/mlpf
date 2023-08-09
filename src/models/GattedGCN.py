@@ -145,7 +145,7 @@ class GatedGCNNet(nn.Module):
         # )  # 0, 1, 2: cluster space coords
 
         bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-
+        original_coords = batch.ndata["h"][:, 0:clust_space_dim]
         xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
         if self.clust_space_norm == "twonorm":
             xj = torch.nn.functional.normalize(
@@ -186,6 +186,7 @@ class GatedGCNNet(nn.Module):
         ).to(dev)
 
         a = calc_LV_Lbeta(
+            original_coords,
             batch,
             y,
             distance_threshold,
@@ -210,7 +211,7 @@ class GatedGCNNet(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + 2 * a[1]
+            loss = a[0] + a[1]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min
