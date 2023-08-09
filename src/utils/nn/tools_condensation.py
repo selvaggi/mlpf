@@ -33,7 +33,7 @@ def clip_list(l, clip_val=4.0):
             else:
                 result.append(-clip_val)
         elif np.isnan(item):
-            result.append(0.) # i don't know why the hell we need this
+            result.append(0.0)  # i don't know why the hell we need this
         else:
             result.append(item)
     return result
@@ -204,6 +204,7 @@ def train_regression(
                         "loss attractive": losses[12],
                         "loss repulsive": losses[13],
                         "loss alpha coord": losses[14],
+                        "loss beta zeros": losses[15],
                     }
                 )  # , step=step_count)
 

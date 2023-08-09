@@ -529,7 +529,7 @@ def calc_LV_Lbeta(
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    norms_rep = torch.exp(-4.0 * norms**2) * M_inv
+    norms_rep = torch.exp(-40.0 * norms**2) * M_inv
 
     # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
     V_repulsive = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep
@@ -545,8 +545,8 @@ def calc_LV_Lbeta(
     L_V = (
         attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
-        + L_clusters
-        + fill_loss
+        # + L_clusters
+        # + fill_loss
     )
     if L_clusters != 0:
         print(
@@ -583,6 +583,7 @@ def calc_LV_Lbeta(
 
         beta_exp = beta[is_sig]
         beta_exp[index_alpha] = 0
+        L_exp = torch.mean(beta_exp)
         # L_exp = torch.mean(scatter_add(torch.exp(15*beta_exp)-1,  batch)/ n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
@@ -628,11 +629,9 @@ def calc_LV_Lbeta(
             f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
         )
 
-    L_beta = L_beta_noise + L_beta_sig
+    L_beta = L_beta_noise + L_beta_sig 
 
-    L_alpha_coordinates = torch.mean(
-        torch.norm(x_alpha_original - x_alpha, p=2, dim=1)
-    ) / torch.sum(n_objects_per_event)
+    L_alpha_coordinates = torch.mean(torch.norm(x_alpha_original - x_alpha, p=2, dim=1))
     # ________________________________
     # Returning
     # Also divide by batch size here
@@ -690,6 +689,7 @@ def calc_LV_Lbeta(
         L_V_attractive / batch_size,
         L_V_repulsive / batch_size,
         L_alpha_coordinates,
+        L_exp
     )
 
 

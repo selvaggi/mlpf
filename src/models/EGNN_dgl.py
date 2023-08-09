@@ -175,7 +175,7 @@ class EGNN(nn.Module):
             return a
         if clust_loss_only:
             loss = (
-                a[0] + 2.0 * a[1]
+                a[0] + a[1] + a[15]
             )  # + a[10] # temporarily add inter-clustering loss too
             # loss = a[10]  # ONLY INTERCLUSTERING LOSS - TEMPORARY!!!!
 
