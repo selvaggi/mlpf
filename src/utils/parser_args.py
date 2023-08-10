@@ -336,8 +336,13 @@ parser.add_argument(
     "--clustering_and_energy_loss", "-clust_en", action="store_true", default=False
 )
 parser.add_argument("--clustering_space_dim", "-clust_dim", type=int, default=2)
-parser.add_argument("--n-noise", "-n-noise", type=int, default=0,
-                    help="Number of random features that get added to the input")
+parser.add_argument(
+    "--n-noise",
+    "-n-noise",
+    type=int,
+    default=0,
+    help="Number of random features that get added to the input",
+)
 parser.add_argument(
     "--energy-loss",
     action="store_true",
@@ -376,14 +381,23 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--L_attractive_weight", type=float, default=1.0, help="Attractitve term of the potential weight"
+    "--L_attractive_weight",
+    type=float,
+    default=1.0,
+    help="Attractitve term of the potential weight",
 )
 parser.add_argument(
-    "--L_repulsive_weight", type=float, default=1.0, help="Repulsive term of the potential weight"
+    "--L_repulsive_weight",
+    type=float,
+    default=1.0,
+    help="Repulsive term of the potential weight",
 )
 
 parser.add_argument(
-    "--frac_cluster_loss", type=float, default=0.1, help="Fraction of total pairs to use for the clustering loss"
+    "--frac_cluster_loss",
+    type=float,
+    default=0.1,
+    help="Fraction of total pairs to use for the clustering loss",
 )
 parser.add_argument(
     "--condensation",
@@ -404,7 +418,7 @@ parser.add_argument(
     "--fill_loss_weight",
     default=0.1,
     type=float,
-    help="weight for the fill loss to try to prevent mode collapse"
+    help="weight for the fill loss to try to prevent mode collapse",
 )
 
 parser.add_argument(
@@ -412,6 +426,12 @@ parser.add_argument(
     "-synthetic",
     type=str,
     default="",
-    help="Range of number of particles to use for synthetic graph generation: e.g. '3, 5'"
+    help="Range of number of particles to use for synthetic graph generation: e.g. '3, 5'",
 )
 
+parser.add_argument(
+    "--use-average-cc-pos",
+    default=0.0,
+    type=float,
+    help="push the alpha to the mean of the coordinates in the object by this value",
+)
