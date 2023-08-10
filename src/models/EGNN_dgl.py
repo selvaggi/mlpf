@@ -35,7 +35,7 @@ class EGNN(nn.Module):
         self.n_layers = n_layers
         self.concat_global_exchange = concat_global_exchange
         if self.concat_global_exchange:
-            add_global_exchange = 3 * (in_node_nf+3) # also add coords
+            add_global_exchange = 3 * (in_node_nf+3)   # also add coords
         else:
             add_global_exchange = 0
         self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
@@ -72,8 +72,7 @@ class EGNN(nn.Module):
         g.ndata["x"] = g.ndata["h"][:, 0:3]
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
-            h = h[3:]
-            #h = torch.cat((h,  global_ex), dim=1)
+            h = h[:, 3:]
         h = self.embedding_in(h)  # NBx80
         g.ndata["hh"] = h
 
