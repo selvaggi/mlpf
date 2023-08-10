@@ -24,6 +24,10 @@ from src.utils.logger_wandb import plot_clust
 class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
 
+def lst_nonzero(x):
+    return [i for i in x if i != 0]
+
+
 def clip_list(l, clip_val=4.0):
     result = []
     for item in l:
@@ -190,7 +194,7 @@ def train_regression(
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
                 fig, ax = plt.subplots()
-                repulsive, attractive = losses[16].detach().cpu().flatten().nonzero(), losses[17].detach().cpu().flatten().nonzero()
+                repulsive, attractive = lst_nonzero(losses[16].detach().cpu().flatten()), lst_nonzero(losses[17].detach().cpu().flatten())
                 #print("rep", repulsive.shape)
                 ax.hist(repulsive, bins=100, alpha=0.5, label="repulsive", color="r")
                 ax.hist(attractive, bins=100, alpha=0.5, label="attractive", color="b")
