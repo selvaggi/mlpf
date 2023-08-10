@@ -9,12 +9,14 @@ import dgl
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
 from src.layers.obj_cond_inf import calc_energy_loss
-
+from src.models.gravnet_model import global_exchange, obtain_batch_numbers
 
 class EGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",)):
+    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False):
+        '''
+        :param concat_global_exchange: Whether to concat "global" features to the node features.
+        '''
         super().__init__()
-
         in_node_nf = 6
         hidden_nf = 128
         out_node_nf = 4
@@ -31,7 +33,12 @@ class EGNN(nn.Module):
         self.hidden_nf = hidden_nf
         self.device = device
         self.n_layers = n_layers
-        self.embedding_in = nn.Linear(in_node_nf, self.hidden_nf)
+        self.concat_global_exchange = concat_global_exchange
+        if self.concat_global_exchange:
+            add_global_exchange = 3 * (in_node_nf+3) # also add coords
+        else:
+            add_global_exchange = 0
+        self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
         # self.embedding_in_coords = nn.Linear(6, self.hidden_nf)
         self.embedding_out = nn.Linear(self.hidden_nf + 3, out_node_nf)
         self.layers = nn.ModuleList()
@@ -57,10 +64,16 @@ class EGNN(nn.Module):
             nn.Softmax(dim=-1),
         )
 
+
     def forward(self, g):
+        batch = obtain_batch_numbers(g.ndata["h"], g)
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
         g.ndata["x"] = g.ndata["h"][:, 0:3]
+        if self.concat_global_exchange:
+            h = global_exchange(g.ndata["h"], batch)
+            h = h[3:]
+            #h = torch.cat((h,  global_ex), dim=1)
         h = self.embedding_in(h)  # NBx80
         g.ndata["hh"] = h
 
