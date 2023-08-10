@@ -58,7 +58,7 @@ class GravNetConv(MessagePassing):
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
 
-        #self.reset_parameters()
+        # self.reset_parameters()
 
     def reset_parameters(self):
         self.lin_s.reset_parameters()
@@ -78,7 +78,7 @@ class GravNetConv(MessagePassing):
         s_l: Tensor = self.lin_s(x)
 
         graph = knn_per_graph(g, s_l, self.k)
-        graph.ndata['s_l'] = s_l
+        graph.ndata["s_l"] = s_l
         row = graph.edges()[0]
         col = graph.edges()[1]
         edge_index = torch.stack([row, col], dim=0)
@@ -87,14 +87,17 @@ class GravNetConv(MessagePassing):
         edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
 
         # propagate_type: (x: OptPairTensor, edge_weight: OptTensor)
+        #! this is the output_feature_transform
         out = self.propagate(
             edge_index,
-            x=(h_l, None),
+            x=h_l,
             edge_weight=edge_weight,
             size=(s_l.size(0), s_l.size(0)),
         )
 
-        return self.lin(torch.cat([out, x], dim=-1)), graph
+        #! not sure this cat is exactly the same that is happening in the RaggedGravNet but they also cat
+
+        return self.lin(torch.cat([out, x], dim=-1)), graph, s_l
 
     def message(self, x_j: Tensor, edge_weight: Tensor) -> Tensor:
         return x_j * edge_weight.unsqueeze(1)
@@ -102,6 +105,7 @@ class GravNetConv(MessagePassing):
     def aggregate(
         self, inputs: Tensor, index: Tensor, dim_size: Optional[int] = None
     ) -> Tensor:
+
         out_mean = scatter(
             inputs, index, dim=self.node_dim, dim_size=dim_size, reduce="mean"
         )
@@ -115,17 +119,15 @@ class GravNetConv(MessagePassing):
             self.__class__.__name__, self.in_channels, self.out_channels, self.k
         )
 
+
 def knn_per_graph(g, sl, k):
     graphs_list = dgl.unbatch(g)
     node_counter = 0
-    new_graphs =[]
+    new_graphs = []
     for graph in graphs_list:
         non = graph.number_of_nodes()
-        sls_graph = sl[node_counter:node_counter+non]
+        sls_graph = sl[node_counter : node_counter + non]
         new_graph = dgl.knn_graph(sls_graph, k, exclude_self=True)
         new_graphs.append(new_graph)
-        node_counter = node_counter+non
+        node_counter = node_counter + non
     return dgl.batch(new_graphs)
-    
-
-        
