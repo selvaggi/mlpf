@@ -190,10 +190,24 @@ def train_regression(
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
                 fig, ax = plt.subplots()
-                repulsive, attractive = losses[16].detach().cpu().flatten().nonzero(), losses[17].detach().cpu().flatten().nonzero()
-                #print("rep", repulsive.shape)
-                ax.hist(repulsive, bins=100, alpha=0.5, label="repulsive", color="r")
-                ax.hist(attractive, bins=100, alpha=0.5, label="attractive", color="b")
+                repulsive, attractive = (
+                    losses[16].detach().cpu().flatten().nonzero(),
+                    losses[17].detach().cpu().flatten().nonzero(),
+                )
+                ax.hist(
+                    repulsive.view(-1),
+                    bins=100,
+                    alpha=0.5,
+                    label="repulsive",
+                    color="r",
+                )
+                ax.hist(
+                    attractive.view(-1),
+                    bins=100,
+                    alpha=0.5,
+                    label="attractive",
+                    color="b",
+                )
                 ax.set_yscale("log")
                 ax.legend()
                 wandb.log({"rep. and att. norms": wandb.Image(fig)})
