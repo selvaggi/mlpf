@@ -126,7 +126,7 @@ class GravNetBlock(nn.Module):
         )
 
     def forward(self, g, x: Tensor, batch: Tensor) -> Tensor:
-        x, graph = self.gravnet_layer(g, x, batch)
+        x, graph, s_l = self.gravnet_layer(g, x, batch)
         x = self.post_gravnet(x)
         assert x.size(1) == 96
         x = global_exchange(x, batch)
@@ -266,6 +266,7 @@ class GravnetModel(nn.Module):
         attr_weight=1.0,
         repul_weight=1.0,
         fill_loss_weight=1.0,
+        use_average_cc_pos=0.0,
     ):
         """
 
@@ -349,11 +350,12 @@ class GravnetModel(nn.Module):
             attr_weight=attr_weight,
             repul_weight=repul_weight,
             fill_loss_weight=fill_loss_weight,
+            use_average_cc_pos=use_average_cc_pos,
         )
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1] 
+            loss = a[0] + a[1]  # + 5 * a[14]
             if calc_e_frac_loss:
                 loss_E_frac, loss_E_frac_true = calc_energy_loss(
                     batch, xj, bj.view(-1), qmin=q_min

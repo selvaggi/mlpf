@@ -86,6 +86,7 @@ class EGNN(nn.Module):
         attr_weight=1.0,
         repul_weight=1.0,
         fill_loss_weight=1.0,
+        use_average_cc_pos=0.0,
     ):
         """
 
@@ -170,11 +171,12 @@ class EGNN(nn.Module):
             attr_weight=attr_weight,
             repul_weight=repul_weight,
             fill_loss_weight=fill_loss_weight,
+            use_average_cc_pos=use_average_cc_pos,
         )
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]   #  Temporarily disable beta loss
+            loss = a[0] + a[1]  #  Temporarily disable beta loss
             # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
 
             if add_energy_loss:

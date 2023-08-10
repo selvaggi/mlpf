@@ -25,7 +25,7 @@ class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
 
 def lst_nonzero(x):
-    return x[x!=0.]
+    return x[x != 0.0]
 
 
 def clip_list(l, clip_val=4.0):
@@ -112,6 +112,7 @@ def train_regression(
                     attr_weight=args.L_attractive_weight,
                     repul_weight=args.L_repulsive_weight,
                     fill_loss_weight=args.fill_loss_weight,
+                    use_average_cc_pos=args.use_average_cc_pos,
                 )
                 betas = (
                     torch.sigmoid(
@@ -194,8 +195,10 @@ def train_regression(
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
                 fig, ax = plt.subplots()
-                repulsive, attractive = lst_nonzero(losses[16].detach().cpu().flatten()), lst_nonzero(losses[17].detach().cpu().flatten())
-                #print("rep", repulsive.shape)
+                repulsive, attractive = lst_nonzero(
+                    losses[16].detach().cpu().flatten()
+                ), lst_nonzero(losses[17].detach().cpu().flatten())
+                # print("rep", repulsive.shape)
                 ax.hist(repulsive, bins=100, alpha=0.5, label="repulsive", color="r")
                 ax.hist(attractive, bins=100, alpha=0.5, label="attractive", color="b")
                 ax.set_yscale("log")
@@ -427,6 +430,7 @@ def evaluate_regression(
                     frac_clustering_loss=0,
                     q_min=args.qmin,
                     clust_loss_only=args.clustering_loss_only,
+                    use_average_cc_pos=args.use_average_cc_pos,
                 )
                 num_batches += 1
                 count += num_examples
@@ -571,6 +575,7 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
                     return_resolution=True,
                     q_min=args.qmin,
                     frac_clustering_loss=0,
+                    use_average_cc_pos=args.use_average_cc_pos,
                 )
                 results.append(resolutions)
                 pid_classification_results.append((pid_true, pid_pred))

@@ -168,6 +168,7 @@ def calc_LV_Lbeta(
     attr_weight=1.0,
     repul_weight=1.0,
     fill_loss_weight=1.0,
+    use_average_cc_pos=0.0,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -264,6 +265,20 @@ def calc_LV_Lbeta(
     # Get the cluster space coordinates and betas for these maxima hits too
     x_alpha = cluster_space_coords[is_sig][index_alpha]
     x_alpha_original = original_coords[is_sig][index_alpha]
+    if use_average_cc_pos > 0:
+        #! this is a func of beta and q so maybe we could also do it with only q
+        x_alpha_sum = scatter_add(
+            q[is_sig].view(-1, 1).repeat(1, 3)
+            * beta[is_sig].view(-1, 1).repeat(1, 3)
+            * cluster_space_coords[is_sig],
+            object_index,
+            dim=0,
+        )
+        qbeta_alpha_sum = scatter_add(q[is_sig] * beta[is_sig], object_index) + 1e-9
+        div_fac = 1 / qbeta_alpha_sum
+        div_fac = torch.nan_to_num(div_fac, nan=0)
+        x_alpha_mean = torch.mul(x_alpha_sum, div_fac.view(-1, 1).repeat(1, 3))
+        x_alpha = use_average_cc_pos * x_alpha_mean + (1 - use_average_cc_pos) * x_alpha
 
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
@@ -629,7 +644,7 @@ def calc_LV_Lbeta(
             f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
         )
 
-    L_beta = L_beta_noise + L_beta_sig 
+    L_beta = L_beta_noise + L_beta_sig
 
     L_alpha_coordinates = torch.mean(torch.norm(x_alpha_original - x_alpha, p=2, dim=1))
     # ________________________________
@@ -674,24 +689,24 @@ def calc_LV_Lbeta(
     # except:
     #    pass
     return (
-        L_V / batch_size, # 0
+        L_V / batch_size,  # 0
         L_beta / batch_size,
         loss_E,
         loss_x,
-        loss_particle_ids, # 4
+        loss_particle_ids,  # 4
         loss_momentum,
         loss_mass,
         pid_true,
         pid_pred,
         resolutions,
-        L_clusters,   # 10
+        L_clusters,  # 10
         fill_loss,
         L_V_attractive / batch_size,
         L_V_repulsive / batch_size,
         L_alpha_coordinates,
         L_exp,
         norms_rep,  # 16
-        norms_att   # 17
+        norms_att,  # 17
     )
 
 
