@@ -25,7 +25,7 @@ class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
 
 def lst_nonzero(x):
-    return [i for i in x if i != 0]
+    return x[x!=0.]
 
 
 def clip_list(l, clip_val=4.0):
