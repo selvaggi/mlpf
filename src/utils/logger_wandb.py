@@ -256,7 +256,7 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(len(graph_list), 3, figsize=(12, 40))
+        fig, ax = plt.subplots(len(graph_list), 5, figsize=(20, 40))
         for i in range(len(graph_list)):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
@@ -268,7 +268,6 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
             #    continue
             q_graph = q[node_counter : node_counter + non].flatten()
             hit_type = torch.argmax(graph_eval.ndata["hit_type"], dim=1).view(-1)
-
             part_num = graph_eval.ndata["particle_number"].view(-1).to(torch.long)
             q_alpha, index_alpha = scatter_max(
                 q_graph.cpu().view(-1), part_num.cpu() - 1
@@ -280,7 +279,13 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
             clr = graph_eval.ndata["particle_number"]
             ax[i, 2].set_title("x and y of hits")
             xhits, yhits = graph_eval.ndata["h"][:, 0].detach().cpu(), graph_eval.ndata["h"][:, 1].detach().cpu()
+            hittype = torch.argmax(graph_eval.ndata["h"][3, 4, 5, 6], dim=1).view(-1)
+            clr_energy = torch.log10(graph_eval.ndata["h"][:, 7].detach().cpu())
             ax[i, 2].scatter(xhits, yhits, c=clr.tolist(), alpha=0.2)
+            ax[i, 3].scatter(xhits, yhits, c=clr_energy.tolist(), alpha=0.2)
+            ax[i, 3].set_title("x and y of hits colored by log10 energy")
+            ax[i, 4].scatter(xhits, yhits, c=hittype.tolist(), alpha=0.2)
+            ax[i, 4].set_title("x and y of hits colored by hit type (ecal/hcal)")
             ax[i, 0].set_title(
                 title_prefix
                 + " "

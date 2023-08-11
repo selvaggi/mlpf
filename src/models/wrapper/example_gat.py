@@ -9,7 +9,7 @@ class GATWrapper(torch.nn.Module):
         self.emb_out = torch.nn.Linear(128, 4).to(dev)
         self.mod = GATConv(in_channels=128, out_channels=128, heads=3, concat=False, **kwargs).to(dev)
         self.mod.input_dim = 9
-        self.mod.output_dim = 4 # to be used by the loss model
+        self.mod.output_dim = 4   # to be used by the loss model
         self.mod.clust_space_norm = "none"
         self.mod.post_pid_pool_module = torch.nn.Identity()
     def forward(self, g):
