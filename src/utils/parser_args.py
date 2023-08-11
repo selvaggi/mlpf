@@ -216,7 +216,15 @@ parser.add_argument(
     "--lr-scheduler",
     type=str,
     default="flat+decay",
-    choices=["none", "steps", "flat+decay", "flat+linear", "flat+cos", "one-cycle"],
+    choices=[
+        "none",
+        "steps",
+        "flat+decay",
+        "flat+linear",
+        "flat+cos",
+        "one-cycle",
+        "reduceplateau",
+    ],
     help="learning rate scheduler",
 )
 parser.add_argument(
@@ -416,7 +424,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--fill_loss_weight",
-    default=0.1,
+    default=0.0,
     type=float,
     help="weight for the fill loss to try to prevent mode collapse",
 )
