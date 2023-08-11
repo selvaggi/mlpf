@@ -142,7 +142,15 @@ def train_regression(
                 grad_scaler.update()
             step_end_time = time.time()
             if scheduler and getattr(scheduler, "_update_per_step", False):
-                scheduler.step()
+                if args.lr_scheduler == "reduceplateau":
+                    scheduler.step(total_loss / num_batches)  # loss
+                else:
+                    scheduler.step()  # loss
+                if logwandb and local_rank == 0:
+                    if args.lr_scheduler == "reduceplateau":
+                        wandb.log({"lr": opt.param_groups[0]["lr"]})
+                    else:
+                        wandb.log({"lr": scheduler.get_last_lr()[0]})
             if clust_loss_only and calc_e_frac_loss and logwandb:
                 wandb.log(
                     {
