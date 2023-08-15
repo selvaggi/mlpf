@@ -454,7 +454,10 @@ def evaluate_regression(
                 label = y
                 num_examples = label.shape[0]
                 label = label.to(dev)
-                model_output = model(batch_g)
+                if args.loss_regularization:
+                    model_output, loss_regularizing_neig, loss_ll = model(batch_g)
+                else:
+                    model_output = model(batch_g)
                 preds = model_output.squeeze().float()
                 (
                     loss,

@@ -53,11 +53,8 @@ class GravnetModel(nn.Module):
         self.output_dim = output_dim
         self.n_gravnet_blocks = TOTAL_ITERATIONS
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
-        # self.batchnorm = batchnorm
-        # if self.batchnorm:
         self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
-        # else:
-        #    self.batchnorm1 = nn.Identity()
+
         self.input = nn.Linear(input_dim, 64, bias=False)
         # self.input.weight.data.copy_(torch.eye(64,input_dim))
         print("clust_space_norm", clust_space_norm)
@@ -67,7 +64,9 @@ class GravnetModel(nn.Module):
         self.d_shape = 32
         self.gravnet_blocks = nn.ModuleList(
             [
-                GravNetBlock(64 if i == 0 else self.d_shape, k=k)
+                GravNetBlock(
+                    64 if i == 0 else (self.d_shape * i + 64), k=N_NEIGHBOURS[i]
+                )
                 for i in range(self.n_gravnet_blocks)
             ]
         )
@@ -77,7 +76,7 @@ class GravnetModel(nn.Module):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(4 * self.d_shape if i == 0 else 64, 64),
+                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
                     self.act,  # ,
                 ]
             )
@@ -107,17 +106,20 @@ class GravnetModel(nn.Module):
         x = g.ndata["h"]
         device = x.device
         batch = obtain_batch_numbers(x, g)
-        # print('forward called on device', device)
-        # x = self.batchnorm1(x)
+        x = self.batchnorm1(x)
         # x = global_exchange(x, batch)
         x = self.input(x)
         assert x.device == device
 
         x_gravnet_per_block = []  # To store intermediate outputs
+        x_gravnet_per_block.append(x)
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
         for gravnet_block in self.gravnet_blocks:
+            #! first time dim x is 64
+            #! second time is 64+d
+            print("shape x in block is", x.shape)
             x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
                 g, x, batch
             )
@@ -127,6 +129,11 @@ class GravnetModel(nn.Module):
                 loss_regularizing_neig_block + loss_regularizing_neig
             )
             loss_ll = loss_ll_ + loss_ll
+            if len(x_gravnet_per_block) > 1:
+                for ll in x_gravnet_per_block:
+                    print(ll.shape)
+                x = torch.concatenate(x_gravnet_per_block, dim=1)
+
         x = torch.cat(x_gravnet_per_block, dim=-1)
 
         # assert x.size() == (x.size(0), 4 * 96)
@@ -333,12 +340,14 @@ class GravNetBlock(nn.Module):
         super(GravNetBlock, self).__init__()
         self.d_shape = 32
         out_channels = self.d_shape
+        self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape)
         propagate_dimensions = self.d_shape * 2
         self.gravnet_layer = GravNetConv(
             self.d_shape, out_channels, space_dimensions, propagate_dimensions, k
         ).jittable()
+
         self.post_gravnet = nn.Sequential(
-            nn.Linear(out_channels + space_dimensions, self.d_shape),
+            nn.Linear(out_channels, self.d_shape),
             nn.ELU(),
             nn.Linear(self.d_shape, self.d_shape),
             nn.ELU(),
@@ -349,13 +358,16 @@ class GravNetBlock(nn.Module):
             nn.Linear(self.d_shape, self.d_shape),
             nn.ELU(),
         )
-        self.output = nn.Sequential(nn.Linear(4 * self.d_shape, self.d_shape), nn.ELU())
+        self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
+        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)
 
     def forward(self, g, x: Tensor, batch: Tensor) -> Tensor:
         x = self.pre_gravnet(x)
+        x = self.batchnorm_gravnet1(x)
         x, graph, s_l, loss_regularizing_neig, ll_r = self.gravnet_layer(g, x, batch)
-        x = torch.cat((x, s_l), dim=1)
+        # x = torch.cat((x, s_l), dim=1)
         x = self.post_gravnet(x)
-        x = global_exchange(x, batch)
+        x = self.batchnorm_gravnet2(x)
+        # x = global_exchange(x, batch)
         x = self.output(x)
         return x, graph, loss_regularizing_neig, ll_r

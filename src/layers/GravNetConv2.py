@@ -6,13 +6,13 @@ from torch import Tensor
 from torch.nn import Linear
 from torch_scatter import scatter
 from torch_geometric.nn.conv import MessagePassing
-
+import torch.nn as nn
 import dgl
 import dgl.function as fn
 
 
 class GravNetConv(MessagePassing):
-    r"""The GravNet operator from the `"Learning Representations of Irregular
+    """The GravNet operator from the `"Learning Representations of Irregular
     Particle-detector Geometry with Distance-weighted Graph
     Networks" <https://arxiv.org/abs/1902.07987>`_ paper, where the graph is
     dynamically constructed using nearest neighbors.
@@ -53,11 +53,13 @@ class GravNetConv(MessagePassing):
         self.out_channels = out_channels
         self.k = k
         self.num_workers = num_workers
-
+        self.batchnorm_gravconv = nn.BatchNorm1d(2 * propagate_dimensions)
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
         self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
         self.lin_h = Linear(in_channels, propagate_dimensions)
-        self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
+        self.lin = Linear(
+            in_channels + 2 * propagate_dimensions + space_dimensions, out_channels
+        )
 
         # self.reset_parameters()
 
@@ -75,7 +77,6 @@ class GravNetConv(MessagePassing):
         if isinstance(batch, Tensor):
             b = batch
         h_l: Tensor = self.lin_h(x)
-
         s_l: Tensor = self.lin_s(x)
 
         graph = knn_per_graph(g, s_l, self.k)
@@ -106,7 +107,7 @@ class GravNetConv(MessagePassing):
             .sum(-1)
         )
         gndist = torch.sqrt(dit_orig + 1e-6)
-        loss_llregulariser = 0.1 * torch.mean(torch.square(dist - gndist))
+        loss_llregulariser = 5 * torch.mean(torch.square(dist - gndist))
         #! this is the output_feature_transform
 
         out = self.propagate(
@@ -117,8 +118,14 @@ class GravNetConv(MessagePassing):
         )
 
         #! not sure this cat is exactly the same that is happening in the RaggedGravNet but they also cat
-
-        return self.lin(torch.cat([out, x], dim=-1)), graph, s_l, loss_regularizing_neig, loss_llregulariser
+        out = self.batchnorm_gravconv(out)
+        return (
+            self.lin(torch.cat([out, x, s_l], dim=-1)),
+            graph,
+            s_l,
+            loss_regularizing_neig,
+            loss_llregulariser,
+        )
 
     def message(self, x_j: Tensor, edge_weight: Tensor) -> Tensor:
         return x_j * edge_weight.unsqueeze(1)
