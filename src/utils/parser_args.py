@@ -443,3 +443,10 @@ parser.add_argument(
     type=float,
     help="push the alpha to the mean of the coordinates in the object by this value",
 )
+
+parser.add_argument(
+    "--hgcalloss",
+    action="store_true",
+    default=False,
+    help="use the hgcal loss",
+)

@@ -123,7 +123,10 @@ def train_load(args):
         raise RuntimeError("Must set --steps-per-epoch when using --in-memory!")
     syn_str = args.synthetic_graph_npart_range
     synthetic = syn_str != ""
-    minp, maxp = 0, 0,
+    minp, maxp = (
+        0,
+        0,
+    )
     if synthetic:
         minp = int(syn_str.split("-")[0])
         maxp = int(syn_str.split("-")[1])
@@ -579,7 +582,10 @@ def optim(args, model, device):
                 True  # mark it to update the lr every step, instead of every epoch
             )
         elif args.lr_scheduler == "reduce_plateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, patience=3)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+            scheduler._update_per_step = (
+                True  # mark it to update the lr every step, instead of every epoch
+            )
     return opt, scheduler
 
 
