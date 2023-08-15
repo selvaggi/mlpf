@@ -256,8 +256,8 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(len(graph_list), 5, figsize=(20, 40))
-        for i in range(len(graph_list)):
+        fig, ax = plt.subplots(12, 5, figsize=(20, 40))
+        for i in range(0, 12):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
             non = graph_eval.number_of_nodes()
@@ -278,8 +278,13 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
                 index_alpha = index_alpha.item()
             clr = graph_eval.ndata["particle_number"]
             ax[i, 2].set_title("x and y of hits")
-            xhits, yhits = graph_eval.ndata["h"][:, 0].detach().cpu(), graph_eval.ndata["h"][:, 1].detach().cpu()
-            hittype = torch.argmax(graph_eval.ndata["h"][[3, 4, 5, 6]], dim=1).view(-1)
+            xhits, yhits = (
+                graph_eval.ndata["h"][:, 0].detach().cpu(),
+                graph_eval.ndata["h"][:, 1].detach().cpu(),
+            )
+            hittype = torch.argmax(graph_eval.ndata["h"][:, [3, 4, 5, 6]], dim=1).view(
+                -1
+            )
             clr_energy = torch.log10(graph_eval.ndata["h"][:, 7].detach().cpu())
             ax[i, 2].scatter(xhits, yhits, c=clr.tolist(), alpha=0.2)
             ax[i, 3].scatter(xhits, yhits, c=clr_energy.tolist(), alpha=0.2)

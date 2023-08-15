@@ -113,6 +113,7 @@ def train_regression(
                     repul_weight=args.L_repulsive_weight,
                     fill_loss_weight=args.fill_loss_weight,
                     use_average_cc_pos=args.use_average_cc_pos,
+                    hgcalloss=args.hgcalloss,
                 )
                 betas = (
                     torch.sigmoid(
@@ -141,16 +142,7 @@ def train_regression(
                 grad_scaler.step(opt)
                 grad_scaler.update()
             step_end_time = time.time()
-            if scheduler and getattr(scheduler, "_update_per_step", False):
-                if args.lr_scheduler == "reduceplateau":
-                    scheduler.step(total_loss / num_batches)  # loss
-                else:
-                    scheduler.step()  # loss
-                if logwandb and local_rank == 0:
-                    if args.lr_scheduler == "reduceplateau":
-                        wandb.log({"lr": opt.param_groups[0]["lr"]})
-                    else:
-                        wandb.log({"lr": scheduler.get_last_lr()[0]})
+
             if clust_loss_only and calc_e_frac_loss and logwandb:
                 wandb.log(
                     {
@@ -180,6 +172,16 @@ def train_regression(
                     "AvgLoss": "%.5f" % (total_loss / num_batches),
                 }
             )
+            if scheduler and getattr(scheduler, "_update_per_step", True):
+                if args.lr_scheduler == "reduceplateau":
+                    scheduler.step(total_loss / num_batches)  # loss
+                else:
+                    scheduler.step()  # loss
+            if logwandb and local_rank == 0:
+                if args.lr_scheduler == "reduceplateau":
+                    wandb.log({"lr": opt.param_groups[0]["lr"]})
+                else:
+                    wandb.log({"lr": scheduler.get_last_lr()[0]})
 
             if tb_helper:
                 print("tb_helper!", tb_helper)
@@ -340,8 +342,16 @@ def train_regression(
             # update the batch state
             tb_helper.batch_train_count += num_batches
 
-    if scheduler and not getattr(scheduler, "_update_per_step", False):
-        scheduler.step()
+        if scheduler and getattr(scheduler, "_update_per_step", False):
+            if args.lr_scheduler == "reduceplateau":
+                scheduler.step(total_loss / num_batches)  # loss
+            else:
+                scheduler.step()  # loss
+            if logwandb and local_rank == 0:
+                if args.lr_scheduler == "reduceplateau":
+                    wandb.log({"lr": opt.param_groups[0]["lr"]})
+                else:
+                    wandb.log({"lr": scheduler.get_last_lr()[0]})
     return step_count
 
 
@@ -451,6 +461,7 @@ def evaluate_regression(
                     q_min=args.qmin,
                     clust_loss_only=args.clustering_loss_only,
                     use_average_cc_pos=args.use_average_cc_pos,
+                    hgcalloss=args.hgcalloss,
                 )
                 num_batches += 1
                 count += num_examples
@@ -596,6 +607,7 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
                     q_min=args.qmin,
                     frac_clustering_loss=0,
                     use_average_cc_pos=args.use_average_cc_pos,
+                    hgcalloss=args.hgcalloss,
                 )
                 results.append(resolutions)
                 pid_classification_results.append((pid_true, pid_pred))

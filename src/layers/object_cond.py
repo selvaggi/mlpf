@@ -167,8 +167,9 @@ def calc_LV_Lbeta(
     frac_combinations=0,  # fraction of the all possible pairs to be used for the clustering loss
     attr_weight=1.0,
     repul_weight=1.0,
-    fill_loss_weight=1.0,
+    fill_loss_weight=0.0,
     use_average_cc_pos=0.0,
+    hgcal_implementation=False,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -522,6 +523,11 @@ def calc_LV_Lbeta(
         norms_att = norms_att**2
     assert norms_att.size() == (n_hits_sig, n_objects)
 
+    if hgcal_implementation:
+        #! att func as in line 159 of object condensation
+        norms_att = torch.log(
+            torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
+        )
     # Now apply the mask to keep only norms of signal hits w.r.t. to the object
     # they belong to
     norms_att *= M[is_sig]
@@ -532,9 +538,23 @@ def calc_LV_Lbeta(
     assert V_attractive.size() == (n_hits_sig, n_objects)
 
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum over events
-    V_attractive = scatter_add(V_attractive.sum(dim=0), batch_object) / n_hits_per_event
-    assert V_attractive.size() == (batch_size,)
-    L_V_attractive = V_attractive.sum()
+    if hgcal_implementation:
+        #! each shower is account for separately
+        V_attractive = V_attractive.sum(dim=0)  # K objects
+        #! divide by the number of hits per object
+        V_attractive = V_attractive / n_hits_per_object
+
+        #! add to terms function (divide by total number of showers per event)
+        L_V_attractive = scatter_add(V_attractive, batch_object) / n_objects_per_event
+        L_V_attractive = torch.sum(L_V_attractive)
+
+    else:
+        #! in comparison this works per hit
+        V_attractive = (
+            scatter_add(V_attractive.sum(dim=0), batch_object) / n_hits_per_event
+        )
+        assert V_attractive.size() == (batch_size,)
+        L_V_attractive = V_attractive.sum()
 
     # -------
     # Repulsive potential term
@@ -544,7 +564,10 @@ def calc_LV_Lbeta(
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    norms_rep = torch.exp(-40.0 * norms**2) * M_inv
+    if hgcal_implementation:
+        norms_rep = torch.exp(-(norms**2) / 2) * M_inv
+    else:
+        norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
     # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
     V_repulsive = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep
@@ -554,9 +577,22 @@ def calc_LV_Lbeta(
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
     nope = n_objects_per_event - 1
     nope[nope == 0] = 1
-    L_V_repulsive = (
-        scatter_add(V_repulsive.sum(dim=0), batch_object) / (n_hits_per_event * nope)
-    ).sum()
+    if hgcal_implementation:
+        #! sum each object repulsive terms
+        L_V_repulsive = V_repulsive.sum(dim=0)  # size number of objects
+        number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
+        L_V_repulsive = L_V_repulsive.view(
+            -1
+        ) / number_of_repulsive_terms_per_object.view(-1)
+        #! add to terms function (divide by total number of showers per event)
+        L_V_repulsive = scatter_add(L_V_repulsive, batch_object) / n_objects_per_event
+        L_V_repulsive = torch.sum(L_V_repulsive)
+    else:
+        L_V_repulsive = (
+            scatter_add(V_repulsive.sum(dim=0), batch_object)
+            / (n_hits_per_event * nope)
+        ).sum()
+
     L_V = (
         attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
@@ -589,7 +625,14 @@ def calc_LV_Lbeta(
 
     # -------
     # L_beta signal term
-
+    # if hgcal_implementation:
+    #     eps = 1e-3
+    #     beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
+    #     beta_pen = 1-eps*torch.log(beta_per_object)
+    #     beta_per_object_c = scatter_add(beta[is_sig], object_index)
+    #     beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
+    #     L_beta_sig = beta_pen.sum()/len(beta_pen)
+    # else:
     if beta_term_option == "paper":
 
         L_beta_sig = (
@@ -688,6 +731,7 @@ def calc_LV_Lbeta(
     #    L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
     # except:
     #    pass
+
     return (
         L_V / batch_size,  # 0
         L_beta / batch_size,
