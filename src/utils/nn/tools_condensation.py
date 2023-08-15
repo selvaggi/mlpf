@@ -93,7 +93,10 @@ def train_regression(
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
                 batch_g = batch_g.to(dev)
                 calc_e_frac_loss = (num_batches % 250) == 0
-                model_output = model(batch_g)
+                if args.loss_regularization:
+                    model_output, loss_regularizing_neig, loss_ll = model(batch_g)
+                else:
+                    model_output = model(batch_g)
                 preds = model_output.squeeze()
                 (
                     loss,
@@ -115,6 +118,8 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
+                if args.loss_regularization:
+                    loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
                     torch.sigmoid(
                         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
@@ -245,6 +250,9 @@ def train_regression(
                         "loss beta zeros": losses[15],
                     }
                 )  # , step=step_count)
+                if args.loss_regularization:
+                    wandb.log({"loss regul neigh": loss_regularizing_neig})
+                    wandb.log({"loss ll": loss_ll})
 
                 if (num_batches - 1) % 100 == 0:
                     if clust_loss_only:
@@ -598,7 +606,10 @@ def plot_regression_resolution(model, test_loader, dev, **kwargs):
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
                 batch_g = batch_g.to(dev)
-                model_output = model(batch_g)
+                if args.loss_regularization:
+                    model_output, loss_regularizing_neig = model(batch_g)
+                else:
+                    model_output = model(batch_g)
                 resolutions, pid_true, pid_pred = model.mod.object_condensation_loss2(
                     batch_g,
                     model_output,

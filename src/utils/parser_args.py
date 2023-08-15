@@ -450,3 +450,9 @@ parser.add_argument(
     default=False,
     help="use the hgcal loss",
 )
+parser.add_argument(
+    "--loss-regularization",
+    action="store_true",
+    default=False,
+    help="use the hgcal regularization losses",
+)
