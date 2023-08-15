@@ -182,9 +182,10 @@ class GravnetModel(nn.Module):
 
         # Note: out_channels of the internal gravnet layer
         # not clearly specified in paper
+        N_NEIGHBOURS = [16,128,16,256]  # TEMPORARILY
         self.gravnet_blocks = nn.ModuleList(
             [
-                GravNetBlock(64 if i == 0 else 96, k=k)
+                GravNetBlock(64 if i == 0 else 96, k=N_NEIGHBOURS[i])
                 for i in range(self.n_gravnet_blocks)
             ]
         )

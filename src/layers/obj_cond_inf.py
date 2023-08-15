@@ -49,7 +49,7 @@ def calc_energy_loss(
             mask_clustering_particle = clusterings == counter
             clustered_energy = torch.sum(g.ndata["e_hits"][mask_clustering_particle])
             clustered_energy_true = torch.sum(
-                g.ndata["e_hits"][mask_clustering_particle * true_mask_particle]
+                g.ndata["e_hits"][mask_clustering_particle * true_mask_particle.flatten()]
             )  # only consider how much has been correctly assigned
             frac_energy.append(clustered_energy / (true_energy + 1e-7))
             frac_energy_true.append(clustered_energy_true / (true_energy + 1e-7))

@@ -257,7 +257,7 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
     node_counter = 0
     if len(graph_list) > 1:
         fig, ax = plt.subplots(12, 5, figsize=(20, 40))
-        for i in range(0, 12):
+        for i in range(0, min(12, len(graph_list))):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
             non = graph_eval.number_of_nodes()
