@@ -6,12 +6,15 @@ from torch import Tensor
 from torch.nn import Linear
 from torch_scatter import scatter
 from torch_geometric.nn.conv import MessagePassing
-
+import torch.nn as nn
 import dgl
+import dgl.function as fn
+import numpy as np
+from dgl.nn import EdgeWeightNorm
 
 
 class GravNetConv(MessagePassing):
-    r"""The GravNet operator from the `"Learning Representations of Irregular
+    """The GravNet operator from the `"Learning Representations of Irregular
     Particle-detector Geometry with Distance-weighted Graph
     Networks" <https://arxiv.org/abs/1902.07987>`_ paper, where the graph is
     dynamically constructed using nearest neighbors.
@@ -52,12 +55,13 @@ class GravNetConv(MessagePassing):
         self.out_channels = out_channels
         self.k = k
         self.num_workers = num_workers
-
+        self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
-        self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
+        # self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
+        torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
-
+        self.norm = EdgeWeightNorm(norm="both")
         # self.reset_parameters()
 
     def reset_parameters(self):
@@ -65,7 +69,9 @@ class GravNetConv(MessagePassing):
         self.lin_h.reset_parameters()
         self.lin.reset_parameters()
 
-    def forward(self, g, x: Tensor, batch: OptTensor = None) -> Tensor:
+    def forward(
+        self, g, x: Tensor, original_coords: Tensor, batch: OptTensor = None
+    ) -> Tensor:
         """"""
 
         assert x.dim() == 2, "Static graphs not supported in `GravNetConv`."
@@ -74,8 +80,8 @@ class GravNetConv(MessagePassing):
         if isinstance(batch, Tensor):
             b = batch
         h_l: Tensor = self.lin_h(x)
-
         s_l: Tensor = self.lin_s(x)
+        s_l = s_l + original_coords
 
         graph = knn_per_graph(g, s_l, self.k)
         graph.ndata["s_l"] = s_l
@@ -84,10 +90,35 @@ class GravNetConv(MessagePassing):
         edge_index = torch.stack([row, col], dim=0)
 
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
-        edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
+        edge_weight = edge_weight + 1e-5
+        #! normalized edge weight
+        # edge_weight = self.norm(graph, edge_weight * 10)
+        # edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
 
+        #! AverageDistanceRegularizer
+        dist = edge_weight
+        dist = torch.sqrt(dist + 1e-3)
+        graph.edata["dist"] = dist
+        graph.ndata["ones"] = torch.ones_like(s_l)
+        # average dist per node and divide by the number of neighbourgs
+        graph.update_all(fn.u_mul_e("ones", "dist", "m"), fn.mean("m", "dist"))
+        avdist = graph.ndata["dist"]
+        loss_regularizing_neig = 1e-2 * torch.mean(torch.square(avdist - 0.5))
         # propagate_type: (x: OptPairTensor, edge_weight: OptTensor)
+
+        #! LLRegulariseGravNetSpace
+        original_coord = g.ndata["pos_hits_xyz"]
+        dit_orig = (
+            (original_coord[edge_index[0]] - original_coord[edge_index[1]])
+            .pow(2)
+            .sum(-1)
+        )
+        gndist = torch.sqrt(dit_orig + 1e-6)
+        # gndist = self.norm(graph, gndist)
+        loss_llregulariser = 5 * torch.mean(torch.square(dist - gndist))
+        #print(torch.square(dist - gndist))
         #! this is the output_feature_transform
+
         out = self.propagate(
             edge_index,
             x=[h_l, None],
@@ -96,8 +127,15 @@ class GravNetConv(MessagePassing):
         )
 
         #! not sure this cat is exactly the same that is happening in the RaggedGravNet but they also cat
-
-        return self.lin(torch.cat([out, x], dim=-1)), graph, s_l
+        out = self.lin(torch.cat([out, x], dim=-1))
+        out = self.batchnorm_gravconv(out)
+        return (
+            out,
+            graph,
+            s_l,
+            loss_regularizing_neig,
+            loss_llregulariser,
+        )
 
     def message(self, x_j: Tensor, edge_weight: Tensor) -> Tensor:
         return x_j * edge_weight.unsqueeze(1)
@@ -109,6 +147,7 @@ class GravNetConv(MessagePassing):
         out_mean = scatter(
             inputs, index, dim=self.node_dim, dim_size=dim_size, reduce="mean"
         )
+
         out_max = scatter(
             inputs, index, dim=self.node_dim, dim_size=dim_size, reduce="max"
         )

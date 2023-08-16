@@ -31,10 +31,10 @@ def calc_energy_loss(
         betas = beta[node_counter : non + node_counter]
         sorted, indices = torch.sort(q_g, descending=False)
         selected_centers = indices[0:number_of_objects]
-        if len((particle_id[selected_centers]).unique()) < number_of_objects:
-            print("there are two or more clusters for one GT object")
-            print("objects have ids:", particle_id[selected_centers])
-            print("there are", number_of_objects, "objects")
+        # if len((particle_id[selected_centers]).unique()) < number_of_objects:
+        #     print("there are two or more clusters for one GT object")
+        #     print("objects have ids:", particle_id[selected_centers])
+        #     print("there are", number_of_objects, "objects")
         X = cluster_space_coords[node_counter : non + node_counter]
         clusterings = get_clustering(selected_centers, X, betas, td=0.7)
         clusterings = clusterings.to(g.device)
@@ -49,7 +49,9 @@ def calc_energy_loss(
             mask_clustering_particle = clusterings == counter
             clustered_energy = torch.sum(g.ndata["e_hits"][mask_clustering_particle])
             clustered_energy_true = torch.sum(
-                g.ndata["e_hits"][mask_clustering_particle * true_mask_particle.flatten()]
+                g.ndata["e_hits"][
+                    mask_clustering_particle * true_mask_particle.flatten()
+                ]
             )  # only consider how much has been correctly assigned
             frac_energy.append(clustered_energy / (true_energy + 1e-7))
             frac_energy_true.append(clustered_energy_true / (true_energy + 1e-7))

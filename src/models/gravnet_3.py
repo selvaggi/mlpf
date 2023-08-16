@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch_scatter import scatter_min, scatter_max, scatter_mean, scatter_add
 
-from src.layers.GravNetConv2 import GravNetConv
+from src.layers.GravNetConv3 import GravNetConv
 
 from typing import Tuple, Union, List
 import dgl
@@ -56,7 +56,7 @@ class GravnetModel(nn.Module):
         self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
 
         self.input = nn.Linear(input_dim, 64, bias=False)
-        # self.input.weight.data.copy_(torch.eye(64,input_dim))
+        self.input.weight.data.copy_(torch.eye(64, input_dim))
         print("clust_space_norm", clust_space_norm)
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
@@ -104,6 +104,7 @@ class GravnetModel(nn.Module):
 
     def forward(self, g):
         x = g.ndata["h"]
+        original_coords = x[:, 0:3]
         device = x.device
         batch = obtain_batch_numbers(x, g)
         x = self.batchnorm1(x)
@@ -119,9 +120,8 @@ class GravnetModel(nn.Module):
         for gravnet_block in self.gravnet_blocks:
             #! first time dim x is 64
             #! second time is 64+d
-            print("shape x in block is", x.shape)
             x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
-                g, x, batch
+                g, x, batch, original_coords
             )
             x_gravnet_per_block.append(x)
             graphs.append(graph)
@@ -130,17 +130,17 @@ class GravnetModel(nn.Module):
             )
             loss_ll = loss_ll_ + loss_ll
             if len(x_gravnet_per_block) > 1:
-                for ll in x_gravnet_per_block:
-                    print(ll.shape)
                 x = torch.concatenate(x_gravnet_per_block, dim=1)
 
         x = torch.cat(x_gravnet_per_block, dim=-1)
-
+        print("cat gravnet", x)
         # assert x.size() == (x.size(0), 4 * 96)
         assert x.device == device
 
         x = self.postgn_dense(x)
+        print("post dense", x)
         x = self.output(x)
+        print("output", x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
@@ -164,7 +164,7 @@ class GravnetModel(nn.Module):
         frac_clustering_loss=0.1,
         attr_weight=1.0,
         repul_weight=1.0,
-        fill_loss_weight=0.0,
+        fill_loss_weight=1.0,
         use_average_cc_pos=0.0,
         hgcalloss=False,
     ):
@@ -341,13 +341,13 @@ class GravNetBlock(nn.Module):
         self.d_shape = 32
         out_channels = self.d_shape
         self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape)
-        propagate_dimensions = self.d_shape * 2
+        propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
             self.d_shape, out_channels, space_dimensions, propagate_dimensions, k
         ).jittable()
 
         self.post_gravnet = nn.Sequential(
-            nn.Linear(out_channels, self.d_shape),
+            nn.Linear(out_channels + space_dimensions + self.d_shape, self.d_shape),
             nn.ELU(),
             nn.Linear(self.d_shape, self.d_shape),
             nn.ELU(),
@@ -361,11 +361,15 @@ class GravNetBlock(nn.Module):
         self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
         self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)
 
-    def forward(self, g, x: Tensor, batch: Tensor) -> Tensor:
+    def forward(self, g, x: Tensor, batch: Tensor, original_coords: Tensor) -> Tensor:
         x = self.pre_gravnet(x)
         x = self.batchnorm_gravnet1(x)
-        x, graph, s_l, loss_regularizing_neig, ll_r = self.gravnet_layer(g, x, batch)
-        # x = torch.cat((x, s_l), dim=1)
+        x_input = x
+        x, graph, s_l, loss_regularizing_neig, ll_r = self.gravnet_layer(
+            g, x, original_coords, batch
+        )
+        s_l = s_l.detach()
+        x = torch.cat((x, s_l, x_input), dim=1)
         x = self.post_gravnet(x)
         x = self.batchnorm_gravnet2(x)
         # x = global_exchange(x, batch)
