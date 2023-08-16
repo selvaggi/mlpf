@@ -408,126 +408,39 @@ def calc_LV_Lbeta(
     assert norms.size() == (n_hits, n_objects)
     L_clusters = torch.tensor(0.0).to(device)
     if frac_combinations != 0:
-        number_of_pairs = 0
-        for batch_id in batch.unique():
-            # do all possible pairs...
-            bmask = batch == batch_id
-            clust_space_filt = cluster_space_coords[bmask]
-            pos_pairs_all = []
-            neg_pairs_all = []
-            if len(cluster_index[bmask].unique()) <= 1:
-                continue
-            for cluster in cluster_index[bmask].unique():
-                coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
-                coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
-                if len(coords_neg) == 0:
-                    continue
-                clust_idx = cluster_index[bmask] == cluster
-                # all_ones = torch.ones_like((clust_idx, clust_idx))
-                # pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
-                total_num = (len(coords_pos) ** 2) / 2
-                num = int(frac_combinations * total_num)
-                pos_pairs = []
-                for i in range(num):
-                    pos_pairs.append(
-                        [
-                            np.random.randint(len(coords_pos)),
-                            np.random.randint(len(coords_pos)),
-                        ]
-                    )
-                neg_pairs = []
-                for i in range(len(pos_pairs)):
-                    neg_pairs.append(
-                        [
-                            np.random.randint(len(coords_pos)),
-                            np.random.randint(len(coords_neg)),
-                        ]
-                    )
-                pos_pairs_all += pos_pairs
-                neg_pairs_all += neg_pairs
-            pos_pairs = torch.tensor(pos_pairs_all)
-            neg_pairs = torch.tensor(neg_pairs_all)
-            """# do just a small sample of the pairs. ...
-            bmask = batch == batch_id
-    
-            #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
-    
-            pos_idx, neg_idx = [], []
-            for cluster in cluster_index[bmask].unique():
-                clust_idx = (cluster_index == cluster)[bmask]
-                perm = torch.randperm(clust_idx.sum())
-                perm1 = torch.randperm((~clust_idx).sum())
-                perm2 = torch.randperm(clust_idx.sum())
-                #cutoff = clust_idx.sum()//2
-                pos_lst = clust_idx.nonzero()[perm]
-                neg_lst = (~clust_idx).nonzero()[perm1]
-                neg_lst_second = clust_idx.nonzero()[perm2]
-                if len(pos_lst) % 2:
-                    pos_lst = pos_lst[:-1]
-                if len(neg_lst) % 2:
-                    neg_lst = neg_lst[:-1]
-                len_cap = min(len(pos_lst), len(neg_lst), len(neg_lst_second))
-                if len_cap % 2:
-                    len_cap -= 1
-                pos_lst = pos_lst[:len_cap]
-                neg_lst = neg_lst[:len_cap]
-                neg_lst_second = neg_lst_second[:len_cap]
-                pos_pairs = pos_lst.reshape(-1, 2)
-                neg_pairs = torch.cat([neg_lst, neg_lst_second], dim=1)
-                neg_pairs = neg_pairs[:pos_lst.shape[0]//2, :]
-                pos_idx.append(pos_pairs)
-                neg_idx.append(neg_pairs)
-            pos_idx = torch.cat(pos_idx)
-            neg_idx = torch.cat(neg_idx)"""
-            assert pos_pairs.shape == neg_pairs.shape
-            if len(pos_pairs) == 0:
-                continue
-            cluster_space_coords_filtered = cluster_space_coords[bmask]
-            qs_filtered = q[bmask]
-            pos_norms = (
-                cluster_space_coords_filtered[pos_pairs[:, 0]]
-                - cluster_space_coords_filtered[pos_pairs[:, 1]]
-            ).norm(dim=-1)
+        L_clusters = L_clusters_calc(
+            batch, cluster_space_coords, cluster_index, frac_combinations
+        )
 
-            neg_norms = (
-                cluster_space_coords_filtered[neg_pairs[:, 0]]
-                - cluster_space_coords_filtered[neg_pairs[:, 1]]
-            ).norm(dim=-1)
-            q_pos = qs_filtered[pos_pairs[:, 0]]
-            q_neg = qs_filtered[neg_pairs[:, 0]]
-            q_s = torch.cat([q_pos, q_neg])
-            norms_pos = torch.cat([pos_norms, neg_norms])
-            ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
-            L_clusters += torch.sum(
-                q_s * torch.nn.HingeEmbeddingLoss(reduce=None)(norms_pos, ys)
-            )
-            number_of_pairs += norms_pos.shape[0]
-        if number_of_pairs > 0:
-            L_clusters = L_clusters / number_of_pairs
     # -------
     # Attractive potential term
 
     # First get all the relevant norms: We only want norms of signal hits
     # w.r.t. the object they belong to, i.e. no noise hits and no noise clusters.
     # First select all norms of all signal hits w.r.t. all objects, mask out later
-    norms_att = norms[is_sig]
 
-    # Power-scale the norms
-    if huberize_norm_for_V_attractive:
+    if hgcal_implementation:
+        norms = (cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)).norm(
+            p=2, dim=-1
+        )
+        norms_att = norms[is_sig]
+        #! att func as in line 159 of object condensation
+        norms_att = torch.log(
+            torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
+        )
+        # Power-scale the norms
+    elif huberize_norm_for_V_attractive:
+        norms_att = norms[is_sig]
         # Huberized version (linear but times 4)
         # Be sure to not move 'off-diagonal' away from zero
         # (i.e. norms of hits w.r.t. clusters they do _not_ belong to)
         norms_att = huber(norms_att + 1e-5, 4.0)
     else:
+        norms_att = norms[is_sig]
         # Paper version is simply norms squared (no need for mask)
         norms_att = norms_att**2
     assert norms_att.size() == (n_hits_sig, n_objects)
 
-    if hgcal_implementation:
-        #! att func as in line 159 of object condensation
-        norms_att = torch.log(
-            torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
-        )
     # Now apply the mask to keep only norms of signal hits w.r.t. to the object
     # they belong to
     norms_att *= M[is_sig]
@@ -1284,3 +1197,104 @@ def reincrementalize(y: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
     offset_without_holes = torch.gather(offset_per_event, 0, batch).long()
     reincrementalized = y_offset - offset_without_holes
     return reincrementalized
+
+
+def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combinations):
+    number_of_pairs = 0
+    for batch_id in batch.unique():
+        # do all possible pairs...
+        bmask = batch == batch_id
+        clust_space_filt = cluster_space_coords[bmask]
+        pos_pairs_all = []
+        neg_pairs_all = []
+        if len(cluster_index[bmask].unique()) <= 1:
+            continue
+        for cluster in cluster_index[bmask].unique():
+            coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
+            coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
+            if len(coords_neg) == 0:
+                continue
+            clust_idx = cluster_index[bmask] == cluster
+            # all_ones = torch.ones_like((clust_idx, clust_idx))
+            # pos_pairs = [[i, j] for i in range(len(coords_pos)) for j in range (len(coords_pos)) if i < j]
+            total_num = (len(coords_pos) ** 2) / 2
+            num = int(frac_combinations * total_num)
+            pos_pairs = []
+            for i in range(num):
+                pos_pairs.append(
+                    [
+                        np.random.randint(len(coords_pos)),
+                        np.random.randint(len(coords_pos)),
+                    ]
+                )
+            neg_pairs = []
+            for i in range(len(pos_pairs)):
+                neg_pairs.append(
+                    [
+                        np.random.randint(len(coords_pos)),
+                        np.random.randint(len(coords_neg)),
+                    ]
+                )
+            pos_pairs_all += pos_pairs
+            neg_pairs_all += neg_pairs
+        pos_pairs = torch.tensor(pos_pairs_all)
+        neg_pairs = torch.tensor(neg_pairs_all)
+        """# do just a small sample of the pairs. ...
+        bmask = batch == batch_id
+
+        #L_clusters = 0   # Loss of randomly sampled distances between points inside and outside clusters
+
+        pos_idx, neg_idx = [], []
+        for cluster in cluster_index[bmask].unique():
+            clust_idx = (cluster_index == cluster)[bmask]
+            perm = torch.randperm(clust_idx.sum())
+            perm1 = torch.randperm((~clust_idx).sum())
+            perm2 = torch.randperm(clust_idx.sum())
+            #cutoff = clust_idx.sum()//2
+            pos_lst = clust_idx.nonzero()[perm]
+            neg_lst = (~clust_idx).nonzero()[perm1]
+            neg_lst_second = clust_idx.nonzero()[perm2]
+            if len(pos_lst) % 2:
+                pos_lst = pos_lst[:-1]
+            if len(neg_lst) % 2:
+                neg_lst = neg_lst[:-1]
+            len_cap = min(len(pos_lst), len(neg_lst), len(neg_lst_second))
+            if len_cap % 2:
+                len_cap -= 1
+            pos_lst = pos_lst[:len_cap]
+            neg_lst = neg_lst[:len_cap]
+            neg_lst_second = neg_lst_second[:len_cap]
+            pos_pairs = pos_lst.reshape(-1, 2)
+            neg_pairs = torch.cat([neg_lst, neg_lst_second], dim=1)
+            neg_pairs = neg_pairs[:pos_lst.shape[0]//2, :]
+            pos_idx.append(pos_pairs)
+            neg_idx.append(neg_pairs)
+        pos_idx = torch.cat(pos_idx)
+        neg_idx = torch.cat(neg_idx)"""
+        assert pos_pairs.shape == neg_pairs.shape
+        if len(pos_pairs) == 0:
+            continue
+        cluster_space_coords_filtered = cluster_space_coords[bmask]
+        qs_filtered = q[bmask]
+        pos_norms = (
+            cluster_space_coords_filtered[pos_pairs[:, 0]]
+            - cluster_space_coords_filtered[pos_pairs[:, 1]]
+        ).norm(dim=-1)
+
+        neg_norms = (
+            cluster_space_coords_filtered[neg_pairs[:, 0]]
+            - cluster_space_coords_filtered[neg_pairs[:, 1]]
+        ).norm(dim=-1)
+        q_pos = qs_filtered[pos_pairs[:, 0]]
+        q_neg = qs_filtered[neg_pairs[:, 0]]
+        q_s = torch.cat([q_pos, q_neg])
+        norms_pos = torch.cat([pos_norms, neg_norms])
+        ys = torch.cat([torch.ones_like(pos_norms), -torch.ones_like(neg_norms)])
+        L_clusters += torch.sum(
+            q_s * torch.nn.HingeEmbeddingLoss(reduce=None)(norms_pos, ys)
+        )
+        number_of_pairs += norms_pos.shape[0]
+    if number_of_pairs > 0:
+        L_clusters = L_clusters / number_of_pairs
+
+    return L_clusters
