@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch_scatter import scatter_min, scatter_max, scatter_mean, scatter_add
-
-from src.layers.GravNetConv3 import GravNetConv
+from torch.nn import Parameter
+from src.layers.GravNetConv3 import GravNetConv, WeirdBatchNorm
 
 from typing import Tuple, Union, List
 import dgl
@@ -32,6 +32,7 @@ class GravnetModel(nn.Module):
         clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
         activation: str = "elu",
+        weird_batchnom=True,
     ):
 
         super(GravnetModel, self).__init__()
@@ -53,7 +54,10 @@ class GravnetModel(nn.Module):
         self.output_dim = output_dim
         self.n_gravnet_blocks = TOTAL_ITERATIONS
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
-        self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
+        if weird_batchnom:
+            self.batchnorm1 = WeirdBatchNorm(self.input_dim)
+        else:
+            self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
 
         self.input = nn.Linear(input_dim, 64, bias=False)
         self.input.weight.data.copy_(torch.eye(64, input_dim))
@@ -65,7 +69,9 @@ class GravnetModel(nn.Module):
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (self.d_shape * i + 64), k=N_NEIGHBOURS[i]
+                    64 if i == 0 else (self.d_shape * i + 64),
+                    k=N_NEIGHBOURS[i],
+                    weird_batchnom=weird_batchnom,
                 )
                 for i in range(self.n_gravnet_blocks)
             ]
@@ -336,14 +342,23 @@ class GravNetBlock(nn.Module):
         propagate_dimensions: int = 22,
         k: int = 40,
         # batchnorm: bool = True
+        weird_batchnom=False,
     ):
         super(GravNetBlock, self).__init__()
         self.d_shape = 32
         out_channels = self.d_shape
-        self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape)
+        if weird_batchnom:
+            self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
+        else:
+            self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape)
         propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
-            self.d_shape, out_channels, space_dimensions, propagate_dimensions, k
+            self.d_shape,
+            out_channels,
+            space_dimensions,
+            propagate_dimensions,
+            k,
+            weird_batchnom,
         ).jittable()
 
         self.post_gravnet = nn.Sequential(
@@ -359,7 +374,10 @@ class GravNetBlock(nn.Module):
             nn.ELU(),
         )
         self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
-        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)
+        if weird_batchnom:
+            self.batchnorm_gravnet2 = WeirdBatchNorm(self.d_shape)
+        else:
+            self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)
 
     def forward(self, g, x: Tensor, batch: Tensor, original_coords: Tensor) -> Tensor:
         x = self.pre_gravnet(x)

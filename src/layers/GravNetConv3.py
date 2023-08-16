@@ -47,6 +47,7 @@ class GravNetConv(MessagePassing):
         propagate_dimensions: int,
         k: int,
         num_workers: int = 1,
+        weird_batchnom=False,
         **kwargs
     ):
         super(GravNetConv, self).__init__(flow="target_to_source", **kwargs)
@@ -55,7 +56,10 @@ class GravNetConv(MessagePassing):
         self.out_channels = out_channels
         self.k = k
         self.num_workers = num_workers
-        self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
+        if weird_batchnom:
+            self.batchnorm_gravconv = WeirdBatchNorm(out_channels)
+        else:
+            self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
         # self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
         torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
@@ -116,7 +120,7 @@ class GravNetConv(MessagePassing):
         gndist = torch.sqrt(dit_orig + 1e-6)
         # gndist = self.norm(graph, gndist)
         loss_llregulariser = 5 * torch.mean(torch.square(dist - gndist))
-        #print(torch.square(dist - gndist))
+        # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
 
         out = self.propagate(
@@ -170,3 +174,61 @@ def knn_per_graph(g, sl, k):
         new_graphs.append(new_graph)
         node_counter = node_counter + non
     return dgl.batch(new_graphs)
+
+
+class WeirdBatchNorm(nn.Module):
+    def __init__(self, n_neurons, eps=1e-5):
+
+        super(WeirdBatchNorm, self).__init__()
+
+        # stores number of neuros
+        self.n_neurons = n_neurons
+
+        # initinalize batch normalization parameters
+        self.gamma = nn.Parameter(torch.ones(self.n_neurons))
+        self.beta = nn.Parameter(torch.zeros(self.n_neurons))
+        print("self beta requires grad", self.beta.requires_grad)
+        self.mean = torch.zeros(self.n_neurons)
+        self.den = torch.ones(self.n_neurons)
+        self.viscosity = 0.999999
+        self.epsilon = eps
+        self.fluidity_decay = 0.01
+        self.max_viscosity = 1
+
+    def forward(self, input):
+        x = input.detach()
+        mu = x.mean(dim=0)
+        var = x.var(dim=0, unbiased=False)
+
+        mu_update = self._calc_update(self.mean, mu)
+        self.mean = mu_update
+        var_update = self._calc_update(self.den, var)
+        self.den = var_update
+
+        # normalization
+        center_input = x - self.mean
+        denominator = self.den + self.epsilon
+        denominator = denominator.sqrt()
+
+        in_hat = center_input / denominator
+
+        self._update_viscosity()
+
+        # scale and shift
+        out = self.gamma * in_hat + self.beta
+
+        return out
+
+    def _calc_update(self, old, new):
+        delta = new - old.to(new.device)
+        update = old.to(new.device) + (1 - self.viscosity) * delta.to(new.device)
+        update = update.to(new.device)
+        return update
+
+    def _update_viscosity(self):
+        if self.fluidity_decay > 0:
+            newvisc = (
+                self.viscosity
+                + (self.max_viscosity - self.viscosity) * self.fluidity_decay
+            )
+            self.viscosity = newvisc
