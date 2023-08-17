@@ -100,6 +100,7 @@ class EGNN(nn.Module):
         fill_loss_weight=1.0,
         use_average_cc_pos=0.0,
         hgcalloss=False,
+        e_frac_loss_radius=0.7
     ):
         """
 
@@ -190,12 +191,10 @@ class EGNN(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]  #  Temporarily disable beta loss
+            loss = a[0] + a[1]
             # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
-
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
-
         else:
             loss = (
                 a[0]
@@ -210,7 +209,10 @@ class EGNN(nn.Module):
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
             if calc_e_frac_loss:
-                return loss, a, 0, 0
+                loss_e_frac, loss_e_frac_true = calc_energy_loss(
+                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius
+                )
+                return loss, a, loss_e_frac, loss_e_frac_true
             else:
                 return loss, a, 0, 0
         return loss, a, 0, 0

@@ -1209,6 +1209,7 @@ def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combination
         neg_pairs_all = []
         if len(cluster_index[bmask].unique()) <= 1:
             continue
+        L_clusters = torch.tensor(0.0).to(q.device)
         for cluster in cluster_index[bmask].unique():
             coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
             coords_neg = clust_space_filt[cluster_index[bmask] != cluster]
