@@ -12,9 +12,10 @@ from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
 
 class HEGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False):
+    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, single_embedding_in_out: bool = True):
         '''
         :param concat_global_exchange: Whether to concat "global" features to the node features.
+        :param single_embedding_in_out: Whether to use the same embedding matrices for all node types.
         '''
         super().__init__()
         in_node_nf = 6
@@ -35,17 +36,21 @@ class HEGNN(nn.Module):
         self.n_layers = n_layers
         self.concat_global_exchange = concat_global_exchange
         if self.concat_global_exchange:
-            add_global_exchange = 3 * (in_node_nf+3)   # also add coords
+            add_global_exchange = 3 * (in_node_nf + 3)   # also add coords
         else:
             add_global_exchange = 0
         node_types = ["2", "3"]
-        self.embedding_in = torch.nn.ModuleDict()
-        for nt in node_types:
-            self.embedding_in[nt] = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
-        # self.embedding_in_coords = nn.Linear(6, self.hidden_nf)
-        self.embedding_out = torch.nn.ModuleDict()
-        for nt in node_types:
-            self.embedding_out[nt] = nn.Linear(self.hidden_nf + 3, out_node_nf)
+        self.single_embedding_in_out = single_embedding_in_out  # if True, use same embedding matrices for all node types
+        if single_embedding_in_out:
+            self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
+            self.embedding_out = nn.Linear(self.hidden_nf + 3, out_node_nf)
+        else:
+            self.embedding_in = torch.nn.ModuleDict()
+            for nt in node_types:
+                self.embedding_in[nt] = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
+            self.embedding_out = torch.nn.ModuleDict()
+            for nt in node_types:
+                self.embedding_out[nt] = nn.Linear(self.hidden_nf + 3, out_node_nf)
         self.layers = nn.ModuleDict()
         for edge_type in node_types:
             for edge_type_dst in node_types:
@@ -80,10 +85,13 @@ class HEGNN(nn.Module):
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
             h = h[:, 3:]
-        h1 = torch.zeros((h.shape[0], self.hidden_nf)).to(self.device)
-        for ht1 in [2, 3]:
-            h1[ht == ht1] = self.embedding_in[str(ht1)](h[ht == ht1])
-        h = h1
+        if not self.single_embedding_in_out:
+            h1 = torch.zeros((h.shape[0], self.hidden_nf)).to(self.device)
+            for ht1 in [2, 3]:
+                h1[ht == ht1] = self.embedding_in[str(ht1)](h[ht == ht1])
+            h = h1
+        else:
+            h = self.embedding_in(h)
         g.ndata["hh"] = h
         for i in range(len(self.layers["2-2"])):
             n = 0
@@ -106,10 +114,13 @@ class HEGNN(nn.Module):
 
             # the second step could be to do the knn again for each graph with the new coordinates
         h = torch.cat((g.ndata["hh"], g.ndata["x"]), dim=1)
-        h1 = torch.zeros((h.shape[0], 4)).to(self.device)
-        for ht1 in [2, 3]:
-            h1[ht == ht1, :] = self.embedding_out[str(ht1)](h[ht == ht1])
-        h = h1
+        if not self.single_embedding_in_out:
+            h1 = torch.zeros((h.shape[0], 4)).to(self.device)
+            for ht1 in [2, 3]:
+                h1[ht == ht1, :] = self.embedding_out[str(ht1)](h[ht == ht1])
+            h = h1
+        else:
+            h = self.embedding_out(h)
         g.ndata["hh"] = h
         return h
 
