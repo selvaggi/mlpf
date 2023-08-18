@@ -230,8 +230,10 @@ def to_hetero(g, all_hit_types=[2, 3]):
             edge_mask = hit_types[edges[0]] == i
             edge_mask = edge_mask & (hit_types[edges[1]] == j)
             graph_data[(str(i), "-", str(j))] = (edges[0][edge_mask], edges[1][edge_mask])
+    old_g = g
     g = dgl.heterograph(graph_data)
-    g.ndata["h"] = g.nodes()
+    g.nodes["2"].data = {key: old_g.ndata[key][ht_idx == 2] for key in old_g.ndata}
+    g.nodes["3"].data = {key: old_g.ndata[key][ht_idx == 3] for key in old_g.ndata}
     return g
 
 
