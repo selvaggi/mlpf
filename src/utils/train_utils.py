@@ -506,8 +506,8 @@ def optim(args, model, device):
             lr_step = round(args.num_epochs / 3)
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 opt,
-                milestones=[lr_step, 2 * lr_step],
-                gamma=0.1,
+                milestones=[10],  # [lr_step, 2 * lr_step],
+                gamma=0.20,
                 last_epoch=-1 if args.load_epoch is None else args.load_epoch,
             )
         elif args.lr_scheduler == "flat+decay":
@@ -581,10 +581,15 @@ def optim(args, model, device):
             scheduler._update_per_step = (
                 True  # mark it to update the lr every step, instead of every epoch
             )
-        elif args.lr_scheduler == "reduce_plateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, patience=2)
+        elif args.lr_scheduler == "reduceplateau":
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                opt, patience=2, threshold=0.01
+            )
+            # scheduler._update_per_step = (
+            #     True  # mark it to update the lr every step, instead of every epoch
+            # )
             scheduler._update_per_step = (
-                True  # mark it to update the lr every step, instead of every epoch
+                False  # mark it to update the lr every step, instead of every epoch
             )
     return opt, scheduler
 

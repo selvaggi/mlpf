@@ -168,25 +168,25 @@ def train_regression(
             count += num_examples
             total_loss += loss
 
-            tq.set_postfix(
-                {
-                    "lr": "%.2e" % scheduler.get_last_lr()[0]
-                    if scheduler
-                    else opt.defaults["lr"],
-                    "Loss": "%.5f" % loss,
-                    "AvgLoss": "%.5f" % (total_loss / num_batches),
-                }
-            )
-            if scheduler and getattr(scheduler, "_update_per_step", True):
+            # tq.set_postfix(
+            #     {
+            #         "lr": "%.2e" % scheduler.get_last_lr()[0]
+            #         if scheduler
+            #         else opt.defaults["lr"],
+            #         "Loss": "%.5f" % loss,
+            #         "AvgLoss": "%.5f" % (total_loss / num_batches),
+            #     }
+            # )
+            if scheduler and getattr(scheduler, "_update_per_step"):
                 if args.lr_scheduler == "reduceplateau":
-                    scheduler.step(total_loss / num_batches)  # loss
+                    scheduler.step(loss)  # loss
                 else:
                     scheduler.step()  # loss
-            if logwandb and local_rank == 0:
-                if args.lr_scheduler == "reduceplateau":
-                    wandb.log({"lr": opt.param_groups[0]["lr"]})
-                else:
-                    wandb.log({"lr": scheduler.get_last_lr()[0]})
+                if logwandb and local_rank == 0:
+                    if args.lr_scheduler == "reduceplateau":
+                        wandb.log({"lr": opt.param_groups[0]["lr"]})
+                    else:
+                        wandb.log({"lr": scheduler.get_last_lr()[0]})
 
             if tb_helper:
                 print("tb_helper!", tb_helper)
@@ -349,10 +349,10 @@ def train_regression(
                     )
             # update the batch state
             tb_helper.batch_train_count += num_batches
-
-        if scheduler and getattr(scheduler, "_update_per_step", False):
+        if scheduler and getattr(scheduler, "_update_per_step") == False:
             if args.lr_scheduler == "reduceplateau":
                 scheduler.step(total_loss / num_batches)  # loss
+                wandb.log({"total_loss batch": total_loss / num_batches})
             else:
                 scheduler.step()  # loss
             if logwandb and local_rank == 0:

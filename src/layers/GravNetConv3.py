@@ -65,7 +65,7 @@ class GravNetConv(MessagePassing):
         torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
-        self.norm = EdgeWeightNorm(norm="both")
+        self.norm = EdgeWeightNorm(norm="right")
         # self.reset_parameters()
 
     def reset_parameters(self):
@@ -85,7 +85,7 @@ class GravNetConv(MessagePassing):
             b = batch
         h_l: Tensor = self.lin_h(x)
         s_l: Tensor = self.lin_s(x)
-        s_l = s_l + original_coords
+        s_l = s_l  ##+ original_coords
 
         graph = knn_per_graph(g, s_l, self.k)
         graph.ndata["s_l"] = s_l
@@ -96,7 +96,9 @@ class GravNetConv(MessagePassing):
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
         edge_weight = edge_weight + 1e-5
         #! normalized edge weight
-        # edge_weight = self.norm(graph, edge_weight * 10)
+        # print("edge weight", edge_weight)
+        edge_weight = self.norm(graph, edge_weight)
+        # print("normalized edge weight", edge_weight)
         # edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
 
         #! AverageDistanceRegularizer
@@ -117,9 +119,12 @@ class GravNetConv(MessagePassing):
             .pow(2)
             .sum(-1)
         )
-        gndist = torch.sqrt(dit_orig + 1e-6)
-        # gndist = self.norm(graph, gndist)
-        loss_llregulariser = 5 * torch.mean(torch.square(dist - gndist))
+        # print("gndist", dit_orig * 100)
+        gndist = self.norm(graph, dit_orig)
+        # print("normalized gndist", gndist)
+        gndist = torch.sqrt(gndist + 1e-6)
+
+        loss_llregulariser = 0.1 * torch.mean(torch.square(dist - gndist))
         # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
 
