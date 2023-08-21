@@ -183,11 +183,11 @@ def main():
     _configLogger("weaver", stdout=stdout, filename=args.log)
 
     results = {}
-    for rad in [0.05, 0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25]:
-        results[rad] = _main(args, radius=rad, batches=1)
+    for rad in [0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
+        results[rad] = _main(args, radius=rad, batches=25)
         print(results[rad]["loss_e_fracs"])
     import pickle
-    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/hgcal_model/result_e_frac11.pkl", "wb") as f:
+    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/HEGNN_CORRECTED_250evt.pkl", "wb") as f:
         pickle.dump(results, f)
 main()
 
