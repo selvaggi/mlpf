@@ -621,7 +621,7 @@ def model_setup(args, data_config):
     if args.load_model_weights:
         print("Loading model state from %s" % args.load_model_weights)
         model_state = torch.load(args.load_model_weights, map_location="cpu")
-        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=True)
         _logger.info(
             "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
             % (args.load_model_weights, missing_keys, unexpected_keys)
