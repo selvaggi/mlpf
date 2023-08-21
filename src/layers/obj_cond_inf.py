@@ -7,7 +7,7 @@ import dgl
 
 
 def calc_energy_loss(
-    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1
+    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7
 ):
     list_graphs = dgl.unbatch(batch)
     node_counter = 0
@@ -31,17 +31,14 @@ def calc_energy_loss(
         betas = beta[node_counter : non + node_counter]
         sorted, indices = torch.sort(q_g, descending=False)
         selected_centers = indices[0:number_of_objects]
-        # if len((particle_id[selected_centers]).unique()) < number_of_objects:
-        #     print("there are two or more clusters for one GT object")
-        #     print("objects have ids:", particle_id[selected_centers])
-        #     print("there are", number_of_objects, "objects")
         X = cluster_space_coords[node_counter : non + node_counter]
-        clusterings = get_clustering(selected_centers, X, betas, td=0.7)
+        print("Radius", radius)
+        clusterings = get_clustering(selected_centers, X, betas, td=radius)
         clusterings = clusterings.to(g.device)
+        node_counter += non
         counter = 0
         frac_energy = []
         frac_energy_true = []
-        # for each clustering find the percentage of energy that has been assigned (this could contain particles from the wrong cluster)
         for alpha in indices:
             id_particle = particle_id[alpha]
             true_mask_particle = particle_id == id_particle
@@ -61,7 +58,6 @@ def calc_energy_loss(
         frac_energy_true = torch.mean(frac_energy_true)
         loss_E_frac.append(frac_energy)
         loss_E_frac_true.append(frac_energy_true)
-
     loss_E_frac = torch.mean(torch.stack(loss_E_frac, dim=0))
     loss_E_frac_true = torch.mean(torch.stack(loss_E_frac_true, dim=0))
     return loss_E_frac, loss_E_frac_true

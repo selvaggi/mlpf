@@ -91,7 +91,6 @@ def train_load(args):
     :param args:
     :return: train_loader, val_loader, data_config, train_inputs
     """
-
     train_file_dict, train_files = to_filelist(args, "train")
     if args.data_val:
         val_file_dict, val_files = to_filelist(args, "val")
@@ -625,8 +624,9 @@ def model_setup(args, data_config):
         data_config, dev=dev, **network_options
     )
     if args.load_model_weights:
+        print("Loading model state from %s" % args.load_model_weights)
         model_state = torch.load(args.load_model_weights, map_location="cpu")
-        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=True)
         _logger.info(
             "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
             % (args.load_model_weights, missing_keys, unexpected_keys)

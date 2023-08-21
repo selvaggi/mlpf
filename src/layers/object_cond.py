@@ -409,7 +409,7 @@ def calc_LV_Lbeta(
     L_clusters = torch.tensor(0.0).to(device)
     if frac_combinations != 0:
         L_clusters = L_clusters_calc(
-            batch, cluster_space_coords, cluster_index, frac_combinations
+            batch, cluster_space_coords, cluster_index, frac_combinations, q
         )
 
     # -------
@@ -1199,7 +1199,7 @@ def reincrementalize(y: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
     return reincrementalized
 
 
-def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combinations):
+def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combinations, q):
     number_of_pairs = 0
     for batch_id in batch.unique():
         # do all possible pairs...
@@ -1209,6 +1209,7 @@ def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combination
         neg_pairs_all = []
         if len(cluster_index[bmask].unique()) <= 1:
             continue
+        L_clusters = torch.tensor(0.0).to(q.device)
         for cluster in cluster_index[bmask].unique():
             coords_pos = clust_space_filt[cluster_index[bmask] == cluster]
             coords_neg = clust_space_filt[cluster_index[bmask] != cluster]

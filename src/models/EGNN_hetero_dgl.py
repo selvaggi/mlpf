@@ -11,10 +11,11 @@ from src.layers.object_cond import calc_LV_Lbeta
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
 
-class EGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False):
+class HEGNN(nn.Module):
+    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, single_embedding_in_out: bool = False):
         '''
         :param concat_global_exchange: Whether to concat "global" features to the node features.
+        :param single_embedding_in_out: Whether to use the same embedding matrices for all node types.
         '''
         super().__init__()
         in_node_nf = 6
@@ -35,16 +36,28 @@ class EGNN(nn.Module):
         self.n_layers = n_layers
         self.concat_global_exchange = concat_global_exchange
         if self.concat_global_exchange:
-            add_global_exchange = 3 * (in_node_nf+3)   # also add coords
+            add_global_exchange = 3 * (in_node_nf + 3)   # also add coords
         else:
             add_global_exchange = 0
-        self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
-        # self.embedding_in_coords = nn.Linear(6, self.hidden_nf)
-        self.embedding_out = nn.Linear(self.hidden_nf + 3, out_node_nf)
-        self.layers = nn.ModuleList()
+        node_types = ["2", "3"]
+        self.single_embedding_in_out = single_embedding_in_out  # if True, use same embedding matrices for all node types
+        if single_embedding_in_out:
+            self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
+            self.embedding_out = nn.Linear(self.hidden_nf + 3, out_node_nf)
+        else:
+            self.embedding_in = torch.nn.ModuleDict()
+            for nt in node_types:
+                self.embedding_in[nt] = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
+            self.embedding_out = torch.nn.ModuleDict()
+            for nt in node_types:
+                self.embedding_out[nt] = nn.Linear(self.hidden_nf + 3, out_node_nf)
+        self.layers = nn.ModuleDict()
+        for edge_type in node_types:
+            for edge_type_dst in node_types:
+                self.layers[edge_type + "-" + edge_type_dst] = nn.ModuleList()
         for i in range(0, n_layers):
-            self.layers.append(
-                E_GCL(
+            for key in self.layers.keys():
+                self.layers[key].append(E_GCL(
                     self.hidden_nf,
                     self.hidden_nf,
                     self.hidden_nf,
@@ -54,9 +67,7 @@ class EGNN(nn.Module):
                     attention=attention,
                     normalize=normalize,
                     tanh=tanh,
-                )
-            )
-
+                ))
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
             nn.Linear(22, 64),
             nn.Linear(64, 64),
@@ -64,24 +75,53 @@ class EGNN(nn.Module):
             nn.Softmax(dim=-1),
         )
 
-
     def forward(self, g):
         batch = obtain_batch_numbers(g.ndata["h"], g)
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
+        ht = g.ndata["hit_type"]
+        ht = torch.argmax(ht, dim=1)
         g.ndata["x"] = g.ndata["h"][:, 0:3]
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
             h = h[:, 3:]
-        h = self.embedding_in(h)  # NBx80
+        if not self.single_embedding_in_out:
+            h1 = torch.zeros((h.shape[0], self.hidden_nf)).to(self.device)
+            for ht1 in [2, 3]:
+                h1[ht == ht1] = self.embedding_in[str(ht1)](h[ht == ht1])
+            h = h1
+        else:
+            h = self.embedding_in(h)
         g.ndata["hh"] = h
-
-        for conv in self.layers:
-            g = conv(g)
+        for i in range(len(self.layers["2-2"])):
+            n = 0
+            for key in self.layers.keys():
+                # edges of g
+                edge_type, edge_type_dst = key.split("-")
+                edgelist = g.edges()
+                filt = ht[edgelist[0]] == int(edge_type)
+                filt_dst = ht[edgelist[1]] == int(edge_type_dst)
+                filt = filt & filt_dst
+                if torch.sum(filt) <= 0:
+                    continue
+                filt_edges = torch.nonzero(filt, as_tuple=False).squeeze()
+                subgraph = dgl.edge_subgraph(g, filt_edges, relabel_nodes=False)
+                g1 = self.layers[key][i](subgraph)
+                g.ndata["hh"] = g1.ndata["hh"] + g.ndata["hh"]
+                n += 1
+            g.ndata["hh"] = g.ndata["hh"] / n
             g = update_knn(g)
+
             # the second step could be to do the knn again for each graph with the new coordinates
         h = torch.cat((g.ndata["hh"], g.ndata["x"]), dim=1)
-        h = self.embedding_out(h)
+        if not self.single_embedding_in_out:
+            h1 = torch.zeros((h.shape[0], 4)).to(self.device)
+            for ht1 in [2, 3]:
+                h1[ht == ht1, :] = self.embedding_out[str(ht1)](h[ht == ht1])
+            h = h1
+        else:
+            h = self.embedding_out(h)
+        g.ndata["hh"] = h
         return h
 
     def object_condensation_loss2(
@@ -216,6 +256,57 @@ class EGNN(nn.Module):
             else:
                 return loss, a, 0, 0
         return loss, a, 0, 0
+
+
+class E_GCL_H(nn.Module):
+    """
+    E(n) Equivariant Convolutional Layer
+    Heterogeneous version
+    re
+    """
+
+    def __init__(
+        self,
+        input_nf,
+        output_nf,
+        hidden_nf,
+        edges_in_d=0,
+        act_fn=nn.SiLU(),
+        residual=True,
+        attention=False,
+        normalize=False,
+        coords_agg="mean",
+        tanh=False,
+    ):
+        super(E_GCL, self).__init__()
+        input_edge = input_nf * 2
+        self.residual = residual
+        self.attention = attention
+        self.normalize = normalize
+        self.coords_agg = coords_agg
+        self.tanh = tanh
+        self.epsilon = 1e-8
+        edge_coords_nf = 1
+
+        self.message = RelativePositionCordMessage(
+            input_nf,
+            output_nf,
+            hidden_nf,
+            residual=residual,
+            attention=attention,
+            normalize=normalize,
+            coords_agg=coords_agg,
+            tanh=tanh,
+        )
+
+        self.agg = Aggregationlayer(input_nf, hidden_nf, output_nf, residual)
+
+    def forward(self, g, edge_attr=None, node_attr=None):
+
+        g.update_all(self.message, self.agg)
+
+        return g
+
 
 
 class E_GCL(nn.Module):

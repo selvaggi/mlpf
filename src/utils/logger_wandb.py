@@ -252,7 +252,7 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
     wandb.log({name_10: tpr_10_percent, name_1: tpr_1_percent})
 
 
-def plot_clust(g, q, xj, title_prefix="", y=None):
+def plot_clust(g, q, xj, title_prefix="", y=None, radius=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
@@ -317,10 +317,19 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
                 c="r",
                 alpha=1.0,
             )
+            if radius != None:
+                ax[i, 0].add_artist(
+                    plt.Circle(
+                        (xj_graph[index_alpha, 0], xj_graph[index_alpha, 1]),
+                        radius=radius,
+                        color="r",
+                        fill=False,
+                    )
+                )
             pos = graph_eval.ndata["pos_hits_norm"]
             node_counter += non
     else:
-        fig, ax = plt.subplots(1, 2, figsize=(9, 28))
+        fig, ax = plt.subplots(1, 2, figsize=(9, 9))
         for i in range(len(graph_list)):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
@@ -368,6 +377,15 @@ def plot_clust(g, q, xj, title_prefix="", y=None):
                 c="r",
                 alpha=1.0,
             )
+            #if radius != None:
+            #    ax[0].add_artist(
+            #        plt.Circle(
+            #            (xj_graph[index_alpha, 0], xj_graph[index_alpha, 1]),
+            #            radius=radius,
+            #            color="r",
+            #            fill=False,
+            #        )
+            #    )
             pos = graph_eval.ndata["pos_hits_norm"]
             node_counter += non
     return fig, ax

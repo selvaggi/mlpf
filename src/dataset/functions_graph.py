@@ -217,6 +217,26 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     return [g, y_data_graph], False
 
 
+def to_hetero(g, all_hit_types=[2, 3]):
+    # Convert the dgl graph object to a heterograph
+    # We probably won't be using this
+    hit_types = g.ndata["hit_type"]
+    hit_types = torch.argmax(hit_types, dim=1)
+    ht_idx = [all_hit_types.index(i) for i in hit_types]
+    edges = g.edges()
+    graph_data = {}
+    for i in all_hit_types:
+        for j in all_hit_types:
+            edge_mask = hit_types[edges[0]] == i
+            edge_mask = edge_mask & (hit_types[edges[1]] == j)
+            graph_data[(str(i), "-", str(j))] = (edges[0][edge_mask], edges[1][edge_mask])
+    old_g = g
+    g = dgl.heterograph(graph_data)
+    g.nodes["2"].data = {key: old_g.ndata[key][ht_idx == 2] for key in old_g.ndata}
+    g.nodes["3"].data = {key: old_g.ndata[key][ht_idx == 3] for key in old_g.ndata}
+    return g
+
+
 def create_graph(output, config=None, n_noise=0):
     hits_only = config.graph_config.get(
         "only_hits", False

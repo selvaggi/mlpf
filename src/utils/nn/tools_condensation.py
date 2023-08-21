@@ -363,6 +363,90 @@ def train_regression(
     return step_count
 
 
+def inference_statistics(
+    model,
+    train_loader,
+    dev,
+    grad_scaler=None,
+    loss_terms=[],
+    args=None,
+    radius=0.7,
+    total_num_batches=10
+):
+    model.train()
+    clust_loss_only = loss_terms[0]
+    add_energy_loss = loss_terms[1]
+    num_batches = 0
+    loss_E_fracs = []
+    loss_E_fracs_true = []
+    betas_list = []
+    figs = []
+    with tqdm.tqdm(train_loader) as tq:
+        for batch_g, y in tq:
+            with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
+                batch_g = batch_g.to(dev)
+                if args.loss_regularization:
+                    model_output, loss_regularizing_neig, loss_ll = model(batch_g)
+                else:
+                    model_output = model(batch_g)
+                preds = model_output.squeeze()
+                (
+                    loss,
+                    losses,
+                    loss_E_frac,
+                    loss_E_frac_true,
+                ) = model.mod.object_condensation_loss2(
+                    batch_g,
+                    model_output,
+                    y,
+                    clust_loss_only=clust_loss_only,
+                    add_energy_loss=add_energy_loss,
+                    calc_e_frac_loss=True,
+                    q_min=args.qmin,
+                    frac_clustering_loss=args.frac_cluster_loss,
+                    attr_weight=args.L_attractive_weight,
+                    repul_weight=args.L_repulsive_weight,
+                    fill_loss_weight=args.fill_loss_weight,
+                    use_average_cc_pos=args.use_average_cc_pos,
+                    hgcalloss=args.hgcalloss,
+                    e_frac_loss_radius=radius
+                )
+                loss_E_fracs.append(loss_E_frac.detach().cpu().item())
+                loss_E_fracs_true.append(loss_E_frac_true.detach().cpu().item())
+                if clust_loss_only:
+                    clust_space_dim = model.mod.output_dim - 1
+                else:
+                    clust_space_dim = model.mod.output_dim - 28
+                xj = model_output[:, 0:clust_space_dim]
+                if model.mod.clust_space_norm == "twonorm":
+                    xj = torch.nn.functional.normalize(
+                        xj, dim=1
+                    )
+                elif model.mod.clust_space_norm == "tanh":
+                    xj = torch.tanh(xj)
+                elif model.mod.clust_space_norm == "none":
+                    pass
+                bj = torch.sigmoid(
+                        torch.reshape(model_output[:, clust_space_dim], [-1, 1])
+                )  # 3: betas
+                bj = bj.clip(0.0, 1 - 1e-4)
+                q = bj.arctanh() ** 2 + args.qmin
+                fig, ax = plot_clust(batch_g, q, xj,
+                                     title_prefix="loss_E_frac: " + str(loss_E_fracs[-1]) + "  | loss_E_frac_true: " + str(loss_E_fracs_true[-1]),
+                                     y=y, radius=radius)
+                betas = (
+                    torch.sigmoid(
+                        torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
+                    ).detach().cpu().numpy()
+                )
+                figs.append(fig)
+                betas_list.append(betas)
+            num_batches += 1
+            if num_batches >= total_num_batches:
+                break
+    return {"loss_e_fracs": loss_E_fracs, "loss_e_fracs_true": loss_E_fracs_true, "betas": betas_list}#, "figs": figs}
+
+
 def inference(model, test_loader, dev):
     """
     Similar to evaluate_regression, but without the ground truth labels.
