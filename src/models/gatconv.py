@@ -21,7 +21,7 @@ from torch_geometric.utils import (
     remove_self_loops,
     softmax,
 )
-from torch_geometric.utils.sparse import set_sparse_value
+#from  torch_sparse import set_sparse_value
 from src.models.EGNN_dgl import EGNN
 
 import torch
@@ -251,7 +251,8 @@ class GATConv(MessagePassing):
             if isinstance(edge_index, Tensor):
                 if is_torch_sparse_tensor(edge_index):
                     # TODO TorchScript requires to return a tuple
-                    adj = set_sparse_value(edge_index, alpha)
+                    # adj = set_sparse_value(edge_index, alpha)
+                    raise Exception("No support for sparse tensors now")
                     return out, (adj, alpha)
                 else:
                     return out, (edge_index, alpha)
