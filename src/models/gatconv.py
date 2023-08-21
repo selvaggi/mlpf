@@ -15,10 +15,8 @@ from torch_geometric.typing import (
     OptTensor,
     Size,
     SparseTensor,
-    torch_sparse,
 )
 from torch_geometric.utils import (
-    add_self_loops,
     is_torch_sparse_tensor,
     remove_self_loops,
     softmax,
