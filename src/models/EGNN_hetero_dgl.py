@@ -12,7 +12,7 @@ from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
 
 class HEGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, single_embedding_in_out: bool = True):
+    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, single_embedding_in_out: bool = False):
         '''
         :param concat_global_exchange: Whether to concat "global" features to the node features.
         :param single_embedding_in_out: Whether to use the same embedding matrices for all node types.
