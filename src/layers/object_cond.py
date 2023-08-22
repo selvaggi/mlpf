@@ -193,11 +193,10 @@ def calc_LV_Lbeta(
     - The norms for V_repulsive are now Gaussian (instead of linear hinge)
     """
     # remove dummy rows added for dataloader #TODO think of better way to do this
-
     device = beta.device
-
     assert_no_nans(beta)
     # ________________________________
+
     # Calculate a bunch of needed counts and indices locally
 
     # cluster_index: unique index over events

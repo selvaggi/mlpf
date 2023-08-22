@@ -7,7 +7,7 @@ import dgl
 
 
 def calc_energy_loss(
-    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7
+    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7, e_frac_loss_return_particles=False
 ):
     list_graphs = dgl.unbatch(batch)
     node_counter = 0
@@ -23,13 +23,14 @@ def calc_energy_loss(
 
     loss_E_frac = []
     loss_E_frac_true = []
+    particle_ids_all = []
     for g in list_graphs:
         particle_id = g.ndata["particle_number"]
         number_of_objects = len(particle_id.unique())
         non = g.number_of_nodes()
         q_g = q[node_counter : non + node_counter]
         betas = beta[node_counter : non + node_counter]
-        sorted, indices = torch.sort(q_g, descending=False)
+        sorted, indices = torch.sort(betas.view(-1), descending=False)
         selected_centers = indices[0:number_of_objects]
         X = cluster_space_coords[node_counter : non + node_counter]
         print("Radius", radius)
@@ -39,7 +40,8 @@ def calc_energy_loss(
         counter = 0
         frac_energy = []
         frac_energy_true = []
-        for alpha in indices:
+        particle_ids = []
+        for alpha in selected_centers:
             id_particle = particle_id[alpha]
             true_mask_particle = particle_id == id_particle
             true_energy = torch.sum(g.ndata["e_hits"][true_mask_particle])
@@ -52,12 +54,18 @@ def calc_energy_loss(
             )  # only consider how much has been correctly assigned
             frac_energy.append(clustered_energy / (true_energy + 1e-7))
             frac_energy_true.append(clustered_energy_true / (true_energy + 1e-7))
+            particle_ids.append(id_particle.cpu().long().item())
         frac_energy = torch.stack(frac_energy, dim=0)
-        frac_energy = torch.mean(frac_energy)
+        if not e_frac_loss_return_particles:
+            frac_energy = torch.mean(frac_energy)
         frac_energy_true = torch.stack(frac_energy_true, dim=0)
-        frac_energy_true = torch.mean(frac_energy_true)
+        if not e_frac_loss_return_particles:
+            frac_energy_true = torch.mean(frac_energy_true)
         loss_E_frac.append(frac_energy)
         loss_E_frac_true.append(frac_energy_true)
+        particle_ids_all.append(particle_ids)
+    if e_frac_loss_return_particles:
+        return loss_E_frac, [loss_E_frac_true, particle_ids_all]
     loss_E_frac = torch.mean(torch.stack(loss_E_frac, dim=0))
     loss_E_frac_true = torch.mean(torch.stack(loss_E_frac_true, dim=0))
     return loss_E_frac, loss_E_frac_true

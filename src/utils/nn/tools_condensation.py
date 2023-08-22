@@ -373,12 +373,14 @@ def inference_statistics(
     radius=0.7,
     total_num_batches=10
 ):
-    model.train()
+    model.eval()
     clust_loss_only = loss_terms[0]
     add_energy_loss = loss_terms[1]
     num_batches = 0
     loss_E_fracs = []
     loss_E_fracs_true = []
+    part_E_true = []
+    part_PID_true = []
     betas_list = []
     figs = []
     with tqdm.tqdm(train_loader) as tq:
@@ -402,6 +404,7 @@ def inference_statistics(
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
                     calc_e_frac_loss=True,
+                    e_frac_loss_return_particles=True,
                     q_min=args.qmin,
                     frac_clustering_loss=args.frac_cluster_loss,
                     attr_weight=args.L_attractive_weight,
@@ -411,8 +414,11 @@ def inference_statistics(
                     hgcalloss=args.hgcalloss,
                     e_frac_loss_radius=radius
                 )
-                loss_E_fracs.append(loss_E_frac.detach().cpu().item())
-                loss_E_fracs_true.append(loss_E_frac_true.detach().cpu().item())
+                loss_E_frac_true, particle_ids_all = loss_E_frac_true
+                loss_E_fracs.append([x.cpu() for x in loss_E_frac])
+                loss_E_fracs_true.append([x.cpu() for x in loss_E_frac_true])
+                part_PID_true.append([y[torch.tensor(pidall) - 1, 6].long() for pidall in particle_ids_all])
+                part_E_true.append([y[torch.tensor(pidall) - 1, 3] for pidall in particle_ids_all])
                 if clust_loss_only:
                     clust_space_dim = model.mod.output_dim - 1
                 else:
@@ -444,7 +450,16 @@ def inference_statistics(
             num_batches += 1
             if num_batches >= total_num_batches:
                 break
-    return {"loss_e_fracs": loss_E_fracs, "loss_e_fracs_true": loss_E_fracs_true, "betas": betas_list}#, "figs": figs}
+            # flatten the lists
+        loss_E_fracs = [item for sublist in loss_E_fracs for item in sublist]
+        loss_E_fracs = torch.concat(loss_E_fracs).flatten()
+        loss_E_fracs_true = [item for sublist in loss_E_fracs_true for item in sublist]
+        loss_E_fracs_true = torch.concat(loss_E_fracs_true).flatten()
+        part_E_true = [item for sublist in part_E_true for item in sublist]
+        part_E_true = torch.concat(part_E_true).flatten()
+        part_PID_true = [item for sublist in part_PID_true for item in sublist]
+        part_PID_true = torch.concat(part_PID_true).flatten()
+    return {"loss_e_fracs": loss_E_fracs, "loss_e_fracs_true": loss_E_fracs_true, "betas": betas_list, "part_E_true": part_E_true, "part_PID_true": part_PID_true}#, "figs": figs}
 
 
 def inference(model, test_loader, dev):

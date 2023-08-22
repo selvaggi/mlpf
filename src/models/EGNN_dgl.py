@@ -100,7 +100,8 @@ class EGNN(nn.Module):
         fill_loss_weight=1.0,
         use_average_cc_pos=0.0,
         hgcalloss=False,
-        e_frac_loss_radius=0.7
+        e_frac_loss_radius=0.7,
+        e_frac_loss_return_particles=False
     ):
         """
 
@@ -210,7 +211,7 @@ class EGNN(nn.Module):
         if clust_loss_only:
             if calc_e_frac_loss:
                 loss_e_frac, loss_e_frac_true = calc_energy_loss(
-                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius
+                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, e_frac_loss_return_particles=e_frac_loss_return_particles,
                 )
                 return loss, a, loss_e_frac, loss_e_frac_true
             else:
