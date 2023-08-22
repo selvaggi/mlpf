@@ -184,7 +184,7 @@ def main():
 
     results = {}
     for rad in [0.4]:
-        results[rad] = _main(args, radius=rad, batches=25)
+        results[rad] = _main(args, radius=rad, batches=75)
         #print(results[rad]["loss_e_fracs"])
     import pickle
     with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/temporary_22082023.pkl", "wb") as f:

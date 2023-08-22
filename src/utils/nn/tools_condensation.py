@@ -285,6 +285,7 @@ def train_regression(
                             epoch, num_batches
                         ),
                         y=y,
+                        betas=bj
                     )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()

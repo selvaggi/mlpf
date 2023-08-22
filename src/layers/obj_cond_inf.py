@@ -27,6 +27,7 @@ def calc_energy_loss(
     for g in list_graphs:
         particle_id = g.ndata["particle_number"]
         number_of_objects = len(particle_id.unique())
+        print("No. of objects", number_of_objects)
         non = g.number_of_nodes()
         q_g = q[node_counter : non + node_counter]
         betas = beta[node_counter : non + node_counter]

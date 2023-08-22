@@ -7,6 +7,8 @@ import dgl
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from torch_scatter import scatter_max
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 
 
 def log_wandb_init(args, data_config={}):
@@ -252,11 +254,11 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
     wandb.log({name_10: tpr_10_percent, name_1: tpr_1_percent})
 
 
-def plot_clust(g, q, xj, title_prefix="", y=None, radius=None):
+def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(12, 5, figsize=(20, 40))
+        fig, ax = plt.subplots(12, 8, figsize=(27, 40))
         for i in range(0, min(12, len(graph_list))):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
@@ -267,6 +269,8 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None):
             #    print("skipping one, only plotting events with 2 particles")
             #    continue
             q_graph = q[node_counter : node_counter + non].flatten()
+            if betas != None:
+                beta_graph = betas[node_counter : node_counter + non].flatten()
             hit_type = torch.argmax(graph_eval.ndata["hit_type"], dim=1).view(-1)
             part_num = graph_eval.ndata["particle_number"].view(-1).to(torch.long)
             q_alpha, index_alpha = scatter_max(
@@ -291,6 +295,24 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None):
             ax[i, 3].set_title("x and y of hits colored by log10 energy")
             ax[i, 4].scatter(xhits, yhits, c=hittype.tolist(), alpha=0.2)
             ax[i, 4].set_title("x and y of hits colored by hit type (ecal/hcal)")
+            if betas != None:
+                ax[i, 5].scatter(xhits, yhits, c=beta_graph.detach().cpu(), alpha=0.2)
+                ax[i, 5].set_title("hits coloored by beta")
+                fig.colorbar(
+                    ScalarMappable(norm=Normalize(vmin=0, vmax=1)), ax=ax[i, 5]
+                ).set_label("beta")
+                ax[i, 6].hist(beta_graph.detach().cpu(), bins=100, range=(0, 1))
+                ax[i, 6].set_title("beta distr.")
+                fig.colorbar(
+                    ScalarMappable(norm=Normalize(vmin=0.5, vmax=1)), ax=ax[i, 7]
+                ).set_label("beta > 0.5")
+                ax[i, 7].scatter(
+                    xhits[beta_graph > 0.5],
+                    yhits[beta_graph > 0.5],
+                    c=beta_graph[beta_graph > 0.5].detach().cpu(),
+                    alpha=0.2,
+                )
+                ax[i, 7].set_title("hits with beta > 0.5")
             ax[i, 0].set_title(
                 title_prefix
                 + " "
