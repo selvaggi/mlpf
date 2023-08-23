@@ -7,7 +7,7 @@ import dgl
 
 
 def calc_energy_loss(
-    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7, e_frac_loss_return_particles=False
+    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7, e_frac_loss_return_particles=False, y=None, select_centers_by_particle=True
 ):
     list_graphs = dgl.unbatch(batch)
     node_counter = 0
@@ -24,6 +24,9 @@ def calc_energy_loss(
     loss_E_frac = []
     loss_E_frac_true = []
     particle_ids_all = []
+    reco_count = {}  # per-PID count
+    non_reco_count = {}
+    total_count = {}
     for g in list_graphs:
         particle_id = g.ndata["particle_number"]
         number_of_objects = len(particle_id.unique())
@@ -33,6 +36,29 @@ def calc_energy_loss(
         betas = beta[node_counter : non + node_counter]
         sorted, indices = torch.sort(betas.view(-1), descending=False)
         selected_centers = indices[0:number_of_objects]
+        if select_centers_by_particle:
+            selected_centers = scatter_max(betas.flatten(), particle_id.long(), dim=0)[1].flatten()[1:]
+            assert selected_centers.shape[0] == number_of_objects
+        all_particles = set((particle_id.unique()-1).long().tolist())
+        reco_particles = set((particle_id[selected_centers]-1).long().tolist())
+        non_reco_particles = all_particles - reco_particles
+        part_pids = y[:, 6].long()
+        for particle in all_particles:
+            curr_pid = part_pids[particle].item()
+            if curr_pid in total_count:
+                total_count[curr_pid] += 1
+            else:
+                total_count[curr_pid] = 1
+            if particle in reco_particles:
+                if curr_pid in reco_count:
+                    reco_count[curr_pid] += 1
+                else:
+                    reco_count[curr_pid] = 1
+            else:
+                if curr_pid in non_reco_count:
+                    non_reco_count[curr_pid] += 1
+                else:
+                    non_reco_count[curr_pid] = 1
         X = cluster_space_coords[node_counter : non + node_counter]
         print("Radius", radius)
         clusterings = get_clustering(selected_centers, X, betas, td=radius)
@@ -66,7 +92,7 @@ def calc_energy_loss(
         loss_E_frac_true.append(frac_energy_true)
         particle_ids_all.append(particle_ids)
     if e_frac_loss_return_particles:
-        return loss_E_frac, [loss_E_frac_true, particle_ids_all]
+        return loss_E_frac, [loss_E_frac_true, particle_ids_all, reco_count, non_reco_count, total_count]
     loss_E_frac = torch.mean(torch.stack(loss_E_frac, dim=0))
     loss_E_frac_true = torch.mean(torch.stack(loss_E_frac_true, dim=0))
     return loss_E_frac, loss_E_frac_true

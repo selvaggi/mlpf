@@ -363,6 +363,12 @@ def train_regression(
                     wandb.log({"lr": scheduler.get_last_lr()[0]})
     return step_count
 
+def update_dict(dict1, dict2):
+    for key in dict2:
+        if key not in dict1:
+            dict1[key] = 0.
+        dict1[key] += dict2[key]
+    return dict1
 
 def inference_statistics(
     model,
@@ -384,6 +390,8 @@ def inference_statistics(
     part_PID_true = []
     betas_list = []
     figs = []
+    reco_counts, non_reco_counts = {}, {}
+    total_counts = {}
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
@@ -415,7 +423,12 @@ def inference_statistics(
                     hgcalloss=args.hgcalloss,
                     e_frac_loss_radius=radius
                 )
-                loss_E_frac_true, particle_ids_all = loss_E_frac_true
+                loss_E_frac_true, particle_ids_all, reco_count, non_reco_count, total_count = loss_E_frac_true
+                update_dict(reco_counts, reco_count)
+                update_dict(total_counts, total_count)
+                if len(reco_count):
+                    assert len(reco_counts) >= len(reco_count)
+                update_dict(non_reco_counts, non_reco_count)
                 loss_E_fracs.append([x.cpu() for x in loss_E_frac])
                 loss_E_fracs_true.append([x.cpu() for x in loss_E_frac_true])
                 part_PID_true.append([y[torch.tensor(pidall) - 1, 6].long() for pidall in particle_ids_all])
@@ -460,7 +473,16 @@ def inference_statistics(
         part_E_true = torch.concat(part_E_true).flatten()
         part_PID_true = [item for sublist in part_PID_true for item in sublist]
         part_PID_true = torch.concat(part_PID_true).flatten()
-    return {"loss_e_fracs": loss_E_fracs, "loss_e_fracs_true": loss_E_fracs_true, "betas": betas_list, "part_E_true": part_E_true, "part_PID_true": part_PID_true}#, "figs": figs}
+    return {
+        "loss_e_fracs": loss_E_fracs,
+        "loss_e_fracs_true": loss_E_fracs_true,
+        "betas": betas_list,
+        "part_E_true": part_E_true,
+        "part_PID_true": part_PID_true,
+        "reco_counts": reco_counts,
+        "non_reco_counts": non_reco_counts,
+        "total_counts": total_counts
+    }
 
 
 def inference(model, test_loader, dev):

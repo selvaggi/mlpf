@@ -211,7 +211,7 @@ class EGNN(nn.Module):
         if clust_loss_only:
             if calc_e_frac_loss:
                 loss_e_frac, loss_e_frac_true = calc_energy_loss(
-                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, e_frac_loss_return_particles=e_frac_loss_return_particles,
+                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, e_frac_loss_return_particles=e_frac_loss_return_particles, y=y
                 )
                 return loss, a, loss_e_frac, loss_e_frac_true
             else:

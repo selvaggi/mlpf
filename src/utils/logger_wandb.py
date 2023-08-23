@@ -306,11 +306,20 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None):
                 fig.colorbar(
                     ScalarMappable(norm=Normalize(vmin=0.5, vmax=1)), ax=ax[i, 7]
                 ).set_label("beta > 0.5")
+                no_objects = len(np.unique(part_num.cpu()))
                 ax[i, 7].scatter(
-                    xhits[beta_graph > 0.5],
-                    yhits[beta_graph > 0.5],
-                    c=beta_graph[beta_graph > 0.5].detach().cpu(),
-                    alpha=0.2,
+                    xj_graph[:, 0][beta_graph.detach().cpu() > 0.5],
+                    xj_graph[:, 1][beta_graph.detach().cpu() > 0.5],
+                    c=beta_graph[beta_graph.detach().cpu() > 0.5].detach().cpu(),
+                    alpha=0.2
+                )
+                # plot no_objects highest betas
+                index_highest = np.argsort(beta_graph.detach().cpu())[-no_objects:]
+                ax[i, 7].scatter(
+                    xj_graph[:, 0][index_highest],
+                    xj_graph[:, 1][index_highest],
+                    marker="*",
+                    c="red"
                 )
                 ax[i, 7].set_title("hits with beta > 0.5")
             ax[i, 0].set_title(
