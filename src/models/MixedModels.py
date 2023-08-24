@@ -101,22 +101,23 @@ class Mixed_EGNN(nn.Module):
         return h
 
     def object_condensation_loss2(
-        self,
-        batch,
-        pred,
-        y,
-        return_resolution=False,
-        clust_loss_only=True,
-        add_energy_loss=False,
-        calc_e_frac_loss=False,
-        q_min=0.1,
-        frac_clustering_loss=0.1,
-        attr_weight=1.0,
-        repul_weight=1.0,
-        fill_loss_weight=1.0,
-        use_average_cc_pos=0.0,
-        hgcalloss=False,
-        e_frac_loss_radius=0.7
+            self,
+            batch,
+            pred,
+            y,
+            return_resolution=False,
+            clust_loss_only=True,
+            add_energy_loss=False,
+            calc_e_frac_loss=False,
+            q_min=0.1,
+            frac_clustering_loss=0.1,
+            attr_weight=1.0,
+            repul_weight=1.0,
+            fill_loss_weight=1.0,
+            use_average_cc_pos=0.0,
+            hgcalloss=False,
+            e_frac_loss_radius=0.7,
+            e_frac_loss_return_particles=False
     ):
         """
 
@@ -160,7 +161,7 @@ class Mixed_EGNN(nn.Module):
             )
         else:
             distance_threshold = torch.reshape(
-                pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
+                pred[:, 1 + clust_space_dim: 4 + clust_space_dim], [-1, 3]
             )  # 4, 5, 6: distance thresholds
             energy_correction = torch.nn.functional.relu(
                 torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
@@ -169,8 +170,8 @@ class Mixed_EGNN(nn.Module):
                 torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
             )
             pid_predicted = pred[
-                :, 5 + clust_space_dim : 27 + clust_space_dim
-            ]  # 8:30: predicted particle one-hot encoding
+                            :, 5 + clust_space_dim: 27 + clust_space_dim
+                            ]  # 8:30: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -213,20 +214,21 @@ class Mixed_EGNN(nn.Module):
                 loss += a[2]  # TODO add weight as argument
         else:
             loss = (
-                a[0]
-                + a[1]
-                + 20 * a[2]
-                + 0.001 * a[3]
-                + 0.001 * a[4]
-                + 0.001
-                * a[
-                    5
-                ]  # TODO: the last term is the PID classification loss, explore this yet
+                    a[0]
+                    + a[1]
+                    + 20 * a[2]
+                    + 0.001 * a[3]
+                    + 0.001 * a[4]
+                    + 0.001
+                    * a[
+                        5
+                    ]  # TODO: the last term is the PID classification loss, explore this yet
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
             if calc_e_frac_loss:
                 loss_e_frac, loss_e_frac_true = calc_energy_loss(
-                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius
+                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y,
+                    e_frac_loss_return_particles=e_frac_loss_return_particles
                 )
                 return loss, a, loss_e_frac, loss_e_frac_true
             else:
