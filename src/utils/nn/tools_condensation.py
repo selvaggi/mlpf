@@ -373,6 +373,42 @@ def update_dict(dict1, dict2):
         dict1[key] += dict2[key]
     return dict1
 
+def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
+    bins = np.linspace(0, 200, bins+1)
+    theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
+    wmin = 0.2
+    wmax = 1.0
+    epsilon = 0.01
+    point = wmin
+    weight = 0.0
+    points = []
+    sums = []
+    # fill list of bin centers and the integral up to those point
+    for i in range(len(bin_edges) - 1):
+        weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
+        points.append([(bin_edges[i + 1] + bin_edges[i]) / 2, weight])
+        sums.append(weight)
+
+    low = wmin
+    high = wmax
+    width = 100
+    for i in range(len(points)):
+        for j in range(i, len(points)):
+            wy = points[j][1] - points[i][1]
+            # print(wy)
+            if abs(wy - percentage) < epsilon:
+                # print("here")
+                wx = points[j][0] - points[i][0]
+                if wx < width:
+                    low = points[i][0]
+                    high = points[j][0]
+                    # print(points[j][0], points[i][0], wy, wx)
+                    width = wx
+                    ii = i
+                    jj = j
+    # print(low, high)
+    return 0.5 * (high - low), low, high
+
 def inference_statistics(
     model,
     train_loader,
