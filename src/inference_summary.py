@@ -60,12 +60,10 @@ def _main(args, radius=0.6, batches=15):
         gpus = None
         local_rank = 0
         dev = torch.device("cpu")
-
     model, model_info, loss_func = model_setup(args, data_config)
     from src.utils.train_utils import count_parameters
     num_parameters_counted = count_parameters(model)
     print(num_parameters_counted)
-
     orig_model = model
     training_mode = not args.predict
     if args.log_wandb and local_rank == 0:
@@ -111,7 +109,8 @@ def _main(args, radius=0.6, batches=15):
         loss_terms=[args.clustering_loss_only, add_energy_loss],
         args=args,
         radius=radius,
-        total_num_batches=batches
+        total_num_batches=batches,
+        save_ckpt_to_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/23_08_larger_DS_known_particle_ckpts"
     )
 
     return result
@@ -184,10 +183,10 @@ def main():
 
     results = {}
     for rad in [0.4]:
-        results[rad] = _main(args, radius=rad, batches=50)
+        results[rad] = _main(args, radius=rad, batches=99999999999)
         #print(results[rad]["loss_e_fracs"])
     import pickle
-    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/temporary_22082023_with_reco_count_known_particles1.pkl", "wb") as f:
+    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/23_08_larger_DS_known_particles_partial_results.pkl", "wb") as f:
         pickle.dump(results, f)
 main()
 

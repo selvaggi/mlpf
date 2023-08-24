@@ -9,6 +9,7 @@ import dgl
 def calc_energy_loss(
     batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7, e_frac_loss_return_particles=False, y=None, select_centers_by_particle=True
 ):
+    # select_centers_by_particle: if True, we pretend we know which hits belong to which particle...
     list_graphs = dgl.unbatch(batch)
     node_counter = 0
     if beta_stabilizing == "paper":
@@ -20,7 +21,6 @@ def calc_energy_loss(
         q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
     else:
         raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
-
     loss_E_frac = []
     loss_E_frac_true = []
     particle_ids_all = []
@@ -37,7 +37,9 @@ def calc_energy_loss(
         sorted, indices = torch.sort(betas.view(-1), descending=False)
         selected_centers = indices[0:number_of_objects]
         if select_centers_by_particle:
-            selected_centers = scatter_max(betas.flatten(), particle_id.long(), dim=0)[1].flatten()[1:]
+            _, selected_centers = scatter_max(
+                betas.flatten().cpu(), particle_id.cpu().long() - 1
+            )
             assert selected_centers.shape[0] == number_of_objects
         all_particles = set((particle_id.unique()-1).long().tolist())
         reco_particles = set((particle_id[selected_centers]-1).long().tolist())
@@ -79,6 +81,7 @@ def calc_energy_loss(
                     mask_clustering_particle * true_mask_particle.flatten()
                 ]
             )  # only consider how much has been correctly assigned
+            counter += 1
             frac_energy.append(clustered_energy / (true_energy + 1e-7))
             frac_energy_true.append(clustered_energy_true / (true_energy + 1e-7))
             particle_ids.append(id_particle.cpu().long().item())

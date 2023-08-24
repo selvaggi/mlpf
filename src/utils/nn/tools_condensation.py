@@ -11,6 +11,9 @@ import wandb
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
+from pathlib import Path
+import os
+import pickle
 
 
 from src.layers.object_cond import (
@@ -378,7 +381,8 @@ def inference_statistics(
     loss_terms=[],
     args=None,
     radius=0.7,
-    total_num_batches=10
+    total_num_batches=10,
+    save_ckpt_to_folder=None,
 ):
     model.eval()
     clust_loss_only = loss_terms[0]
@@ -462,9 +466,33 @@ def inference_statistics(
                 figs.append(fig)
                 betas_list.append(betas)
             num_batches += 1
+            if num_batches % 5 == 0 and save_ckpt_to_folder is not None:
+                Path(save_ckpt_to_folder).mkdir(parents=True, exist_ok=True)
+                loss_E_fracs_fold = [item for sublist in loss_E_fracs for item in sublist]
+                loss_E_fracs_fold = torch.concat(loss_E_fracs_fold).flatten()
+                loss_E_fracs_true_fold = [item for sublist in loss_E_fracs_true for item in sublist]
+                loss_E_fracs_true_fold = torch.concat(loss_E_fracs_true_fold).flatten()
+                part_E_true_fold = [item for sublist in part_E_true for item in sublist]
+                part_E_true_fold = torch.concat(part_E_true_fold).flatten()
+                part_PID_true_fold = [item for sublist in part_PID_true for item in sublist]
+                part_PID_true_fold = torch.concat(part_PID_true_fold).flatten()
+                obj = {
+                    "loss_e_fracs": loss_E_fracs_fold,
+                    "loss_e_fracs_true": loss_E_fracs_true_fold,
+                    "part_E_true": part_E_true_fold,
+                    "part_PID_true": part_PID_true_fold,
+                    "reco_counts": reco_counts,
+                    "non_reco_counts": non_reco_counts,
+                    "total_counts": total_counts
+                }
+                file_to_save = os.path.join(save_ckpt_to_folder, "temp_ckpt" + ".pkl")
+                with open(file_to_save, "wb") as f:
+                    pickle.dump(obj, f)
             if num_batches >= total_num_batches:
                 break
             # flatten the lists
+        if save_ckpt_to_folder is not None:
+            return
         loss_E_fracs = [item for sublist in loss_E_fracs for item in sublist]
         loss_E_fracs = torch.concat(loss_E_fracs).flatten()
         loss_E_fracs_true = [item for sublist in loss_E_fracs_true for item in sublist]
