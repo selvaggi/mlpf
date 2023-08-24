@@ -92,7 +92,7 @@ class Mixed_EGNN(nn.Module):
 
         for i, conv in enumerate(self.layers):
             g = conv(g)
-            g.ndata["hh_local"] = g.ndata["hh_local"] + self.local_layers[i](h_local, g.edges())
+            g.ndata["hh_local"] = g.ndata["hh_local"] + self.local_layers[i](h_local, torch.tensor(g.edges()))
             # g = self.local_layers[i](g, g.ndata["hh"])
             g = update_knn(g)
             # the second step could be to do the knn again for each graph with the new coordinates
