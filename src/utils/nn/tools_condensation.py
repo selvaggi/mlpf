@@ -472,7 +472,7 @@ def inference_statistics(
                 update_dict(reco_counts, reco_count_nopart)
                 update_dict(total_counts, total_count_nopart)
                 if len(reco_count):
-                    assert len(reco_counts) >= len(reco_count)
+                    assert len(reco_counts) >= len(reco_count_nopart)
                 update_dict(non_reco_counts, non_reco_count_nopart)
                 loss_E_fracs.append([x.cpu() for x in loss_E_frac])
                 loss_E_fracs_true.append([x.cpu() for x in loss_E_frac_true])
