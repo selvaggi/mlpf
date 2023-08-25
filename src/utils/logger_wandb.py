@@ -254,11 +254,11 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
     wandb.log({name_10: tpr_10_percent, name_1: tpr_1_percent})
 
 
-def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None):
+def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None, loss_e_frac=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
     if len(graph_list) > 1:
-        fig, ax = plt.subplots(12, 8, figsize=(27, 40))
+        fig, ax = plt.subplots(12, 9, figsize=(33, 40))
         for i in range(0, min(12, len(graph_list))):
             graph_eval = graph_list[i]
             # print([g.num_nodes() for g in graph_list])
@@ -322,6 +322,25 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None):
                     c="red"
                 )
                 ax[i, 7].set_title("hits with beta > 0.5")
+                ax[i, 8].set_title("hits of particles that have a low loss_e_frac")
+                if loss_e_frac is not None:
+                    low_filter = torch.nonzero(loss_e_frac < 0.02).flatten()[0]
+                    particle_number_low = part_num[low_filter]
+                    # filter to particle numbers contained in particle_number_low
+                    low_filter = torch.nonzero(part_num == particle_number_low[0]).flatten()
+                    ax[i, 8].scatter(
+                        xj_graph[:, 0][low_filter],
+                        xj_graph[:, 1][low_filter],
+                        c=beta_graph[low_filter].detach().cpu(),
+                        alpha=0.2
+                    )
+                    ax[i, 8].scatter(
+                        xj_graph[index_alpha, 0],
+                        xj_graph[index_alpha, 1],
+                        marker="*",
+                        c="r",
+                        alpha=1.0,
+                    )
             ax[i, 0].set_title(
                 title_prefix
                 + " "

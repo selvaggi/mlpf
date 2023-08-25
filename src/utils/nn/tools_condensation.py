@@ -493,7 +493,7 @@ def inference_statistics(
                 q = bj.arctanh() ** 2 + args.qmin
                 fig, ax = plot_clust(batch_g, q, xj,
                                      title_prefix="loss_E_frac: " + str(loss_E_fracs[-1]) + "  | loss_E_frac_true: " + str(loss_E_fracs_true[-1]),
-                                     y=y, radius=radius)
+                                     y=y, radius=radius, loss_e_frac=loss_E_fracs[-1])
                 betas = (
                     torch.sigmoid(
                         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
