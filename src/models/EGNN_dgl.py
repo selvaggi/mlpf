@@ -104,7 +104,6 @@ class EGNN(nn.Module):
             e_frac_loss_return_particles=False
     ):
         """
-
         :param batch:
         :param pred:
         :param y:
@@ -211,8 +210,14 @@ class EGNN(nn.Module):
         if clust_loss_only:
             if calc_e_frac_loss:
                 loss_e_frac, loss_e_frac_true = calc_energy_loss(
-                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y, e_frac_loss_return_particles=e_frac_loss_return_particles
+                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y, e_frac_loss_return_particles=e_frac_loss_return_particles, select_centers_by_particle=True
                 )
+                if e_frac_loss_return_particles:
+                    loss_e_frac_nopart, loss_e_frac_true_nopart = calc_energy_loss(
+                        batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y,
+                        e_frac_loss_return_particles=e_frac_loss_return_particles, select_centers_by_particle=False
+                    )
+                    return loss, a, loss_e_frac, loss_e_frac_true, loss_e_frac_nopart, loss_e_frac_true_nopart
                 return loss, a, loss_e_frac, loss_e_frac_true
             else:
                 return loss, a, 0, 0

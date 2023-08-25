@@ -426,6 +426,8 @@ def inference_statistics(
     num_batches = 0
     loss_E_fracs = []
     loss_E_fracs_true = []
+    loss_E_fracs_true_nopart = []
+    loss_E_fracs_nopart = []
     part_E_true = []
     part_PID_true = []
     betas_list = []
@@ -446,6 +448,8 @@ def inference_statistics(
                     losses,
                     loss_E_frac,
                     loss_E_frac_true,
+                    loss_E_frac_nopart,
+                    loss_E_frac_true_nopart,
                 ) = model.mod.object_condensation_loss2(
                     batch_g,
                     model_output,
@@ -464,13 +468,16 @@ def inference_statistics(
                     e_frac_loss_radius=radius
                 )
                 loss_E_frac_true, particle_ids_all, reco_count, non_reco_count, total_count = loss_E_frac_true
-                update_dict(reco_counts, reco_count)
-                update_dict(total_counts, total_count)
+                loss_E_frac_true_nopart, particle_ids_all_nopart, reco_count_nopart, non_reco_count_nopart, total_count_nopart = loss_E_frac_true_nopart
+                update_dict(reco_counts, reco_count_nopart)
+                update_dict(total_counts, total_count_nopart)
                 if len(reco_count):
                     assert len(reco_counts) >= len(reco_count)
-                update_dict(non_reco_counts, non_reco_count)
+                update_dict(non_reco_counts, non_reco_count_nopart)
                 loss_E_fracs.append([x.cpu() for x in loss_E_frac])
                 loss_E_fracs_true.append([x.cpu() for x in loss_E_frac_true])
+                loss_E_fracs_true_nopart.append([x.cpu() for x in loss_E_frac_true_nopart])
+                loss_E_fracs_nopart.append([x.cpu() for x in loss_E_frac_nopart])
                 part_PID_true.append([y[torch.tensor(pidall) - 1, 6].long() for pidall in particle_ids_all])
                 part_E_true.append([y[torch.tensor(pidall) - 1, 3] for pidall in particle_ids_all])
                 if clust_loss_only:
@@ -512,14 +519,18 @@ def inference_statistics(
                 part_E_true_fold = torch.concat(part_E_true_fold).flatten()
                 part_PID_true_fold = [item for sublist in part_PID_true for item in sublist]
                 part_PID_true_fold = torch.concat(part_PID_true_fold).flatten()
+                loss_E_fracs_nopart_fold = [item for sublist in loss_E_fracs_nopart for item in sublist]
+                loss_E_fracs_true_nopart_fold = [item for sublist in loss_E_fracs_true_nopart for item in sublist]
                 obj = {
+                    "loss_e_fracs_nopart": loss_E_fracs_nopart_fold,
+                    "loss_e_fracs_true_nopart": loss_E_fracs_true_nopart_fold,
                     "loss_e_fracs": loss_E_fracs_fold,
                     "loss_e_fracs_true": loss_E_fracs_true_fold,
                     "part_E_true": part_E_true_fold,
                     "part_PID_true": part_PID_true_fold,
                     "reco_counts": reco_counts,
                     "non_reco_counts": non_reco_counts,
-                    "total_counts": total_counts
+                    "total_counts": total_counts,
                 }
                 file_to_save = os.path.join(save_ckpt_to_folder, "temp_ckpt" + ".pkl")
                 with open(file_to_save, "wb") as f:
@@ -537,9 +548,14 @@ def inference_statistics(
         part_E_true = torch.concat(part_E_true).flatten()
         part_PID_true = [item for sublist in part_PID_true for item in sublist]
         part_PID_true = torch.concat(part_PID_true).flatten()
+        loss_E_fracs_nopart = [item for sublist in loss_E_fracs_nopart for item in sublist]
+        loss_E_fracs_true_nopart = [item for sublist in loss_E_fracs_true_nopart for item in sublist]
+
     return {
         "loss_e_fracs": loss_E_fracs,
         "loss_e_fracs_true": loss_E_fracs_true,
+        "loss_e_fracs_nopart": loss_E_fracs_nopart,
+        "loss_e_fracs_true_nopart": loss_E_fracs_true_nopart,
         "betas": betas_list,
         "part_E_true": part_E_true,
         "part_PID_true": part_PID_true,
