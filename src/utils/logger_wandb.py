@@ -257,185 +257,124 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
 def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None, loss_e_frac=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
-    if len(graph_list) > 1:
-        fig, ax = plt.subplots(12, 9, figsize=(33, 40))
-        for i in range(0, min(12, len(graph_list))):
-            graph_eval = graph_list[i]
-            # print([g.num_nodes() for g in graph_list])
-            non = graph_eval.number_of_nodes()
-            assert non == graph_eval.ndata["h"].shape[0]
-            particle_number = graph_eval.ndata["particle_number"]
-            # if particle_number.max() > 1:
-            #    print("skipping one, only plotting events with 2 particles")
-            #    continue
-            q_graph = q[node_counter : node_counter + non].flatten()
-            if betas != None:
-                beta_graph = betas[node_counter : node_counter + non].flatten()
-            hit_type = torch.argmax(graph_eval.ndata["hit_type"], dim=1).view(-1)
-            part_num = graph_eval.ndata["particle_number"].view(-1).to(torch.long)
-            q_alpha, index_alpha = scatter_max(
-                q_graph.cpu().view(-1), part_num.cpu() - 1
+    fig, ax = plt.subplots(12, 9, figsize=(33, 40))
+    for i in range(0, min(12, len(graph_list))):
+        graph_eval = graph_list[i]
+        # print([g.num_nodes() for g in graph_list])
+        non = graph_eval.number_of_nodes()
+        assert non == graph_eval.ndata["h"].shape[0]
+        particle_number = graph_eval.ndata["particle_number"]
+        # if particle_number.max() > 1:
+        #    print("skipping one, only plotting events with 2 particles")
+        #    continue
+        q_graph = q[node_counter : node_counter + non].flatten()
+        if betas != None:
+            beta_graph = betas[node_counter : node_counter + non].flatten()
+        hit_type = torch.argmax(graph_eval.ndata["hit_type"], dim=1).view(-1)
+        part_num = graph_eval.ndata["particle_number"].view(-1).to(torch.long)
+        q_alpha, index_alpha = scatter_max(
+            q_graph.cpu().view(-1), part_num.cpu() - 1
+        )
+        # print(part_num.unique())
+        xj_graph = xj[node_counter : node_counter + non, :].detach().cpu()
+        if len(index_alpha) == 1:
+            index_alpha = index_alpha.item()
+        clr = graph_eval.ndata["particle_number"]
+        ax[i, 2].set_title("x and y of hits")
+        xhits, yhits = (
+            graph_eval.ndata["h"][:, 0].detach().cpu(),
+            graph_eval.ndata["h"][:, 1].detach().cpu(),
+        )
+        hittype = torch.argmax(graph_eval.ndata["h"][:, [3, 4, 5, 6]], dim=1).view(
+            -1
+        )
+        clr_energy = torch.log10(graph_eval.ndata["h"][:, 7].detach().cpu())
+        ax[i, 2].scatter(xhits, yhits, c=clr.tolist(), alpha=0.2)
+        ax[i, 3].scatter(xhits, yhits, c=clr_energy.tolist(), alpha=0.2)
+        ax[i, 3].set_title("x and y of hits colored by log10 energy")
+        ax[i, 4].scatter(xhits, yhits, c=hittype.tolist(), alpha=0.2)
+        ax[i, 4].set_title("x and y of hits colored by hit type (ecal/hcal)")
+        if betas != None:
+            ax[i, 5].scatter(xhits, yhits, c=beta_graph.detach().cpu(), alpha=0.2)
+            ax[i, 5].set_title("hits coloored by beta")
+            fig.colorbar(
+                ScalarMappable(norm=Normalize(vmin=0, vmax=1)), ax=ax[i, 5]
+            ).set_label("beta")
+            ax[i, 6].hist(beta_graph.detach().cpu(), bins=100, range=(0, 1))
+            ax[i, 6].set_title("beta distr.")
+            fig.colorbar(
+                ScalarMappable(norm=Normalize(vmin=0.5, vmax=1)), ax=ax[i, 7]
+            ).set_label("beta > 0.5")
+            no_objects = len(np.unique(part_num.cpu()))
+            ax[i, 7].scatter(
+                xj_graph[:, 0][beta_graph.detach().cpu() > 0.5],
+                xj_graph[:, 1][beta_graph.detach().cpu() > 0.5],
+                c=beta_graph[beta_graph.detach().cpu() > 0.5].detach().cpu(),
+                alpha=0.2
             )
-            # print(part_num.unique())
-            xj_graph = xj[node_counter : node_counter + non, :].detach().cpu()
-            if len(index_alpha) == 1:
-                index_alpha = index_alpha.item()
-            clr = graph_eval.ndata["particle_number"]
-            ax[i, 2].set_title("x and y of hits")
-            xhits, yhits = (
-                graph_eval.ndata["h"][:, 0].detach().cpu(),
-                graph_eval.ndata["h"][:, 1].detach().cpu(),
+            # plot no_objects highest betas
+            index_highest = np.argsort(beta_graph.detach().cpu())[-no_objects:]
+            ax[i, 7].scatter(
+                xj_graph[:, 0][index_highest],
+                xj_graph[:, 1][index_highest],
+                marker="*",
+                c="red"
             )
-            hittype = torch.argmax(graph_eval.ndata["h"][:, [3, 4, 5, 6]], dim=1).view(
-                -1
-            )
-            clr_energy = torch.log10(graph_eval.ndata["h"][:, 7].detach().cpu())
-            ax[i, 2].scatter(xhits, yhits, c=clr.tolist(), alpha=0.2)
-            ax[i, 3].scatter(xhits, yhits, c=clr_energy.tolist(), alpha=0.2)
-            ax[i, 3].set_title("x and y of hits colored by log10 energy")
-            ax[i, 4].scatter(xhits, yhits, c=hittype.tolist(), alpha=0.2)
-            ax[i, 4].set_title("x and y of hits colored by hit type (ecal/hcal)")
-            if betas != None:
-                ax[i, 5].scatter(xhits, yhits, c=beta_graph.detach().cpu(), alpha=0.2)
-                ax[i, 5].set_title("hits coloored by beta")
-                fig.colorbar(
-                    ScalarMappable(norm=Normalize(vmin=0, vmax=1)), ax=ax[i, 5]
-                ).set_label("beta")
-                ax[i, 6].hist(beta_graph.detach().cpu(), bins=100, range=(0, 1))
-                ax[i, 6].set_title("beta distr.")
-                fig.colorbar(
-                    ScalarMappable(norm=Normalize(vmin=0.5, vmax=1)), ax=ax[i, 7]
-                ).set_label("beta > 0.5")
-                no_objects = len(np.unique(part_num.cpu()))
-                ax[i, 7].scatter(
-                    xj_graph[:, 0][beta_graph.detach().cpu() > 0.5],
-                    xj_graph[:, 1][beta_graph.detach().cpu() > 0.5],
-                    c=beta_graph[beta_graph.detach().cpu() > 0.5].detach().cpu(),
+            ax[i, 7].set_title("hits with beta > 0.5")
+            ax[i, 8].set_title("hits of particles that have a low loss_e_frac")
+            if loss_e_frac is not None:
+                if not isinstance(loss_e_frac, torch.Tensor):
+                    loss_e_frac = torch.cat(loss_e_frac)
+                low_filter = torch.nonzero(loss_e_frac < 0.02).flatten()
+                particle_number_low = part_num[low_filter[0]]
+                # filter to particle numbers contained in particle_number_low
+                low_filter = torch.nonzero(part_num == particle_number_low).flatten().detach().cpu()
+                ax[i, 8].scatter(
+                    xj_graph[:, 0],
+                    xj_graph[:, 1],
+                    c="gray",
                     alpha=0.2
                 )
-                # plot no_objects highest betas
-                index_highest = np.argsort(beta_graph.detach().cpu())[-no_objects:]
-                ax[i, 7].scatter(
-                    xj_graph[:, 0][index_highest],
-                    xj_graph[:, 1][index_highest],
+                ax[i, 8].scatter(
+                    xj_graph[:, 0][low_filter],
+                    xj_graph[:, 1][low_filter],
+                    c="blue",
+                    alpha=0.2
+                )
+                ax[i, 8].scatter(
+                    xj_graph[index_alpha, 0],
+                    xj_graph[index_alpha, 1],
                     marker="*",
-                    c="red"
+                    c="r",
+                    alpha=1.0,
                 )
-                ax[i, 7].set_title("hits with beta > 0.5")
-                ax[i, 8].set_title("hits of particles that have a low loss_e_frac")
-                if loss_e_frac is not None:
-                    low_filter = torch.nonzero(loss_e_frac < 0.02).flatten()[0]
-                    particle_number_low = part_num[low_filter]
-                    # filter to particle numbers contained in particle_number_low
-                    low_filter = torch.nonzero(part_num == particle_number_low[0]).flatten()
-                    ax[i, 8].scatter(
-                        xj_graph[:, 0][low_filter],
-                        xj_graph[:, 1][low_filter],
-                        c=beta_graph[low_filter].detach().cpu(),
-                        alpha=0.2
-                    )
-                    ax[i, 8].scatter(
-                        xj_graph[index_alpha, 0],
-                        xj_graph[index_alpha, 1],
-                        marker="*",
-                        c="r",
-                        alpha=1.0,
-                    )
-            ax[i, 0].set_title(
-                title_prefix
-                + " "
-                + str(np.unique(part_num.cpu()))
-                + " "
-                + str(len(np.unique(part_num.cpu())))
+        ax[i, 0].set_title(
+            title_prefix
+            + " "
+            + str(np.unique(part_num.cpu()))
+            + " "
+            + str(len(np.unique(part_num.cpu())))
+        )
+        ax[i, 1].set_title("PCA of node features")
+        ax[i, 0].scatter(xj_graph[:, 0], xj_graph[:, 1], c=clr.tolist(), alpha=0.2)
+        if non > 1:
+            PCA_2d_node_feats = PCA(n_components=2).fit_transform(
+                graph_eval.ndata["h"].detach().cpu().numpy()
             )
-            ax[i, 1].set_title("PCA of node features")
-            ax[i, 0].scatter(xj_graph[:, 0], xj_graph[:, 1], c=clr.tolist(), alpha=0.2)
-            if non > 1:
-                PCA_2d_node_feats = PCA(n_components=2).fit_transform(
-                    graph_eval.ndata["h"].detach().cpu().numpy()
-                )
-                ax[i, 1].scatter(
-                    PCA_2d_node_feats[:, 0],
-                    PCA_2d_node_feats[:, 1],
-                    c=clr.tolist(),
-                    alpha=0.2,
-                )
-            ax[i, 0].scatter(
-                xj_graph[index_alpha, 0],
-                xj_graph[index_alpha, 1],
-                marker="*",
-                c="r",
-                alpha=1.0,
+            ax[i, 1].scatter(
+                PCA_2d_node_feats[:, 0],
+                PCA_2d_node_feats[:, 1],
+                c=clr.tolist(),
+                alpha=0.2,
             )
-            if radius != None:
-                ax[i, 0].add_artist(
-                    plt.Circle(
-                        (xj_graph[index_alpha, 0], xj_graph[index_alpha, 1]),
-                        radius=radius,
-                        color="r",
-                        fill=False,
-                    )
-                )
-            pos = graph_eval.ndata["pos_hits_norm"]
-            node_counter += non
-    else:
-        fig, ax = plt.subplots(1, 2, figsize=(9, 9))
-        for i in range(len(graph_list)):
-            graph_eval = graph_list[i]
-            # print([g.num_nodes() for g in graph_list])
-            non = graph_eval.number_of_nodes()
-            assert non == graph_eval.ndata["h"].shape[0]
-            particle_number = graph_eval.ndata["particle_number"]
-            # if particle_number.max() > 1:
-            #    print("skipping one, only plotting events with 2 particles")
-            #    continue
-            q_graph = q[node_counter : node_counter + non].flatten()
-            hit_type = torch.argmax(graph_eval.ndata["hit_type"], dim=1).view(-1)
+        ax[i, 0].scatter(
+            xj_graph[index_alpha, 0],
+            xj_graph[index_alpha, 1],
+            marker="*",
+            c="r",
+            alpha=1.0,
+        )
+        pos = graph_eval.ndata["pos_hits_norm"]
+        node_counter += non
 
-            part_num = graph_eval.ndata["particle_number"].view(-1).to(torch.long)
-            q_alpha, index_alpha = scatter_max(
-                q_graph.cpu().view(-1), part_num.cpu() - 1
-            )
-            # print(part_num.unique())
-            xj_graph = xj[node_counter : node_counter + non, :].detach().cpu()
-            if len(index_alpha) == 1:
-                index_alpha = index_alpha.item()
-            clr = graph_eval.ndata["particle_number"]
-            ax[0].set_title(
-                title_prefix
-                + " "
-                + str(np.unique(part_num.cpu()))
-                + " "
-                + str(len(np.unique(part_num.cpu())))
-            )
-            ax[1].set_title("PCA of node features")
-            ax[0].scatter(xj_graph[:, 0], xj_graph[:, 1], c=clr.tolist(), alpha=0.2)
-            if non > 1:
-                PCA_2d_node_feats = PCA(n_components=2).fit_transform(
-                    graph_eval.ndata["h"].detach().cpu().numpy()
-                )
-                ax[1].scatter(
-                    PCA_2d_node_feats[:, 0],
-                    PCA_2d_node_feats[:, 1],
-                    c=clr.tolist(),
-                    alpha=0.2,
-                )
-            ax[0].scatter(
-                xj_graph[index_alpha, 0],
-                xj_graph[index_alpha, 1],
-                marker="*",
-                c="r",
-                alpha=1.0,
-            )
-            #if radius != None:
-            #    ax[0].add_artist(
-            #        plt.Circle(
-            #            (xj_graph[index_alpha, 0], xj_graph[index_alpha, 1]),
-            #            radius=radius,
-            #            color="r",
-            #            fill=False,
-            #        )
-            #    )
-            pos = graph_eval.ndata["pos_hits_norm"]
-            node_counter += non
     return fig, ax

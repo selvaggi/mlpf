@@ -498,15 +498,13 @@ def inference_statistics(
                 )  # 3: betas
                 bj = bj.clip(0.0, 1 - 1e-4)
                 q = bj.arctanh() ** 2 + args.qmin
-                fig, ax = plot_clust(batch_g, q, xj,
-                                     title_prefix="loss_E_frac: " + str(loss_E_fracs[-1]) + "  | loss_E_frac_true: " + str(loss_E_fracs_true[-1]),
-                                     y=y, radius=radius, loss_e_frac=loss_E_fracs[-1])
+                fig, ax = plot_clust(batch_g, q, xj, y=y, radius=radius, loss_e_frac=loss_E_fracs[-1], betas=bj)
                 betas = (
                     torch.sigmoid(
                         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
                     ).detach().cpu().numpy()
                 )
-                figs.append(fig)
+                #figs.append(fig)
                 betas_list.append(betas)
             num_batches += 1
             if num_batches % 5 == 0 and save_ckpt_to_folder is not None:
