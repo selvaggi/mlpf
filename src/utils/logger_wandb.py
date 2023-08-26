@@ -257,12 +257,14 @@ def calculate_and_log_tpr_1_10_percent(fpr, tpr, name_pos, name_neg):
 def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None, loss_e_frac=None):
     graph_list = dgl.unbatch(g)
     node_counter = 0
-    fig, ax = plt.subplots(12, 9, figsize=(33, 40))
+    particle_counter = 0
+    fig, ax = plt.subplots(12, 10, figsize=(33, 40))
     for i in range(0, min(12, len(graph_list))):
         graph_eval = graph_list[i]
         # print([g.num_nodes() for g in graph_list])
         non = graph_eval.number_of_nodes()
         assert non == graph_eval.ndata["h"].shape[0]
+        n_part = graph_eval.ndata["particle_number"].max().long().item()
         particle_number = graph_eval.ndata["particle_number"]
         # if particle_number.max() > 1:
         #    print("skipping one, only plotting events with 2 particles")
@@ -325,7 +327,12 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None, loss_
             if loss_e_frac is not None:
                 if not isinstance(loss_e_frac, torch.Tensor):
                     loss_e_frac = torch.cat(loss_e_frac)
-                low_filter = torch.nonzero(loss_e_frac < 0.02).flatten()
+                loss_e_frac_batch = loss_e_frac[particle_counter : particle_counter + n_part]
+                particle_counter += n_part
+                low_filter = torch.nonzero(loss_e_frac_batch < 0.05).flatten()
+                if not len(low_filter):
+                    continue
+                ax[i, 8].set_title(loss_e_frac_batch[low_filter[0]])
                 particle_number_low = part_num[low_filter[0]]
                 # filter to particle numbers contained in particle_number_low
                 low_filter = torch.nonzero(part_num == particle_number_low).flatten().detach().cpu()
@@ -335,17 +342,58 @@ def plot_clust(g, q, xj, title_prefix="", y=None, radius=None, betas=None, loss_
                     c="gray",
                     alpha=0.2
                 )
+                ax[i, 9].scatter(
+                    xj_graph[:, 0],
+                    xj_graph[:, 2],
+                    c="gray",
+                    alpha=0.2
+                )
+                ax[i, 8].set_xlabel("X")
+                ax[i, 8].set_ylabel("Y")
+                ax[i, 9].set_xlabel("X")
+                ax[i, 9].set_ylabel("Z")
                 ax[i, 8].scatter(
                     xj_graph[:, 0][low_filter],
                     xj_graph[:, 1][low_filter],
                     c="blue",
                     alpha=0.2
                 )
+                ax[i, 9].scatter(
+                    xj_graph[:, 0][low_filter],
+                    xj_graph[:, 2][low_filter],
+                    c="blue",
+                    alpha=0.2
+                )
+                ia1 = torch.zeros(xj_graph.shape[0]).long()
+                ia2 = torch.zeros_like(ia1)
+                ia1[index_alpha] = 1.
+                ia2[low_filter] = 1.
                 ax[i, 8].scatter(
-                    xj_graph[index_alpha, 0],
-                    xj_graph[index_alpha, 1],
+                    xj_graph[ia1, 0],
+                    xj_graph[ia1, 1],
                     marker="*",
                     c="r",
+                    alpha=1.0,
+                )
+                ax[i, 8].scatter(
+                    xj_graph[ia1*ia2, 0],
+                    xj_graph[ia1*ia2, 1],
+                    marker="*",
+                    c="g",
+                    alpha=1.0,
+                )
+                ax[i, 9].scatter(
+                    xj_graph[ia1, 0],
+                    xj_graph[ia1, 2],
+                    marker="*",
+                    c="r",
+                    alpha=1.0,
+                )
+                ax[i, 9].scatter(
+                    xj_graph[ia1 * ia2, 0],
+                    xj_graph[ia1 * ia2, 2],
+                    marker="*",
+                    c="g",
                     alpha=1.0,
                 )
         ax[i, 0].set_title(
