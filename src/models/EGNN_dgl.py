@@ -34,6 +34,7 @@ class EGNN(nn.Module):
         self.device = device
         self.n_layers = n_layers
         self.concat_global_exchange = concat_global_exchange
+        self.beta_weight = 1.0  # set this to zero for no beta loss (when it's frozen)
         if self.concat_global_exchange:
             add_global_exchange = 3 * (in_node_nf+3)   # also add coords
         else:
@@ -67,14 +68,14 @@ class EGNN(nn.Module):
         )
         if self.separate_heads:
             self.beta_head = nn.Sequential(
-                nn.Linear(self.hidden_nf, 32),
+                nn.Linear(self.hidden_nf + 3, 32),
                 nn.SELU(),
                 nn.Linear(32, 32),
                 nn.SELU(),
                 nn.Linear(32, 1)
             )
             self.coords_head = nn.Sequential(
-                nn.Linear(self.hidden_nf, 32),
+                nn.Linear(self.hidden_nf + 3, 32),
                 nn.SELU(),
                 nn.Linear(32, 32),
                 nn.SELU(),
@@ -104,8 +105,8 @@ class EGNN(nn.Module):
             h = self.embedding_out(h)
         return h
     def freeze(self, what="core", unfreeze=False):
-        # what = ["core", "beta_head", "coords_head"]
-        assert what in ["core", "beta_head", "coords_head"]
+        # what = ["core", "beta", "coords"]
+        assert what in ["core", "beta", "coords"]
         if what == "core":
             for layer in self.layers:
                 for param in layer.parameters():
@@ -114,10 +115,10 @@ class EGNN(nn.Module):
                 param.requires_grad = unfreeze
             for param in self.embedding_out.parameters():
                 param.requires_grad = unfreeze
-        elif what == "beta_head":
+        elif what == "beta":
             for param in self.beta_head.parameters():
                 param.requires_grad = unfreeze
-        elif what == "coords_head":
+        elif what == "coords":
             for param in self.coords_head.parameters():
                 param.requires_grad = unfreeze
 
@@ -228,7 +229,8 @@ class EGNN(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            loss = a[0] + a[1]
+            print("BETA WEIGHT", self.beta_weight)
+            loss = a[0] + self.beta_weight * a[1]
             # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument

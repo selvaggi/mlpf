@@ -456,3 +456,33 @@ parser.add_argument(
     default=False,
     help="use the hgcal regularization losses",
 )
+
+
+parser.add_argument(
+    "--use_heads",
+    action="store_true",
+    default=False,
+    help="Use the model with separate heads for the beta and the coords",
+)
+
+parser.add_argument(
+    "--freeze_beta",
+    action="store_true",
+    default=False,
+    help="freeze the beta head",
+)
+
+parser.add_argument(
+    "--freeze_core",
+    action="store_true",
+    default=False,
+    help="freeze the core of the model",
+)
+
+parser.add_argument(
+    "--freeze_coords",
+    action="store_true",
+    default=False,
+    help="freeze the coordinates head of the model",
+)
+

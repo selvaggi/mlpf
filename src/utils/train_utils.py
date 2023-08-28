@@ -612,6 +612,8 @@ def model_setup(args, data_config):
         network_options["output_dim"] = args.clustering_space_dim + 28
     network_options["input_dim"] = 9 + args.n_noise
     network_options.update(data_config.custom_model_kwargs)
+    if args.use_heads:
+        network_options["separate_heads"] = True
     _logger.info("Network options: %s" % str(network_options))
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
@@ -623,6 +625,17 @@ def model_setup(args, data_config):
     model, model_info = network_module.get_model(
         data_config, dev=dev, **network_options
     )
+    if args.freeze_core:
+        model.mod.freeze("core")
+        print("Frozen core parameters")
+    if args.freeze_beta:
+        model.mod.freeze("beta")
+        print("Frozen beta parameters")
+        assert model.mod.beta_weight == 1.0
+        model.mod.beta_weight = 0.0
+    if args.freeze_coords:
+        model.mod.freeze("coords")
+        print("Frozen coordinates parameters")
     if args.load_model_weights:
         print("Loading model state from %s" % args.load_model_weights)
         model_state = torch.load(args.load_model_weights, map_location="cpu")
