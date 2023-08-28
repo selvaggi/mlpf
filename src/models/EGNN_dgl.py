@@ -12,7 +12,7 @@ from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
 
 class EGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False):
+    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, separate_heads: bool = False):
         '''
         :param concat_global_exchange: Whether to concat "global" features to the node features.
         '''
@@ -57,14 +57,29 @@ class EGNN(nn.Module):
                 )
             )
 
+        self.separate_heads = separate_heads
+
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
             nn.Linear(22, 64),
             nn.Linear(64, 64),
             nn.Linear(64, 22),
             nn.Softmax(dim=-1),
         )
-
-
+        if self.separate_heads:
+            self.beta_head = nn.Sequential(
+                nn.Linear(self.hidden_nf, 32),
+                nn.SELU(),
+                nn.Linear(32, 32),
+                nn.SELU(),
+                nn.Linear(32, 1)
+            )
+            self.coords_head = nn.Sequential(
+                nn.Linear(self.hidden_nf, 32),
+                nn.SELU(),
+                nn.Linear(32, 32),
+                nn.SELU(),
+                nn.Linear(32, 3)
+            )
     def forward(self, g):
         batch = obtain_batch_numbers(g.ndata["h"], g)
         h = g.ndata["h"][:, 3:]
@@ -81,8 +96,30 @@ class EGNN(nn.Module):
             g = update_knn(g)
             # the second step could be to do the knn again for each graph with the new coordinates
         h = torch.cat((g.ndata["hh"], g.ndata["x"]), dim=1)
-        h = self.embedding_out(h)
+        if self.separate_heads:
+            bj_raw = self.beta_head(h)
+            xj_raw = self.coords_head(h)
+            h = torch.cat((xj_raw, bj_raw), dim=1)
+        else:
+            h = self.embedding_out(h)
         return h
+    def freeze(self, what="core", unfreeze=False):
+        # what = ["core", "beta_head", "coords_head"]
+        assert what in ["core", "beta_head", "coords_head"]
+        if what == "core":
+            for layer in self.layers:
+                for param in layer.parameters():
+                    param.requires_grad = unfreeze
+            for param in self.embedding_in.parameters():
+                param.requires_grad = unfreeze
+            for param in self.embedding_out.parameters():
+                param.requires_grad = unfreeze
+        elif what == "beta_head":
+            for param in self.beta_head.parameters():
+                param.requires_grad = unfreeze
+        elif what == "coords_head":
+            for param in self.coords_head.parameters():
+                param.requires_grad = unfreeze
 
     def object_condensation_loss2(
             self,
