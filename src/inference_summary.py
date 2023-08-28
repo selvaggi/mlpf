@@ -183,7 +183,7 @@ def main():
     _configLogger("weaver", stdout=stdout, filename=args.log)
 
     results = {}
-    for rad in [0.4]:
+    for rad in ["dynamic"]:
         results[rad] = _main(args, radius=rad, batches=99999999999)
         #print(results[rad]["loss_e_fracs"])
     import pickle

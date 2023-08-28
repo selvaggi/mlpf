@@ -37,11 +37,12 @@ def calc_energy_loss(
         betas = beta[node_counter : non + node_counter]
         sorted, indices = torch.sort(betas.view(-1), descending=False)
         selected_centers = indices[0:number_of_objects]
+        _, selected_centers_particles = scatter_max(
+            betas.flatten().cpu(), particle_id.cpu().long() - 1
+        )
+        assert selected_centers.shape[0] == number_of_objects
         if select_centers_by_particle:
-            _, selected_centers = scatter_max(
-                betas.flatten().cpu(), particle_id.cpu().long() - 1
-            )
-            assert selected_centers.shape[0] == number_of_objects
+            selected_centers = selected_centers_particles.to(g.device)
         all_particles = set((particle_id.unique()-1).long().tolist())
         reco_particles = set((particle_id[selected_centers]-1).long().tolist())
         non_reco_particles = all_particles - reco_particles
@@ -63,8 +64,19 @@ def calc_energy_loss(
                 else:
                     non_reco_count[curr_pid] = 1
         X = cluster_space_coords[node_counter : non + node_counter]
-        print("Radius", radius)
-        clusterings = get_clustering(selected_centers, X, betas, td=radius)
+
+        if radius == "dynamic":
+            pick_ = torch.argsort(
+                torch.cdist(X[selected_centers], X[selected_centers], p=2),
+                dim=1)[:, 1]
+            current_radius = torch.cdist(torch.Tensor(X[selected_centers]), torch.Tensor(X[selected_centers]), p=2).gather(1, pick_.view(-1, 1))
+            current_radius = current_radius / 2
+            current_radius = max(0.2, current_radius.flatten().min())
+            print("Current radius", current_radius)
+        else:
+            print("Radius", radius)
+            current_radius = radius
+        clusterings = get_clustering(selected_centers, X, betas, td=current_radius)
         clusterings = clusterings.to(g.device)
         node_counter += non
         counter = 0
