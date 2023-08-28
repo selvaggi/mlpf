@@ -7,7 +7,8 @@ import dgl
 
 
 def calc_energy_loss(
-    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7, e_frac_loss_return_particles=False, y=None, select_centers_by_particle=True
+    batch, cluster_space_coords, beta, beta_stabilizing="soft_q_scaling", qmin=0.1, radius=0.7,
+    e_frac_loss_return_particles=False, y=None, select_centers_by_particle=True
 ):
     # select_centers_by_particle: if True, we pretend we know which hits belong to which particle...
     list_graphs = dgl.unbatch(batch)
