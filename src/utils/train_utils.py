@@ -633,6 +633,9 @@ def model_setup(args, data_config):
         print("Frozen beta parameters")
         assert model.mod.beta_weight == 1.0
         model.mod.beta_weight = 0.0
+    if args.beta_zeros:
+        model.mod.beta_exp_weight = 1.0
+        print("Set beta_exp_weight to 1.0")
     if args.freeze_coords:
         model.mod.freeze("coords")
         print("Frozen coordinates parameters")

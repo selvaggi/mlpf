@@ -110,7 +110,7 @@ def _main(args, radius=0.6, batches=15):
         args=args,
         radius=radius,
         total_num_batches=batches,
-        save_ckpt_to_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/tmp",
+        save_ckpt_to_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots1/dynamic_radius_EGNN_qmin3",
         #plots_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/24_08_plots_of_clustering"
     )
 
@@ -187,7 +187,7 @@ def main():
         results[rad] = _main(args, radius=rad, batches=99999999999)
         #print(results[rad]["loss_e_fracs"])
     import pickle
-    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/tmp.pkl", "wb") as f:
+    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/dynamic_radius_EGNN_qmin3.pkl", "wb") as f:
         pickle.dump(results, f)
 main()
 

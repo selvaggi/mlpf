@@ -486,3 +486,10 @@ parser.add_argument(
     help="freeze the coordinates head of the model",
 )
 
+parser.add_argument(
+    "--beta_zeros",
+    action="store_true",
+    default=False,
+    help="Add beta zeros loss"
+)
+
