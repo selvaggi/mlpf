@@ -109,7 +109,7 @@ class EGNN(nn.Module):
         g.ndata["hh"] = h
         if self.special_beta_core:
             h_beta = self.embedding_in_beta
-            g_beta = deepcopy(g)
+            g_beta = g
             for conv in self.layers_beta:
                 g_beta = conv(g_beta)
                 g_beta = update_knn(g_beta)
@@ -435,6 +435,8 @@ class Aggregationlayer(nn.Module):
 
     def forward(self, nodes):
         # shape = nodes.mailbox['agg_feat'].shape # 1x7x80
+        nodes.data["x"] = torch.clip(nodes.data["x"], min=-1e3, max=1e3)  # to mitigate weird random NaN errors...
+        nodes.mailbox["trans"] = torch.clip(nodes.mailbox["trans"], min=-1e3, max=1e3)
         trans = torch.mean(nodes.mailbox["trans"], dim=1)
         coord = nodes.data["x"] + trans
         edge_feature = torch.sum(nodes.mailbox["edge_feature"], dim=1)
@@ -445,7 +447,7 @@ class Aggregationlayer(nn.Module):
             h = nodes.data["hh"] + h
         assert_no_nans(coord)
         assert_no_nans(h)
-        return {"x": torch.nan_to_num(coord, 0.0), "hh": torch.nan_to_num(h, 0.0)}
+        return {"x": coord, "hh": h}
 
 
 def update_knn(batch):

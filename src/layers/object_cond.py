@@ -265,8 +265,8 @@ def calc_LV_Lbeta(
 
     # Calculate q_alpha, the max q per object, and the indices of said maxima
     assert hit_energies.shape == q.shape
-    q_alpha, index_alpha = scatter_max(hit_energies[is_sig], object_index)
-    #q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
+    #q_alpha, index_alpha = scatter_max(hit_energies[is_sig], object_index)
+    q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
     assert q_alpha.size() == (n_objects,)
 
     # Get the cluster space coordinates and betas for these maxima hits too
