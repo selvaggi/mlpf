@@ -108,7 +108,7 @@ def train_regression(
                 if logwandb:
                     wandb.log(
                         {
-                            "betas": wandb.Histogram(betas),
+                            "betas": wandb.Histogram(torch.nan_to_num(torch.tensor(betas), 0.0)),
                             "qs": wandb.Histogram(np.arctanh(betas) ** 2 + args.qmin),
                         }
                     )  # , step=step_count)

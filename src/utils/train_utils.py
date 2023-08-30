@@ -625,6 +625,7 @@ def model_setup(args, data_config):
     model, model_info = network_module.get_model(
         data_config, dev=dev, **network_options
     )
+
     if args.freeze_core:
         model.mod.freeze("core")
         print("Frozen core parameters")
@@ -642,11 +643,14 @@ def model_setup(args, data_config):
     if args.load_model_weights:
         print("Loading model state from %s" % args.load_model_weights)
         model_state = torch.load(args.load_model_weights, map_location="cpu")
-        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=True)
+        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
         _logger.info(
             "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
             % (args.load_model_weights, missing_keys, unexpected_keys)
         )
+    if args.copy_core_for_beta:
+        model.mod.create_separate_beta_core()
+        print("Created separate beta core")
     # _logger.info(model)
     # flops(model, model_info) # commented before it adds lodel to gpu
     # loss function

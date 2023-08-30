@@ -71,7 +71,7 @@ def calc_energy_loss(
                 dim=1)[:, 1]
             current_radius = torch.cdist(torch.Tensor(X[selected_centers]), torch.Tensor(X[selected_centers]), p=2).gather(1, pick_.view(-1, 1))
             current_radius = current_radius / 2
-            current_radius = max(0.2, current_radius.flatten().min())
+            current_radius = max(0.1, current_radius.flatten().min())
             print("Current radius", current_radius)
         else:
             print("Radius", radius)

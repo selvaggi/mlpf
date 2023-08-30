@@ -170,6 +170,7 @@ def calc_LV_Lbeta(
     fill_loss_weight=0.0,
     use_average_cc_pos=0.0,
     hgcal_implementation=False,
+    hit_energies=None
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -194,6 +195,10 @@ def calc_LV_Lbeta(
     """
     # remove dummy rows added for dataloader #TODO think of better way to do this
     device = beta.device
+    if torch.isnan(beta).any():
+        print("There are nans in beta! L198", len(beta[torch.isnan(beta)]))
+
+    beta = torch.nan_to_num(beta, nan=0.0)
     assert_no_nans(beta)
     # ________________________________
 
@@ -259,7 +264,9 @@ def calc_LV_Lbeta(
     assert q.size() == (n_hits,)
 
     # Calculate q_alpha, the max q per object, and the indices of said maxima
-    q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
+    assert hit_energies.shape == q.shape
+    q_alpha, index_alpha = scatter_max(hit_energies[is_sig], object_index)
+    #q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
     assert q_alpha.size() == (n_objects,)
 
     # Get the cluster space coordinates and betas for these maxima hits too
@@ -546,15 +553,16 @@ def calc_LV_Lbeta(
     #     L_beta_sig = beta_pen.sum()/len(beta_pen)
     # else:
     if beta_term_option == "paper":
-
-        L_beta_sig = (
+        beta_alpha = torch.exp(0.5 * beta[is_sig][index_alpha])
+        L_beta_sig = (  # maybe 0.5 for less aggressive loss
             scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
         ).sum()
 
         beta_exp = beta[is_sig]
         beta_exp[index_alpha] = 0
-        L_exp = torch.mean(beta_exp)
-        # L_exp = torch.mean(scatter_add(torch.exp(15*beta_exp)-1,  batch)/ n_hits_per_event)
+        #L_exp = torch.mean(beta_exp)
+        beta_exp = torch.exp(0.5*beta_exp)
+        L_exp = torch.mean(scatter_add(beta_exp,  batch)/ n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
 
@@ -708,6 +716,11 @@ def calc_LV_Lbeta_inference(
     # remove dummy rows added for dataloader  # TODO think of better way to do this
 
     device = beta.device
+    # alert the user if there are nans
+    if torch.isnan(beta).any():
+        print("There are nans in beta!", len(beta[torch.isnan(beta)]))
+
+    beta = torch.nan_to_num(beta, nan=0.0)
     assert_no_nans(beta)
     # ________________________________
     # Calculate a bunch of needed counts and indices locally
@@ -768,6 +781,10 @@ def calc_LV_Lbeta_inference(
         q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
     else:
         raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
+    if torch.isnan(beta).any():
+        print("There are nans in beta!", len(beta[torch.isnan(beta)]))
+
+    beta = torch.nan_to_num(beta, nan=0.0)
     assert_no_nans(q)
     assert q.device == device
     assert q.size() == (n_hits,)

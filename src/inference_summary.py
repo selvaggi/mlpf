@@ -12,9 +12,12 @@ import math
 import torch
 import sys
 import os
+from sklearn.cluster import DBSCAN
+
 
 torch.autograd.set_detect_anomaly(True)
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
+
 
 from src.logger.logger import _logger, _configLogger
 from src.dataset.dataset import SimpleIterDataset
@@ -110,7 +113,7 @@ def _main(args, radius=0.6, batches=15):
         args=args,
         radius=radius,
         total_num_batches=batches,
-        save_ckpt_to_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots1/dynamic_radius_EGNN_qmin3",
+        save_ckpt_to_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots1/dynamic_radius_EGNN_qmin3_minrad01",
         #plots_folder="/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/24_08_plots_of_clustering"
     )
 
@@ -187,7 +190,7 @@ def main():
         results[rad] = _main(args, radius=rad, batches=99999999999)
         #print(results[rad]["loss_e_fracs"])
     import pickle
-    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/dynamic_radius_EGNN_qmin3.pkl", "wb") as f:
+    with open("/eos/user/g/gkrzmanc/summ_results/frac_energy_plots/dynamic_radius_minrad01_EGNN_qmin3.pkl", "wb") as f:
         pickle.dump(results, f)
 main()
 

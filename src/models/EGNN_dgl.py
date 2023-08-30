@@ -4,12 +4,23 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 import dgl
+from copy import deepcopy
 
 
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
+
+def assert_no_nans(x):
+    """
+    Raises AssertionError if there is a nan in the tensor
+    """
+    if torch.isnan(x).any():
+        print(x)
+    assert not torch.isnan(x).any()
+
+
 
 class EGNN(nn.Module):
     def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, separate_heads: bool = False):
@@ -20,7 +31,9 @@ class EGNN(nn.Module):
         in_node_nf = 6
         hidden_nf = 128
         out_node_nf = 4
+
         self.output_dim = out_node_nf
+        self.special_beta_core = False
         self.clust_space_norm = "none"
         in_edge_nf = 0
         device = dev
@@ -58,6 +71,8 @@ class EGNN(nn.Module):
                     tanh=tanh,
                 )
             )
+        self.embedding_in_beta = deepcopy(self.embedding_in)
+        self.layers_beta = deepcopy(self.layers)
 
         self.separate_heads = separate_heads
 
@@ -92,19 +107,40 @@ class EGNN(nn.Module):
             h = h[:, 3:]
         h = self.embedding_in(h)  # NBx80
         g.ndata["hh"] = h
-
+        if self.special_beta_core:
+            h_beta = self.embedding_in_beta
+            g_beta = deepcopy(g)
+            for conv in self.layers_beta:
+                g_beta = conv(g_beta)
+                g_beta = update_knn(g_beta)
+            h_beta = torch.cat((g_beta.ndata["hh"], g_beta.ndata["x"]), dim=1)
         for conv in self.layers:
             g = conv(g)
             g = update_knn(g)
             # the second step could be to do the knn again for each graph with the new coordinates
         h = torch.cat((g.ndata["hh"], g.ndata["x"]), dim=1)
         if self.separate_heads:
-            bj_raw = self.beta_head(h)
+            if self.special_beta_core:
+                bj_raw = self.beta_head(h_beta)
+            else:
+                bj_raw = self.beta_head(h)
             xj_raw = self.coords_head(h)
             h = torch.cat((xj_raw, bj_raw), dim=1)
         else:
             h = self.embedding_out(h)
         return h
+
+    def create_separate_beta_core(self):
+        self.special_beta_core = True
+        self.embedding_in_beta.load_state_dict(self.embedding_in.state_dict())
+        self.layers_beta.load_state_dict(self.layers.state_dict())
+        for param in self.embedding_in_beta.parameters():
+            param.requires_grad = True
+        for layer in self.layers_beta:
+            for param in layer.parameters():
+                param.requires_grad = True
+        print("Created separate beta head.")
+
     def freeze(self, what="core", unfreeze=False):
         # what = ["core", "beta", "coords"]
         assert what in ["core", "beta", "coords"]
@@ -226,6 +262,7 @@ class EGNN(nn.Module):
             fill_loss_weight=fill_loss_weight,
             use_average_cc_pos=use_average_cc_pos,
             hgcal_implementation=hgcalloss,
+            hit_energies=batch.ndata["h"][:, 3]
         )
         if return_resolution:
             return a
@@ -406,8 +443,9 @@ class Aggregationlayer(nn.Module):
         h = self.node_mlp(agg)
         if self.residual:
             h = nodes.data["hh"] + h
-
-        return {"x": coord, "hh": h}
+        assert_no_nans(coord)
+        assert_no_nans(h)
+        return {"x": torch.nan_to_num(coord, 0.0), "hh": torch.nan_to_num(h, 0.0)}
 
 
 def update_knn(batch):

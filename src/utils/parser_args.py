@@ -493,3 +493,12 @@ parser.add_argument(
     help="Add beta zeros loss"
 )
 
+
+parser.add_argument(
+    "--copy_core_for_beta",
+    action="store_true",
+    default=False,
+    help="Copy the core of the model for the beta head (the clustering core remains frozen)"
+)
+
+
