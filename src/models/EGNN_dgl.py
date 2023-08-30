@@ -49,6 +49,7 @@ class EGNN(nn.Module):
         self.concat_global_exchange = concat_global_exchange
         self.beta_weight = 1.0  # set this to zero for no beta loss (when it's frozen)
         self.beta_exp_weight = 0.0  # set this to also optimize using beta zeros loss
+        self.attr_rep_weight = 1.0
         if self.concat_global_exchange:
             add_global_exchange = 3 * (in_node_nf+3)   # also add coords
         else:
@@ -267,8 +268,8 @@ class EGNN(nn.Module):
         if return_resolution:
             return a
         if clust_loss_only:
-            print("BETA WEIGHT", self.beta_weight, "BETA EXP WEIGHT", self.beta_exp_weight)
-            loss = a[0] + self.beta_weight * a[1] + self.beta_exp_weight * a[15]
+            print("BETA WEIGHT", self.beta_weight, "BETA EXP WEIGHT", self.beta_exp_weight, "ATTR./REP. WEIGHT", self.attr_rep_weight)
+            loss = self.attr_rep_weight * a[0] + self.beta_weight * a[1] + self.beta_exp_weight * a[15]
             # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument

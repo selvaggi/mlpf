@@ -63,6 +63,7 @@ def train_regression(
     loss_terms=[],  # whether to only optimize the clustering loss
     args=None,
     args_model=None,
+    alternate_steps=None,  # alternate_steps: after how many steps to switch between beta and clustering loss
 ):
     model.train()
     # print("starting to train")
@@ -83,8 +84,29 @@ def train_regression(
     start_time = time.time()
     prev_time = time.time()
     loss_epoch_total, losses_epoch_total = [], []
+    if alternate_steps is not None:
+        if not hasattr(model.mod, "current_state_alternate_steps"):
+            model.mod.current_state_alternate_steps = 0
     with tqdm.tqdm(train_loader) as tq:
+
         for batch_g, y in tq:
+            if alternate_steps is not None and step_count % alternate_steps == 0:
+                print("Flipping steps")
+                state = model.mod.current_state_alternate_steps
+                state = 1 - state
+                model.mod.current_state_alternate_steps = state
+                wandb.log({"current_state_alternate_steps": model.mod.current_state_alternate_steps})
+                if state == 0:
+                    print("Switched to beta loss")
+                    model.mod.beta_weight = 1.0  # set this to zero for no beta loss (when it's frozen)
+                    model.mod.beta_exp_weight = 1.0
+                    model.mod.attr_rep_weight = 0.0
+                else:
+                    print("Switched to clustering loss")
+                    model.mod.beta_weight = 0.0  # set this to zero for no beta loss (when it's frozen)
+                    model.mod.beta_exp_weight = 0.0
+                    model.mod.attr_rep_weight = 1.0
+
             # print(batch_g)
             # print(y)
             load_end_time = time.time()
@@ -121,6 +143,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
+
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (

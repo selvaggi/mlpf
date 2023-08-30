@@ -173,6 +173,7 @@ def _main(args):
                 loss_terms=[args.clustering_loss_only, add_energy_loss],
                 args=args,
                 args_model=data_config,
+                alternate_steps=args.alternate_steps_beta_clustering
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):

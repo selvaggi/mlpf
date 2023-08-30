@@ -502,3 +502,9 @@ parser.add_argument(
 )
 
 
+parser.add_argument(
+    "--alternate_steps_beta_clustering",
+    default=None,
+    type=int,
+    help="Alternate the training of the beta and clustering heads every N steps",
+)
