@@ -22,7 +22,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     for p in list_p:
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        if np.array_equal(hit_types, [0, 1]) or int(p) not in filt1:
+        if np.array_equal(hit_types, [0, 1]):# or int(p) not in filt1: # This is commented to disable filtering
             list_remove.append(p)
             assert part_frac[int(p) - 1] < 0.05
     if len(list_remove) > 0:
