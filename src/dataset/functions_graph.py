@@ -1,18 +1,30 @@
 import numpy as np
 import torch
 import dgl
-from torch_scatter import scatter_add
+from torch_scatter import scatter_add, scatter_sum
 from sklearn.preprocessing import StandardScaler
 
+from torch_scatter import scatter_sum
+def get_ratios(e_hits, part_idx, y):
+    energy_from_showers = scatter_sum(e_hits, part_idx.long(), dim=0)
+    y_energy = y[:, 3]
+    energy_from_showers = energy_from_showers[1:]
+    assert len(energy_from_showers) > 0
+    return (energy_from_showers.flatten() / y_energy).tolist()
 
-def find_mask_no_energy(hit_particle_link, hit_type_a):
+
+def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
+    # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
     list_remove = []
+    part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
+    filt1 = (torch.where(part_frac >= 0.05)[0] + 1).long().tolist()  # only keep these particles
     for p in list_p:
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        if np.array_equal(hit_types, [0, 1]):
+        if np.array_equal(hit_types, [0, 1]) or int(p) not in filt1:
             list_remove.append(p)
+            assert part_frac[int(p) - 1] < 0.05
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
@@ -86,7 +98,6 @@ def create_inputs_from_table(output, hits_only):
     coord_cart_hits = spherical_to_cartesian(theta, phi, r, normalized=False)
     pos_xyz_hits = pos_hits
     coord_cart_hits_norm = spherical_to_cartesian(theta, phi, r, normalized=True)
-
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     features_particles = torch.permute(
@@ -113,7 +124,7 @@ def create_inputs_from_table(output, hits_only):
     )
     assert len(y_data_graph) == len(unique_list_particles)
     # old_cluster_id = cluster_id
-    mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature)
+    mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature, e_hits, y_data_graph)
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
     result = [
@@ -128,13 +139,15 @@ def create_inputs_from_table(output, hits_only):
         cluster_id,
         hit_particle_link[~mask_hits],
         pos_xyz_hits[~mask_hits],
+        theta[~mask_hits],
+        phi[~mask_hits],
     ]
     hit_type = result[5].argmax(dim=1)
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
         result[0] = hit_mask.sum()
-        for i in [3, 4, 5, 6, 7, 8, 9, 10]:
+        for i in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
             result[i] = result[i][hit_mask]
 
     return result
@@ -256,6 +269,8 @@ def create_graph(output, config=None, n_noise=0):
         cluster_id,
         hit_particle_link,
         pos_xyz_hits,
+        theta_hits,
+        phi_hits
     ) = create_inputs_from_table(output, hits_only=hits_only)
     pos_xyz_hits = pos_xyz_hits / 3330  # divide by detector size
     if standardize_coords:
@@ -325,6 +340,8 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
         g.edata["h"] = edge_attr
+        g.ndata["theta_hits"] = theta_hits
+        g.ndata["phi_hits"] = phi_hits
         if len(y_data_graph) < 2:
             graph_empty = True
     else:
