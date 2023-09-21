@@ -508,3 +508,12 @@ parser.add_argument(
     type=int,
     help="Alternate the training of the beta and clustering heads every N steps",
 )
+
+
+parser.add_argument(
+    "--output_dir_inference_summary",
+    default="",
+    type=str,
+    help="For inference_summary.py, specify the output directory. Otherwise, leave empty.",
+)
+
