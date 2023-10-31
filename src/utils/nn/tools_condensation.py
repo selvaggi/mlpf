@@ -14,7 +14,7 @@ from sklearn.metrics import confusion_matrix
 from pathlib import Path
 import os
 import pickle
-
+from src.models.gravnet_3 import object_condensation_loss2
 
 from src.layers.object_cond import (
     onehot_particles_arr,
@@ -95,15 +95,23 @@ def train_regression(
                 state = model.mod.current_state_alternate_steps
                 state = 1 - state
                 model.mod.current_state_alternate_steps = state
-                wandb.log({"current_state_alternate_steps": model.mod.current_state_alternate_steps})
+                wandb.log(
+                    {
+                        "current_state_alternate_steps": model.mod.current_state_alternate_steps
+                    }
+                )
                 if state == 0:
                     print("Switched to beta loss")
-                    model.mod.beta_weight = 1.0  # set this to zero for no beta loss (when it's frozen)
+                    model.mod.beta_weight = (
+                        1.0  # set this to zero for no beta loss (when it's frozen)
+                    )
                     model.mod.beta_exp_weight = 1.0
                     model.mod.attr_rep_weight = 0.0
                 else:
                     print("Switched to clustering loss")
-                    model.mod.beta_weight = 0.0  # set this to zero for no beta loss (when it's frozen)
+                    model.mod.beta_weight = (
+                        0.0  # set this to zero for no beta loss (when it's frozen)
+                    )
                     model.mod.beta_exp_weight = 0.0
                     model.mod.attr_rep_weight = 1.0
 
@@ -128,7 +136,7 @@ def train_regression(
                     losses,
                     loss_E_frac,
                     loss_E_frac_true,
-                ) = model.mod.object_condensation_loss2(
+                ) = object_condensation_loss2(
                     batch_g,
                     model_output,
                     y,
@@ -158,7 +166,9 @@ def train_regression(
                 if logwandb:
                     wandb.log(
                         {
-                            "betas": wandb.Histogram(torch.nan_to_num(torch.tensor(betas), 0.0)),
+                            "betas": wandb.Histogram(
+                                torch.nan_to_num(torch.tensor(betas), 0.0)
+                            ),
                             "qs": wandb.Histogram(
                                 np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2
                                 + args.qmin
@@ -311,7 +321,7 @@ def train_regression(
                             epoch, num_batches
                         ),
                         y=y,
-                        betas=bj
+                        betas=bj,
                     )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
@@ -389,15 +399,17 @@ def train_regression(
                     wandb.log({"lr": scheduler.get_last_lr()[0]})
     return step_count
 
+
 def update_dict(dict1, dict2):
     for key in dict2:
         if key not in dict1:
-            dict1[key] = 0.
+            dict1[key] = 0.0
         dict1[key] += dict2[key]
     return dict1
 
+
 def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
-    bins = np.linspace(0, 200, bins+1)
+    bins = np.linspace(0, 200, bins + 1)
     theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
     wmin = 0.2
     wmax = 1.0
@@ -431,6 +443,7 @@ def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
                     jj = j
     # print(low, high)
     return 0.5 * (high - low), low, high
+
 
 def inference_statistics(
     model,
@@ -473,7 +486,7 @@ def inference_statistics(
                     loss_E_frac_true,
                     loss_E_frac_nopart,
                     loss_E_frac_true_nopart,
-                ) = model.mod.object_condensation_loss2(
+                ) = object_condensation_loss2(
                     batch_g,
                     model_output,
                     y,
@@ -488,10 +501,22 @@ def inference_statistics(
                     fill_loss_weight=args.fill_loss_weight,
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
-                    e_frac_loss_radius=radius
+                    e_frac_loss_radius=radius,
                 )
-                loss_E_frac_true, particle_ids_all, reco_count, non_reco_count, total_count = loss_E_frac_true
-                loss_E_frac_true_nopart, particle_ids_all_nopart, reco_count_nopart, non_reco_count_nopart, total_count_nopart = loss_E_frac_true_nopart
+                (
+                    loss_E_frac_true,
+                    particle_ids_all,
+                    reco_count,
+                    non_reco_count,
+                    total_count,
+                ) = loss_E_frac_true
+                (
+                    loss_E_frac_true_nopart,
+                    particle_ids_all_nopart,
+                    reco_count_nopart,
+                    non_reco_count_nopart,
+                    total_count_nopart,
+                ) = loss_E_frac_true_nopart
                 update_dict(reco_counts, reco_count_nopart)
                 update_dict(total_counts, total_count_nopart)
                 if len(reco_count):
@@ -499,49 +524,77 @@ def inference_statistics(
                 update_dict(non_reco_counts, non_reco_count_nopart)
                 loss_E_fracs.append([x.cpu() for x in loss_E_frac])
                 loss_E_fracs_true.append([x.cpu() for x in loss_E_frac_true])
-                loss_E_fracs_true_nopart.append([x.cpu() for x in loss_E_frac_true_nopart])
+                loss_E_fracs_true_nopart.append(
+                    [x.cpu() for x in loss_E_frac_true_nopart]
+                )
                 loss_E_fracs_nopart.append([x.cpu() for x in loss_E_frac_nopart])
-                part_PID_true.append([y[torch.tensor(pidall) - 1, 6].long() for pidall in particle_ids_all])
-                part_E_true.append([y[torch.tensor(pidall) - 1, 3] for pidall in particle_ids_all])
+                part_PID_true.append(
+                    [
+                        y[torch.tensor(pidall) - 1, 6].long()
+                        for pidall in particle_ids_all
+                    ]
+                )
+                part_E_true.append(
+                    [y[torch.tensor(pidall) - 1, 3] for pidall in particle_ids_all]
+                )
                 if clust_loss_only:
                     clust_space_dim = model.mod.output_dim - 1
                 else:
                     clust_space_dim = model.mod.output_dim - 28
                 xj = model_output[:, 0:clust_space_dim]
                 if model.mod.clust_space_norm == "twonorm":
-                    xj = torch.nn.functional.normalize(
-                        xj, dim=1
-                    )
+                    xj = torch.nn.functional.normalize(xj, dim=1)
                 elif model.mod.clust_space_norm == "tanh":
                     xj = torch.tanh(xj)
                 elif model.mod.clust_space_norm == "none":
                     pass
                 bj = torch.sigmoid(
-                        torch.reshape(model_output[:, clust_space_dim], [-1, 1])
+                    torch.reshape(model_output[:, clust_space_dim], [-1, 1])
                 )  # 3: betas
                 bj = bj.clip(0.0, 1 - 1e-4)
                 q = bj.arctanh() ** 2 + args.qmin
-                fig, ax = plot_clust(batch_g, q, xj, y=y, radius=radius, loss_e_frac=loss_E_fracs[-1], betas=bj)
+                fig, ax = plot_clust(
+                    batch_g,
+                    q,
+                    xj,
+                    y=y,
+                    radius=radius,
+                    loss_e_frac=loss_E_fracs[-1],
+                    betas=bj,
+                )
                 betas = (
                     torch.sigmoid(
                         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
-                    ).detach().cpu().numpy()
+                    )
+                    .detach()
+                    .cpu()
+                    .numpy()
                 )
-                #figs.append(fig)
+                # figs.append(fig)
                 betas_list.append(betas)
             num_batches += 1
             if num_batches % 5 == 0 and save_ckpt_to_folder is not None:
                 Path(save_ckpt_to_folder).mkdir(parents=True, exist_ok=True)
-                loss_E_fracs_fold = [item for sublist in loss_E_fracs for item in sublist]
+                loss_E_fracs_fold = [
+                    item for sublist in loss_E_fracs for item in sublist
+                ]
                 loss_E_fracs_fold = torch.concat(loss_E_fracs_fold).flatten()
-                loss_E_fracs_true_fold = [item for sublist in loss_E_fracs_true for item in sublist]
+                loss_E_fracs_true_fold = [
+                    item for sublist in loss_E_fracs_true for item in sublist
+                ]
                 loss_E_fracs_true_fold = torch.concat(loss_E_fracs_true_fold).flatten()
                 part_E_true_fold = [item for sublist in part_E_true for item in sublist]
                 part_E_true_fold = torch.concat(part_E_true_fold).flatten()
-                part_PID_true_fold = [item for sublist in part_PID_true for item in sublist]
+                part_PID_true_fold = [
+                    item for sublist in part_PID_true for item in sublist
+                ]
                 part_PID_true_fold = torch.concat(part_PID_true_fold).flatten()
-                loss_E_fracs_nopart_fold = [item for sublist in loss_E_fracs_nopart for item in sublist]
-                loss_E_fracs_true_nopart_fold = [item for sublist in loss_E_fracs_true_nopart for item in sublist]
+                loss_E_fracs_nopart_fold = [
+                    item for sublist in loss_E_fracs_nopart for item in sublist
+                ]
+                loss_E_fracs_true_nopart_fold = [
+                    item for sublist in loss_E_fracs_true_nopart for item in sublist
+                ]
                 obj = {
                     "loss_e_fracs_nopart": loss_E_fracs_nopart_fold,
                     "loss_e_fracs_true_nopart": loss_E_fracs_true_nopart_fold,
@@ -569,8 +622,12 @@ def inference_statistics(
         part_E_true = torch.concat(part_E_true).flatten()
         part_PID_true = [item for sublist in part_PID_true for item in sublist]
         part_PID_true = torch.concat(part_PID_true).flatten()
-        loss_E_fracs_nopart = [item for sublist in loss_E_fracs_nopart for item in sublist]
-        loss_E_fracs_true_nopart = [item for sublist in loss_E_fracs_true_nopart for item in sublist]
+        loss_E_fracs_nopart = [
+            item for sublist in loss_E_fracs_nopart for item in sublist
+        ]
+        loss_E_fracs_true_nopart = [
+            item for sublist in loss_E_fracs_true_nopart for item in sublist
+        ]
 
     return {
         "loss_e_fracs": loss_E_fracs,
@@ -582,7 +639,7 @@ def inference_statistics(
         "part_PID_true": part_PID_true,
         "reco_counts": reco_counts,
         "non_reco_counts": non_reco_counts,
-        "total_counts": total_counts
+        "total_counts": total_counts,
     }
 
 

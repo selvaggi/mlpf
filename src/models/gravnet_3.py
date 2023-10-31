@@ -26,7 +26,7 @@ class GravnetModel(nn.Module):
         self,
         dev,
         input_dim: int = 9,
-        output_dim: int = 31,
+        output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
         clust_space_norm: str = "twonorm",
@@ -164,180 +164,181 @@ class GravnetModel(nn.Module):
         else:
             return x  # , loss_regularizing_neig, loss_ll
 
-    def object_condensation_loss2(
-        self,
-        batch,
-        pred,
-        y,
-        return_resolution=False,
-        clust_loss_only=False,
-        add_energy_loss=False,
-        calc_e_frac_loss=False,
-        q_min=0.1,
-        frac_clustering_loss=0.1,
-        attr_weight=1.0,
-        repul_weight=1.0,
-        fill_loss_weight=1.0,
-        use_average_cc_pos=0.0,
-        hgcalloss=False,
-    ):
-        """
 
-        :param batch:
-        :param pred:
-        :param y:
-        :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
-        :param clust_loss_only: If True, it will only add the clustering terms to the loss
-        :return:
-        """
-        _, S = pred.shape
-        if clust_loss_only:
-            clust_space_dim = self.output_dim - 1
-        else:
-            clust_space_dim = self.output_dim - 28
+def object_condensation_loss2(
+    batch,
+    pred,
+    y,
+    return_resolution=False,
+    clust_loss_only=False,
+    add_energy_loss=False,
+    calc_e_frac_loss=False,
+    q_min=0.1,
+    frac_clustering_loss=0.1,
+    attr_weight=1.0,
+    repul_weight=1.0,
+    fill_loss_weight=1.0,
+    use_average_cc_pos=0.0,
+    hgcalloss=False,
+    output_dim=4,
+    clust_space_norm="none",
+):
+    """
 
-        # xj = torch.nn.functional.normalize(
-        #     pred[:, 0:clust_space_dim], dim=1
-        # )  # 0, 1, 2: cluster space coords
+    :param batch:
+    :param pred:
+    :param y:
+    :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
+    :param clust_loss_only: If True, it will only add the clustering terms to the loss
+    :return:
+    """
+    _, S = pred.shape
+    if clust_loss_only:
+        clust_space_dim = output_dim - 1
+    else:
+        clust_space_dim = output_dim - 28
 
-        bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-        original_coords = batch.ndata["h"][:, 0:clust_space_dim]
-        xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
-        if self.clust_space_norm == "twonorm":
-            xj = torch.nn.functional.normalize(
-                xj, dim=1
-            )  # 0, 1, 2: cluster space coords
-        elif self.clust_space_norm == "tanh":
-            xj = torch.tanh(xj)
-        elif self.clust_space_norm == "none":
-            pass
-        else:
-            raise NotImplementedError
-        if clust_loss_only:
-            distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
-            energy_correction = torch.zeros_like(bj)
-            momentum = torch.zeros_like(bj)
-            pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
-                momentum.device
-            )
-        else:
-            distance_threshold = torch.reshape(
-                pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
-            )  # 4, 5, 6: distance thresholds
-            energy_correction = torch.nn.functional.relu(
-                torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
-            )  # 7: energy correction factor
-            momentum = torch.nn.functional.relu(
-                torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
-            )
-            pid_predicted = pred[
-                :, 5 + clust_space_dim : 27 + clust_space_dim
-            ]  # 8:30: predicted particle one-hot encoding
-        dev = batch.device
-        clustering_index_l = batch.ndata["particle_number"]
+    # xj = torch.nn.functional.normalize(
+    #     pred[:, 0:clust_space_dim], dim=1
+    # )  # 0, 1, 2: cluster space coords
 
-        len_batch = len(batch.batch_num_nodes())
-        batch_numbers = torch.repeat_interleave(
-            torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
-        ).to(dev)
-
-        a = calc_LV_Lbeta(
-            original_coords,
-            batch,
-            y,
-            distance_threshold,
-            energy_correction,
-            momentum=momentum,
-            predicted_pid=pid_predicted,
-            beta=bj.view(-1),
-            cluster_space_coords=xj,  # Predicted by model
-            cluster_index_per_event=clustering_index_l.view(
-                -1
-            ).long(),  # Truth hit->cluster index
-            batch=batch_numbers.long(),
-            qmin=q_min,
-            return_regression_resolution=return_resolution,
-            post_pid_pool_module=self.post_pid_pool_module,
-            clust_space_dim=clust_space_dim,
-            frac_combinations=frac_clustering_loss,
-            attr_weight=attr_weight,
-            repul_weight=repul_weight,
-            fill_loss_weight=fill_loss_weight,
-            use_average_cc_pos=use_average_cc_pos,
-            hgcal_implementation=hgcalloss,
+    bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
+    original_coords = batch.ndata["h"][:, 0:clust_space_dim]
+    xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
+    if clust_space_norm == "twonorm":
+        xj = torch.nn.functional.normalize(xj, dim=1)  # 0, 1, 2: cluster space coords
+    elif clust_space_norm == "tanh":
+        xj = torch.tanh(xj)
+    elif clust_space_norm == "none":
+        pass
+    else:
+        raise NotImplementedError
+    if clust_loss_only:
+        distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
+        energy_correction = torch.zeros_like(bj)
+        momentum = torch.zeros_like(bj)
+        pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
+            momentum.device
         )
-        if return_resolution:
-            return a
-        if clust_loss_only:
-            loss = a[0] + a[1]  # + 5 * a[14]
-            # if calc_e_frac_loss:
-            #     loss_E_frac, loss_E_frac_true = calc_energy_loss(
-            #         batch, xj, bj.view(-1), qmin=q_min
-            #     )
-            if add_energy_loss:
-                loss += a[2]  # TODO add weight as argument
-
-        else:
-            loss = (
-                a[0]
-                + a[1]
-                + 20 * a[2]
-                + 0.001 * a[3]
-                + 0.001 * a[4]
-                + 0.001
-                * a[
-                    5
-                ]  # TODO: the last term is the PID classification loss, explore this yet
-            )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
-        if clust_loss_only:
-            if calc_e_frac_loss:
-                return loss, a, 0, 0
-            else:
-                return loss, a, 0, 0
-        return loss, a, 0, 0
-
-    def object_condensation_inference(self, batch, pred):
-        """
-        Similar to object_condensation_loss, but made for inference
-        """
-        _, S = pred.shape
-        xj = torch.nn.functional.normalize(
-            pred[:, 0:3], dim=1
-        )  # 0, 1, 2: cluster space coords
-        bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
+    else:
         distance_threshold = torch.reshape(
-            pred[:, 4:7], [-1, 3]
+            pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
         )  # 4, 5, 6: distance thresholds
         energy_correction = torch.nn.functional.relu(
-            torch.reshape(pred[:, 7], [-1, 1])
+            torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
         )  # 7: energy correction factor
         momentum = torch.nn.functional.relu(
-            torch.reshape(pred[:, 30], [-1, 1])
-        )  # momentum magnitude
-        pid_predicted = pred[:, 8:30]  # 8:30: predicted particle PID
-        clustering_index = get_clustering(bj, xj)
-        dev = batch.device
-        len_batch = len(batch.batch_num_nodes())
-        batch_numbers = torch.repeat_interleave(
-            torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
-        ).to(dev)
-
-        pred = calc_LV_Lbeta_inference(
-            batch,
-            distance_threshold,
-            energy_correction,
-            momentum=momentum,
-            predicted_pid=pid_predicted,
-            beta=bj.view(-1),
-            cluster_space_coords=xj,  # Predicted by model
-            cluster_index_per_event=clustering_index.view(
-                -1
-            ).long(),  # Predicted hit->cluster index, determined by the clustering
-            batch=batch_numbers.long(),
-            qmin=0.1,
-            post_pid_pool_module=self.post_pid_pool_module,
+            torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
         )
-        return pred
+        pid_predicted = pred[
+            :, 5 + clust_space_dim : 27 + clust_space_dim
+        ]  # 8:30: predicted particle one-hot encoding
+    dev = batch.device
+    clustering_index_l = batch.ndata["particle_number"]
+
+    len_batch = len(batch.batch_num_nodes())
+    batch_numbers = torch.repeat_interleave(
+        torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
+    ).to(dev)
+
+    a = calc_LV_Lbeta(
+        original_coords,
+        batch,
+        y,
+        distance_threshold,
+        energy_correction,
+        momentum=momentum,
+        predicted_pid=pid_predicted,
+        beta=bj.view(-1),
+        cluster_space_coords=xj,  # Predicted by model
+        cluster_index_per_event=clustering_index_l.view(
+            -1
+        ).long(),  # Truth hit->cluster index
+        batch=batch_numbers.long(),
+        qmin=q_min,
+        return_regression_resolution=return_resolution,
+        post_pid_pool_module=None,
+        clust_space_dim=clust_space_dim,
+        frac_combinations=frac_clustering_loss,
+        attr_weight=attr_weight,
+        repul_weight=repul_weight,
+        fill_loss_weight=fill_loss_weight,
+        use_average_cc_pos=use_average_cc_pos,
+        hgcal_implementation=hgcalloss,
+    )
+    if return_resolution:
+        return a
+    if clust_loss_only:
+        loss = a[0] + a[1]  # + 5 * a[14]
+        # if calc_e_frac_loss:
+        #     loss_E_frac, loss_E_frac_true = calc_energy_loss(
+        #         batch, xj, bj.view(-1), qmin=q_min
+        #     )
+        if add_energy_loss:
+            loss += a[2]  # TODO add weight as argument
+
+    else:
+        loss = (
+            a[0]
+            + a[1]
+            + 20 * a[2]
+            + 0.001 * a[3]
+            + 0.001 * a[4]
+            + 0.001
+            * a[
+                5
+            ]  # TODO: the last term is the PID classification loss, explore this yet
+        )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
+    if clust_loss_only:
+        if calc_e_frac_loss:
+            return loss, a, 0, 0
+        else:
+            return loss, a, 0, 0
+    return loss, a, 0, 0
+
+
+def object_condensation_inference(self, batch, pred):
+    """
+    Similar to object_condensation_loss, but made for inference
+    """
+    _, S = pred.shape
+    xj = torch.nn.functional.normalize(
+        pred[:, 0:3], dim=1
+    )  # 0, 1, 2: cluster space coords
+    bj = torch.sigmoid(torch.reshape(pred[:, 3], [-1, 1]))  # 3: betas
+    distance_threshold = torch.reshape(
+        pred[:, 4:7], [-1, 3]
+    )  # 4, 5, 6: distance thresholds
+    energy_correction = torch.nn.functional.relu(
+        torch.reshape(pred[:, 7], [-1, 1])
+    )  # 7: energy correction factor
+    momentum = torch.nn.functional.relu(
+        torch.reshape(pred[:, 30], [-1, 1])
+    )  # momentum magnitude
+    pid_predicted = pred[:, 8:30]  # 8:30: predicted particle PID
+    clustering_index = get_clustering(bj, xj)
+    dev = batch.device
+    len_batch = len(batch.batch_num_nodes())
+    batch_numbers = torch.repeat_interleave(
+        torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
+    ).to(dev)
+
+    pred = calc_LV_Lbeta_inference(
+        batch,
+        distance_threshold,
+        energy_correction,
+        momentum=momentum,
+        predicted_pid=pid_predicted,
+        beta=bj.view(-1),
+        cluster_space_coords=xj,  # Predicted by model
+        cluster_index_per_event=clustering_index.view(
+            -1
+        ).long(),  # Predicted hit->cluster index, determined by the clustering
+        batch=batch_numbers.long(),
+        qmin=0.1,
+        post_pid_pool_module=self.post_pid_pool_module,
+    )
+    return pred
 
 
 class GravNetBlock(nn.Module):
@@ -400,7 +401,7 @@ class GravNetBlock(nn.Module):
         xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
             g, x, original_coords, batch
         )
-        #gncoords = gncoords.detach()
+        # gncoords = gncoords.detach()
         x = torch.cat((xgn, gncoords, x_input), dim=1)
         x = self.post_gravnet(x)
         x = self.batchnorm_gravnet2(x)  #! batchnorm 2

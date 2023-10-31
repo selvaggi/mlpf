@@ -153,7 +153,7 @@ def calc_LV_Lbeta(
     cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
     batch: torch.Tensor,
     predicted_pid: torch.Tensor,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
-    post_pid_pool_module: torch.nn.Module,  # MLP to apply to the pooled embeddings to get the PID predictions
+    post_pid_pool_module: None,  # MLP to apply to the pooled embeddings to get the PID predictions torch.nn.Module
     # From here on just parameters
     qmin: float = 0.1,
     s_B: float = 1.0,
@@ -316,9 +316,9 @@ def calc_LV_Lbeta(
         fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
     else:
         fill_loss = 0
-    pid_particles_pred = post_pid_pool_module(
-        pid_particles_pred
-    )  # Project the pooled PID embeddings to the final "one hot encoding" space
+    # pid_particles_pred = post_pid_pool_module(
+    #     pid_particles_pred
+    # )  # Project the pooled PID embeddings to the final "one hot encoding" space
     # pid_particles_pred = calc_pred_pid(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
     # )
@@ -342,26 +342,26 @@ def calc_LV_Lbeta(
     ]
     pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.0
 
-    if return_regression_resolution:
-        e_particles_pred = e_particles_pred.detach().flatten()
-        e_particles = e_particles.detach().flatten()
-        positions_particles_pred = positions_particles_pred.detach().flatten()
-        x_particles = x_particles.detach().flatten()
-        mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
-        mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-        return (
-            {
-                "momentum_res": (
-                    (mom_particles_pred - mom_particles_true) / mom_particles_true
-                ).tolist(),
-                "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-                "pos_res": (
-                    (positions_particles_pred - x_particles) / x_particles
-                ).tolist(),
-            },
-            pid_particles_true,
-            pid_particles_pred,
-        )
+    # if return_regression_resolution:
+    #     e_particles_pred = e_particles_pred.detach().flatten()
+    #     e_particles = e_particles.detach().flatten()
+    #     positions_particles_pred = positions_particles_pred.detach().flatten()
+    #     x_particles = x_particles.detach().flatten()
+    #     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+    #     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
+    #     return (
+    #         {
+    #             "momentum_res": (
+    #                 (mom_particles_pred - mom_particles_true) / mom_particles_true
+    #             ).tolist(),
+    #             "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+    #             "pos_res": (
+    #                 (positions_particles_pred - x_particles) / x_particles
+    #             ).tolist(),
+    #         },
+    #         pid_particles_true,
+    #         pid_particles_pred,
+    #     )
 
     loss_E = torch.mean(
         torch.square(
@@ -375,15 +375,15 @@ def calc_LV_Lbeta(
             / mom_particles_true.to(device)
         )
     )
-    loss_ce = torch.nn.BCELoss()
+    # loss_ce = torch.nn.BCELoss()
     loss_mse = torch.nn.MSELoss()
     loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
     # loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
-    loss_particle_ids = loss_ce(
-        pid_particles_pred.to(device), pid_particles_true.to(device)
-    )
-    pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
-    pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
+    # loss_particle_ids = loss_ce(
+    #     pid_particles_pred.to(device), pid_particles_true.to(device)
+    # )
+    # pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
+    # pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
     # pid_true = [pid_dict[i.long().item()] for i in pid_true]
     # pid_pred = [pid_dict[i.long().item()] for i in pid_pred]
     # Connectivity matrix from hit (row) -> cluster (column)
@@ -656,11 +656,11 @@ def calc_LV_Lbeta(
         L_beta / batch_size,
         loss_E,
         loss_x,
-        loss_particle_ids,  # 4
+        None,  # loss_particle_ids0,  # 4
         loss_momentum,
         loss_mass,
-        pid_true,
-        pid_pred,
+        None,  # pid_true,
+        None,  # pid_pred,
         resolutions,
         L_clusters,  # 10
         fill_loss,
