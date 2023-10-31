@@ -325,16 +325,16 @@ def train_regression(
                     )
                     wandb.log({"clust": wandb.Image(fig)})
                     fig.clf()
-                    if (num_batches - 1) % 500 == 0:
-                        wandb.log(
-                            {
-                                "conf_mat_train": wandb.plot.confusion_matrix(
-                                    y_true=pid_true,
-                                    preds=pid_pred,
-                                    class_names=class_names,
-                                )
-                            }
-                        )
+                    # if (num_batches - 1) % 500 == 0:
+                    #     wandb.log(
+                    #         {
+                    #             "conf_mat_train": wandb.plot.confusion_matrix(
+                    #                 y_true=pid_true,
+                    #                 preds=pid_pred,
+                    #                 class_names=class_names,
+                    #             )
+                    #         }
+                    #     )
 
                 ks = sorted(list(losses[9].keys()))
                 losses_cpu = [
