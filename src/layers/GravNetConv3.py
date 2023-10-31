@@ -126,7 +126,7 @@ class GravNetConv(MessagePassing):
 
         #! LLRegulariseGravNetSpace
         graph.edata["_edge_w"] = dist
-        graph.update_all(fn.copy_edge("_edge_w", "m"), fn.sum("m", "in_weight"))
+        graph.update_all(fn.copy_e("_edge_w", "m"), fn.sum("m", "in_weight"))
         degs = graph.dstdata["in_weight"] + 1e-4
         graph.dstdata["_dst_in_w"] = 1 / degs
         graph.apply_edges(
@@ -143,7 +143,7 @@ class GravNetConv(MessagePassing):
 
         gndist = torch.sqrt(gndist + 1e-6)
         graph.edata["_edge_w_gndist"] = dist
-        graph.update_all(fn.copy_edge("_edge_w_gndist", "m"), fn.sum("m", "in_weight"))
+        graph.update_all(fn.copy_e("_edge_w_gndist", "m"), fn.sum("m", "in_weight"))
         degs = graph.dstdata["in_weight"] + 1e-4
         graph.dstdata["_dst_in_w"] = 1 / degs
         graph.apply_edges(
