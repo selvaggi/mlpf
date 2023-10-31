@@ -390,7 +390,8 @@ def train_regression(
         if scheduler and getattr(scheduler, "_update_per_step") == False:
             if args.lr_scheduler == "reduceplateau":
                 scheduler.step(total_loss / num_batches)  # loss
-                wandb.log({"total_loss batch": total_loss / num_batches})
+                if logwandb and local_rank == 0:
+                    wandb.log({"total_loss batch": total_loss / num_batches})
             else:
                 scheduler.step()  # loss
             if logwandb and local_rank == 0:
