@@ -316,7 +316,7 @@ def create_graph(output, config=None, n_noise=0):
         theta_hits,
         phi_hits,
     ) = create_inputs_from_table(output, hits_only=hits_only)
-    pos_xyz_hits = pos_xyz_hits / 3330  # divide by detector size
+    pos_xyz_hits = pos_xyz_hits  # / 3330  # divide by detector size
     if standardize_coords:
         # Standardize the coordinates of the hits
         coord_cart_hits, scaler = standardize_coordinates(coord_cart_hits)
