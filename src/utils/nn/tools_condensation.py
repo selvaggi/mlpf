@@ -787,10 +787,10 @@ def evaluate_regression(
                     break
 
     if logwandb and local_rank == 0:
-        pid_true, pid_pred = torch.cat(
-            [torch.tensor(x[7]) for x in all_val_losses]
-        ), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
-        pid_true, pid_pred = pid_true.tolist(), pid_pred.tolist()
+        # pid_true, pid_pred = torch.cat(
+        #     [torch.tensor(x[7]) for x in all_val_losses]
+        # ), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
+        # pid_true, pid_pred = pid_true.tolist(), pid_pred.tolist()
         wandb.log(
             {
                 "loss val regression": np.mean(all_val_loss),
@@ -798,9 +798,9 @@ def evaluate_regression(
                 "loss val beta": np.mean([x[1] for x in all_val_losses]),
                 "loss val E": np.mean([x[2] for x in all_val_losses]),
                 "loss val X": np.mean([x[3] for x in all_val_losses]),
-                "conf_mat_val": wandb.plot.confusion_matrix(
-                    y_true=pid_true, preds=pid_pred, class_names=class_names
-                ),
+                # "conf_mat_val": wandb.plot.confusion_matrix(
+                #     y_true=pid_true, preds=pid_pred, class_names=class_names
+                # ),
             }
         )  # , step=step)
         if clust_loss_only and calc_e_frac_loss:
