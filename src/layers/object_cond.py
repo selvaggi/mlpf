@@ -541,7 +541,7 @@ def calc_LV_Lbeta(
             (scatter_add(beta[is_noise], batch[is_noise])) / n_noise_hits_per_event
         ).sum()
     )
-    print("L_beta_noise", L_beta_noise)
+    print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
     # if hgcal_implementation:
@@ -553,10 +553,10 @@ def calc_LV_Lbeta(
     #     L_beta_sig = beta_pen.sum()/len(beta_pen)
     if beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
-        L_beta_sig = torch.mean(  # maybe 0.5 for less aggressive loss
+        L_beta_sig = torch.sum(  # maybe 0.5 for less aggressive loss
             scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
         )
-        print("L_beta_sig", L_beta_sig)
+        print("L_beta_sig", L_beta_sig / batch_size)
         # beta_exp = beta[is_sig]
         # beta_exp[index_alpha] = 0
         # # L_exp = torch.mean(beta_exp)
@@ -650,7 +650,7 @@ def calc_LV_Lbeta(
     #    L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
     # except:
     #    pass
-
+    L_exp = L_beta
     return (
         L_V / batch_size,  # 0
         L_beta / batch_size,
