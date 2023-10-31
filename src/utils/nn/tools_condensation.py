@@ -163,7 +163,7 @@ def train_regression(
                     .numpy()
                 )
                 # wandb log betas hist
-                if logwandb:
+                if logwandb and local_rank == 0:
                     wandb.log(
                         {
                             "betas": wandb.Histogram(
@@ -184,14 +184,14 @@ def train_regression(
                 grad_scaler.update()
             step_end_time = time.time()
 
-            if clust_loss_only and calc_e_frac_loss and logwandb:
+            if clust_loss_only and calc_e_frac_loss and logwandb and local_rank == 0:
                 wandb.log(
                     {
                         "loss e frac": loss_E_frac,
                         "loss e frac true": loss_E_frac_true,
                     }
                 )
-            if logwandb and (num_batches % 10) == 0:
+            if logwandb and (num_batches % 10) == 0 and local_rank == 0:
                 wandb.log(
                     {
                         "load_time": load_end_time - prev_time,
@@ -241,7 +241,7 @@ def train_regression(
                             mode="train",
                         )
 
-            if logwandb and ((num_batches - 1) % 10) == 0:
+            if logwandb and ((num_batches - 1) % 10) == 0 and local_rank == 0:
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
@@ -346,12 +346,13 @@ def train_regression(
                     tables[key] = losses[9][
                         key
                     ]  # wandb.Table(data=[[x] for x in losses[9][key]], columns=[key])
-                wandb.log(
-                    {
-                        key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
-                        for key, val in losses_cpu[9].items()
-                    }
-                )  # , step=step_count)
+                if local_rank == 0:
+                    wandb.log(
+                        {
+                            key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
+                            for key, val in losses_cpu[9].items()
+                        }
+                    )  # , step=step_count)
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
@@ -387,7 +388,7 @@ def train_regression(
             # update the batch state
             tb_helper.batch_train_count += num_batches
         if scheduler and getattr(scheduler, "_update_per_step") == False:
-            if args.lr_scheduler == "reduceplateau":
+            if args.lr_scheduler == "reduceplateau" and local_rank == 0:
                 scheduler.step(total_loss / num_batches)  # loss
                 wandb.log({"total_loss batch": total_loss / num_batches})
             else:
@@ -784,7 +785,7 @@ def evaluate_regression(
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
 
-    if logwandb:
+    if logwandb and local_rank == 0:
         pid_true, pid_pred = torch.cat(
             [torch.tensor(x[7]) for x in all_val_losses]
         ), torch.cat([torch.tensor(x[8]) for x in all_val_losses])
