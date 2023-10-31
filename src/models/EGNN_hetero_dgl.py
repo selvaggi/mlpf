@@ -203,6 +203,10 @@ class HEGNN(nn.Module):
             torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
         ).to(dev)
 
+        self.beta_weight = 1.0  # set this to zero for no beta loss (when it's frozen)
+        self.beta_exp_weight = 0.0  # set this to also optimize using beta zeros loss
+        self.attr_rep_weight = 1.0
+
         a = calc_LV_Lbeta(
             original_coords,
             batch,
