@@ -42,7 +42,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     list_p = np.unique(hit_particle_link)
     list_remove = []
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
-    print(part_frac)
+    # print(part_frac)
     filt1 = (
         (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     )  # only keep these particles
@@ -75,13 +75,13 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
 
     else:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
-    print(
-        "removing",
-        np.sum(mask_particles),
-        "particles out of ",
-        len(list_p),
-        np.sum(mask_particles) / len(list_p),
-    )
+    # print(
+    #     "removing",
+    #     np.sum(mask_particles),
+    #     "particles out of ",
+    #     len(list_p),
+    #     np.sum(mask_particles) / len(list_p),
+    # )
     return mask, mask_particles
 
 
@@ -107,7 +107,7 @@ def scatter_count(input: torch.Tensor):
 
 def create_inputs_from_table(output, hits_only):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
-    print("number_hits", number_hits)
+    # print("number_hits", number_hits)
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
@@ -338,18 +338,18 @@ def create_graph(output, config=None, n_noise=0):
     # g = dgl.to_bidirected(g)
     if coord_cart_hits.shape[0] > 0:
         graph_empty = False
-        if config.graph_config.get("fully_connected", False):
-            n_nodes = graph_coordinates.shape[0]
-            if n_nodes > 1:
-                i, j = torch.tril_indices(n_nodes, n_nodes, offset=-1)
-                g = dgl.graph((i, j))  # create fully connected graph
-                g = dgl.to_simple(g)  # remove repeated edges
-                g = dgl.to_bidirected(g)
-            else:
-                g = dgl.knn_graph(graph_coordinates, 0, exclude_self=True)
-        else:
-            g = dgl.DGLGraph()
-            g.add_nodes(graph_coordinates.shape[0])
+        # if config.graph_config.get("fully_connected", False):
+        #     n_nodes = graph_coordinates.shape[0]
+        #     if n_nodes > 1:
+        #         i, j = torch.tril_indices(n_nodes, n_nodes, offset=-1)
+        #         g = dgl.graph((i, j))  # create fully connected graph
+        #         g = dgl.to_simple(g)  # remove repeated edges
+        #         g = dgl.to_bidirected(g)
+        #     else:
+        #         g = dgl.knn_graph(graph_coordinates, 0, exclude_self=True)
+        # else:
+        g = dgl.DGLGraph()
+        g.add_nodes(graph_coordinates.shape[0])
         #     g = dgl.knn_graph(
         #         graph_coordinates,
         #         config.graph_config.get("k", 7),
@@ -370,8 +370,8 @@ def create_graph(output, config=None, n_noise=0):
         #     )
         # else:
         hit_features_graph = torch.cat(
-                (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-            )
+            (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
+        )
         # hit_features_graph = torch.cat(
         #     (hit_type_one_hot, e_hits, p_hits), dim=1
         # )
@@ -385,7 +385,7 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["e_hits"] = e_hits
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
-        #g.edata["h"] = edge_attr
+        # g.edata["h"] = edge_attr
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
         if len(y_data_graph) < 2:

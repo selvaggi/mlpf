@@ -170,7 +170,7 @@ def calc_LV_Lbeta(
     fill_loss_weight=0.0,
     use_average_cc_pos=0.0,
     hgcal_implementation=False,
-    hit_energies=None
+    hit_energies=None,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -264,9 +264,9 @@ def calc_LV_Lbeta(
     assert q.size() == (n_hits,)
 
     # Calculate q_alpha, the max q per object, and the indices of said maxima
-    assert hit_energies.shape == q.shape
-    q_alpha, index_alpha = scatter_max(hit_energies[is_sig], object_index)
-    #q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
+    # assert hit_energies.shape == q.shape
+    # q_alpha, index_alpha = scatter_max(hit_energies[is_sig], object_index)
+    q_alpha, index_alpha = scatter_max(q[is_sig], object_index)
     assert q_alpha.size() == (n_objects,)
 
     # Get the cluster space coordinates and betas for these maxima hits too
@@ -560,9 +560,9 @@ def calc_LV_Lbeta(
 
         beta_exp = beta[is_sig]
         beta_exp[index_alpha] = 0
-        #L_exp = torch.mean(beta_exp)
-        beta_exp = torch.exp(0.5*beta_exp)
-        L_exp = torch.mean(scatter_add(beta_exp,  batch)/ n_hits_per_event)
+        # L_exp = torch.mean(beta_exp)
+        beta_exp = torch.exp(0.5 * beta_exp)
+        L_exp = torch.mean(scatter_add(beta_exp, batch) / n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
 
