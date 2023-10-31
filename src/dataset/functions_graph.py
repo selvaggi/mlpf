@@ -40,10 +40,10 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     energy_cut = 0.01
     # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
-    print(list_p)
+    # print(list_p)
     list_remove = []
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
-    print(part_frac)
+    # print(part_frac)
     filt1 = (
         (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     )  # only keep these particles
@@ -51,8 +51,8 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     for p in list_p:
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        if np.array_equal(hit_types, [0, 1]):
-            print("will remove particle", p)
+        # if np.array_equal(hit_types, [0, 1]):
+        #     print("will remove particle", p)
         if (
             np.array_equal(hit_types, [0, 1]) or int(p) not in filt1
         ):  # This is commented to disable filtering
