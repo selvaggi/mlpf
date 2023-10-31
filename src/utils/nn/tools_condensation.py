@@ -388,7 +388,7 @@ def train_regression(
             # update the batch state
             tb_helper.batch_train_count += num_batches
         if scheduler and getattr(scheduler, "_update_per_step") == False:
-            if args.lr_scheduler == "reduceplateau" and local_rank == 0:
+            if args.lr_scheduler == "reduceplateau":
                 scheduler.step(total_loss / num_batches)  # loss
                 wandb.log({"total_loss batch": total_loss / num_batches})
             else:
