@@ -66,7 +66,7 @@ class GravNetConv(MessagePassing):
         # torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
-        self.norm = EdgeWeightNorm(norm="right")
+        self.norm = EdgeWeightNorm(norm="right", eps=0.0)
         # self.reset_parameters()
 
     def reset_parameters(self):
@@ -103,18 +103,19 @@ class GravNetConv(MessagePassing):
         edge_index = torch.stack([row, col], dim=0)
 
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
+
         # print("distancesq distancesq distancesq")
         # print(edge_weight)
-        edge_weight = edge_weight + 1e-5
+        # edge_weight = edge_weight + 1e-5
         #! normalized edge weight
         # print("edge weight", edge_weight)
-        edge_weight = self.norm(graph, edge_weight)
+        # edge_weight = self.norm(graph, edge_weight)
         # print("normalized edge weight", edge_weight)
         # edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
 
         #! AverageDistanceRegularizer
         dist = edge_weight
-        dist = torch.sqrt(dist + 1e-3)
+        dist = torch.sqrt(dist + 1e-6)
         graph.edata["dist"] = dist
         graph.ndata["ones"] = torch.ones_like(s_l)
         # average dist per node and divide by the number of neighbourgs
@@ -124,17 +125,31 @@ class GravNetConv(MessagePassing):
         # propagate_type: (x: OptPairTensor, edge_weight: OptTensor)
 
         #! LLRegulariseGravNetSpace
+        graph.edata["_edge_w"] = dist
+        graph.update_all(fn.copy_edge("_edge_w", "m"), fn.sum("m", "in_weight"))
+        degs = graph.dstdata["in_weight"] + 1e-4
+        graph.dstdata["_dst_in_w"] = 1 / degs
+        graph.apply_edges(
+            lambda e: {"_norm_edge_weights": e.dst["_dst_in_w"] * e.data["_edge_w"]}
+        )
+        dist = graph.edata["_norm_edge_weights"]
+
         original_coord = g.ndata["pos_hits_xyz"]
-        dit_orig = (
+        gndist = (
             (original_coord[edge_index[0]] - original_coord[edge_index[1]])
             .pow(2)
             .sum(-1)
         )
-        # print("gndist", dit_orig * 100)
-        gndist = self.norm(graph, dit_orig)
-        # print("normalized gndist", gndist)
-        gndist = torch.sqrt(gndist + 1e-6)
 
+        gndist = torch.sqrt(gndist + 1e-6)
+        graph.edata["_edge_w_gndist"] = dist
+        graph.update_all(fn.copy_edge("_edge_w_gndist", "m"), fn.sum("m", "in_weight"))
+        degs = graph.dstdata["in_weight"] + 1e-4
+        graph.dstdata["_dst_in_w"] = 1 / degs
+        graph.apply_edges(
+            lambda e: {"_norm_edge_weights_gn": e.dst["_dst_in_w"] * e.data["_edge_w"]}
+        )
+        gndist = graph.edata["_norm_edge_weights_gn"]
         loss_llregulariser = 0.1 * torch.mean(torch.square(dist - gndist))
         # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
