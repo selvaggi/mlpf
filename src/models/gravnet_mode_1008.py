@@ -97,7 +97,7 @@ class GravnetModel(nn.Module):
         }
         self.act = acts[activation]
         N_NEIGHBOURS = [16, 128, 16, 256]
-
+        # N_NEIGHBOURS = [16, 50, 16, 60]
         self.return_graphs = False
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -108,10 +108,9 @@ class GravnetModel(nn.Module):
         self.batchnorm1 = nn.BatchNorm1d(self.input_dim)
         # else:
         #    self.batchnorm1 = nn.Identity()
-        input_dim_prime = 9   # 4 * input_dim
-        d_shape = 6  # 2 * input_dim
-        self.input = nn.Linear(input_dim_prime, d_shape, bias=False)
-        self.input.weight.data.copy_(torch.eye(d_shape, input_dim_prime))
+        d_shape = 2 * input_dim
+        self.input = nn.Linear(4 * input_dim, d_shape, bias=False)
+        self.input.weight.data.copy_(torch.eye(d_shape, 4 * input_dim))
         print("clust_space_norm", clust_space_norm)
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
@@ -167,9 +166,9 @@ class GravnetModel(nn.Module):
         batch = obtain_batch_numbers(x, g)
         # print('forward called on device', device)
         # x = self.batchnorm1(x)
-        # x = global_exchange(x, batch)
-        #x_prime = XYZtoXYZPrime(x)
-        #x = torch.cat((x, x_prime), dim=1)
+        x = global_exchange(x, batch)
+        # x_prime = XYZtoXYZPrime(x)
+        # x = torch.cat((x, x_prime), dim=1)
         x = self.input(x)
         assert x.device == device
 

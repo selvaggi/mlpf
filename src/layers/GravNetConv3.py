@@ -11,6 +11,7 @@ import dgl
 import dgl.function as fn
 import numpy as np
 from dgl.nn import EdgeWeightNorm
+import torch_cmspepr
 
 
 class GravNetConv(MessagePassing):
@@ -62,7 +63,7 @@ class GravNetConv(MessagePassing):
             self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
         # self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
-        torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
+        # torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
         self.lin_h = Linear(in_channels, propagate_dimensions)
         self.lin = Linear(in_channels + 2 * propagate_dimensions, out_channels)
         self.norm = EdgeWeightNorm(norm="right")
@@ -71,7 +72,7 @@ class GravNetConv(MessagePassing):
     def reset_parameters(self):
         self.lin_s.reset_parameters()
         self.lin_h.reset_parameters()
-        self.lin.reset_parameters()
+        # self.lin.reset_parameters()
 
     def forward(
         self, g, x: Tensor, original_coords: Tensor, batch: OptTensor = None
@@ -83,9 +84,17 @@ class GravNetConv(MessagePassing):
         b: OptTensor = None
         if isinstance(batch, Tensor):
             b = batch
-        h_l: Tensor = self.lin_h(x)
+        h_l: Tensor = self.lin_h(x)  #! input_feature_transform
+
+        # print("weights input_feature_transform", self.lin_h.weight.data)
+        # print("bias input_feature_transform", self.lin_h.bias.data)
+
         s_l: Tensor = self.lin_s(x)
+        # print("weights input_spatial_transform", self.lin_s.weight.data)
+        # print("bias input_spatial_transform", self.lin_s.bias.data)
         s_l = s_l  ##+ original_coords
+        # print("coordinates INPUTS TO FIRST LAYER")
+        # print(s_l)
 
         graph = knn_per_graph(g, s_l, self.k)
         graph.ndata["s_l"] = s_l
@@ -94,6 +103,8 @@ class GravNetConv(MessagePassing):
         edge_index = torch.stack([row, col], dim=0)
 
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
+        # print("distancesq distancesq distancesq")
+        # print(edge_weight)
         edge_weight = edge_weight + 1e-5
         #! normalized edge weight
         # print("edge weight", edge_weight)
@@ -134,10 +145,10 @@ class GravNetConv(MessagePassing):
             edge_weight=edge_weight,
             size=(s_l.size(0), s_l.size(0)),
         )
-
+        # print("outfeats", out)
         #! not sure this cat is exactly the same that is happening in the RaggedGravNet but they also cat
         out = self.lin(torch.cat([out, x], dim=-1))
-        out = self.batchnorm_gravconv(out)
+        # out = self.batchnorm_gravconv(out)
         return (
             out,
             graph,
@@ -175,7 +186,12 @@ def knn_per_graph(g, sl, k):
     for graph in graphs_list:
         non = graph.number_of_nodes()
         sls_graph = sl[node_counter : node_counter + non]
-        new_graph = dgl.knn_graph(sls_graph, k, exclude_self=True)
+        # new_graph = dgl.knn_graph(sls_graph, k, exclude_self=True)
+        edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+        new_graph = dgl.graph(
+            (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+        )
+        new_graph = dgl.remove_self_loop(new_graph)
         new_graphs.append(new_graph)
         node_counter = node_counter + non
     return dgl.batch(new_graphs)

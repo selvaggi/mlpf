@@ -32,7 +32,7 @@ class GravnetModel(nn.Module):
         clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
         activation: str = "elu",
-        weird_batchnom=True,
+        weird_batchnom=False,
     ):
 
         super(GravnetModel, self).__init__()
@@ -47,7 +47,7 @@ class GravnetModel(nn.Module):
         }
         self.act = acts[activation]
 
-        N_NEIGHBOURS = [16, 40, 16, 40]
+        N_NEIGHBOURS = [16, 128, 16, 256]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim
@@ -57,7 +57,7 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
@@ -118,7 +118,7 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
         else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)
+            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
     def forward(self, g):
         x = g.ndata["h"]
@@ -150,12 +150,9 @@ class GravnetModel(nn.Module):
                 x = torch.concatenate(allfeat, dim=1)
 
         x = torch.cat(allfeat, dim=-1)
-        # print("cat gravnet", x)
-        # assert x.size() == (x.size(0), 4 * 96)
         assert x.device == device
 
         x = self.postgn_dense(x)
-        # print("post dense", x)
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
@@ -165,7 +162,7 @@ class GravnetModel(nn.Module):
         if self.return_graphs:
             return x, graphs
         else:
-            return x, loss_regularizing_neig, loss_ll
+            return x  # , loss_regularizing_neig, loss_ll
 
     def object_condensation_loss2(
         self,
@@ -273,10 +270,10 @@ class GravnetModel(nn.Module):
             return a
         if clust_loss_only:
             loss = a[0] + a[1]  # + 5 * a[14]
-            if calc_e_frac_loss:
-                loss_E_frac, loss_E_frac_true = calc_energy_loss(
-                    batch, xj, bj.view(-1), qmin=q_min
-                )
+            # if calc_e_frac_loss:
+            #     loss_E_frac, loss_E_frac_true = calc_energy_loss(
+            #         batch, xj, bj.view(-1), qmin=q_min
+            #     )
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
 
@@ -294,7 +291,7 @@ class GravnetModel(nn.Module):
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
             if calc_e_frac_loss:
-                return loss, a, loss_E_frac, loss_E_frac_true
+                return loss, a, 0, 0
             else:
                 return loss, a, 0, 0
         return loss, a, 0, 0
@@ -360,7 +357,7 @@ class GravNetBlock(nn.Module):
         if weird_batchnom:
             self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
         else:
-            self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape)
+            self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
         propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
             self.d_shape,
@@ -394,7 +391,7 @@ class GravNetBlock(nn.Module):
         if weird_batchnom:
             self.batchnorm_gravnet2 = WeirdBatchNorm(self.d_shape)
         else:
-            self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)
+            self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
 
     def forward(self, g, x: Tensor, batch: Tensor, original_coords: Tensor) -> Tensor:
         x = self.pre_gravnet(x)
@@ -403,7 +400,7 @@ class GravNetBlock(nn.Module):
         xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
             g, x, original_coords, batch
         )
-        gncoords = gncoords.detach()
+        #gncoords = gncoords.detach()
         x = torch.cat((xgn, gncoords, x_input), dim=1)
         x = self.post_gravnet(x)
         x = self.batchnorm_gravnet2(x)  #! batchnorm 2

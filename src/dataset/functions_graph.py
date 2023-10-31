@@ -5,7 +5,19 @@ from torch_scatter import scatter_add, scatter_sum
 from sklearn.preprocessing import StandardScaler
 
 from torch_scatter import scatter_sum
+
+
 def get_ratios(e_hits, part_idx, y):
+    """Obtain the percentage of energy of the particle present in the hits
+
+    Args:
+        e_hits (_type_): _description_
+        part_idx (_type_): _description_
+        y (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     energy_from_showers = scatter_sum(e_hits, part_idx.long(), dim=0)
     y_energy = y[:, 3]
     energy_from_showers = energy_from_showers[1:]
@@ -14,17 +26,38 @@ def get_ratios(e_hits, part_idx, y):
 
 
 def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
+    """This function remove particles with tracks only and remove particles with low fractions
+
+    Args:
+        hit_particle_link (_type_): _description_
+        hit_type_a (_type_): _description_
+        hit_energies (_type_): _description_
+        y (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    energy_cut = 0.01
     # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
     list_remove = []
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
-    filt1 = (torch.where(part_frac >= 0.05)[0] + 1).long().tolist()  # only keep these particles
+    print(part_frac)
+    filt1 = (
+        (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
+    )  # only keep these particles
+
     for p in list_p:
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        if np.array_equal(hit_types, [0, 1]):# or int(p) not in filt1: # This is commented to disable filtering
+        if np.array_equal(hit_types, [0, 1]):
+            print("will remove particle", p)
+        if (
+            np.array_equal(hit_types, [0, 1]) or int(p) not in filt1
+        ):  # This is commented to disable filtering
             list_remove.append(p)
-            assert part_frac[int(p) - 1] < 0.05
+            assert part_frac[int(p) - 1] < energy_cut
+
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
@@ -42,7 +75,13 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
 
     else:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
-
+    print(
+        "removing",
+        np.sum(mask_particles),
+        "particles out of ",
+        len(list_p),
+        np.sum(mask_particles) / len(list_p),
+    )
     return mask, mask_particles
 
 
@@ -68,6 +107,7 @@ def scatter_count(input: torch.Tensor):
 
 def create_inputs_from_table(output, hits_only):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
+    print("number_hits", number_hits)
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
@@ -81,7 +121,7 @@ def create_inputs_from_table(output, hits_only):
     )
     hit_type_feature = features_hits[:, 0].to(torch.int64)
     tracks = (hit_type_feature == 0) | (hit_type_feature == 1)
-    no_tracks = ~tracks
+    # no_tracks = ~tracks
     # no_tracks[0] = True
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type_feature, num_classes=4)
     # build the features (theta,phi,p)
@@ -124,7 +164,9 @@ def create_inputs_from_table(output, hits_only):
     )
     assert len(y_data_graph) == len(unique_list_particles)
     # old_cluster_id = cluster_id
-    mask_hits, mask_particles = find_mask_no_energy(cluster_id, hit_type_feature, e_hits, y_data_graph)
+    mask_hits, mask_particles = find_mask_no_energy(
+        cluster_id, hit_type_feature, e_hits, y_data_graph
+    )
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
     result = [
@@ -165,8 +207,7 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     num_hits_per_particle_min, num_hits_per_particle_max = 5, 60
     num_part = np.random.randint(npart_min, npart_max)
     num_hits_per_particle = np.random.randint(
-        num_hits_per_particle_min, num_hits_per_particle_max,
-        size=(num_part,)
+        num_hits_per_particle_min, num_hits_per_particle_max, size=(num_part,)
     )
     # create a synthetic graph - random hits uniformly between -4 and 4, distribution of hits is gaussian
     y_coords = torch.zeros((num_part, 3)).float()
@@ -178,15 +219,15 @@ def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
     graph_coordinates = torch.zeros((nh, 3)).float()
     hit_type_one_hot = torch.zeros((nh, 4)).float()
     e_hits = torch.zeros((nh, 1)).float() + 1.0
-    p_hits = (
-        torch.zeros((nh, 1)).float() + 1.0
-    )  # to avoid nans
+    p_hits = torch.zeros((nh, 1)).float() + 1.0  # to avoid nans
     for i in range(num_part):
         index = np.sum(num_hits_per_particle[:i])
-        graph_coordinates[index: index + num_hits_per_particle[i]] = (
-            torch.randn((num_hits_per_particle[i], 3)).float() * torch.tensor([0.12, 0.5, 0.4]) + y_coords[i]
+        graph_coordinates[index : index + num_hits_per_particle[i]] = (
+            torch.randn((num_hits_per_particle[i], 3)).float()
+            * torch.tensor([0.12, 0.5, 0.4])
+            + y_coords[i]
         )
-        hit_type_one_hot[index: index + num_hits_per_particle[i], 3] = 1.0
+        hit_type_one_hot[index : index + num_hits_per_particle[i], 3] = 1.0
     g = dgl.knn_graph(
         graph_coordinates, config.graph_config.get("k", 7), exclude_self=True
     )
@@ -242,7 +283,10 @@ def to_hetero(g, all_hit_types=[2, 3]):
         for j in all_hit_types:
             edge_mask = hit_types[edges[0]] == i
             edge_mask = edge_mask & (hit_types[edges[1]] == j)
-            graph_data[(str(i), "-", str(j))] = (edges[0][edge_mask], edges[1][edge_mask])
+            graph_data[(str(i), "-", str(j))] = (
+                edges[0][edge_mask],
+                edges[1][edge_mask],
+            )
     old_g = g
     g = dgl.heterograph(graph_data)
     g.nodes["2"].data = {key: old_g.ndata[key][ht_idx == 2] for key in old_g.ndata}
@@ -270,7 +314,7 @@ def create_graph(output, config=None, n_noise=0):
         hit_particle_link,
         pos_xyz_hits,
         theta_hits,
-        phi_hits
+        phi_hits,
     ) = create_inputs_from_table(output, hits_only=hits_only)
     pos_xyz_hits = pos_xyz_hits / 3330  # divide by detector size
     if standardize_coords:
@@ -304,26 +348,28 @@ def create_graph(output, config=None, n_noise=0):
             else:
                 g = dgl.knn_graph(graph_coordinates, 0, exclude_self=True)
         else:
-            g = dgl.knn_graph(
-                graph_coordinates,
-                config.graph_config.get("k", 7),
-                exclude_self=True,
-            )
-            if graph_coordinates.shape[0] < 10:
-                print(graph_coordinates.shape)
+            g = dgl.DGLGraph()
+            g.add_nodes(graph_coordinates.shape[0])
+        #     g = dgl.knn_graph(
+        #         graph_coordinates,
+        #         config.graph_config.get("k", 7),
+        #         exclude_self=True,
+        #     )
+        #     if graph_coordinates.shape[0] < 10:
+        #         print(graph_coordinates.shape)
 
-        i, j = g.edges()
-        edge_attr = torch.norm(
-            graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
-        ).view(-1, 1)
-        if n_noise > 0:
-            noise = torch.zeros((p_hits.shape[0], n_noise)).float()
-            noise.normal_(mean=0, std=1)
-            hit_features_graph = torch.cat(
-                (graph_coordinates, hit_type_one_hot, e_hits, p_hits, noise), dim=1
-            )
-        else:
-            hit_features_graph = torch.cat(
+        # i, j = g.edges()
+        # edge_attr = torch.norm(
+        #     graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
+        # ).view(-1, 1)
+        # if n_noise > 0:
+        #     noise = torch.zeros((p_hits.shape[0], n_noise)).float()
+        #     noise.normal_(mean=0, std=1)
+        #     hit_features_graph = torch.cat(
+        #         (graph_coordinates, hit_type_one_hot, e_hits, p_hits, noise), dim=1
+        #     )
+        # else:
+        hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
             )
         # hit_features_graph = torch.cat(
@@ -339,7 +385,7 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["e_hits"] = e_hits
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
-        g.edata["h"] = edge_attr
+        #g.edata["h"] = edge_attr
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
         if len(y_data_graph) < 2:
