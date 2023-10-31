@@ -511,7 +511,7 @@ def calc_LV_Lbeta(
             scatter_add(V_repulsive.sum(dim=0), batch_object)
             / (n_hits_per_event * nope)
         ).sum()
-
+    print(L_V_attractive, L_V_repulsive, L_V)
     L_V = (
         attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
@@ -541,7 +541,7 @@ def calc_LV_Lbeta(
             (scatter_add(beta[is_noise], batch[is_noise])) / n_noise_hits_per_event
         ).sum()
     )
-
+    print("L_beta_noise", L_beta_noise)
     # -------
     # L_beta signal term
     # if hgcal_implementation:
@@ -551,18 +551,17 @@ def calc_LV_Lbeta(
     #     beta_per_object_c = scatter_add(beta[is_sig], object_index)
     #     beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
     #     L_beta_sig = beta_pen.sum()/len(beta_pen)
-    # else:
     if beta_term_option == "paper":
-        beta_alpha = torch.exp(0.5 * beta[is_sig][index_alpha])
-        L_beta_sig = (  # maybe 0.5 for less aggressive loss
+        beta_alpha = beta[is_sig][index_alpha]
+        L_beta_sig = torch.mean(  # maybe 0.5 for less aggressive loss
             scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
-        ).sum()
-
-        beta_exp = beta[is_sig]
-        beta_exp[index_alpha] = 0
-        # L_exp = torch.mean(beta_exp)
-        beta_exp = torch.exp(0.5 * beta_exp)
-        L_exp = torch.mean(scatter_add(beta_exp, batch) / n_hits_per_event)
+        )
+        print("L_beta_sig", L_beta_sig)
+        # beta_exp = beta[is_sig]
+        # beta_exp[index_alpha] = 0
+        # # L_exp = torch.mean(beta_exp)
+        # beta_exp = torch.exp(0.5 * beta_exp)
+        # L_exp = torch.mean(scatter_add(beta_exp, batch) / n_hits_per_event)
 
     elif beta_term_option == "short-range-potential":
 
