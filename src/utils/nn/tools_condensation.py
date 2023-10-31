@@ -292,7 +292,7 @@ def train_regression(
 
                 if (num_batches - 1) % 100 == 0:
                     if clust_loss_only:
-                        clust_space_dim = model.mod.output_dim - 1
+                        clust_space_dim = 3  # model.mod.output_dim - 1
                     else:
                         clust_space_dim = model.mod.output_dim - 28
                     bj = torch.sigmoid(
@@ -300,14 +300,14 @@ def train_regression(
                     )  # 3: betas
                     xj = model_output[:, 0:clust_space_dim]  # xj: cluster space coords
                     # assert len(bj) == len(xj)
-                    if model.mod.clust_space_norm == "twonorm":
-                        xj = torch.nn.functional.normalize(
-                            xj, dim=1
-                        )  # 0, 1, 2: cluster space coords
-                    elif model.mod.clust_space_norm == "tanh":
-                        xj = torch.tanh(xj)
-                    elif model.mod.clust_space_norm == "none":
-                        pass
+                    # if model.mod.clust_space_norm == "twonorm":
+                    #     xj = torch.nn.functional.normalize(
+                    #         xj, dim=1
+                    #     )  # 0, 1, 2: cluster space coords
+                    # elif model.mod.clust_space_norm == "tanh":
+                    #     xj = torch.tanh(xj)
+                    # elif model.mod.clust_space_norm == "none":
+                    #     pass
 
                     bj = bj.clip(0.0, 1 - 1e-4)
                     q = bj.arctanh() ** 2 + args.qmin
@@ -539,16 +539,16 @@ def inference_statistics(
                     [y[torch.tensor(pidall) - 1, 3] for pidall in particle_ids_all]
                 )
                 if clust_loss_only:
-                    clust_space_dim = model.mod.output_dim - 1
+                    clust_space_dim = 3
                 else:
                     clust_space_dim = model.mod.output_dim - 28
                 xj = model_output[:, 0:clust_space_dim]
-                if model.mod.clust_space_norm == "twonorm":
-                    xj = torch.nn.functional.normalize(xj, dim=1)
-                elif model.mod.clust_space_norm == "tanh":
-                    xj = torch.tanh(xj)
-                elif model.mod.clust_space_norm == "none":
-                    pass
+                # if model.mod.clust_space_norm == "twonorm":
+                #     xj = torch.nn.functional.normalize(xj, dim=1)
+                # elif model.mod.clust_space_norm == "tanh":
+                #     xj = torch.tanh(xj)
+                # elif model.mod.clust_space_norm == "none":
+                #     pass
                 bj = torch.sigmoid(
                     torch.reshape(model_output[:, clust_space_dim], [-1, 1])
                 )  # 3: betas
@@ -745,7 +745,7 @@ def evaluate_regression(
                     losses,
                     loss_E_frac,
                     loss_E_frac_true,
-                ) = model.mod.object_condensation_loss2(
+                ) = object_condensation_loss2(
                     batch_g,
                     model_output,
                     y,
