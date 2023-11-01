@@ -128,7 +128,10 @@ def train_regression(
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
-                    model_output = model(batch_g)
+                    if local_rank == 0:
+                        model_output = model(batch_g, step_count)
+                    else:
+                        model_output = model(batch_g, 1)
                 preds = model_output.squeeze()
                 (
                     loss,
@@ -478,7 +481,7 @@ def inference_statistics(
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
-                    model_output = model(batch_g)
+                    model_output = model(batch_g,1)
                 preds = model_output.squeeze()
                 (
                     loss,
