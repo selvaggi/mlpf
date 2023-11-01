@@ -463,11 +463,11 @@ def PlotCoordinates(g, path, outdir, num_layer=0):
 
         tidx = graph_i.ndata["particle_number"]
         data = {
-            "X": coords[:, 0].numpy(),
-            "Y": coords[:, 1].numpy(),
-            "Z": coords[:, 2].numpy(),
-            "tIdx": tidx.numpy(),
-            "features": features.numpy(),
+            "X": coords[:, 0].detach().cpu().numpy(),
+            "Y": coords[:, 1].detach().cpu().numpy(),
+            "Z": coords[:, 2].detach().cpu().numpy(),
+            "tIdx": tidx.detach().cpu().numpy(),
+            "features": features.detach().cpu().numpy(),
         }
         hoverdict = {}
         # if hoverfeat is not None:
