@@ -423,7 +423,7 @@ def graph_batch_func(list_graphs):
         batch dgl: dgl batch of graphs
     """
     list_graphs_g = [el[0] for el in list_graphs]
-    list_y = [el[1] for el in list_graphs]
+    list_y = add_batch_number(list_graphs)
     ys = torch.cat(list_y, dim=0)
     ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
     bg = dgl.batch(list_graphs_g)
@@ -438,3 +438,13 @@ def spherical_to_cartesian(theta, phi, r, normalized=False):
     y = r * torch.sin(phi) * torch.sin(theta)
     z = r * torch.cos(phi)
     return torch.cat((x.unsqueeze(1), y.unsqueeze(1), z.unsqueeze(1)), dim=1)
+
+
+def add_batch_number(list_graphs):
+    list_y = []
+    for i, el in enumerate(list_graphs):
+        y = el[1]
+        batch_id = torch.ones(y.shape[0], 1) * i
+        y = torch.cat((y, batch_id), dim=1)
+        list_y.append(y)
+    return list_y

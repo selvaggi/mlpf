@@ -15,7 +15,7 @@ from pathlib import Path
 import os
 import pickle
 from src.models.gravnet_3 import object_condensation_loss2
-
+from src.layers.inference_oc import create_and_store_graph_output
 from src.layers.object_cond import (
     onehot_particles_arr,
     get_clustering,
@@ -695,22 +695,6 @@ def evaluate_regression(
     loss_terms=[],
     args=None,
 ):
-    """
-
-    :param model:
-    :param test_loader:
-    :param dev:
-    :param epoch:
-    :param for_training:
-    :param loss_func:
-    :param steps_per_epoch:
-    :param eval_metrics:
-    :param tb_helper:
-    :param logwandb:
-    :param energy_weighted:
-    :param local_rank:
-    :return:
-    """
     model.eval()
 
     data_config = test_loader.dataset.config
@@ -729,7 +713,7 @@ def evaluate_regression(
     observers = defaultdict(list)
     start_time = time.time()
     all_val_loss, all_val_losses = [], []
-
+    step = 0
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
@@ -742,7 +726,6 @@ def evaluate_regression(
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
                     model_output = model(batch_g, 1)
-                preds = model_output.squeeze().float()
                 (
                     loss,
                     losses,
@@ -758,6 +741,18 @@ def evaluate_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
+                #! create output graph with shower id ndata and store it for each event
+                # if args.store_output:
+                create_and_store_graph_output(
+                    batch_g,
+                    model_output,
+                    y,
+                    local_rank,
+                    step,
+                    path_save=args.model_prefix + "/evaluation_graphs",
+                )
+                step += 1
+
                 num_batches += 1
                 count += num_examples
                 total_loss += loss * num_examples
@@ -769,16 +764,6 @@ def evaluate_regression(
                     }
                 )
 
-                if tb_helper:
-                    if tb_helper.custom_fn:
-                        with torch.no_grad():
-                            tb_helper.custom_fn(
-                                model_output=model_output,
-                                model=model,
-                                epoch=epoch,
-                                i_batch=num_batches,
-                                mode="eval" if for_training else "test",
-                            )
                 losses_cpu = [
                     x.detach().to("cpu") if isinstance(x, torch.Tensor) else x
                     for x in losses
@@ -805,53 +790,34 @@ def evaluate_regression(
                 # ),
             }
         )  # , step=step)
-        if clust_loss_only and calc_e_frac_loss:
-            wandb.log(
-                {
-                    "loss e frac val": loss_E_frac,
-                    "loss e frac true val": loss_E_frac_true,
-                }
-            )
-        ks = sorted(list(all_val_losses[0][9].keys()))
-        concatenated = {}
-        for key in ks:
-            concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
-        tables = {}
-        for key in ks:
-            tables[key] = concatenated[
-                key
-            ]  # wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
-        wandb.log(
-            {
-                "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
-                for key in ks
-            }
-        )  # , step=step)
+        # if clust_loss_only and calc_e_frac_loss:
+        #     wandb.log(
+        #         {
+        #             "loss e frac val": loss_E_frac,
+        #             "loss e frac true val": loss_E_frac_true,
+        #         }
+        #     )
+        # ks = sorted(list(all_val_losses[0][9].keys()))
+        # concatenated = {}
+        # for key in ks:
+        #     concatenated[key] = np.concatenate([x[9][key] for x in all_val_losses])
+        # tables = {}
+        # for key in ks:
+        #     tables[key] = concatenated[
+        #         key
+        #     ]  # wandb.Table(data=[[x] for x in concatenated[key]], columns=[key])
+        # wandb.log(
+        #     {
+        #         "val " + key: wandb.Histogram(clip_list(tables[key]), num_bins=100)
+        #         for key in ks
+        #     }
+        # )  # , step=step)
 
     time_diff = time.time() - start_time
     _logger.info(
         "Processed %d entries in total (avg. speed %.1f entries/s)"
         % (count, count / time_diff)
     )
-
-    if tb_helper:
-        tb_mode = "eval" if for_training else "test"
-        tb_helper.write_scalars(
-            [
-                ("Loss/%s (epoch)" % tb_mode, total_loss / count, epoch),
-                ("MSE/%s (epoch)" % tb_mode, sum_sqr_err / count, epoch),
-                ("MAE/%s (epoch)" % tb_mode, sum_abs_err / count, epoch),
-            ]
-        )
-        if tb_helper.custom_fn:
-            with torch.no_grad():
-                tb_helper.custom_fn(
-                    model_output=model_output,
-                    model=model,
-                    epoch=epoch,
-                    i_batch=-1,
-                    mode=tb_mode,
-                )
 
     # scores = np.concatenate(scores)
     # labels = {k: _concat(v) for k, v in labels.items()}

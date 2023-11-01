@@ -512,7 +512,6 @@ def calc_LV_Lbeta(
             scatter_add(V_repulsive.sum(dim=0), batch_object)
             / (n_hits_per_event * nope)
         ).sum()
-    print(L_V_attractive, L_V_repulsive)
     L_V = (
         attr_weight * L_V_attractive
         + repul_weight * L_V_repulsive
