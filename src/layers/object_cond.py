@@ -552,15 +552,10 @@ def calc_LV_Lbeta(
         # beta_per_object_c = scatter_add(beta[is_sig], object_index)
         # beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
         # L_beta_sig = beta_pen.sum()/len(beta_pen)
-        #! one beta alpha per object 
+        #! one beta alpha per object
         beta_alpha = beta[is_sig][index_alpha]
-        L_beta_sig = (
-            torch.sum(  # maybe 0.5 for less aggressive loss
-                scatter_add((1 - beta_alpha), batch_object)
-            )
-            / n_objects
-        )
-        print("L_beta_sig", n_objects, scatter_add((1 - beta_alpha), batch_object))
+        L_beta_sig = torch.mean(1 - beta_alpha)
+        print("L_beta_sig", L_beta_sig, len(beta_alpha))
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.sum(  # maybe 0.5 for less aggressive loss
