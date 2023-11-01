@@ -741,7 +741,7 @@ def evaluate_regression(
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
-                    model_output = model(batch_g)
+                    model_output = model(batch_g, 1)
                 preds = model_output.squeeze().float()
                 (
                     loss,
