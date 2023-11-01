@@ -458,7 +458,7 @@ def PlotCoordinates(g, path, outdir, num_layer=0):
             coords = graph_i.ndata["gncoords"]
             features = graph_i.ndata["h"][:, -1]
         if path == "final_clustering":
-            coords = g.ndata["final_cluster"]
+            coords = graph_i.ndata["final_cluster"]
             features = graph_i.ndata["beta"]
 
         tidx = graph_i.ndata["particle_number"]
