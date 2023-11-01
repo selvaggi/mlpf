@@ -623,7 +623,7 @@ def model_setup(args, data_config):
         local_rank = 0
         dev = torch.device("cpu")
     model, model_info = network_module.get_model(
-        data_config, dev=dev, **network_options
+        data_config, args=args, dev=dev, **network_options
     )
 
     if args.freeze_core:
