@@ -463,9 +463,9 @@ def PlotCoordinates(g, path, outdir, num_layer=0):
 
         tidx = graph_i.ndata["particle_number"]
         data = {
-            "X": coords[:, 0].view(-1).detach().cpu().numpy(),
-            "Y": coords[:, 1].view(-1).detach().cpu().numpy(),
-            "Z": coords[:, 2].view(-1).detach().cpu().numpy(),
+            "X": coords[:, 0].view(-1,1).detach().cpu().numpy(),
+            "Y": coords[:, 1].view(-1,1).detach().cpu().numpy(),
+            "Z": coords[:, 2].view(-1,1).detach().cpu().numpy(),
             "tIdx": tidx.view(-1).detach().cpu().numpy(),
             "features": features.view(-1).detach().cpu().numpy(),
         }
