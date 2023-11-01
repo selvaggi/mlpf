@@ -33,6 +33,7 @@ from src.utils.train_utils import (
 )
 from src.dataset.functions_graph import graph_batch_func
 from src.utils.parser_args import parser
+import warnings
 
 
 def find_free_port():
@@ -47,6 +48,7 @@ def find_free_port():
 
 
 def _main(args):
+    warnings.filterwarnings("ignore")
     if args.condensation:
         from src.utils.nn.tools_condensation import train_regression as train
         from src.utils.nn.tools_condensation import evaluate_regression as evaluate
