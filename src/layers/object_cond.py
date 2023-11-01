@@ -546,12 +546,21 @@ def calc_LV_Lbeta(
     # -------
     # L_beta signal term
     if hgcal_implementation:
-        eps = 1e-3
-        beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
-        beta_pen = 1-eps*torch.log(beta_per_object)
-        beta_per_object_c = scatter_add(beta[is_sig], object_index)
-        beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
-        L_beta_sig = beta_pen.sum()/len(beta_pen)
+        # eps = 1e-3
+        # beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
+        # beta_pen = 1-eps*torch.log(beta_per_object)
+        # beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        # beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
+        # L_beta_sig = beta_pen.sum()/len(beta_pen)
+        #! one beta alpha per object 
+        beta_alpha = beta[is_sig][index_alpha]
+        L_beta_sig = (
+            torch.sum(  # maybe 0.5 for less aggressive loss
+                scatter_add((1 - beta_alpha), batch_object)
+            )
+            / n_objects
+        )
+        print("L_beta_sig", n_objects, scatter_add((1 - beta_alpha), batch_object))
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.sum(  # maybe 0.5 for less aggressive loss
