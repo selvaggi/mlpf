@@ -3,19 +3,19 @@ from src.models.gravnet_3 import GravnetModel
 
 
 class GraphTransformerNetWrapper(torch.nn.Module):
-    def __init__(self, dev, **kwargs) -> None:
+    def __init__(self, args, dev, **kwargs) -> None:
         super().__init__()
-        self.mod = GravnetModel(dev, **kwargs)
+        self.mod = GravnetModel(args, dev, **kwargs)
 
-    def forward(self, g):
-        return self.mod(g)
+    def forward(self, g, step_count):
+        return self.mod(g, step_count)
 
 
-def get_model(data_config, dev, **kwargs):
+def get_model(data_config, args, dev, **kwargs):
     # pf_features_dims = len(data_config.input_dicts['pf_features'])
     # num_classes = len(data_config.label_value)
     print("Model options: ", kwargs)
-    model = GraphTransformerNetWrapper(dev, **kwargs)
+    model = GraphTransformerNetWrapper(args, dev, **kwargs)
 
     model_info = {
         "input_names": list(data_config.input_names),
