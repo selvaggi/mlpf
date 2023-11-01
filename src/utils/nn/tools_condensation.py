@@ -88,7 +88,6 @@ def train_regression(
         if not hasattr(model.mod, "current_state_alternate_steps"):
             model.mod.current_state_alternate_steps = 0
     with tqdm.tqdm(train_loader) as tq:
-
         for batch_g, y in tq:
             if alternate_steps is not None and step_count % alternate_steps == 0:
                 print("Flipping steps")

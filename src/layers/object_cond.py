@@ -426,6 +426,7 @@ def calc_LV_Lbeta(
     # First select all norms of all signal hits w.r.t. all objects, mask out later
 
     if hgcal_implementation:
+        N_k = torch.sum(M, dim=0)
         norms = (cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)).norm(
             p=2, dim=-1
         )
@@ -460,8 +461,8 @@ def calc_LV_Lbeta(
     if hgcal_implementation:
         #! each shower is account for separately
         V_attractive = V_attractive.sum(dim=0)  # K objects
-        #! divide by the number of hits per object
-        V_attractive = V_attractive / n_hits_per_object
+        #! divide by the number of accounted points
+        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
 
         #! add to terms function (divide by total number of showers per event)
         L_V_attractive = scatter_add(V_attractive, batch_object) / n_objects_per_event
@@ -544,14 +545,14 @@ def calc_LV_Lbeta(
     print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
-    # if hgcal_implementation:
-    #     eps = 1e-3
-    #     beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
-    #     beta_pen = 1-eps*torch.log(beta_per_object)
-    #     beta_per_object_c = scatter_add(beta[is_sig], object_index)
-    #     beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
-    #     L_beta_sig = beta_pen.sum()/len(beta_pen)
-    if beta_term_option == "paper":
+    if hgcal_implementation:
+        eps = 1e-3
+        beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
+        beta_pen = 1-eps*torch.log(beta_per_object)
+        beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
+        L_beta_sig = beta_pen.sum()/len(beta_pen)
+    elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.sum(  # maybe 0.5 for less aggressive loss
             scatter_add((1 - beta_alpha), batch_object) / n_objects_per_event
