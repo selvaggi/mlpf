@@ -4,10 +4,11 @@ from torch import Tensor
 from torch_scatter import scatter_min, scatter_max, scatter_mean, scatter_add
 from torch.nn import Parameter
 from src.layers.GravNetConv3 import GravNetConv, WeirdBatchNorm
-
+import pandas as pd
+import numpy as np
 from typing import Tuple, Union, List
 import dgl
-
+import plotly.express as px
 from src.layers.object_cond import (
     calc_LV_Lbeta,
     get_clustering,
@@ -24,6 +25,7 @@ from src.models.gravnet_model import (
 class GravnetModel(nn.Module):
     def __init__(
         self,
+        args,
         dev,
         input_dim: int = 9,
         output_dim: int = 4,
@@ -36,8 +38,7 @@ class GravnetModel(nn.Module):
     ):
 
         super(GravnetModel, self).__init__()
-        print("k_gravnet:", k_gravnet)
-        k = k_gravnet
+        self.args = args
         assert activation in ["relu", "tanh", "sigmoid", "elu"]
         acts = {
             "relu": nn.ReLU(),
@@ -120,9 +121,10 @@ class GravnetModel(nn.Module):
         else:
             self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
-    def forward(self, g):
+    def forward(self, g, step_count):
         x = g.ndata["h"]
         original_coords = x[:, 0:3]
+        g.ndata["original_coords"] = original_coords
         device = x.device
         batch = obtain_batch_numbers(x, g)
         x = self.ScaledGooeyBatchNorm2_1(x)
@@ -134,12 +136,21 @@ class GravnetModel(nn.Module):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        for gravnet_block in self.gravnet_blocks:
+        if step_count % 5:
+            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+        for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
             x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
-                g, x, batch, original_coords
+                g,
+                x,
+                batch,
+                original_coords,
+                step_count,
+                self.args.model_prefix,
+                num_layer,
             )
+
             allfeat.append(x)
             graphs.append(graph)
             loss_regularizing_neig = (
@@ -156,6 +167,10 @@ class GravnetModel(nn.Module):
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
+        g.ndata["final_cluster"] = x_cluster_coord
+        g.ndata["beta"] = beta.view(-1)
+        if step_count % 5:
+            PlotCoordinates(g, path="final_clustering", outdir=self.args.model_prefix)
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         assert x.device == device
 
@@ -394,13 +409,27 @@ class GravNetBlock(nn.Module):
         else:
             self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
 
-    def forward(self, g, x: Tensor, batch: Tensor, original_coords: Tensor) -> Tensor:
+    def forward(
+        self,
+        g,
+        x: Tensor,
+        batch: Tensor,
+        original_coords: Tensor,
+        step_count,
+        outdir,
+        num_layer,
+    ) -> Tensor:
         x = self.pre_gravnet(x)
         x = self.batchnorm_gravnet1(x)
         x_input = x
         xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
             g, x, original_coords, batch
         )
+        g.ndata["gncoords"] = gncoords
+        if step_count % 5:
+            PlotCoordinates(
+                g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
+            )
         # gncoords = gncoords.detach()
         x = torch.cat((xgn, gncoords, x_input), dim=1)
         x = self.post_gravnet(x)
@@ -414,3 +443,81 @@ def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.00)
+
+
+def PlotCoordinates(g, path, outdir, num_layer=0):
+    outdir = outdir + "/figures"
+    name = path
+    graphs = dgl.unbatch(g)
+    for i in range(0, 3):
+        graph_i = graphs[i]
+        if path == "input_coords":
+            coords = graph_i.ndata["original_coords"]
+            features = graph_i.ndata["h"][:, -1]  # consider energy for size
+        if path == "gravnet_coord":
+            coords = graph_i.ndata["gncoords"]
+            features = graph_i.ndata["h"][:, -1]
+        if path == "final_clustering":
+            coords = g.ndata["final_cluster"]
+            features = graph_i.ndata["beta"]
+
+        tidx = graph_i.ndata["particle_number"]
+        data = {
+            "X": coords[:, 0].numpy(),
+            "Y": coords[:, 1].numpy(),
+            "Z": coords[:, 2].numpy(),
+            "tIdx": tidx.numpy(),
+            "features": features.numpy(),
+        }
+        hoverdict = {}
+        # if hoverfeat is not None:
+        #     for j in range(hoverfeat.shape[1]):
+        #         hoverdict["f_" + str(j)] = hoverfeat[:, j : j + 1]
+        #     data.update(hoverdict)
+
+        # if nidx is not None:
+        #     data.update({"av_same": av_same})
+
+        df = pd.DataFrame(
+            np.concatenate([data[k] for k in data], axis=1),
+            columns=[k for k in data],
+        )
+        df["orig_tIdx"] = df["tIdx"]
+        rdst = np.random.RandomState(1234567890)  # all the same
+        shuffle_truth_colors(df, "tIdx", rdst)
+
+        # hover_data = ["orig_tIdx", "idx"] + [k for k in hoverdict.keys()]
+        # if nidx is not None:
+        #     hover_data.append("av_same")
+        fig = px.scatter_3d(
+            df,
+            x="X",
+            y="Y",
+            z="Z",
+            color="tIdx",
+            size="features",
+            # hover_data=hover_data,
+            template="plotly_dark",
+            color_continuous_scale=px.colors.sequential.Rainbow,
+        )
+        fig.update_traces(marker=dict(line=dict(width=0)))
+        if path == "gravnet_coord":
+            fig.write_html(
+                outdir + "/" + name + "_" + num_layer + "_" + str(i) + ".html"
+            )
+        else:
+            fig.write_html(outdir + "/" + name + "_" + str(i) + ".html")
+
+
+def shuffle_truth_colors(df, qualifier="truthHitAssignementIdx", rdst=None):
+    ta = df[qualifier]
+    unta = np.unique(ta)
+    unta = unta[unta > -0.1]
+    if rdst is None:
+        np.random.shuffle(unta)
+    else:
+        rdst.shuffle(unta)
+    out = ta.copy()
+    for i in range(len(unta)):
+        out[ta == unta[i]] = i
+    df[qualifier] = out
