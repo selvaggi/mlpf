@@ -103,7 +103,7 @@ def generate_showers_data_frame(
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     pred_showers = shower_p_unique
-    true_showers = particle_ids
+    # true_showers = particle_ids
     # max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
 
     # Add true showers (matched and unmatched)
@@ -144,7 +144,8 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
         intersection_matrix[:, index] = scatter_add(counts, labels)
-        intersection_matrix_w[:, index] = scatter_add(h_hits, labels)
+        print(h_hits.device, labels.device)
+        intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
     return intersection_matrix, intersection_matrix_w
 
 
