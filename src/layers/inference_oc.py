@@ -111,7 +111,8 @@ def generate_showers_data_frame(
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3]
     index_matches = col_ind + 1
-    matched_es = torch.zeros_like(energy_t) * torch.nan
+    index_matches = index_matches.to(energy_t.device)
+    matched_es = torch.zeros_like(energy_t).to(energy_t.device) * torch.nan
     matched_es[row_ind] = e_pred_showers[index_matches]
     intersection_E = torch.zeros_like(energy_t) * torch.nan
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
