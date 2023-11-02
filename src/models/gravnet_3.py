@@ -135,7 +135,7 @@ class GravnetModel(nn.Module):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        if step_count % 5:
+        if step_count % 10:
             PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
@@ -442,5 +442,3 @@ def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.00)
-
-
