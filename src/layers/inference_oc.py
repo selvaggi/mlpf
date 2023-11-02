@@ -114,7 +114,7 @@ def generate_showers_data_frame(
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
     index_matches = col_ind + 1
-    index_matches = index_matches.to(e_pred_showers.device)
+    index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * torch.nan
     matched_es = matched_es.to(e_pred_showers.device)
     print(
