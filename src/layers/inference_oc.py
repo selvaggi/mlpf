@@ -120,7 +120,7 @@ def generate_showers_data_frame(
     matched_es[row_ind] = e_pred_showers[index_matches]
     intersection_E = torch.zeros_like(energy_t) * torch.nan
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
-    intersection_E[row_ind] = ie_e
+    intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
     ## showers that are not in the true showers:
     pred_showers[index_matches] = -1
     mask = pred_showers != -1
