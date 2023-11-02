@@ -143,8 +143,12 @@ def generate_showers_data_frame(
 
 
 def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hits):
-    intersection_matrix = torch.zeros((len(shower_p_unique), len(particle_ids)))
-    intersection_matrix_w = torch.zeros((len(shower_p_unique), len(particle_ids)))
+    intersection_matrix = torch.zeros((len(shower_p_unique), len(particle_ids))).to(
+        shower_p_unique.device
+    )
+    intersection_matrix_w = torch.zeros((len(shower_p_unique), len(particle_ids))).to(
+        shower_p_unique.device
+    )
     for index, id in enumerate(particle_ids):
         counts = torch.zeros_like(labels)
         mask_p = dic["graph"].ndata["particle_number"] == id
