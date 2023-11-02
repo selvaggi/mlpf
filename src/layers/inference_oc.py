@@ -109,11 +109,11 @@ def generate_showers_data_frame(
     # max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
 
     # Add true showers (matched and unmatched)
-    energy_t = dic["part_true"][:, 3]
+    energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
     index_matches = col_ind + 1
-    index_matches = index_matches.to(energy_t.device)
+    index_matches = index_matches.to(e_pred_showers.device)
     matched_es = torch.zeros_like(energy_t) * torch.nan
-    matched_es = matched_es.to(energy_t.device)
+    matched_es = matched_es.to(e_pred_showers.device)
     print(
         matched_es.device, row_ind.device, e_pred_showers.device, index_matches.device
     )
