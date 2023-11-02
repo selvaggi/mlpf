@@ -220,7 +220,7 @@ def plot_iou_matrix(iou_matrix, image_path):
     ax.matshow(iou_matrix, cmap=plt.cm.Blues)
     for i in range(0, iou_matrix.shape[1]):
         for j in range(0, iou_matrix.shape[0]):
-            c = np.round(iou_matrix[j, i].numpy(), 2)
+            c = np.round(iou_matrix[j, i].detach().cpu().numpy(), 2)
             ax.text(i, j, str(c), va="center", ha="center")
     fig.savefig(image_path, bbox_inches="tight")
     wandb.log({"iou_matrix": wandb.Image(image_path)})
