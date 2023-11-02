@@ -44,7 +44,6 @@ def create_and_store_graph_output(
                 )
                 .detach()
                 .cpu()
-                .numpy()
             )
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X)
             labels = db.labels_ + 1
@@ -161,7 +160,7 @@ def obtain_union_matrix(shower_p_unique, particle_ids, labels, dic):
     return union_matrix
 
 
-def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=1.0):
+def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
     """
     Returns a clustering of hits -> cluster_index, based on the GravNet model
     output (predicted betas and cluster space coordinates) and the clustering
