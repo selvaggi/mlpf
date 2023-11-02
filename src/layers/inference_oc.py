@@ -102,6 +102,8 @@ def generate_showers_data_frame(
     labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
+    row_ind = torch.Tensor(row_ind).to(e_pred_showers.device)
+    col_ind = torch.Tensor(col_ind).to(e_pred_showers.device)
     pred_showers = shower_p_unique
     # true_showers = particle_ids
     # max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
