@@ -36,8 +36,15 @@ def create_and_store_graph_output(
             clustering = get_clustering(betas, X)
         elif clustering_mode == "dbscan":
             distance_scale = (
-                torch.min(torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0]))
-                / 20
+                (
+                    torch.min(
+                        torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])
+                    )
+                    / 20
+                )
+                .detach()
+                .cpu()
+                .numpy()
             )
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X)
             labels = db.labels_ + 1
