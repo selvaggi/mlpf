@@ -64,7 +64,7 @@ def create_and_store_graph_output(
         u_m = u_m.to(model_output.device)
         iou_matrix = i_m / u_m
         iou_matrix_num = (
-            torch.transpose(iou_matrix_num[1:, :], 1, 0).clone().detach().cpu().numpy()
+            torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
         )
         row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
         if i == 0 and local_rank == 0:
