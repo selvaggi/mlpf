@@ -58,7 +58,7 @@ def create_and_store_graph_output(
         i_m, i_m_w = obtain_intersection_matrix(
             shower_p_unique, particle_ids, labels, dic, e_hits
         )
-        im = im.to(model_output.device)
+        i_m = i_m.to(model_output.device)
         i_m_w = i_m_w.to(model_output.device)
         u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
         u_m = u_m.to(model_output.device)
