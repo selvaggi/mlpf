@@ -133,9 +133,9 @@ def generate_showers_data_frame(
         (intersection_E, torch.zeros_like(fake_showers_e) * torch.nan), dim=0
     )
     d = {
-        "true_showers_E": energy_t,
-        "pred_showers_E": e_pred,
-        "e_pred_and_truth": e_pred_t,
+        "true_showers_E": energy_t.detach().cpu(),
+        "pred_showers_E": e_pred.detach().cpu(),
+        "e_pred_and_truth": e_pred_t.detach().cpu(),
     }
     df = pd.DataFrame(data=d)
 
