@@ -47,7 +47,7 @@ def create_and_store_graph_output(
                 .cpu()
                 .numpy()[0]
             )
-            db = DBSCAN(eps=distance_scale, min_samples=100).fit(X)
+            db = DBSCAN(eps=distance_scale, min_samples=100).fit(X.detach().cpu())
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long()
