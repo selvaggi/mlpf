@@ -63,10 +63,10 @@ def create_and_store_graph_output(
         u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
         u_m = u_m.to(model_output.device)
         iou_matrix = i_m / u_m
-
-        row_ind, col_ind = linear_sum_assignment(
-            -torch.transpose(iou_matrix[1:, :], 1, 0)
+        iou_matrix_num = (
+            torch.transpose(iou_matrix_num[1:, :], 1, 0).clone().detach().cpu().numpy()
         )
+        row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
         if i == 0 and local_rank == 0:
             image_path = path_save + "/example_1_clustering.png"
             plot_iou_matrix(iou_matrix, image_path)
