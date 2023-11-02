@@ -217,10 +217,11 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
 def plot_iou_matrix(iou_matrix, image_path):
     iou_matrix = torch.transpose(iou_matrix[1:, :], 1, 0)
     fig, ax = plt.subplots()
+    iou_matrix = iou_matrix.detach().cpu().numpy()
     ax.matshow(iou_matrix, cmap=plt.cm.Blues)
     for i in range(0, iou_matrix.shape[1]):
         for j in range(0, iou_matrix.shape[0]):
-            c = np.round(iou_matrix[j, i].detach().cpu().numpy(), 2)
+            c = np.round(iou_matrix[j, i], 2)
             ax.text(i, j, str(c), va="center", ha="center")
     fig.savefig(image_path, bbox_inches="tight")
     wandb.log({"iou_matrix": wandb.Image(image_path)})
