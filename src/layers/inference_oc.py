@@ -50,7 +50,7 @@ def create_and_store_graph_output(
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X.detach().cpu())
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
-            labels = torch.Tensor(labels).long()
+            labels = torch.Tensor(labels).long().to(model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
@@ -104,7 +104,7 @@ def generate_showers_data_frame(
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     pred_showers = shower_p_unique
     true_showers = particle_ids
-    max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
+    # max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
 
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3]
