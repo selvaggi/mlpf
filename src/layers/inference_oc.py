@@ -42,8 +42,10 @@ def create_and_store_graph_output(
                     )
                     / 20
                 )
+                .view(-1)
                 .detach()
                 .cpu()
+                .numpy()[0]
             )
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X)
             labels = db.labels_ + 1
