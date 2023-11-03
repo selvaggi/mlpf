@@ -212,14 +212,15 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     print(row_ind)
     print(col_ind)
     print(intersection_matrix_wt.shape)
-    print(range(len(col_ind) - 1))
-    for i in range(len(col_ind)):
+    print(range(0, len(col_ind) - 1))
+    for i in range(0, len(col_ind)):
         print("i", i)
         print(row_ind[i], col_ind[i])
         print(intersection_matrix_wt[row_ind[i], col_ind[i]])
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
         )
+    print("finized list")
     return torch.cat(list_intersection_E, dim=0)
 
 
