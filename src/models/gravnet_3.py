@@ -425,7 +425,7 @@ class GravNetBlock(nn.Module):
             g, x, original_coords, batch
         )
         g.ndata["gncoords"] = gncoords
-        if step_count % 5:
+        if step_count % 50:
             PlotCoordinates(
                 g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
             )
