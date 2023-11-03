@@ -214,6 +214,8 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     print(intersection_matrix_wt.shape)
     print(range(len(col_ind)))
     for i in range(len(col_ind)):
+        print(row_ind[i], col_ind[i])
+        print(intersection_matrix_wt[row_ind[i], col_ind[i]])
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
         )
