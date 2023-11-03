@@ -20,10 +20,12 @@ def create_and_store_graph_output(
     batch_id = y[:, -1].view(-1)
     df_list = []
     for i in range(0, len(graphs)):
-        mask = batch_id == 0
+        print("llooking into graph,", i)
+        mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
+        print("loaded graph and particles ", i)
         # print("STORING GRAPH")
         # torch.save(
         #     dic,
@@ -51,22 +53,27 @@ def create_and_store_graph_output(
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
-
+        print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
         e_hits = dic["graph"].ndata["e_hits"].view(-1)
+        print("asking for intersection matrix  ")
         i_m, i_m_w = obtain_intersection_matrix(
             shower_p_unique, particle_ids, labels, dic, e_hits
         )
+        print("got intersection matrix  ")
         i_m = i_m.to(model_output.device)
         i_m_w = i_m_w.to(model_output.device)
         u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
+        print("got union matrix  ")
         u_m = u_m.to(model_output.device)
         iou_matrix = i_m / u_m
         iou_matrix_num = (
             torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
         )
+        print("askind for LSA")
         row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
+        print("got LSA matrix  ")
         if i == 0 and local_rank == 0:
             image_path = path_save + "/example_1_clustering.png"
             plot_iou_matrix(iou_matrix, image_path)
@@ -78,6 +85,7 @@ def create_and_store_graph_output(
         print("past dataframe generation")
         df_list.append(df_event)
 
+    print("concatenating list")
     df_batch = pd.concat(df_list)
     #
     if store:
