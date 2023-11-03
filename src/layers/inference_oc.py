@@ -91,6 +91,7 @@ def create_and_store_graph_output(
             + ".pt"
         )
         df_batch.to_pickle(path_save)
+    log_efficiency(df_batch)
     return df_batch
 
 
