@@ -118,9 +118,9 @@ def generate_showers_data_frame(
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * torch.nan
     matched_es = matched_es.to(e_pred_showers.device)
-    print(
-        matched_es.device, row_ind.device, e_pred_showers.device, index_matches.device
-    )
+    # print(
+    #     matched_es.device, row_ind.device, e_pred_showers.device, index_matches.device
+    # )
     matched_es[row_ind] = e_pred_showers[index_matches]
     intersection_E = torch.zeros_like(energy_t) * torch.nan
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
@@ -160,7 +160,7 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
         intersection_matrix[:, index] = scatter_add(counts, labels)
-        print(h_hits.device, labels.device)
+        # print(h_hits.device, labels.device)
         intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
     return intersection_matrix, intersection_matrix_w
 
