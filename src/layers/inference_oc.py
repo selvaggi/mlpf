@@ -209,6 +209,10 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
     intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
+    print(row_ind)
+    print(col_ind)
+    print(intersection_matrix_wt.shape)
+    print(range(len(col_ind)))
     for i in range(len(col_ind)):
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)

@@ -743,7 +743,7 @@ def evaluate_regression(
                 )
                 #! create output graph with shower id ndata and store it for each event
                 # if args.store_output:
-                print("calculating clustering and matching showers")
+                #print("calculating clustering and matching showers")
                 # if step == 0 and local_rank == 0:
                 #     create_and_store_graph_output(
                 #         batch_g,
