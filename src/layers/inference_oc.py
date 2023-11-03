@@ -75,6 +75,7 @@ def create_and_store_graph_output(
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
+        print("past dataframe generation")
         df_list.append(df_event)
 
     df_batch = pd.concat(df_list)
@@ -126,24 +127,33 @@ def generate_showers_data_frame(
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
     print("shapes match?", row_ind.shape, ie_e.shape)
     intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
+    print("here")
     ## showers that are not in the true showers:
     pred_showers[index_matches] = -1
+    print("here2 ")
     mask = pred_showers != -1
+    print("here3 ")
     fake_showers_e = e_pred_showers[mask]
+    print("here4")
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * torch.nan
+    print("here5")
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
+    print("here6")
     energy_t = torch.cat((energy_t, fake_showers_showers_e_truw), dim=0)
+    print("here7")
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
+    print("here8")
     e_pred_t = torch.cat(
         (intersection_E, torch.zeros_like(fake_showers_e) * torch.nan), dim=0
     )
+    print("here9")
     d = {
         "true_showers_E": energy_t.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
         "e_pred_and_truth": e_pred_t.detach().cpu(),
     }
     df = pd.DataFrame(data=d)
-
+    print("here10 finished")
     return df
 
 
