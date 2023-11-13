@@ -19,13 +19,14 @@ def create_and_store_graph_output(
     graphs = dgl.unbatch(batch_g)
     batch_id = y[:, -1].view(-1)
     df_list = []
+    df_list_pandora = []
     for i in range(0, len(graphs)):
-        print("llooking into graph,", i)
+        # print("llooking into graph,", i)
         mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
-        print("loaded graph and particles ", i)
+        # print("loaded graph and particles ", i)
         # print("STORING GRAPH")
         # torch.save(
         #     dic,
@@ -53,40 +54,52 @@ def create_and_store_graph_output(
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
-        print("obtained clustering ")
+
+        labels_pandora = dic["graph"].ndata["pandora_cluster"]
+        labels_pandora[labels_pandora == -1] = 0
+        # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        shower_p_unique = torch.unique(labels)
-        e_hits = dic["graph"].ndata["e_hits"].view(-1)
-        print("asking for intersection matrix  ")
-        i_m, i_m_w = obtain_intersection_matrix(
-            shower_p_unique, particle_ids, labels, dic, e_hits
+
+        shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
+            labels, dic, particle_ids, model_output, local_rank, i, path_save
         )
-        print("got intersection matrix  ")
-        i_m = i_m.to(model_output.device)
-        i_m_w = i_m_w.to(model_output.device)
-        u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
-        print("got union matrix  ")
-        u_m = u_m.to(model_output.device)
-        iou_matrix = i_m / u_m
-        iou_matrix_num = (
-            torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
+
+        (
+            shower_p_unique_pandora,
+            row_ind_pandora,
+            col_ind_pandora,
+            i_m_w_pandora,
+        ) = match_showers(
+            labels_pandora,
+            dic,
+            particle_ids,
+            model_output,
+            local_rank,
+            i,
+            path_save,
+            pandora=True,
         )
-        print("askind for LSA")
-        row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
-        print("got LSA matrix  ")
-        if i == 0 and local_rank == 0:
-            image_path = path_save + "/example_1_clustering.png"
-            plot_iou_matrix(iou_matrix, image_path)
-        # row_ind are particles that are matched and col_ind the ind of preds they are matched to
 
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
-        print("past dataframe generation")
+        # print("past dataframe generation")
         df_list.append(df_event)
+        df_event_pandora = generate_showers_data_frame(
+            labels_pandora,
+            dic,
+            shower_p_unique_pandora,
+            particle_ids,
+            row_ind_pandora,
+            col_ind_pandora,
+            i_m_w_pandora,
+        )
+        df_list_pandora.append(df_event_pandora)
 
-    print("concatenating list")
+    # print("concatenating list")
     df_batch = pd.concat(df_list)
+
+    df_batch_pandora = pd.concat(df_list_pandora)
     #
     if store:
         path_save = (
@@ -100,68 +113,132 @@ def create_and_store_graph_output(
             + ".pt"
         )
         df_batch.to_pickle(path_save)
+        path_save_pandora = (
+            path_save
+            + "/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(epoch)
+            + "_pandora.pt"
+        )
+        df_batch_pandora.to_pickle(path_save_pandora)
     log_efficiency(df_batch)
+    log_efficiency(df_batch, pandora=True)
     return df_batch
 
 
-def log_efficiency(df):
+def log_efficiency(df, pandora=False):
     eff = np.sum(~np.isnan(df["pred_showers_E"].values)) / len(
         df["pred_showers_E"].values
     )
-    wandb.log({"efficiency validation": eff})
+    if pandora:
+        wandb.log({"efficiency validation pandora": eff})
+    else:
+        wandb.log({"efficiency validation": eff})
 
 
 def generate_showers_data_frame(
-    labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
+    labels,
+    dic,
+    shower_p_unique,
+    particle_ids,
+    row_ind,
+    col_ind,
+    i_m_w,
+    # labels_pandora,
+    # shower_p_unique_pandora,
+    # row_ind_pandora,
+    # col_ind_pandora,
+    # i_m_w_pandora,
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
-    # true_showers = particle_ids
-    # max_num_showers = torch.max(torch.Tensor([len(pred_showers), len(true_showers)]))
+
+    # e_pred_showers_pandora = scatter_add(
+    #     dic["graph"].ndata["e_hits"].view(-1), labels_pandora
+    # )
+    # row_ind_pandora = torch.Tensor(row_ind_pandora).to(e_pred_showers.device).long()
+    # col_ind_pandora = torch.Tensor(col_ind_pandora).to(e_pred_showers.device).long()
+    # pred_showers_pandora = shower_p_unique_pandora
 
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
-    matched_es = torch.zeros_like(energy_t) * torch.nan
+    matched_es = torch.zeros_like(energy_t) * (torch.nan)
     matched_es = matched_es.to(e_pred_showers.device)
-    # print(
-    #     matched_es.device, row_ind.device, e_pred_showers.device, index_matches.device
-    # )
+
+    # index_matches_pandora = col_ind_pandora + 1
+    # index_matches_pandora = index_matches_pandora.to(e_pred_showers.device).long()
+    # matched_es_pandora = torch.zeros_like(energy_t) * (-100)
+    # matched_es_pandora = matched_es_pandora.to(e_pred_showers.device)
+
     matched_es[row_ind] = e_pred_showers[index_matches]
-    intersection_E = torch.zeros_like(energy_t) * torch.nan
+    # matched_es_pandora[row_ind_pandora] = e_pred_showers_pandora[index_matches_pandora]
+
+    intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
-    print("shapes match?", row_ind.shape, ie_e.shape)
     intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
-    print("here")
-    ## showers that are not in the true showers:
+
+    # intersection_E_pandora = torch.zeros_like(energy_t) * (-100)
+    # ie_e_pandora = obtain_intersection_values(
+    #     i_m_w_pandora, row_ind_pandora, col_ind_pandora
+    # )
+    # intersection_E_pandora[row_ind_pandora] = ie_e_pandora.to(e_pred_showers.device)
+
+    # pred_showers_pandora[index_matches_pandora] = -1
+    # mask = pred_showers_pandora != -1
+    # fake_showers_e_pandora = pred_showers_pandora[mask]
+    # fake_showers_showers_e_truw_pandora = torch.zeros(
+    #     (fake_showers_e_pandora.shape[0])
+    # ) * (-100)
+    # fake_showers_showers_e_truw_pandora = fake_showers_showers_e_truw_pandora.to(
+    #     e_pred_showers.device
+    # )
+
     pred_showers[index_matches] = -1
-    print("here2 ")
     mask = pred_showers != -1
-    print("here3 ")
     fake_showers_e = e_pred_showers[mask]
-    print("here4")
-    fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * torch.nan
-    print("here5")
+    fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
-    print("here6")
-    energy_t = torch.cat((energy_t, fake_showers_showers_e_truw), dim=0)
-    print("here7")
-    e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
-    print("here8")
-    e_pred_t = torch.cat(
-        (intersection_E, torch.zeros_like(fake_showers_e) * torch.nan), dim=0
+
+    energy_t = torch.cat(
+        (energy_t, fake_showers_showers_e_truw),
+        dim=0,
     )
-    print("here9")
+    e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
+    # e_pred_pandora = torch.cat(
+    #     (matched_es_pandora, fake_showers_showers_e_truw), dim=0
+    # )
+    e_pred_t = torch.cat(
+        (
+            intersection_E,
+            torch.zeros_like(fake_showers_e) * (torch.nan),
+        ),
+        dim=0,
+    )
+    # e_pred_t_pandora = torch.cat(
+    #     (
+    #         intersection_E,
+    #         torch.zeros_like(fake_showers_e) * (-200),
+    #         torch.zeros_like(fake_showers_e_pandora) * (-100),
+    #     ),
+    #     dim=0,
+    # )
+    # print("here9")
     d = {
         "true_showers_E": energy_t.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
         "e_pred_and_truth": e_pred_t.detach().cpu(),
+        # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
+        # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
     }
     df = pd.DataFrame(data=d)
-    print("here10 finished")
+    # print("here10 finished")
     return df
 
 
@@ -228,18 +305,18 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
     intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
-    print(row_ind)
-    print(col_ind)
-    print(intersection_matrix_wt.shape)
-    print(range(0, len(col_ind) - 1))
+    # print(row_ind)
+    # print(col_ind)
+    # print(intersection_matrix_wt.shape)
+    # print(range(0, len(col_ind) - 1))
     for i in range(0, len(col_ind)):
-        print("i", i)
-        print(row_ind[i], col_ind[i])
-        print(intersection_matrix_wt[row_ind[i], col_ind[i]])
+        # print("i", i)
+        # print(row_ind[i], col_ind[i])
+        # print(intersection_matrix_wt[row_ind[i], col_ind[i]])
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
         )
-    print("finized list")
+    # print("finized list")
     return torch.cat(list_intersection_E, dim=0)
 
 
@@ -254,3 +331,35 @@ def plot_iou_matrix(iou_matrix, image_path):
             ax.text(i, j, str(c), va="center", ha="center")
     fig.savefig(image_path, bbox_inches="tight")
     wandb.log({"iou_matrix": wandb.Image(image_path)})
+
+
+def match_showers(
+    labels, dic, particle_ids, model_output, local_rank, i, path_save, pandora=False
+):
+    shower_p_unique = torch.unique(labels)
+    e_hits = dic["graph"].ndata["e_hits"].view(-1)
+    # print("asking for intersection matrix  ")
+    i_m, i_m_w = obtain_intersection_matrix(
+        shower_p_unique, particle_ids, labels, dic, e_hits
+    )
+    # print("got intersection matrix  ")
+    i_m = i_m.to(model_output.device)
+    i_m_w = i_m_w.to(model_output.device)
+    u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
+    # print("got union matrix  ")
+    u_m = u_m.to(model_output.device)
+    iou_matrix = i_m / u_m
+    iou_matrix_num = (
+        torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
+    )
+    # print("askind for LSA")
+    row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
+    # print("got LSA matrix  ")
+    if i == 0 and local_rank == 0:
+        if pandora:
+            image_path = path_save + "/example_1_clustering_pandora.png"
+        else:
+            image_path = path_save + "/example_1_clustering.png"
+        plot_iou_matrix(iou_matrix, image_path)
+    # row_ind are particles that are matched and col_ind the ind of preds they are matched to
+    return shower_p_unique, row_ind, col_ind, i_m_w

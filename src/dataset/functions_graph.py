@@ -112,7 +112,7 @@ def create_inputs_from_table(output, hits_only):
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
-
+    pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
@@ -184,13 +184,14 @@ def create_inputs_from_table(output, hits_only):
         pos_xyz_hits[~mask_hits],
         theta[~mask_hits],
         phi[~mask_hits],
+        pandora_cluster[~mask_hits],
     ]
     hit_type = result[5].argmax(dim=1)
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
         result[0] = hit_mask.sum()
-        for i in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
+        for i in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
             result[i] = result[i][hit_mask]
 
     return result
@@ -316,6 +317,7 @@ def create_graph(output, config=None, n_noise=0):
         pos_xyz_hits,
         theta_hits,
         phi_hits,
+        pandora_cluster,
     ) = create_inputs_from_table(output, hits_only=hits_only)
     pos_xyz_hits = pos_xyz_hits  # / 3330  # divide by detector size
     if standardize_coords:
@@ -389,6 +391,7 @@ def create_graph(output, config=None, n_noise=0):
         # g.edata["h"] = edge_attr
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
+        g.ndata["pandora_cluster"] = pandora_cluster
         if len(y_data_graph) < 2:
             graph_empty = True
     else:
