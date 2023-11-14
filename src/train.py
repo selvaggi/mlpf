@@ -242,9 +242,14 @@ def _main(args):
         tb = None
         if args.backend is not None and local_rank != 0:
             return
-        wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
-        wandb.run.name = args.wandb_displayname
-        log_wandb_init(args, data_config)
+        if args.log_wandb and local_rank == 0:
+            import wandb
+            from src.utils.logger_wandb import log_wandb_init
+
+            wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
+            wandb.run.name = args.wandb_displayname
+            log_wandb_init(args, data_config)
+
         if training_mode:
             del train_loader, val_loader
             test_loaders, data_config = test_load(args)
