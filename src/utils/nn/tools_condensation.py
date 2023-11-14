@@ -714,6 +714,8 @@ def evaluate_regression(
     start_time = time.time()
     all_val_loss, all_val_losses = [], []
     step = 0
+    df_showers = []
+    df_showers_pandora = []
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
@@ -776,18 +778,44 @@ def evaluate_regression(
                 all_val_loss.append(loss.detach().to("cpu").item())
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
+                if args.predict:
+                    df_batch, df_batch_pandora = create_and_store_graph_output(
+                        batch_g,
+                        model_output,
+                        y,
+                        local_rank,
+                        step,
+                        epoch,
+                        path_save=args.model_prefix + "/showers_df_evaluation",
+                        store=False,
+                    )
+                    df_showers.append(df_batch)
+                    df_showers_pandora.append(df_batch_pandora)
     # calculate showers at the end of every epoch
     if logwandb and local_rank == 0:
-        create_and_store_graph_output(
-            batch_g,
-            model_output,
-            y,
-            local_rank,
-            step,
-            epoch,
-            path_save=args.model_prefix + "/showers_df_evaluation",
-            store=True,
-        )
+        if args.predict:
+            from src.layers.inference_oc import store_at_batch_end
+            import pandas as pd
+
+            df_showers = pd.concat(df_showers)
+            df_showers_pandora = pd.concat(df_showers_pandora)
+            store_at_batch_end(
+                path_save=args.model_prefix + "/showers_df_evaluation",
+                df_batch=df_showers,
+                df_batch_pandora=df_showers_pandora,
+                step=0,
+            )
+        else:
+            create_and_store_graph_output(
+                batch_g,
+                model_output,
+                y,
+                local_rank,
+                step,
+                epoch,
+                path_save=args.model_prefix + "/showers_df_evaluation",
+                store=True,
+            )
     if logwandb and local_rank == 0:
         # pid_true, pid_pred = torch.cat(
         #     [torch.tensor(x[7]) for x in all_val_losses]
