@@ -240,6 +240,7 @@ def _main(args):
                 color="bold",
             )
 
+    print("TEST DATA TRAIN AND START EVALUATION", args.data_test)
     if args.data_test:
         print(args.data_test)
         tb = None
