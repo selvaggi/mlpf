@@ -102,7 +102,7 @@ def create_and_store_graph_output(
     df_batch_pandora = pd.concat(df_list_pandora)
     #
     if store:
-        path_save = (
+        path_save_ = (
             path_save
             + "/"
             + str(local_rank)
@@ -112,7 +112,7 @@ def create_and_store_graph_output(
             + str(epoch)
             + ".pt"
         )
-        df_batch.to_pickle(path_save)
+        df_batch.to_pickle(path_save_)
         path_save_pandora = (
             path_save
             + "/"
