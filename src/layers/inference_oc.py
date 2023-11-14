@@ -55,7 +55,7 @@ def create_and_store_graph_output(
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
 
-        labels_pandora = dic["graph"].ndata["pandora_cluster"]
+        labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
         labels_pandora[labels_pandora == -1] = 0
         # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
