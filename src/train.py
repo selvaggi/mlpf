@@ -12,6 +12,7 @@ import math
 import torch
 import sys
 import os
+import wandb
 
 torch.autograd.set_detect_anomaly(True)
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
@@ -213,7 +214,7 @@ def _main(args):
                 logwandb=args.log_wandb,
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
-                steps=steps, 
+                steps=steps,
                 loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
                 args=args,
             )
