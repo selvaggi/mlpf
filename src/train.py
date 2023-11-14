@@ -241,6 +241,7 @@ def _main(args):
             )
 
     if args.data_test:
+        print(args.data_test)
         tb = None
         if args.backend is not None and local_rank != 0:
             return
