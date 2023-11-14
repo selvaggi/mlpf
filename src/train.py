@@ -63,10 +63,7 @@ def _main(args):
 
     # load data
     if training_mode:
-
         train_loader, val_loader, data_config, train_input_names = train_load(args)
-        print(train_loader)
-
     else:
         test_loaders, data_config = test_load(args)
     # device
@@ -216,7 +213,6 @@ def _main(args):
                 logwandb=args.log_wandb,
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
-                step=steps,
                 loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
                 args=args,
             )
@@ -240,9 +236,7 @@ def _main(args):
                 color="bold",
             )
 
-    print("TEST DATA TRAIN AND START EVALUATION", args.data_test)
     if args.data_test:
-        print(args.data_test)
         tb = None
         if args.backend is not None and local_rank != 0:
             return
