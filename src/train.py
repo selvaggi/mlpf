@@ -214,7 +214,7 @@ def _main(args):
                 logwandb=args.log_wandb,
                 energy_weighted=args.energy_loss,
                 local_rank=local_rank,
-                steps=steps,
+                step=steps,
                 loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
                 args=args,
             )
