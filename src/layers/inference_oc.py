@@ -107,7 +107,7 @@ def create_and_store_graph_output(
 
 
 def store_at_batch_end(
-    path_save, df_batch, df_batch_pandora, local_rank, step, epoch=None
+    path_save, df_batch, df_batch_pandora, local_rank=0, step=0, epoch=None
 ):
     path_save_ = (
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
