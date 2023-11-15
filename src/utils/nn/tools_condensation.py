@@ -805,6 +805,7 @@ def evaluate_regression(
                 df_batch=df_showers,
                 df_batch_pandora=df_showers_pandora,
                 step=0,
+                predict=True
             )
         else:
             create_and_store_graph_output(

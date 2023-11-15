@@ -111,7 +111,9 @@ def create_and_store_graph_output(
         df_batch_pandora = pd.concat(df_list_pandora)
     #
     if store:
-        store_at_batch_end(path_save, df_list, df_list_pandora, local_rank, step, epoch)
+        store_at_batch_end(
+            path_save, df_list, df_list_pandora, local_rank, step, epoch, predict=False
+        )
     if predict:
         return df_batch, df_batch_pandora
     else:
@@ -119,25 +121,33 @@ def create_and_store_graph_output(
 
 
 def store_at_batch_end(
-    path_save, df_batch, df_batch_pandora, local_rank=0, step=0, epoch=None
+    path_save,
+    df_batch,
+    df_batch_pandora,
+    local_rank=0,
+    step=0,
+    epoch=None,
+    predict=False,
 ):
     path_save_ = (
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
     df_batch.to_pickle(path_save_)
-    path_save_pandora = (
-        path_save
-        + "/"
-        + str(local_rank)
-        + "_"
-        + str(step)
-        + "_"
-        + str(epoch)
-        + "_pandora.pt"
-    )
-    df_batch_pandora.to_pickle(path_save_pandora)
+    if predict:
+        path_save_pandora = (
+            path_save
+            + "/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(epoch)
+            + "_pandora.pt"
+        )
+        df_batch_pandora.to_pickle(path_save_pandora)
     log_efficiency(df_batch)
-    log_efficiency(df_batch_pandora, pandora=True)
+    if predict:
+        log_efficiency(df_batch_pandora, pandora=True)
 
 
 def log_efficiency(df, pandora=False):
