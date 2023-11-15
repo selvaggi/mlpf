@@ -788,6 +788,7 @@ def evaluate_regression(
                         epoch,
                         path_save=args.model_prefix + "/showers_df_evaluation",
                         store=False,
+                        predict=True,
                     )
                     df_showers.append(df_batch)
                     df_showers_pandora.append(df_batch_pandora)
@@ -815,6 +816,7 @@ def evaluate_regression(
                 epoch,
                 path_save=args.model_prefix + "/showers_df_evaluation",
                 store=True,
+                predict=False,
             )
     if logwandb and local_rank == 0:
         # pid_true, pid_pred = torch.cat(

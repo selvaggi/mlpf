@@ -12,7 +12,15 @@ import wandb
 
 
 def create_and_store_graph_output(
-    batch_g, model_output, y, local_rank, step, epoch, path_save, store=False
+    batch_g,
+    model_output,
+    y,
+    local_rank,
+    step,
+    epoch,
+    path_save,
+    store=False,
+    predict=False,
 ):
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
@@ -54,56 +62,60 @@ def create_and_store_graph_output(
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
-
-        labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
-        labels_pandora[labels_pandora == -1] = 0
+        if predict:
+            labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
+            labels_pandora[labels_pandora == -1] = 0
         # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
 
         shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
             labels, dic, particle_ids, model_output, local_rank, i, path_save
         )
-
-        (
-            shower_p_unique_pandora,
-            row_ind_pandora,
-            col_ind_pandora,
-            i_m_w_pandora,
-        ) = match_showers(
-            labels_pandora,
-            dic,
-            particle_ids,
-            model_output,
-            local_rank,
-            i,
-            path_save,
-            pandora=True,
-        )
+        if predict:
+            (
+                shower_p_unique_pandora,
+                row_ind_pandora,
+                col_ind_pandora,
+                i_m_w_pandora,
+            ) = match_showers(
+                labels_pandora,
+                dic,
+                particle_ids,
+                model_output,
+                local_rank,
+                i,
+                path_save,
+                pandora=True,
+            )
 
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
         # print("past dataframe generation")
         df_list.append(df_event)
-        df_event_pandora = generate_showers_data_frame(
-            labels_pandora,
-            dic,
-            shower_p_unique_pandora,
-            particle_ids,
-            row_ind_pandora,
-            col_ind_pandora,
-            i_m_w_pandora,
-        )
-        df_list_pandora.append(df_event_pandora)
+        if predict:
+            df_event_pandora = generate_showers_data_frame(
+                labels_pandora,
+                dic,
+                shower_p_unique_pandora,
+                particle_ids,
+                row_ind_pandora,
+                col_ind_pandora,
+                i_m_w_pandora,
+            )
+            df_list_pandora.append(df_event_pandora)
 
     # print("concatenating list")
     df_batch = pd.concat(df_list)
-
-    df_batch_pandora = pd.concat(df_list_pandora)
+    if predict:
+        df_batch_pandora = pd.concat(df_list_pandora)
     #
     if store:
         store_at_batch_end(path_save, df_list, df_list_pandora, local_rank, step, epoch)
-    return df_batch, df_batch_pandora
+    if predict:
+        return df_batch, df_batch_pandora
+    else:
+        return df_batch
 
 
 def store_at_batch_end(
@@ -255,12 +267,6 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
         h_hits = e_hits.clone()
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
-        print(
-            counts.shape,
-            labels.shape,
-            intersection_matrix.shape,
-            scatter_add(counts, labels).shape,
-        )
         intersection_matrix[:, index] = scatter_add(counts, labels)
         # print(h_hits.device, labels.device)
         intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
@@ -343,8 +349,6 @@ def match_showers(
     labels, dic, particle_ids, model_output, local_rank, i, path_save, pandora=False
 ):
     shower_p_unique = torch.unique(labels)
-    print("showers p unique", shower_p_unique.shape, pandora)
-    print(shower_p_unique)
     e_hits = dic["graph"].ndata["e_hits"].view(-1)
     # print("asking for intersection matrix  ")
     i_m, i_m_w = obtain_intersection_matrix(
