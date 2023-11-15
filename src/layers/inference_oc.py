@@ -248,12 +248,19 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
     intersection_matrix_w = torch.zeros((len(shower_p_unique), len(particle_ids))).to(
         shower_p_unique.device
     )
+
     for index, id in enumerate(particle_ids):
         counts = torch.zeros_like(labels)
         mask_p = dic["graph"].ndata["particle_number"] == id
         h_hits = e_hits.clone()
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
+        print(
+            counts.shape,
+            labels.shape,
+            intersection_matrix.shape,
+            scatter_add(counts, labels).shape,
+        )
         intersection_matrix[:, index] = scatter_add(counts, labels)
         # print(h_hits.device, labels.device)
         intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
