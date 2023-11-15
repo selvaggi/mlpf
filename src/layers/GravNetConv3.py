@@ -153,7 +153,8 @@ class GravNetConv(MessagePassing):
         loss_llregulariser = 0.1 * torch.mean(torch.square(dist - gndist))
         # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
-
+        edge_weight = torch.sqrt(edge_weight + 1e-6)
+        edge_weight = torch.exp(-torch.square(edge_weight))
         out = self.propagate(
             edge_index,
             x=[h_l, None],
