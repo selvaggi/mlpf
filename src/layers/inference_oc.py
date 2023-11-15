@@ -343,7 +343,8 @@ def match_showers(
     labels, dic, particle_ids, model_output, local_rank, i, path_save, pandora=False
 ):
     shower_p_unique = torch.unique(labels)
-    print("showers p unique", shower_p_unique.shape)
+    print("showers p unique", shower_p_unique.shape, pandora)
+    print(shower_p_unique)
     e_hits = dic["graph"].ndata["e_hits"].view(-1)
     # print("asking for intersection matrix  ")
     i_m, i_m_w = obtain_intersection_matrix(
