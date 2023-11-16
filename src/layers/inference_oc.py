@@ -28,6 +28,7 @@ def create_and_store_graph_output(
     batch_id = y[:, -1].view(-1)
     df_list = []
     df_list_pandora = []
+    print("len(graphs)", len(graphs))
     for i in range(0, len(graphs)):
         # print("llooking into graph,", i)
         mask = batch_id == i
@@ -107,6 +108,7 @@ def create_and_store_graph_output(
 
     # print("concatenating list")
     df_batch = pd.concat(df_list)
+    print(df_batch)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
     #
