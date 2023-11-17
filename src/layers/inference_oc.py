@@ -36,10 +36,17 @@ def create_and_store_graph_output(
         dic["part_true"] = y[mask]
         print("loaded graph and particles ", i)
         print("STORING GRAPH")
-        if i<5:
+        if i < 5:
             torch.save(
                 dic,
-                path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(i) + ".pt",
+                path_save
+                + "/"
+                + str(local_rank)
+                + "_"
+                + str(step)
+                + "_"
+                + str(i)
+                + ".pt",
             )
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
@@ -60,7 +67,7 @@ def create_and_store_graph_output(
                 .numpy()[0]
             )
             print("distance_scale", distance_scale)
-            distance_scale = 0.2
+            distance_scale = 0.1
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X.detach().cpu())
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
