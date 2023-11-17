@@ -59,7 +59,7 @@ def create_and_store_graph_output(
                     torch.min(
                         torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])
                     )
-                    / 20
+                    / 25
                 )
                 .view(-1)
                 .detach()
@@ -67,7 +67,7 @@ def create_and_store_graph_output(
                 .numpy()[0]
             )
             print("distance_scale", distance_scale)
-            distance_scale = 0.1
+            # distance_scale = 0.1
             db = DBSCAN(eps=distance_scale, min_samples=100).fit(X.detach().cpu())
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
