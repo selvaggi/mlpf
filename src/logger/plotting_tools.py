@@ -5,8 +5,11 @@ import pandas as pd
 import numpy as np
 
 
-def PlotCoordinates(g, path, outdir, num_layer=0):
-    outdir = outdir + "/figures"
+def PlotCoordinates(g, path, outdir, num_layer=0, predict=False):
+    if predict:
+        outdir = outdir + "/figures_evaluation"
+    else:
+        outdir = outdir + "/figures"
     name = path
     graphs = dgl.unbatch(g)
     for i in range(0, 3):

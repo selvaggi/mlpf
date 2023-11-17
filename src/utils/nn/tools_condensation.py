@@ -727,7 +727,11 @@ def evaluate_regression(
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
-                    model_output = model(batch_g, 1)
+                    if args.predict:
+                        step_plotting = 0
+                    else:
+                        step_plotting = 1
+                    model_output = model(batch_g, step_plotting)
                 (
                     loss,
                     losses,
@@ -805,7 +809,7 @@ def evaluate_regression(
                 df_batch=df_showers,
                 df_batch_pandora=df_showers_pandora,
                 step=0,
-                predict=True
+                predict=True,
             )
         else:
             create_and_store_graph_output(

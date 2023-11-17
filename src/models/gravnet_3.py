@@ -122,7 +122,7 @@ class GravnetModel(nn.Module):
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
-        original_coords = x[:, 0:3]
+        original_coords = x[:, 3:]
         g.ndata["original_coords"] = original_coords
         device = x.device
         batch = obtain_batch_numbers(x, g)
@@ -169,7 +169,7 @@ class GravnetModel(nn.Module):
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if step_count % 5:
-            PlotCoordinates(g, path="final_clustering", outdir=self.args.model_prefix)
+            PlotCoordinates(g, path="final_clustering", outdir=self.args.model_prefix, predict=self.args.predict)
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         assert x.device == device
 
