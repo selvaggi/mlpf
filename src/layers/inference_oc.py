@@ -59,7 +59,7 @@ def create_and_store_graph_output(
                     torch.min(
                         torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])
                     )
-                    / 25
+                    / 30
                 )
                 .view(-1)
                 .detach()
