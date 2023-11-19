@@ -34,20 +34,20 @@ def create_and_store_graph_output(
         dic = {}
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
-        # print("loaded graph and particles ", i)
-        # print("STORING GRAPH")
-        # if i < 5:
-        #     torch.save(
-        #         dic,
-        #         path_save
-        #         + "/"
-        #         + str(local_rank)
-        #         + "_"
-        #         + str(step)
-        #         + "_"
-        #         + str(i)
-        #         + ".pt",
-        #     )
+        print("loaded graph and particles ", i)
+        print("STORING GRAPH")
+        if i < 5:
+            torch.save(
+                dic,
+                path_save
+                + "/"
+                + str(local_rank)
+                + "_"
+                + str(step)
+                + "_"
+                + str(i)
+                + ".pt",
+            )
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
