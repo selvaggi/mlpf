@@ -123,21 +123,28 @@ def obtain_metrics(sd, matched):
     return dict
 
 
+neutrals_only = True
 # "/eos/user/m/mgarciam/datasets_mlpf/models_trained/logs_10_15_allp_karolina1/large_eval/analysis/out.bin.gz",
 # /eos/user/m/mgarciam/datasets_mlpf/models_trained/logs_10_15_allp_karolina/training_evaluation_test2309/analysis/out_matchedshowers.bin.gz
 data = pd.read_pickle(
-    "/eos/user/m/mgarciam/datasets_mlpf/models_trained/mlpf_2309_test/showers_df_evaluation/0_50_None.pt"
+    "/eos/user/m/mgarciam/datasets_mlpf/models_trained/mlpf_v3/showers_df_evaluation/0_0_None.pt"
 )
-sd = data
+if neutrals_only:
+    sd = pd.concat([data[data["pid"] == 130], data[data["pid"] == 2112]])
+else:
+    sd = data
 matched = sd.dropna()
 dict_1 = obtain_metrics(sd, matched)
 
 dic2 = True
 if dic2:
     data = pd.read_pickle(
-        "/eos/user/m/mgarciam/datasets_mlpf/models_trained/mlpf_2309_test/showers_df_evaluation/0_50_None_pandora.pt"
+        "/eos/user/m/mgarciam/datasets_mlpf/models_trained/mlpf_v3/showers_df_evaluation/0_0_None_pandora.pt"
     )
-    sd = data
+    if neutrals_only:
+        sd = pd.concat([data[data["pid"] == 130], data[data["pid"] == 2112]])
+    else:
+        sd = data
     matched = sd.dropna()
     dict_2 = obtain_metrics(sd, matched)
 
@@ -255,7 +262,6 @@ ax[2, 1].errorbar(
     np.array(dict_1["purity_var_energy"]),
     marker=".",
     mec="blue",
-    facecolors="none",
     ms=5,
     mew=4,
     linestyle="",
@@ -268,7 +274,6 @@ if dic2:
         marker=".",
         mec="red",
         ms=5,
-        facecolors="none",
         mew=4,
         linestyle="",
     )

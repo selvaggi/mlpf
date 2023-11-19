@@ -198,6 +198,7 @@ def generate_showers_data_frame(
 
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
+    pid_t = dic["part_true"][:, -2].to(e_pred_showers.device)
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
@@ -241,6 +242,10 @@ def generate_showers_data_frame(
         (energy_t, fake_showers_showers_e_truw),
         dim=0,
     )
+    pid_t = torch.cat(
+        (pid_t, fake_showers_showers_e_truw),
+        dim=0,
+    )
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
     # e_pred_pandora = torch.cat(
     #     (matched_es_pandora, fake_showers_showers_e_truw), dim=0
@@ -265,6 +270,7 @@ def generate_showers_data_frame(
         "true_showers_E": energy_t.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
         "e_pred_and_truth": e_pred_t.detach().cpu(),
+        "pid": pid_t.detach().cpu(),
         # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
         # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
     }
