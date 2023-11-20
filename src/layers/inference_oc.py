@@ -206,6 +206,8 @@ def generate_showers_data_frame(
 
     # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
+    print(energy_t)
+    print(len(energy_t))
     pid_t = dic["part_true"][:, -2].to(e_pred_showers.device)
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
