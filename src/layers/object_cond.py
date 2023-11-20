@@ -250,7 +250,9 @@ def calc_LV_Lbeta(
     # L_V term
 
     # Calculate q
-    if beta_stabilizing == "paper":
+    if hgcal_implementation:
+        q = (beta.arctanh() / 1.01) ** 2 + qmin
+    elif beta_stabilizing == "paper":
         q = beta.arctanh() ** 2 + qmin
     elif beta_stabilizing == "clip":
         beta = beta.clip(0.0, 1 - 1e-4)
@@ -275,13 +277,11 @@ def calc_LV_Lbeta(
     if use_average_cc_pos > 0:
         #! this is a func of beta and q so maybe we could also do it with only q
         x_alpha_sum = scatter_add(
-            q[is_sig].view(-1, 1).repeat(1, 3)
-            * beta[is_sig].view(-1, 1).repeat(1, 3)
-            * cluster_space_coords[is_sig],
+            q[is_sig].view(-1, 1).repeat(1, 3) * cluster_space_coords[is_sig],
             object_index,
             dim=0,
-        )
-        qbeta_alpha_sum = scatter_add(q[is_sig] * beta[is_sig], object_index) + 1e-9
+        )  # * beta[is_sig].view(-1, 1).repeat(1, 3)
+        qbeta_alpha_sum = scatter_add(q[is_sig], object_index) + 1e-9  # * beta[is_sig]
         div_fac = 1 / qbeta_alpha_sum
         div_fac = torch.nan_to_num(div_fac, nan=0)
         x_alpha_mean = torch.mul(x_alpha_sum, div_fac.view(-1, 1).repeat(1, 3))
@@ -426,9 +426,10 @@ def calc_LV_Lbeta(
     # First select all norms of all signal hits w.r.t. all objects, mask out later
 
     if hgcal_implementation:
-        N_k = torch.sum(M, dim=0)
-        norms = (cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)).norm(
-            p=2, dim=-1
+        N_k = torch.sum(M, dim=0)  # number of hits per object
+        norms = torch.sum(
+            torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
+            dim=-1,
         )
         norms_att = norms[is_sig]
         #! att func as in line 159 of object condensation
@@ -485,7 +486,7 @@ def calc_LV_Lbeta(
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
     if hgcal_implementation:
-        norms_rep = torch.exp(-(norms**2) / 2) * M_inv
+        norms_rep = torch.exp(-(norms) / 2) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
@@ -545,15 +546,15 @@ def calc_LV_Lbeta(
     # -------
     # L_beta signal term
     if hgcal_implementation:
-        # eps = 1e-3
-        # beta_per_object = scatter_add(torch.exp(beta[is_sig]/eps), object_index)
-        # beta_pen = 1-eps*torch.log(beta_per_object)
-        # beta_per_object_c = scatter_add(beta[is_sig], object_index)
-        # beta_pen = beta_pen + 1-torch.clip(beta_per_object_c,0,1)
-        # L_beta_sig = beta_pen.sum()/len(beta_pen)
+        eps = 1e-3
+        beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
+        beta_pen = 1 - eps * torch.log(beta_per_object)
+        beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
+        L_beta_sig = beta_pen.sum() / len(beta_pen)
         #! one beta alpha per object
-        beta_alpha = beta[is_sig][index_alpha]
-        L_beta_sig = torch.mean(1 - beta_alpha)
+        # beta_alpha = beta[is_sig][index_alpha]
+        # L_beta_sig = torch.mean(1 - beta_alpha)
         # print("L_beta_sig", L_beta_sig, len(beta_alpha))
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
