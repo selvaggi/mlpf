@@ -185,10 +185,14 @@ def generate_showers_data_frame(
     # i_m_w_pandora,
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
+    print(e_pred_showers)
+    print(len(e_pred_showers))
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
+    print(e_reco_showers)
+    print("reco", len(e_reco_showers))
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
