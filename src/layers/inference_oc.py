@@ -185,6 +185,10 @@ def generate_showers_data_frame(
     # i_m_w_pandora,
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
+    e_reco_showers = scatter_add(
+        dic["graph"].ndata["e_hits"].view(-1),
+        dic["graph"].ndata["particle_number"].long(),
+    )
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
@@ -246,6 +250,7 @@ def generate_showers_data_frame(
         (pid_t, fake_showers_showers_e_truw),
         dim=0,
     )
+    e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
     # e_pred_pandora = torch.cat(
     #     (matched_es_pandora, fake_showers_showers_e_truw), dim=0
@@ -268,6 +273,7 @@ def generate_showers_data_frame(
     # print("here9")
     d = {
         "true_showers_E": energy_t.detach().cpu(),
+        "reco_showers_E": e_reco.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
         "e_pred_and_truth": e_pred_t.detach().cpu(),
         "pid": pid_t.detach().cpu(),
