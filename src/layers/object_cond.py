@@ -466,8 +466,8 @@ def calc_LV_Lbeta(
         V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
 
         #! add to terms function (divide by total number of showers per event)
-        L_V_attractive = scatter_add(V_attractive, batch_object) / n_objects_per_event
-        L_V_attractive = torch.sum(L_V_attractive)
+        L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
+        L_V_attractive = torch.mean(L_V_attractive)
 
     else:
         #! in comparison this works per hit
@@ -506,8 +506,8 @@ def calc_LV_Lbeta(
             -1
         ) / number_of_repulsive_terms_per_object.view(-1)
         #! add to terms function (divide by total number of showers per event)
-        L_V_repulsive = scatter_add(L_V_repulsive, batch_object) / n_objects_per_event
-        L_V_repulsive = torch.sum(L_V_repulsive)
+        L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
+        L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
@@ -546,16 +546,18 @@ def calc_LV_Lbeta(
     # -------
     # L_beta signal term
     if hgcal_implementation:
-        eps = 1e-3
-        beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
-        beta_pen = 1 - eps * torch.log(beta_per_object)
+        # eps = 1e-3
+        # beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
+        # beta_pen = 1 - eps * torch.log(beta_per_object)
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
-        beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
-        L_beta_sig = beta_pen.sum() / len(beta_pen)
+        # beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
+        # L_beta_sig = beta_pen.sum() / len(beta_pen)
         #! one beta alpha per object
-        # beta_alpha = beta[is_sig][index_alpha]
-        # L_beta_sig = torch.mean(1 - beta_alpha)
-        # print("L_beta_sig", L_beta_sig, len(beta_alpha))
+        beta_alpha = beta[is_sig][index_alpha]
+        L_beta_sig = torch.mean(
+            1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
+        )
+
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.sum(  # maybe 0.5 for less aggressive loss
@@ -656,26 +658,48 @@ def calc_LV_Lbeta(
     # except:
     #    pass
     L_exp = L_beta
-    return (
-        L_V / batch_size,  # 0
-        L_beta / batch_size,
-        loss_E,
-        loss_x,
-        None,  # loss_particle_ids0,  # 4
-        loss_momentum,
-        loss_mass,
-        None,  # pid_true,
-        None,  # pid_pred,
-        resolutions,
-        L_clusters,  # 10
-        fill_loss,
-        L_V_attractive / batch_size,
-        L_V_repulsive / batch_size,
-        L_alpha_coordinates,
-        L_exp,
-        norms_rep,  # 16
-        norms_att,  # 17
-    )
+    if hgcal_implementation:
+        return (
+            L_V,  # 0
+            L_beta,
+            loss_E,
+            loss_x,
+            None,  # loss_particle_ids0,  # 4
+            loss_momentum,
+            loss_mass,
+            None,  # pid_true,
+            None,  # pid_pred,
+            resolutions,
+            L_clusters,  # 10
+            fill_loss,
+            L_V_attractive,
+            L_V_repulsive,
+            L_alpha_coordinates,
+            L_exp,
+            norms_rep,  # 16
+            norms_att,  # 17
+        )
+    else:
+        return (
+            L_V / batch_size,  # 0
+            L_beta / batch_size,
+            loss_E,
+            loss_x,
+            None,  # loss_particle_ids0,  # 4
+            loss_momentum,
+            loss_mass,
+            None,  # pid_true,
+            None,  # pid_pred,
+            resolutions,
+            L_clusters,  # 10
+            fill_loss,
+            L_V_attractive / batch_size,
+            L_V_repulsive / batch_size,
+            L_alpha_coordinates,
+            L_exp,
+            norms_rep,  # 16
+            norms_att,  # 17
+        )
 
 
 def calc_LV_Lbeta_inference(
