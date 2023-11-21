@@ -66,7 +66,9 @@ def create_and_store_graph_output(
             labels_pandora[labels_pandora == -1] = 0
         # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-
+        print("unique_ids", particle_ids)
+        shower_p_unique = torch.unique(labels)
+        print("unique labels", shower_p_unique)
         shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
             labels, dic, particle_ids, model_output, local_rank, i, path_save
         )
@@ -86,8 +88,7 @@ def create_and_store_graph_output(
                 path_save,
                 pandora=True,
             )
-        print("unique_ids", particle_ids)
-        print("unique labels", shower_p_unique)
+
         if len(shower_p_unique) < len(particle_ids) - 3:
             print("really bad event", local_rank, step, i)
             torch.save(
