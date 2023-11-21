@@ -520,6 +520,7 @@ def update_knn(batch):
         g_temp = dgl.remove_self_loop(g_temp)
         g_temp.ndata["x"] = g.ndata["x"]
         g_temp.ndata["hh"] = g.ndata["hh"]
+        g_temp.ndata["particle_number"] = g.ndata["particle_number"]
         graphs.append(g_temp)
     bg = dgl.batch(graphs)
     return bg
