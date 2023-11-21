@@ -403,8 +403,11 @@ def match_showers(
     shower_p_unique = torch.unique(labels)
     if torch.sum(labels == 0) == 0:
         shower_p_unique = torch.cat(
-            shower_p_unique.view(-1),
-            torch.Tensor([0]).to(shower_p_unique.device).view(-1),
+            (
+                shower_p_unique.view(-1),
+                torch.Tensor([0]).to(shower_p_unique.device).view(-1),
+            ),
+            dim=0,
         )
     e_hits = dic["graph"].ndata["e_hits"].view(-1)
     # print("asking for intersection matrix  ")
