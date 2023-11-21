@@ -89,6 +89,7 @@ def create_and_store_graph_output(
         print("unique_ids", particle_ids)
         print("unique labels", shower_p_unique)
         if len(shower_p_unique) < len(particle_ids) - 3:
+            print("really bad event", local_rank, step, i)
             torch.save(
                 dic,
                 path_save
@@ -100,22 +101,23 @@ def create_and_store_graph_output(
                 + str(i)
                 + ".pt",
             )
-        df_event = generate_showers_data_frame(
-            labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
-        )
-        # print("past dataframe generation")
-        df_list.append(df_event)
-        if predict:
-            df_event_pandora = generate_showers_data_frame(
-                labels_pandora,
-                dic,
-                shower_p_unique_pandora,
-                particle_ids,
-                row_ind_pandora,
-                col_ind_pandora,
-                i_m_w_pandora,
+        if len(shower_p_unique) > 1:
+            df_event = generate_showers_data_frame(
+                labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
             )
-            df_list_pandora.append(df_event_pandora)
+            # print("past dataframe generation")
+            df_list.append(df_event)
+            if predict:
+                df_event_pandora = generate_showers_data_frame(
+                    labels_pandora,
+                    dic,
+                    shower_p_unique_pandora,
+                    particle_ids,
+                    row_ind_pandora,
+                    col_ind_pandora,
+                    i_m_w_pandora,
+                )
+                df_list_pandora.append(df_event_pandora)
 
     # print("concatenating list")
     df_batch = pd.concat(df_list)
