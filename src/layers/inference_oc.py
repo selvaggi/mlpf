@@ -29,13 +29,10 @@ def create_and_store_graph_output(
     df_list = []
     df_list_pandora = []
     for i in range(0, len(graphs)):
-        # print("llooking into graph,", i)
         mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
-        # print("loaded graph and particles ", i)
-        # print("STORING GRAPH")
 
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
@@ -57,7 +54,7 @@ def create_and_store_graph_output(
             )
             print("distance_scale", distance_scale)
             # distance_scale = 0.1
-            db = DBSCAN(eps=distance_scale, min_samples=100).fit(X.detach().cpu())
+            db = DBSCAN(eps=distance_scale, min_samples=15).fit(X.detach().cpu())
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
@@ -69,12 +66,9 @@ def create_and_store_graph_output(
             labels_pandora = (
                 torch.Tensor(list(cluster_id)).long().to(model_output.device)
             )
-        # print("obtained clustering ")
+
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        print("unique pandora", torch.unique(labels_pandora))
-        print("unique_ids", particle_ids)
         shower_p_unique = torch.unique(labels)
-        print("unique labels", shower_p_unique)
         shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
             labels, dic, particle_ids, model_output, local_rank, i, path_save
         )
@@ -96,7 +90,7 @@ def create_and_store_graph_output(
             )
 
         if len(shower_p_unique) < len(particle_ids) - 3:
-            print("really bad event", local_rank, step, i)
+            print("storing really bad event", local_rank, step, i)
             torch.save(
                 dic,
                 path_save
@@ -112,7 +106,6 @@ def create_and_store_graph_output(
             df_event = generate_showers_data_frame(
                 labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
             )
-            # print("past dataframe generation")
             df_list.append(df_event)
             if predict:
                 df_event_pandora = generate_showers_data_frame(
@@ -126,7 +119,6 @@ def create_and_store_graph_output(
                 )
                 df_list_pandora.append(df_event_pandora)
 
-    # print("concatenating list")
     df_batch = pd.concat(df_list)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
@@ -284,7 +276,6 @@ def generate_showers_data_frame(
     #     ),
     #     dim=0,
     # )
-    # print("here9")
     d = {
         "true_showers_E": energy_t.detach().cpu(),
         "reco_showers_E": e_reco.detach().cpu(),
@@ -295,7 +286,6 @@ def generate_showers_data_frame(
         # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
     }
     df = pd.DataFrame(data=d)
-    # print("here10 finished")
     return df
 
 
@@ -314,9 +304,7 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
         h_hits = e_hits.clone()
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
-
         intersection_matrix[:, index] = scatter_add(counts, labels)
-        # print(h_hits.device, labels.device)
         intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
     return intersection_matrix, intersection_matrix_w
 
@@ -363,24 +351,13 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
 
 
 def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
-    print(row_ind)
-    print(col_ind)
-    print(intersection_matrix_w)
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
     intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
-    # print(row_ind)
-    # print(col_ind)
-    # print(intersection_matrix_wt.shape)
-    # print(range(0, len(col_ind) - 1))
     for i in range(0, len(col_ind)):
-        # print("i", i)
-        # print(row_ind[i], col_ind[i])
-        # print(intersection_matrix_wt[row_ind[i], col_ind[i]])
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
         )
-    # print("finized list")
     return torch.cat(list_intersection_E, dim=0)
 
 
@@ -410,23 +387,18 @@ def match_showers(
             dim=0,
         )
     e_hits = dic["graph"].ndata["e_hits"].view(-1)
-    # print("asking for intersection matrix  ")
     i_m, i_m_w = obtain_intersection_matrix(
         shower_p_unique, particle_ids, labels, dic, e_hits
     )
-    # print("got intersection matrix  ")
     i_m = i_m.to(model_output.device)
     i_m_w = i_m_w.to(model_output.device)
     u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
-    # print("got union matrix  ")
     u_m = u_m.to(model_output.device)
     iou_matrix = i_m / u_m
     iou_matrix_num = (
         torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
     )
-    # print("askind for LSA")
     row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
-    # print("got LSA matrix  ")
     if i == 0 and local_rank == 0:
         if pandora:
             image_path = path_save + "/example_1_clustering_pandora.png"
