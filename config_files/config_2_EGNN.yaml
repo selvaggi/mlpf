@@ -1,11 +1,11 @@
 graph_config:
    only_hits: true
-
+   extended_coords: true
 custom_model_kwargs:
    # add custom model kwargs here
    clust_space_norm: none
    separate_heads: true
-   extended_coords: true
+
 
 
 #treename:
