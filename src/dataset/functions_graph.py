@@ -347,7 +347,6 @@ def create_graph(output, config=None, n_noise=0):
                     e_hits,
                     p_hits,
                     torch.log(e_hits),
-                    torch.log(p_hits),
                 ),
                 dim=1,
             )  # dims = 3+4+1+1+1+1
