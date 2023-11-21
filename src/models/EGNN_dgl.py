@@ -35,7 +35,7 @@ class EGNN(nn.Module):
         :param concat_global_exchange: Whether to concat "global" features to the node features.
         """
         super().__init__()
-        in_node_nf = 11
+        in_node_nf = 8
         hidden_nf = 128
         out_node_nf = 4
         self.args = args
