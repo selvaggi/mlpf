@@ -80,8 +80,8 @@ def find_mother_particle(j, gen_part_coll, gen_parent_link_indexmc):
         )
         pp_old = parent_p
         counter = counter + 1
-        if len(np.reshape(np.array(parent_p_r), -1)) < 1.5:
-            print(parent_p, parent_p_r)
+        # if len(np.reshape(np.array(parent_p_r), -1)) < 1.5:
+        #     print(parent_p, parent_p_r)
         parent_p = parent_p_r
 
     return pp_old
@@ -257,7 +257,7 @@ t.Branch("part_pid", part_pid)
 event_number[0] = 0
 for i, e in enumerate(ev):
     if debug:
-        if i == 100:
+        if i == 1001:
             break
 
     number_of_hist_with_no_genlinks = 0
@@ -321,15 +321,19 @@ for i, e in enumerate(ev):
     gen_daughter_link_indexmc = getattr(e, genparts_daughters)
     gen_part_coll = getattr(e, genparts)
 
+    total_e = 0
     n_part_pre = 0
+    e_pp = np.zeros(11)
     for j, part in enumerate(gen_part_coll):
 
         p = math.sqrt(
             part.momentum.x**2 + part.momentum.y**2 + part.momentum.z**2
         )
+        if j < 11 and j > 1:
+            e_pp[j] = p
+            total_e = total_e + p
         theta = math.acos(part.momentum.z / p)
         phi = math.atan2(part.momentum.y, part.momentum.x)
-
         if debug:
             print(
                 "all genparts: N: {}, PID: {}, Q: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, status: {}, parents: {}, daughters: {}".format(
@@ -357,6 +361,7 @@ for i, e in enumerate(ev):
                     ),
                 )
             )
+
             # part.daughters_begin,  part.daughters_end, part.parents_begin,  part.parents_end, D1: {}, D2: {}, M1: {}, M2: {}
 
         ## store all gen parts for now
@@ -522,21 +527,21 @@ for i, e in enumerate(ev):
         if len(gen_indices) > 4:
             hit_genweight4.push_back(gen_weights[4])
 
-        if debug:
-            print(
-                "track at vertex: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-                    n_hit[0],
-                    track_mom[0],
-                    track_mom[1],
-                    track_mom[2],
-                    x * 1e-03,
-                    y * 1e-03,
-                    R * 1e-03,
-                    z * 1e-03,
-                    r * 1e-03,
-                    list(link_vector),
-                )
-            )
+        # if debug:
+        #     print(
+        #         "track at vertex: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+        #             n_hit[0],
+        #             track_mom[0],
+        #             track_mom[1],
+        #             track_mom[2],
+        #             x * 1e-03,
+        #             y * 1e-03,
+        #             R * 1e-03,
+        #             z * 1e-03,
+        #             r * 1e-03,
+        #             list(link_vector),
+        #         )
+        #     )
 
         n_hit[0] += 1
 
@@ -611,21 +616,21 @@ for i, e in enumerate(ev):
         if len(gen_indices) > 4:
             hit_genweight4.push_back(gen_weights[4])
 
-        if debug:
-            print(
-                "track at calo: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-                    n_hit[0],
-                    track_mom[0],
-                    track_mom[1],
-                    track_mom[2],
-                    x * 1e-03,
-                    y * 1e-03,
-                    R * 1e-03,
-                    z * 1e-03,
-                    r * 1e-03,
-                    list(link_vector),
-                )
-            )
+        # if debug:
+        #     print(
+        #         "track at calo: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+        #             n_hit[0],
+        #             track_mom[0],
+        #             track_mom[1],
+        #             track_mom[2],
+        #             x * 1e-03,
+        #             y * 1e-03,
+        #             R * 1e-03,
+        #             z * 1e-03,
+        #             r * 1e-03,
+        #             list(link_vector),
+        #         )
+        #     )
 
         n_hit[0] += 1
 
@@ -649,7 +654,8 @@ for i, e in enumerate(ev):
         ecal_other[1],
         hcal_other[1],
     ]
-
+    total_calohit_e = 0
+    total_calohit_ = np.zeros(11)
     for k, calohit_coll in enumerate(calohit_collections):
         if debug:
             print("")
@@ -733,24 +739,37 @@ for i, e in enumerate(ev):
             if len(gen_indices) > 4:
                 hit_genweight4.push_back(gen_weights[4])
 
-            # if debug:
-            #     print(
-            #         "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-            #             htype,
-            #             n_hit[0],
-            #             calohit.energy,
-            #             x * 1e-03,
-            #             y * 1e-03,
-            #             R * 1e-03,
-            #             z * 1e-03,
-            #             r * 1e-03,
-            #             list(link_vector),
-            #         )
-            #     )
+            if debug:
+                total_calohit_e = total_calohit_e + calohit.energy
+                if list(link_vector)[0] < 11 and list(link_vector)[0] > 1:
+                    total_calohit_[list(link_vector)[0]] = (
+                        total_calohit_[list(link_vector)[0]] + calohit.energy
+                    )
+
+                # print(
+                #     "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+                #         htype,
+                #         n_hit[0],
+                #         calohit.energy,
+                #         x * 1e-03,
+                #         y * 1e-03,
+                #         R * 1e-03,
+                #         z * 1e-03,
+                #         r * 1e-03,
+                #         list(link_vector),
+                #     )
+                # )
 
             n_hit[0] += 1
 
     if debug:
+        print("total_e", total_e)
+        fracs = []
+        for i in range(2, 11):
+            print(e_pp[i] / total_calohit_[i])
+            fracs.append(e_pp[i] / total_calohit_[i])
+        if np.sum(np.array(fracs) < 0.1) > 1:
+            break
         print("total number of hits: {}".format(n_hit[0]))
         print(
             "total number of hits with no gen links: {}".format(

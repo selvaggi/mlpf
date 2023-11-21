@@ -3,6 +3,7 @@ from Gaudi.Configuration import DEBUG, WARNING, INFO
 
 from Configurables import LcioEvent, k4DataSvc, MarlinProcessorWrapper
 from k4MarlinWrapper.parseConstants import *
+import os
 
 algList = []
 
@@ -67,7 +68,11 @@ inp.OutputLevel = DEBUG
 MyAIDAProcessor = MarlinProcessorWrapper("MyAIDAProcessor")
 MyAIDAProcessor.OutputLevel = WARNING
 MyAIDAProcessor.ProcessorType = "AIDAProcessor"
-MyAIDAProcessor.Parameters = {"Compress": ["1"], "FileName": ["histograms"], "FileType": ["root"]}
+MyAIDAProcessor.Parameters = {
+    "Compress": ["1"],
+    "FileName": ["histograms"],
+    "FileType": ["root"],
+}
 
 # EDM4hep to LCIO converter
 edmConvTool = EDM4hep2LcioTool("EDM4hep2lcio")
@@ -80,7 +85,9 @@ InitDD4hep = MarlinProcessorWrapper("InitDD4hep")
 InitDD4hep.OutputLevel = WARNING
 InitDD4hep.ProcessorType = "InitializeDD4hep"
 InitDD4hep.Parameters = {
-    "DD4hepXMLFile": [os.environ["LCGEO"] + "/CLIC/compact/CLIC_o3_v14/CLIC_o3_v14.xml"],
+    "DD4hepXMLFile": [
+        os.environ["LCGEO"] + "/CLIC/compact/CLIC_o3_v14/CLIC_o3_v14.xml"
+    ],
     "EncodingStringParameter": ["GlobalTrackerReadoutID"],
 }
 
@@ -189,7 +196,9 @@ InnerPlanarDigiProcessorLCIOConv.OutputLevel = DEBUG
 InnerPlanarDigiProcessor.Lcio2EDM4hepTool = InnerPlanarDigiProcessorLCIOConv
 
 
-InnerEndcapPlanarDigiProcessor = MarlinProcessorWrapper("InnerEndcapPlanarDigiProcessor")
+InnerEndcapPlanarDigiProcessor = MarlinProcessorWrapper(
+    "InnerEndcapPlanarDigiProcessor"
+)
 InnerEndcapPlanarDigiProcessor.OutputLevel = WARNING
 InnerEndcapPlanarDigiProcessor.ProcessorType = "DDPlanarDigiProcessor"
 InnerEndcapPlanarDigiProcessor.Parameters = {
@@ -202,7 +211,9 @@ InnerEndcapPlanarDigiProcessor.Parameters = {
     "TrackerHitCollectionName": ["ITrackerEndcapHits"],
 }
 # LCIO to EDM4hep
-InnerEndcapPlanarDigiProcessorLCIOConv = Lcio2EDM4hepTool("InnerEndcapPlanarDigiProcessorLCIOConv")
+InnerEndcapPlanarDigiProcessorLCIOConv = Lcio2EDM4hepTool(
+    "InnerEndcapPlanarDigiProcessorLCIOConv"
+)
 InnerEndcapPlanarDigiProcessorLCIOConv.convertAll = False
 InnerEndcapPlanarDigiProcessorLCIOConv.collNameMapping = {
     # This should be a TrackerHitPlane, but it gets treated as a TrackerHit
@@ -239,7 +250,9 @@ OuterPlanarDigiProcessorLCIOConv.OutputLevel = DEBUG
 OuterPlanarDigiProcessor.Lcio2EDM4hepTool = OuterPlanarDigiProcessorLCIOConv
 
 
-OuterEndcapPlanarDigiProcessor = MarlinProcessorWrapper("OuterEndcapPlanarDigiProcessor")
+OuterEndcapPlanarDigiProcessor = MarlinProcessorWrapper(
+    "OuterEndcapPlanarDigiProcessor"
+)
 OuterEndcapPlanarDigiProcessor.OutputLevel = WARNING
 OuterEndcapPlanarDigiProcessor.ProcessorType = "DDPlanarDigiProcessor"
 OuterEndcapPlanarDigiProcessor.Parameters = {
@@ -252,7 +265,9 @@ OuterEndcapPlanarDigiProcessor.Parameters = {
     "TrackerHitCollectionName": ["OTrackerEndcapHits"],
 }
 # LCIO to EDM4hep
-OuterEndcapPlanarDigiProcessorLCIOConv = Lcio2EDM4hepTool("OuterEndcapPlanarDigiProcessorLCIOConv")
+OuterEndcapPlanarDigiProcessorLCIOConv = Lcio2EDM4hepTool(
+    "OuterEndcapPlanarDigiProcessorLCIOConv"
+)
 OuterEndcapPlanarDigiProcessorLCIOConv.convertAll = False
 OuterEndcapPlanarDigiProcessorLCIOConv.collNameMapping = {
     # This should be a TrackerHitPlane, but it gets treated as a TrackerHit
@@ -565,7 +580,9 @@ ClonesAndSplitTracksFinder.Parameters = {
     "minTrackPt": ["1"],
 }
 # LCIO to EDM4hep
-ClonesAndSplitTracksFinderLCIOConv = Lcio2EDM4hepTool("ClonesAndSplitTracksFinderLCIOConv")
+ClonesAndSplitTracksFinderLCIOConv = Lcio2EDM4hepTool(
+    "ClonesAndSplitTracksFinderLCIOConv"
+)
 ClonesAndSplitTracksFinderLCIOConv.convertAll = False
 ClonesAndSplitTracksFinderLCIOConv.collNameMapping = {"SiTracks": "SiTracks"}
 ClonesAndSplitTracksFinderLCIOConv.OutputLevel = DEBUG
@@ -632,7 +649,9 @@ MyClicEfficiencyCalculator.Parameters = {
 # LCIO to EDM4hep
 MyClicEfficiencyCalculatorLCIOConv = Lcio2EDM4hepTool("MyClicEfficiencyCalculator")
 MyClicEfficiencyCalculatorLCIOConv.convertAll = False
-MyClicEfficiencyCalculatorLCIOConv.collNameMapping = {"MCParticleNotReco": "MCParticleNotReco"}
+MyClicEfficiencyCalculatorLCIOConv.collNameMapping = {
+    "MCParticleNotReco": "MCParticleNotReco"
+}
 MyClicEfficiencyCalculatorLCIOConv.OutputLevel = DEBUG
 # Add it to MyClicEfficiencyCalculatorLCIOConv Algorithm
 MyClicEfficiencyCalculator.Lcio2EDM4hepTool = MyClicEfficiencyCalculatorLCIOConv
@@ -666,7 +685,11 @@ MyDDCaloDigi.Parameters = {
     "CalibrHCALEndcap": ["53.6263377733"],
     "CalibrHCALOther": ["62.2125698179"],
     "ECALBarrelTimeWindowMax": ["10"],
-    "ECALCollections": ["ECalBarrelCollection", "ECalEndcapCollection", "ECalPlugCollection"],
+    "ECALCollections": [
+        "ECalBarrelCollection",
+        "ECalEndcapCollection",
+        "ECalPlugCollection",
+    ],
     "ECALCorrectTimesForPropagation": ["1"],
     "ECALDeltaTimeHitResolution": ["10"],
     "ECALEndcapCorrectionFactor": ["1.0672142727"],
@@ -698,7 +721,11 @@ MyDDCaloDigi.Parameters = {
     "ECAL_pixel_spread": ["0.05"],
     "ECAL_strip_absorbtionLength": ["1e+06"],
     "HCALBarrelTimeWindowMax": ["10"],
-    "HCALCollections": ["HCalBarrelCollection", "HCalEndcapCollection", "HCalRingCollection"],
+    "HCALCollections": [
+        "HCalBarrelCollection",
+        "HCalEndcapCollection",
+        "HCalRingCollection",
+    ],
     "HCALCorrectTimesForPropagation": ["1"],
     "HCALDeltaTimeHitResolution": ["10"],
     "HCALEndcapCorrectionFactor": ["1.000"],
@@ -908,7 +935,10 @@ MyDDSimpleMuonDigi.Parameters = {
 # LCIO to EDM4hep
 MyDDSimpleMuonDigiLCIOConv = Lcio2EDM4hepTool("MyDDSimpleMuonDigiLCIOConv")
 MyDDSimpleMuonDigiLCIOConv.convertAll = False
-MyDDSimpleMuonDigiLCIOConv.collNameMapping = {"MUON": "MUON", "RelationMuonHit": "RelationMuonHit"}
+MyDDSimpleMuonDigiLCIOConv.collNameMapping = {
+    "MUON": "MUON",
+    "RelationMuonHit": "RelationMuonHit",
+}
 MyDDSimpleMuonDigiLCIOConv.OutputLevel = DEBUG
 # Add it to MyDDSimpleMuonDigi Algorithm
 MyDDSimpleMuonDigi.Lcio2EDM4hepTool = MyDDSimpleMuonDigiLCIOConv
@@ -1855,9 +1885,13 @@ CLICPfoSelectorDefault_HE.Parameters = {
     "UseNeutronTiming": ["0"],
 }
 # LCIO to EDM4hep
-CLICPfoSelectorDefault_HELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorDefault_HELCIOConv")
+CLICPfoSelectorDefault_HELCIOConv = Lcio2EDM4hepTool(
+    "CLICPfoSelectorDefault_HELCIOConv"
+)
 CLICPfoSelectorDefault_HELCIOConv.convertAll = False
-CLICPfoSelectorDefault_HELCIOConv.collNameMapping = {"SelectedPandoraPFOs": "SelectedPandoraPFOs"}
+CLICPfoSelectorDefault_HELCIOConv.collNameMapping = {
+    "SelectedPandoraPFOs": "SelectedPandoraPFOs"
+}
 CLICPfoSelectorDefault_HELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorDefault_HE Algorithm
 CLICPfoSelectorDefault_HE.Lcio2EDM4hepTool = CLICPfoSelectorDefault_HELCIOConv
@@ -1916,7 +1950,9 @@ CLICPfoSelectorLoose_HE.Parameters = {
 # LCIO to EDM4hep
 CLICPfoSelectorLoose_HELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorLoose_HELCIOConv")
 CLICPfoSelectorLoose_HELCIOConv.convertAll = False
-CLICPfoSelectorLoose_HELCIOConv.collNameMapping = {"CLICPfoSelectorLoose_HE": "CLICPfoSelectorLoose_HE"}
+CLICPfoSelectorLoose_HELCIOConv.collNameMapping = {
+    "CLICPfoSelectorLoose_HE": "CLICPfoSelectorLoose_HE"
+}
 CLICPfoSelectorLoose_HELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorLoose_HE Algorithm
 CLICPfoSelectorLoose_HE.Lcio2EDM4hepTool = CLICPfoSelectorLoose_HELCIOConv
@@ -1975,7 +2011,9 @@ CLICPfoSelectorTight_HE.Parameters = {
 # LCIO to EDM4hep
 CLICPfoSelectorTight_HELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorTight_HELCIOConv")
 CLICPfoSelectorTight_HELCIOConv.convertAll = False
-CLICPfoSelectorTight_HELCIOConv.collNameMapping = {"TightSelectedPandoraPFOs": "TightSelectedPandoraPFOs"}
+CLICPfoSelectorTight_HELCIOConv.collNameMapping = {
+    "TightSelectedPandoraPFOs": "TightSelectedPandoraPFOs"
+}
 CLICPfoSelectorTight_HELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorTight_HE Algorithm
 CLICPfoSelectorTight_HE.Lcio2EDM4hepTool = CLICPfoSelectorTight_HELCIOConv
@@ -2032,9 +2070,13 @@ CLICPfoSelectorDefault_LE.Parameters = {
     "UseNeutronTiming": ["0"],
 }
 # LCIO to EDM4hep
-CLICPfoSelectorDefault_LELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorDefault_LELCIOConv")
+CLICPfoSelectorDefault_LELCIOConv = Lcio2EDM4hepTool(
+    "CLICPfoSelectorDefault_LELCIOConv"
+)
 CLICPfoSelectorDefault_LELCIOConv.convertAll = False
-CLICPfoSelectorDefault_LELCIOConv.collNameMapping = {"LE_SelectedPandoraPFOs": "LE_SelectedPandoraPFOs"}
+CLICPfoSelectorDefault_LELCIOConv.collNameMapping = {
+    "LE_SelectedPandoraPFOs": "LE_SelectedPandoraPFOs"
+}
 CLICPfoSelectorDefault_LELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorDefault_LE Algorithm
 CLICPfoSelectorDefault_LE.Lcio2EDM4hepTool = CLICPfoSelectorDefault_LELCIOConv
@@ -2093,7 +2135,9 @@ CLICPfoSelectorLoose_LE.Parameters = {
 # LCIO to EDM4hep
 CLICPfoSelectorLoose_LELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorLoose_LELCIOConv")
 CLICPfoSelectorLoose_LELCIOConv.convertAll = False
-CLICPfoSelectorLoose_LELCIOConv.collNameMapping = {"LE_LooseSelectedPandoraPFOs": "LE_LooseSelectedPandoraPFOs"}
+CLICPfoSelectorLoose_LELCIOConv.collNameMapping = {
+    "LE_LooseSelectedPandoraPFOs": "LE_LooseSelectedPandoraPFOs"
+}
 CLICPfoSelectorLoose_LELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorLoose_LE Algorithm
 CLICPfoSelectorLoose_LE.Lcio2EDM4hepTool = CLICPfoSelectorLoose_LELCIOConv
@@ -2152,7 +2196,9 @@ CLICPfoSelectorTight_LE.Parameters = {
 # LCIO to EDM4hep
 CLICPfoSelectorTight_LELCIOConv = Lcio2EDM4hepTool("CLICPfoSelectorTight_LELCIOConv")
 CLICPfoSelectorTight_LELCIOConv.convertAll = False
-CLICPfoSelectorTight_LELCIOConv.collNameMapping = {"LE_TightSelectedPandoraPFOs": "LE_TightSelectedPandoraPFOs"}
+CLICPfoSelectorTight_LELCIOConv.collNameMapping = {
+    "LE_TightSelectedPandoraPFOs": "LE_TightSelectedPandoraPFOs"
+}
 CLICPfoSelectorTight_LELCIOConv.OutputLevel = DEBUG
 # Add it to CLICPfoSelectorTight_LE Algorithm
 CLICPfoSelectorTight_LE.Lcio2EDM4hepTool = CLICPfoSelectorTight_LELCIOConv
@@ -2360,4 +2406,6 @@ algList.append(out)
 
 from Configurables import ApplicationMgr
 
-ApplicationMgr(TopAlg=algList, EvtSel="NONE", EvtMax=3, ExtSvc=[evtsvc], OutputLevel=WARNING)
+ApplicationMgr(
+    TopAlg=algList, EvtSel="NONE", EvtMax=3, ExtSvc=[evtsvc], OutputLevel=WARNING
+)

@@ -10,7 +10,7 @@ import numpy as np
 # Bz should be stored in the in the tree
 # should allow for multiple gen links to hit (probablyhas to be done in the previous edm4hep formation stage)
 
-debug = True
+debug = False
 
 """
 source /cvmfs/fcc.cern.ch/sw/latest/setup.sh
@@ -80,8 +80,8 @@ def find_mother_particle(j, gen_part_coll, gen_parent_link_indexmc):
         )
         pp_old = parent_p
         counter = counter + 1
-        if len(np.reshape(np.array(parent_p_r), -1)) < 1.5:
-            print(parent_p, parent_p_r)
+        # if len(np.reshape(np.array(parent_p_r), -1)) < 1.5:
+        #     print(parent_p, parent_p_r)
         parent_p = parent_p_r
 
     return pp_old

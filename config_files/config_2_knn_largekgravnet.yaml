@@ -9,7 +9,7 @@ custom_model_kwargs:
    # add custom model kwargs here
    n_postgn_dense_blocks: 4
    clust_space_norm: none
-   k_gravnet: 7
+   k_gravnet: 64
 
 
 #treename:

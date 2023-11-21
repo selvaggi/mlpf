@@ -20,13 +20,12 @@ def absoluteFilePaths(directory):
 def main():
     parser = argparse.ArgumentParser()
 
-
     parser.add_argument(
         "--outdir",
         help="output directory ",
         default="/eos/experiment/fcc/ee/simulation/ClicDet/test/",
     )
- 
+
     parser.add_argument(
         "--config",
         help="gun config file (has to be in gun/ directory) ",
@@ -34,8 +33,10 @@ def main():
     )
 
     parser.add_argument("--njobs", help="max number of jobs", default=2)
-    
-    parser.add_argument("--nev", help="max number of events (-1 runs on all events)", default=-1)
+
+    parser.add_argument(
+        "--nev", help="max number of events (-1 runs on all events)", default=-1
+    )
 
     parser.add_argument(
         "--queue",
@@ -68,7 +69,7 @@ def main():
     for name in glob.glob("{}/*.root".format(outdir)):
         list_of_outfiles.append(name)
 
-    script = "run_sequence.sh"
+    script = "run_sequence_update_spread.sh"
 
     jobCount = 0
 
@@ -88,7 +89,7 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
-        
+
         seed = str(job + 1)
         basename = "pf_tree_" + seed + ".root"
         outputFile = outdir + "/" + basename
