@@ -122,6 +122,7 @@ def train_regression(
             num_examples = label.shape[0]
             label = label.to(dev)
             opt.zero_grad()
+            torch.autograd.set_detect_anomaly(True)
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
                 batch_g = batch_g.to(dev)
                 calc_e_frac_loss = (num_batches % 250) == 0
