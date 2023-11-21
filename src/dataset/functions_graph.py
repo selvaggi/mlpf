@@ -25,6 +25,11 @@ def get_ratios(e_hits, part_idx, y):
     return (energy_from_showers.flatten() / y_energy).tolist()
 
 
+def get_number_hits(e_hits, part_idx):
+    number_of_hits = scatter_sum(torch.ones_like(e_hits), part_idx.long(), dim=0)
+    return (number_of_hits.flatten()).tolist()
+
+
 def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     """This function remove particles with tracks only and remove particles with low fractions
 
@@ -37,24 +42,27 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     Returns:
         _type_: _description_
     """
-    energy_cut = 0.01
+    energy_cut = 0.50
     # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
     # print(list_p)
     list_remove = []
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
+    number_of_hits = get_number_hits(hit_energies, hit_particle_link)
     # print(part_frac)
     filt1 = (
         (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     )  # only keep these particles
 
-    for p in list_p:
+    for index, p in enumerate(list_p):
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
         # if np.array_equal(hit_types, [0, 1]):
         #     print("will remove particle", p)
         if (
-            np.array_equal(hit_types, [0, 1]) or int(p) not in filt1
+            np.array_equal(hit_types, [0, 1])
+            or int(p) not in filt1
+            or (number_of_hits[index] < 20)
         ):  # This is commented to disable filtering
             list_remove.append(p)
             assert part_frac[int(p) - 1] < energy_cut
