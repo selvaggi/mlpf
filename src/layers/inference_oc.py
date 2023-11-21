@@ -64,6 +64,11 @@ def create_and_store_graph_output(
         if predict:
             labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
             labels_pandora[labels_pandora == -1] = 0
+            map_from = list(np.unique(labels_pandora).detach().cpu())
+            cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
+            labels_pandora = (
+                torch.Tensor(list(cluster_id)).long().to(model_output.device)
+            )
         # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         print("unique pandora", torch.unique(labels_pandora))
