@@ -367,7 +367,7 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
         g.ndata["pandora_cluster"] = pandora_cluster
-        if len(y_data_graph) < 2:
+        if len(y_data_graph) < 4:
             graph_empty = True
     else:
         graph_empty = True
