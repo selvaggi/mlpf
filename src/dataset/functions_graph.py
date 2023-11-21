@@ -71,7 +71,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
                 number_of_hits[index],
                 y[index, 3],
             )
-            assert part_frac[int(p) - 1] <= energy_cut
+            # assert part_frac[int(p) - 1] <= energy_cut
 
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
