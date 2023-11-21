@@ -35,7 +35,7 @@ class EGNN(nn.Module):
         :param concat_global_exchange: Whether to concat "global" features to the node features.
         """
         super().__init__()
-        in_node_nf = 8
+        in_node_nf = 7
         hidden_nf = 128
         out_node_nf = 4
         self.args = args
@@ -460,7 +460,7 @@ class RelativePositionCordMessage(nn.Module):
         radial0 = torch.sum(coord_diff0**2, 1).unsqueeze(1)
         print(radial0)
         # radial = torch.cat((radial0.unsqueeze(1), radial1.unsqueeze(1)), dim=1)
-        print(" edges.sr",  edges.src["hh"])
+        print(" edges.sr", edges.src["hh"])
         edge_feature = torch.cat(
             (radial0, edges.src["hh"], edges.dst["hh"]), dim=1
         )  # E x (2+80*2)
