@@ -111,6 +111,7 @@ class EGNN(nn.Module):
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
         g.ndata["x"] = g.ndata["h"][:, 0:3] / 3330
+        print("input coords", g.ndata["x"])
         g.ndata["original_coords"] = g.ndata["h"][:, 0:3] / 3330
         if step_count % 5:
             PlotCoordinates(
@@ -496,6 +497,7 @@ class Aggregationlayer(nn.Module):
         )  # to mitigate weird random NaN errors...
         nodes.mailbox["trans"] = torch.clip(nodes.mailbox["trans"], min=-1e3, max=1e3)
         trans = torch.mean(nodes.mailbox["trans"], dim=1)
+        print("trans")
         coord = nodes.data["x"] + trans
         print("coord", coord)
         edge_feature = torch.sum(nodes.mailbox["edge_feature"], dim=1)
