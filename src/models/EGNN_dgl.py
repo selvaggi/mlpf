@@ -454,28 +454,23 @@ class RelativePositionCordMessage(nn.Module):
 
     def forward(self, edges):
         coord_diff0 = edges.src["x"] - edges.dst["x"]
-        # coord_diff1 = edges.src["x"][:, 3:] - edges.dst["x"][:, 3:]
-        coord_diff = edges.src["x"] - edges.dst["x"]
-        # coord_diff0 = torch.atan2(
-        #     torch.sin(edges.src["x"][:, 1] - edges.dst["x"][:, 1]),
-        #     torch.cos(edges.src["x"][:, 1] - edges.dst["x"][:, 1]),
-        # )
-        # radial1 = torch.sqrt(torch.sum(coord_diff1**2, 1))
-        # radial0 = torch.sqrt(torch.sum(coord_diff0**2, 1)).unsqueeze(1)
-        radial0 = torch.sum(coord_diff0**2, 1).unsqueeze(1)
-        # radial = torch.cat((radial0.unsqueeze(1), radial1.unsqueeze(1)), dim=1)
 
+        coord_diff = edges.src["x"] - edges.dst["x"]
+
+        radial0 = torch.sum(coord_diff0**2, 1).unsqueeze(1)
+        print(radial0)
+        # radial = torch.cat((radial0.unsqueeze(1), radial1.unsqueeze(1)), dim=1)
+        print(" edges.sr",  edges.src["hh"])
         edge_feature = torch.cat(
             (radial0, edges.src["hh"], edges.dst["hh"]), dim=1
         )  # E x (2+80*2)
         edge_feature = self.edge_mlp(edge_feature)  # E x 80
         print("edge_feature", edge_feature)
-        if self.normalize:
-            norm = torch.sqrt(radial0).detach() + self.epsilon
-            coord_diff = coord_diff / norm
+        # if self.normalize:
+        #     norm = torch.sqrt(radial0).detach() + self.epsilon
+        #     coord_diff = coord_diff / norm
 
         trans = coord_diff * self.coord_mlp(edge_feature)  # E x 2
-        print("trans", trans)
         return {"radial": radial0, "trans": trans, "edge_feature": edge_feature}
 
 
