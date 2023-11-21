@@ -97,7 +97,8 @@ def create_and_store_graph_output(
                 path_save,
                 pandora=True,
             )
-        print(shower_p_unique)
+        print("unique_ids", particle_ids)
+        print("unique labels", shower_p_unique)
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
