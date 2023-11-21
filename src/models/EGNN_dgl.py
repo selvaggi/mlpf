@@ -111,7 +111,6 @@ class EGNN(nn.Module):
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
         g.ndata["x"] = g.ndata["h"][:, 0:3] / 3330
-        print("input coords", g.ndata["x"])
         g.ndata["original_coords"] = g.ndata["h"][:, 0:3] / 3330
         if step_count % 5:
             PlotCoordinates(
@@ -470,12 +469,13 @@ class RelativePositionCordMessage(nn.Module):
             (radial0, edges.src["hh"], edges.dst["hh"]), dim=1
         )  # E x (2+80*2)
         edge_feature = self.edge_mlp(edge_feature)  # E x 80
+        print("edge_feature", edge_feature)
         if self.normalize:
             norm = torch.sqrt(radial0).detach() + self.epsilon
             coord_diff = coord_diff / norm
 
         trans = coord_diff * self.coord_mlp(edge_feature)  # E x 2
-
+        print("trans", trans)
         return {"radial": radial0, "trans": trans, "edge_feature": edge_feature}
 
 
@@ -497,9 +497,8 @@ class Aggregationlayer(nn.Module):
         )  # to mitigate weird random NaN errors...
         nodes.mailbox["trans"] = torch.clip(nodes.mailbox["trans"], min=-1e3, max=1e3)
         trans = torch.mean(nodes.mailbox["trans"], dim=1)
-        print("trans")
         coord = nodes.data["x"] + trans
-        print("coord", coord)
+
         edge_feature = torch.sum(nodes.mailbox["edge_feature"], dim=1)
 
         agg = torch.cat((nodes.data["hh"], edge_feature), dim=1)
