@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 import dgl
 from copy import deepcopy
-
+from src.logger.plotting_tools import PlotCoordinates
 import torch_cmspepr
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
@@ -25,6 +25,7 @@ def assert_no_nans(x):
 class EGNN(nn.Module):
     def __init__(
         self,
+        args,
         dev,
         activation: str = ("relu",),
         concat_global_exchange: bool = False,
@@ -37,7 +38,7 @@ class EGNN(nn.Module):
         in_node_nf = 11
         hidden_nf = 128
         out_node_nf = 4
-
+        self.args = args
         self.output_dim = out_node_nf
         self.special_beta_core = False
         self.clust_space_norm = "none"
@@ -105,11 +106,14 @@ class EGNN(nn.Module):
                 nn.Linear(32, 3),
             )
 
-    def forward(self, g):
+    def forward(self, g, step_count):
         batch = obtain_batch_numbers(g.ndata["h"], g)
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
         g.ndata["x"] = g.ndata["h"][:, 0:3] / 3330
+        g.ndata["original_coords"] = g.ndata["h"][:, 0:3] / 3330
+        if step_count % 5:
+            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
             h = h[:, 3:]
@@ -134,6 +138,15 @@ class EGNN(nn.Module):
             # else:
             bj_raw = self.beta_head(h)
             xj_raw = self.coords_head(h)
+            g.ndata["final_cluster"] = xj_raw
+            g.ndata["beta"] = bj_raw.view(-1)
+            if step_count % 5:
+                PlotCoordinates(
+                    g,
+                    path="final_clustering",
+                    outdir=self.args.model_prefix,
+                    predict=self.args.predict,
+                )
             h = torch.cat((xj_raw, bj_raw), dim=1)
         else:
             h = self.embedding_out(h)
