@@ -113,7 +113,9 @@ class EGNN(nn.Module):
         g.ndata["x"] = g.ndata["h"][:, 0:3] / 3330
         g.ndata["original_coords"] = g.ndata["h"][:, 0:3] / 3330
         if step_count % 5:
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+            PlotCoordinates(
+                g, path="input_coords", outdir=self.args.model_prefix, egnn=True
+            )
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
             h = h[:, 3:]
@@ -146,6 +148,7 @@ class EGNN(nn.Module):
                     path="final_clustering",
                     outdir=self.args.model_prefix,
                     predict=self.args.predict,
+                    egnn=True,
                 )
             h = torch.cat((xj_raw, bj_raw), dim=1)
         else:

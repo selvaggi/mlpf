@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 
-def PlotCoordinates(g, path, outdir, num_layer=0, predict=False):
+def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
     if predict:
         outdir = outdir + "/figures_evaluation"
     else:
@@ -16,10 +16,16 @@ def PlotCoordinates(g, path, outdir, num_layer=0, predict=False):
         graph_i = graphs[i]
         if path == "input_coords":
             coords = graph_i.ndata["original_coords"]
-            features = graph_i.ndata["h"][:, -2]  # consider energy for size
+            if egnn:
+                features = graph_i.ndata["h"][:, 4]
+            else:
+                features = graph_i.ndata["h"][:, -2]  # consider energy for size
         if path == "gravnet_coord":
             coords = graph_i.ndata["gncoords"]
-            features = graph_i.ndata["h"][:, -2]
+            if egnn:
+                features = graph_i.ndata["h"][:, 4]
+            else:
+                features = graph_i.ndata["h"][:, -2]
         if path == "final_clustering":
             coords = graph_i.ndata["final_cluster"]
             features = torch.sigmoid(graph_i.ndata["beta"])
