@@ -36,18 +36,7 @@ def create_and_store_graph_output(
         dic["part_true"] = y[mask]
         # print("loaded graph and particles ", i)
         # print("STORING GRAPH")
-        # if i < 5:
-        #     torch.save(
-        #         dic,
-        #         path_save
-        #         + "/"
-        #         + str(local_rank)
-        #         + "_"
-        #         + str(step)
-        #         + "_"
-        #         + str(i)
-        #         + ".pt",
-        #     )
+
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
@@ -99,6 +88,18 @@ def create_and_store_graph_output(
             )
         print("unique_ids", particle_ids)
         print("unique labels", shower_p_unique)
+        if len(shower_p_unique) < len(particle_ids) - 3:
+            torch.save(
+                dic,
+                path_save
+                + "/"
+                + str(local_rank)
+                + "_"
+                + str(step)
+                + "_"
+                + str(i)
+                + ".pt",
+            )
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
