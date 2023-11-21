@@ -97,7 +97,7 @@ def create_and_store_graph_output(
                 path_save,
                 pandora=True,
             )
-
+        print(shower_p_unique)
         df_event = generate_showers_data_frame(
             labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w
         )
@@ -349,6 +349,9 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
 
 
 def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
+    print(row_ind)
+    print(col_ind)
+    print(intersection_matrix_w)
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
     intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
