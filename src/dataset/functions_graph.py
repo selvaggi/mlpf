@@ -65,13 +65,13 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
             or (number_of_hits[index + 1] < 20)
         ):  # This is commented to disable filtering
             list_remove.append(p)
-            # print(
-            #     "percentage of energy, number of hits",
-            #     part_frac[int(p) - 1],
-            #     number_of_hits[index],
-            #     y[index, 3],
-            # )
-            # assert part_frac[int(p) - 1] <= energy_cut
+            print(
+                "percentage of energy, number of hits",
+                part_frac[int(p) - 1],
+                number_of_hits[index],
+                y[index, 3],
+            )
+            assert part_frac[int(p) - 1] <= energy_cut
 
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
