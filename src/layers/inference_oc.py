@@ -300,10 +300,11 @@ def generate_showers_data_frame(
 
 
 def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hits):
-    intersection_matrix = torch.zeros((len(shower_p_unique), len(particle_ids))).to(
+    len_pred_showers = len(shower_p_unique)
+    intersection_matrix = torch.zeros((len_pred_showers, len(particle_ids))).to(
         shower_p_unique.device
     )
-    intersection_matrix_w = torch.zeros((len(shower_p_unique), len(particle_ids))).to(
+    intersection_matrix_w = torch.zeros((len_pred_showers, len(particle_ids))).to(
         shower_p_unique.device
     )
 
@@ -313,6 +314,7 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
         h_hits = e_hits.clone()
         counts[mask_p] = 1
         h_hits[~mask_p] = 0
+
         intersection_matrix[:, index] = scatter_add(counts, labels)
         # print(h_hits.device, labels.device)
         intersection_matrix_w[:, index] = scatter_add(h_hits, labels.to(h_hits.device))
@@ -320,7 +322,8 @@ def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hit
 
 
 def obtain_union_matrix(shower_p_unique, particle_ids, labels, dic):
-    union_matrix = torch.zeros((len(shower_p_unique), len(particle_ids)))
+    len_pred_showers = len(shower_p_unique)
+    union_matrix = torch.zeros((len_pred_showers, len(particle_ids)))
 
     for index, id in enumerate(particle_ids):
         counts = torch.zeros_like(labels)
@@ -398,6 +401,11 @@ def match_showers(
     labels, dic, particle_ids, model_output, local_rank, i, path_save, pandora=False
 ):
     shower_p_unique = torch.unique(labels)
+    if torch.sum(labels == 0) == 0:
+        shower_p_unique = torch.cat(
+            shower_p_unique.view(-1),
+            torch.Tensor([0]).to(shower_p_unique.device).view(-1),
+        )
     e_hits = dic["graph"].ndata["e_hits"].view(-1)
     # print("asking for intersection matrix  ")
     i_m, i_m_w = obtain_intersection_matrix(
