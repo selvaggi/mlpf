@@ -6,11 +6,12 @@ import numpy as np
 import dgl
 from copy import deepcopy
 
-
+import torch_cmspepr
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.object_cond import calc_LV_Lbeta
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_model import global_exchange, obtain_batch_numbers
+
 
 def assert_no_nans(x):
     """
@@ -21,14 +22,19 @@ def assert_no_nans(x):
     assert not torch.isnan(x).any()
 
 
-
 class EGNN(nn.Module):
-    def __init__(self, dev, activation: str = ("relu",), concat_global_exchange: bool = False, separate_heads: bool = False):
-        '''
+    def __init__(
+        self,
+        dev,
+        activation: str = ("relu",),
+        concat_global_exchange: bool = False,
+        separate_heads: bool = False,
+    ):
+        """
         :param concat_global_exchange: Whether to concat "global" features to the node features.
-        '''
+        """
         super().__init__()
-        in_node_nf = 6
+        in_node_nf = 11
         hidden_nf = 128
         out_node_nf = 4
 
@@ -51,7 +57,7 @@ class EGNN(nn.Module):
         self.beta_exp_weight = 0.0  # set this to also optimize using beta zeros loss
         self.attr_rep_weight = 1.0
         if self.concat_global_exchange:
-            add_global_exchange = 3 * (in_node_nf+3)   # also add coords
+            add_global_exchange = 3 * (in_node_nf + 3)  # also add coords
         else:
             add_global_exchange = 0
         self.embedding_in = nn.Linear(in_node_nf + add_global_exchange, self.hidden_nf)
@@ -89,42 +95,44 @@ class EGNN(nn.Module):
                 nn.SELU(),
                 nn.Linear(32, 32),
                 nn.SELU(),
-                nn.Linear(32, 1)
+                nn.Linear(32, 1),
             )
             self.coords_head = nn.Sequential(
                 nn.Linear(self.hidden_nf + 3, 32),
                 nn.SELU(),
                 nn.Linear(32, 32),
                 nn.SELU(),
-                nn.Linear(32, 3)
+                nn.Linear(32, 3),
             )
+
     def forward(self, g):
         batch = obtain_batch_numbers(g.ndata["h"], g)
         h = g.ndata["h"][:, 3:]
         # g.ndata["x"] = self.embedding_in_coords(g.ndata["c"])  # NBx2
-        g.ndata["x"] = g.ndata["h"][:, 0:3]
+        g.ndata["x"] = g.ndata["h"][:, 0:3] / 3330
         if self.concat_global_exchange:
             h = global_exchange(g.ndata["h"], batch)
             h = h[:, 3:]
         h = self.embedding_in(h)  # NBx80
         g.ndata["hh"] = h
-        if self.special_beta_core:
-            h_beta = self.embedding_in_beta
-            g_beta = g
-            for conv in self.layers_beta:
-                g_beta = conv(g_beta)
-                g_beta = update_knn(g_beta)
-            h_beta = torch.cat((g_beta.ndata["hh"], g_beta.ndata["x"]), dim=1)
+        # if self.special_beta_core:
+        #     h_beta = self.embedding_in_beta
+        #     g_beta = g
+        #     for conv in self.layers_beta:
+        #         g_beta = conv(g_beta)
+        #         g_beta = update_knn(g_beta)
+        #     h_beta = torch.cat((g_beta.ndata["hh"], g_beta.ndata["x"]), dim=1)
+        g = update_knn(g)  # add edges to graph ad it does not have them by default
         for conv in self.layers:
             g = conv(g)
             g = update_knn(g)
             # the second step could be to do the knn again for each graph with the new coordinates
         h = torch.cat((g.ndata["hh"], g.ndata["x"]), dim=1)
         if self.separate_heads:
-            if self.special_beta_core:
-                bj_raw = self.beta_head(h_beta)
-            else:
-                bj_raw = self.beta_head(h)
+            # if self.special_beta_core:
+            #     bj_raw = self.beta_head(h_beta)
+            # else:
+            bj_raw = self.beta_head(h)
             xj_raw = self.coords_head(h)
             h = torch.cat((xj_raw, bj_raw), dim=1)
         else:
@@ -161,23 +169,23 @@ class EGNN(nn.Module):
                 param.requires_grad = unfreeze
 
     def object_condensation_loss2(
-            self,
-            batch,
-            pred,
-            y,
-            return_resolution=False,
-            clust_loss_only=True,
-            add_energy_loss=False,
-            calc_e_frac_loss=False,
-            q_min=0.1,
-            frac_clustering_loss=0.1,
-            attr_weight=1.0,
-            repul_weight=1.0,
-            fill_loss_weight=1.0,
-            use_average_cc_pos=0.0,
-            hgcalloss=False,
-            e_frac_loss_radius=0.7,
-            e_frac_loss_return_particles=False
+        self,
+        batch,
+        pred,
+        y,
+        return_resolution=False,
+        clust_loss_only=True,
+        add_energy_loss=False,
+        calc_e_frac_loss=False,
+        q_min=0.1,
+        frac_clustering_loss=0.1,
+        attr_weight=1.0,
+        repul_weight=1.0,
+        fill_loss_weight=1.0,
+        use_average_cc_pos=0.0,
+        hgcalloss=False,
+        e_frac_loss_radius=0.7,
+        e_frac_loss_return_particles=False,
     ):
         """
         :param batch:
@@ -220,7 +228,7 @@ class EGNN(nn.Module):
             )
         else:
             distance_threshold = torch.reshape(
-                pred[:, 1 + clust_space_dim: 4 + clust_space_dim], [-1, 3]
+                pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
             )  # 4, 5, 6: distance thresholds
             energy_correction = torch.nn.functional.relu(
                 torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
@@ -229,8 +237,8 @@ class EGNN(nn.Module):
                 torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
             )
             pid_predicted = pred[
-                            :, 5 + clust_space_dim: 27 + clust_space_dim
-                            ]  # 8:30: predicted particle one-hot encoding
+                :, 5 + clust_space_dim : 27 + clust_space_dim
+            ]  # 8:30: predicted particle one-hot encoding
         dev = batch.device
         clustering_index_l = batch.ndata["particle_number"]
 
@@ -263,39 +271,70 @@ class EGNN(nn.Module):
             fill_loss_weight=fill_loss_weight,
             use_average_cc_pos=use_average_cc_pos,
             hgcal_implementation=hgcalloss,
-            hit_energies=batch.ndata["h"][:, 3]
+            hit_energies=batch.ndata["h"][:, 3],
         )
         if return_resolution:
             return a
         if clust_loss_only:
-            print("BETA WEIGHT", self.beta_weight, "BETA EXP WEIGHT", self.beta_exp_weight, "ATTR./REP. WEIGHT", self.attr_rep_weight)
-            loss = self.attr_rep_weight * a[0] + self.beta_weight * a[1] + self.beta_exp_weight * a[15]
+            print(
+                "BETA WEIGHT",
+                self.beta_weight,
+                "BETA EXP WEIGHT",
+                self.beta_exp_weight,
+                "ATTR./REP. WEIGHT",
+                self.attr_rep_weight,
+            )
+            loss = (
+                self.attr_rep_weight * a[0]
+                + self.beta_weight * a[1]
+                + self.beta_exp_weight * a[15]
+            )
             # loss = a[10]       #  ONLY INTERCLUSTERING LOSS - TEMPORARY!
             if add_energy_loss:
                 loss += a[2]  # TODO add weight as argument
         else:
             loss = (
-                    a[0]
-                    + a[1]
-                    + 20 * a[2]
-                    + 0.001 * a[3]
-                    + 0.001 * a[4]
-                    + 0.001
-                    * a[
-                        5
-                    ]  # TODO: the last term is the PID classification loss, explore this yet
+                a[0]
+                + a[1]
+                + 20 * a[2]
+                + 0.001 * a[3]
+                + 0.001 * a[4]
+                + 0.001
+                * a[
+                    5
+                ]  # TODO: the last term is the PID classification loss, explore this yet
             )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
         if clust_loss_only:
             if calc_e_frac_loss:
                 loss_e_frac, loss_e_frac_true = calc_energy_loss(
-                    batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y, e_frac_loss_return_particles=e_frac_loss_return_particles, select_centers_by_particle=True
+                    batch,
+                    xj,
+                    bj,
+                    qmin=q_min,
+                    radius=e_frac_loss_radius,
+                    y=y,
+                    e_frac_loss_return_particles=e_frac_loss_return_particles,
+                    select_centers_by_particle=True,
                 )
                 if e_frac_loss_return_particles:
                     loss_e_frac_nopart, loss_e_frac_true_nopart = calc_energy_loss(
-                        batch, xj, bj, qmin=q_min, radius=e_frac_loss_radius, y=y,
-                        e_frac_loss_return_particles=e_frac_loss_return_particles, select_centers_by_particle=False
+                        batch,
+                        xj,
+                        bj,
+                        qmin=q_min,
+                        radius=e_frac_loss_radius,
+                        y=y,
+                        e_frac_loss_return_particles=e_frac_loss_return_particles,
+                        select_centers_by_particle=False,
                     )
-                    return loss, a, loss_e_frac, loss_e_frac_true, loss_e_frac_nopart, loss_e_frac_true_nopart
+                    return (
+                        loss,
+                        a,
+                        loss_e_frac,
+                        loss_e_frac_true,
+                        loss_e_frac_nopart,
+                        loss_e_frac_true_nopart,
+                    )
                 return loss, a, loss_e_frac, loss_e_frac_true
             else:
                 return loss, a, 0, 0
@@ -436,7 +475,9 @@ class Aggregationlayer(nn.Module):
 
     def forward(self, nodes):
         # shape = nodes.mailbox['agg_feat'].shape # 1x7x80
-        nodes.data["x"] = torch.clip(nodes.data["x"], min=-1e3, max=1e3)  # to mitigate weird random NaN errors...
+        nodes.data["x"] = torch.clip(
+            nodes.data["x"], min=-1e3, max=1e3
+        )  # to mitigate weird random NaN errors...
         nodes.mailbox["trans"] = torch.clip(nodes.mailbox["trans"], min=-1e3, max=1e3)
         trans = torch.mean(nodes.mailbox["trans"], dim=1)
         coord = nodes.data["x"] + trans
@@ -458,7 +499,12 @@ def update_knn(batch):
     node_counter = 0
     for index in range(0, number_graphs):
         g = graphs_eval[index]
-        g_temp = dgl.knn_graph(g.ndata["x"], 11, exclude_self=True)
+        # g_temp = dgl.knn_graph(g.ndata["x"], 11, exclude_self=True)
+        edge_index = torch_cmspepr.knn_graph(g.ndata["x"], k=11)
+        g_temp = dgl.graph(
+            (edge_index[0], edge_index[1]), num_nodes=g.ndata["x"].shape[0]
+        )
+        g_temp = dgl.remove_self_loop(g_temp)
         g_temp.ndata["x"] = g.ndata["x"]
         g_temp.ndata["hh"] = g.ndata["hh"]
         graphs.append(g_temp)

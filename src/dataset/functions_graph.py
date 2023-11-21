@@ -300,9 +300,8 @@ def create_graph(output, config=None, n_noise=0):
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
-    standardize_coords = config.graph_config.get(
-        "standardize_coords", False
-    )  # Whether to standardize the coordinates of the hits
+    standardize_coords = config.graph_config.get("standardize_coords", False)
+    extended_coords = config.graph_config.get("extended_coords", False)
     (
         number_hits,
         number_part,
@@ -332,52 +331,30 @@ def create_graph(output, config=None, n_noise=0):
             y_data_graph[:, :3] = torch.tensor(y_coords_std).float()
 
     graph_coordinates = pos_xyz_hits
-    # print("n hits:", number_hits, "number_part", number_part)
-    # this builds fully connected graph
-    # TODO build graph using the hit links (hit_particle_link) which assigns to each node the particle it belongs to
-    # i, j = torch.tril_indices(number_hits, number_hits)
-    # g = dgl.graph((i, j))
-    # g = dgl.to_simple(g)
-    # g = dgl.to_bidirected(g)
+    graph_coordinates_norm = torch.norm(pos_xyz_hits, dim=1, p=2)
+
     if coord_cart_hits.shape[0] > 0:
         graph_empty = False
-        # if config.graph_config.get("fully_connected", False):
-        #     n_nodes = graph_coordinates.shape[0]
-        #     if n_nodes > 1:
-        #         i, j = torch.tril_indices(n_nodes, n_nodes, offset=-1)
-        #         g = dgl.graph((i, j))  # create fully connected graph
-        #         g = dgl.to_simple(g)  # remove repeated edges
-        #         g = dgl.to_bidirected(g)
-        #     else:
-        #         g = dgl.knn_graph(graph_coordinates, 0, exclude_self=True)
-        # else:
+
         g = dgl.DGLGraph()
         g.add_nodes(graph_coordinates.shape[0])
-        #     g = dgl.knn_graph(
-        #         graph_coordinates,
-        #         config.graph_config.get("k", 7),
-        #         exclude_self=True,
-        #     )
-        #     if graph_coordinates.shape[0] < 10:
-        #         print(graph_coordinates.shape)
 
-        # i, j = g.edges()
-        # edge_attr = torch.norm(
-        #     graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
-        # ).view(-1, 1)
-        # if n_noise > 0:
-        #     noise = torch.zeros((p_hits.shape[0], n_noise)).float()
-        #     noise.normal_(mean=0, std=1)
-        #     hit_features_graph = torch.cat(
-        #         (graph_coordinates, hit_type_one_hot, e_hits, p_hits, noise), dim=1
-        #     )
-        # else:
-        hit_features_graph = torch.cat(
-            (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-        )
-        # hit_features_graph = torch.cat(
-        #     (hit_type_one_hot, e_hits, p_hits), dim=1
-        # )
+        if extended_coords:
+            hit_features_graph = torch.cat(
+                (
+                    graph_coordinates,
+                    hit_type_one_hot,
+                    e_hits,
+                    p_hits,
+                    torch.log(e_hits),
+                    torch.log(p_hits),
+                ),
+                dim=1,
+            )  # dims = 3+4+1+1+1+1
+        else:
+            hit_features_graph = torch.cat(
+                (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
+            )  # dims = 9
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits"] = coord_cart_hits
@@ -388,18 +365,15 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["e_hits"] = e_hits
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
-        # g.edata["h"] = edge_attr
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
         g.ndata["pandora_cluster"] = pandora_cluster
         if len(y_data_graph) < 2:
             graph_empty = True
     else:
-        # print("graph empty")
         graph_empty = True
         g = 0
         y_data_graph = 0
-    # print("found non-empty graph")
     if coord_cart_hits_norm.shape[0] < 10:
         graph_empty = True
 
