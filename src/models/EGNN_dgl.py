@@ -497,6 +497,7 @@ class Aggregationlayer(nn.Module):
         nodes.mailbox["trans"] = torch.clip(nodes.mailbox["trans"], min=-1e3, max=1e3)
         trans = torch.mean(nodes.mailbox["trans"], dim=1)
         coord = nodes.data["x"] + trans
+        print("coord", coord)
         edge_feature = torch.sum(nodes.mailbox["edge_feature"], dim=1)
 
         agg = torch.cat((nodes.data["hh"], edge_feature), dim=1)
