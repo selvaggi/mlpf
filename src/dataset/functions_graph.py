@@ -62,7 +62,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
         if (
             np.array_equal(hit_types, [0, 1])
             or int(p) not in filt1
-            or (number_of_hits[index + 1] < 20)
+            or (number_of_hits[index] < 20)
         ):  # This is commented to disable filtering
             list_remove.append(p)
             print(
