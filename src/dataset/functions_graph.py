@@ -65,12 +65,12 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
             or (number_of_hits[index] < 20)
         ):  # This is commented to disable filtering
             list_remove.append(p)
-            print(
-                "percentage of energy, number of hits",
-                part_frac[int(p) - 1],
-                number_of_hits[index],
-                y[index, 3],
-            )
+            # print(
+            #     "percentage of energy, number of hits",
+            #     part_frac[int(p) - 1],
+            #     number_of_hits[index],
+            #     y[index, 3],
+            # )
             # assert part_frac[int(p) - 1] <= energy_cut
 
     if len(list_remove) > 0:
