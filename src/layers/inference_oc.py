@@ -66,6 +66,7 @@ def create_and_store_graph_output(
             labels_pandora[labels_pandora == -1] = 0
         # print("obtained clustering ")
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
+        print("unique pandora", torch.unique(labels_pandora))
         print("unique_ids", particle_ids)
         shower_p_unique = torch.unique(labels)
         print("unique labels", shower_p_unique)
