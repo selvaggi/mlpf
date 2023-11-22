@@ -466,8 +466,10 @@ def calc_LV_Lbeta(
         V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
 
         #! add to terms function (divide by total number of showers per event)
-        L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
-        L_V_attractive = torch.mean(L_V_attractive)
+        # L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
+        L_V_attractive = torch.mean(
+            V_attractive
+        )  # V_attractive size n_objects, so per shower metric
 
     else:
         #! in comparison this works per hit
@@ -506,7 +508,7 @@ def calc_LV_Lbeta(
             -1
         ) / number_of_repulsive_terms_per_object.view(-1)
         #! add to terms function (divide by total number of showers per event)
-        L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
+        # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
         L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
@@ -556,7 +558,7 @@ def calc_LV_Lbeta(
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.mean(
             1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
-        )
+        )  # this is also per object so not dividing by batch size
 
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
