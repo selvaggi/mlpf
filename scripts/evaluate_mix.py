@@ -10,26 +10,42 @@ import numpy as np
 import pandas as pd
 
 from evaluation_plots import obtain_metrics
+from mycolorpy import colorlist as mcp
+import numpy as np
 
-# "/eos/user/m/mgarciam/datasets_mlpf/models_trained/logs_10_15_allp_karolina1/large_eval/analysis/out.bin.gz",
-# /eos/user/m/mgarciam/datasets_mlpf/models_trained/logs_10_15_allp_karolina/training_evaluation_test2309/analysis/out_matchedshowers.bin.gz
+colors_list = mcp.gen_color(cmap="cividis", n=3)
+colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
+
+all_E = True
+if all_E:
+    path_hgcal = None  # "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
+    path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None.pt"
+    path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None_pandora.pt"
+else:
+    path_hgcal = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
+    path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/2309/mlpf/mlpf_v3/showers_df_evaluation/0_0_None.pt"
+    path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/2309/mlpf/mlpf_v3/showers_df_evaluation/0_0_None_pandora.pt"
+
+
 def main():
-    with gzip.open(
-        "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz",
-        "rb",
-    ) as f:
-        data = pickle.load(f)
-    sd = data["showers_dataframe"]
-    matched = sd.dropna()
-    ms = data["matched_showers"]
-    print(ms.head())
-    dict_1 = obtain_metrics_hgcal(sd, matched, ms)
+    dic1 = False
+    dic2 = False
+    if path_hgcal is not None:
+        dic1 = True
+        with gzip.open(
+            path_hgcal,
+            "rb",
+        ) as f:
+            data = pickle.load(f)
+        sd = data["showers_dataframe"]
+        matched = sd.dropna()
+        ms = data["matched_showers"]
+        print(ms.head())
+        dict_1 = obtain_metrics_hgcal(sd, matched, ms)
 
-    dic2 = True
-    if dic2:
-        data = pd.read_pickle(
-            "/eos/user/m/mgarciam/datasets_mlpf/models_trained/2309/mlpf/mlpf_v3/showers_df_evaluation/0_0_None_pandora.pt"
-        )
+    if path_mlpf is not None:
+        dic2 = True
+        data = pd.read_pickle(path_mlpf)
         sd = data
         matched = sd.dropna()
         dict_2 = obtain_metrics(sd, matched)
@@ -44,119 +60,156 @@ def main():
         # ms = data["matched_showers"]
         # print(ms.head())
         # dict_3 = obtain_metrics_hgcal(sd, matched, ms)
-        data = pd.read_pickle(
-            "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None.pt"
-        )
+        data = pd.read_pickle(path_pandora)
         sd = data
         matched = sd.dropna()
         dict_3 = obtain_metrics(sd, matched)
 
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(3, 2, figsize=(18, 12))
+    fig, ax = plt.subplots(3, 2, figsize=(18, 17))
     # efficiency plot
-    ax[0, 0].scatter(
-        dict_1["energy_eff"], dict_1["eff"], facecolors="none", edgecolors="b"
-    )
+    if dic1:
+        ax[0, 0].scatter(
+            dict_1["energy_eff"],
+            dict_1["eff"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+        )
     if dic2:
         ax[0, 0].scatter(
-            dict_2["energy_eff"], dict_2["eff"], facecolors="none", edgecolors="r"
+            dict_2["energy_eff"],
+            dict_2["eff"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="ML_Pytorch",
         )
         ax[0, 0].scatter(
-            dict_3["energy_eff"], dict_3["eff"], facecolors="none", edgecolors="g"
+            dict_3["energy_eff"],
+            dict_3["eff"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
         )
     ax[0, 0].set_xlabel("True Energy [GeV]")
     ax[0, 0].set_ylabel("Efficiency")
     ax[0, 0].grid()
+    ax[0, 0].legend(loc="lower right")
 
     # fake rates
-    ax[0, 1].scatter(
-        dict_1["energy_fakes"], dict_1["fake_rate"], facecolors="none", edgecolors="b"
-    )
+    if dic1:
+        ax[0, 1].scatter(
+            dict_1["energy_fakes"],
+            dict_1["fake_rate"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+        )
     if dic2:
         ax[0, 1].scatter(
             dict_2["energy_fakes"],
             dict_2["fake_rate"],
-            facecolors="none",
-            edgecolors="r",
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="ML_Pytorch",
         )
         ax[0, 1].scatter(
             dict_3["energy_fakes"],
             dict_3["fake_rate"],
-            facecolors="none",
-            edgecolors="g",
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
         )
     ax[0, 1].set_xlabel("Reconstructed Energy [GeV]")
     ax[0, 1].set_ylabel("Fake rate")
     ax[0, 1].grid()
     ax[0, 1].set_yscale("log")
+    ax[0, 1].legend(loc="upper right")
 
     # resolution
-    ax[1, 0].scatter(
-        dict_1["energy_resolutions"],
-        dict_1["mean_true_rec"],
-        facecolors="none",
-        edgecolors="b",
-    )
+    if dic1:
+        ax[1, 0].scatter(
+            dict_1["energy_resolutions"],
+            dict_1["mean_true_rec"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+        )
     if dic2:
         ax[1, 0].scatter(
             dict_2["energy_resolutions"],
             dict_2["mean_true_rec"],
-            facecolors="none",
-            edgecolors="r",
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="ML_Pytorch",
         )
         ax[1, 0].scatter(
             dict_3["energy_resolutions"],
             dict_3["mean_true_rec"],
-            facecolors="none",
-            edgecolors="g",
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
         )
     ax[1, 0].set_xlabel("Reco Energy [GeV]")
     ax[1, 0].set_ylabel("Response")
     ax[1, 0].grid()
+    ax[1, 0].legend(loc="lower right")
 
     # response
-    ax[1, 1].scatter(
-        dict_1["energy_resolutions"],
-        dict_1["variance_om_true_rec"],
-        facecolors="none",
-        edgecolors="b",
-    )
+    if dic1:
+        ax[1, 1].scatter(
+            dict_1["energy_resolutions"],
+            dict_1["variance_om_true_rec"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+        )
     if dic2:
         ax[1, 1].scatter(
             dict_2["energy_resolutions"],
             dict_2["variance_om_true_rec"],
-            facecolors="none",
-            edgecolors="r",
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="ML_Pytorch",
         )
         ax[1, 1].scatter(
             dict_3["energy_resolutions"],
             dict_3["variance_om_true_rec"],
-            facecolors="none",
-            edgecolors="g",
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
         )
     ax[1, 1].set_xlabel("Reco Energy [GeV]")
     ax[1, 1].set_ylabel("Resolution")
     ax[1, 1].grid()
+    ax[1, 1].legend(loc="upper right")
 
     # purity
-    ax[2, 0].errorbar(
-        np.array(dict_1["energy_ms"]),
-        np.array(dict_1["fce_energy"]),
-        np.array(dict_1["fce_var_energy"]),
-        marker="o",
-        mec="blue",
-        ms=5,
-        mew=4,
-        linestyle="",
-    )
+    if dic1:
+        ax[2, 0].errorbar(
+            np.array(dict_1["energy_ms"]),
+            np.array(dict_1["fce_energy"]),
+            np.array(dict_1["fce_var_energy"]),
+            marker="o",
+            mec=colors_list[0],
+            ecolor=colors_list[0],
+            ms=5,
+            mew=4,
+            linestyle="",
+        )
     if dic2:
         ax[2, 0].errorbar(
             np.array(dict_2["energy_ms"]),
             np.array(dict_2["fce_energy"]),
             np.array(dict_2["fce_var_energy"]),
             marker="o",
-            mec="red",
+            mec=colors_list[1],
+            ecolor=colors_list[1],
             ms=5,
             mew=4,
             linestyle="",
@@ -165,8 +218,9 @@ def main():
             np.array(dict_3["energy_ms"]),
             np.array(dict_3["fce_energy"]),
             np.array(dict_3["fce_var_energy"]),
-            marker="o",
-            mec="green",
+            marker="^",
+            mec=colors_list[2],
+            ecolor=colors_list[2],
             ms=5,
             mew=4,
             linestyle="",
@@ -176,23 +230,26 @@ def main():
     ax[2, 0].set_ylabel("Containment")
     ax[2, 0].grid()
 
-    ax[2, 1].errorbar(
-        np.array(dict_1["energy_ms"]),
-        np.array(dict_1["purity_energy"]),
-        np.array(dict_1["purity_var_energy"]),
-        marker=".",
-        mec="blue",
-        ms=5,
-        mew=4,
-        linestyle="",
-    )
+    if dic1:
+        ax[2, 1].errorbar(
+            np.array(dict_1["energy_ms"]),
+            np.array(dict_1["purity_energy"]),
+            np.array(dict_1["purity_var_energy"]),
+            marker=".",
+            mec=colors_list[0],
+            ecolor=colors_list[0],
+            ms=5,
+            mew=4,
+            linestyle="",
+        )
     if dic2:
         ax[2, 1].errorbar(
             np.array(dict_2["energy_ms"]),
             np.array(dict_2["purity_energy"]),
             np.array(dict_2["purity_var_energy"]),
             marker=".",
-            mec="red",
+            mec=colors_list[1],
+            ecolor=colors_list[1],
             ms=5,
             mew=4,
             linestyle="",
@@ -201,8 +258,9 @@ def main():
             np.array(dict_3["energy_ms"]),
             np.array(dict_3["purity_energy"]),
             np.array(dict_3["purity_var_energy"]),
-            marker=".",
-            mec="green",
+            marker="^",
+            mec=colors_list[2],
+            ecolor=colors_list[2],
             ms=5,
             mew=4,
             linestyle="",
