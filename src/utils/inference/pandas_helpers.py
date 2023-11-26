@@ -34,5 +34,6 @@ def open_mlpf_dataframe(path_mlpf, neutrals_only):
     else:
         sd = data
     sd = data
-    matched = sd.dropna()
+    mask = (~np.isnan(sd["pred_showers_E"])) * (~np.isnan(sd["true_showers_E"]))
+    matched = sd[mask]
     return sd, matched

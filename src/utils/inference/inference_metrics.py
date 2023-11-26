@@ -39,6 +39,7 @@ def calculate_fakes(sd, matched):
         bin_i1 = bins_fakes[i + 1]
         mask_above = sd.pred_showers_E.values <= bin_i1
         mask_below = sd.pred_showers_E.values > bin_i
+
         mask = mask_below * mask_above
         fakes = np.sum(np.isnan(sd.true_showers_E)[mask])
         total_showers = len(sd.pred_showers_E.values[mask])
@@ -51,7 +52,7 @@ def calculate_fakes(sd, matched):
     return fake_rate, energy_fakes
 
 
-def calculate_response(matched):
+def calculate_response(matched, pandora):
     bins = np.arange(0, 51, 2)
 
     bins_plot_histogram = [0, 5, 10, 20]
@@ -68,7 +69,9 @@ def calculate_response(matched):
         bin_i1 = bins[i + 1]
         mask_above = matched["reco_showers_E"] <= bin_i1
         mask_below = matched["reco_showers_E"] > bin_i
-        mask = mask_below * mask_above
+        mask_check = matched["pred_showers_E"] > 0
+        mask = mask_below * mask_above * mask_check
+
         pred_e = matched.pred_showers_E[mask]
         true_rec = matched.reco_showers_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
@@ -90,33 +93,31 @@ def calculate_response(matched):
         bin_i1 = bins[i + 1]
         mask_above = matched["true_showers_E"] <= bin_i1
         mask_below = matched["true_showers_E"] > bin_i
-        mask = mask_below * mask_above
+        mask_check = matched["pred_showers_E"] > 0
+        mask = mask_below * mask_above * mask_check
         true_e = matched.true_showers_E[mask]
-        true_rec = matched.true_showers_E[mask]
-        pred_e = matched.pred_showers_E[mask]
+        if pandora:
+            pred_e = matched.pandora_calibrated_E[mask]
+        else:
+            pred_e = matched.pred_showers_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
-            e_over_rec = pred_e / true_rec
             if i in bins_plot_histogram:
                 dic_histograms[str(i) + "true"] = e_over_true
             mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
                 e_over_true, bins_per_binned_E
             )
 
-            # mean_predtotrue_n = np.mean(e_over_true)
-            # mean_predtored_n = np.mean(e_over_rec)
-            # var_predtotrue_n = np.var(pred_e / true_e) / mean_predtotrue
-            # variance_om_true_rec__n = np.var(e_over_rec) / mean_predtored
-            # print("compare these values")
-            # print("mean pred to true", mean_predtotrue, mean_predtotrue_n)
-            # print("var pred to true", var_predtotrue, var_predtotrue_n)
-            # print("mean pred to rec", mean_predtored, mean_predtored_n)
-            # print("var pred to rec", variance_om_true_rec_, variance_om_true_rec__n)
+            # mean_predtotrue = np.mean(e_over_true)
+            # var_predtotrue = np.var(e_over_true) / mean_predtotrue
+
             mean.append(mean_predtotrue)
             variance_om.append(var_predtotrue)
             energy_resolutions.append((bin_i1 + bin_i) / 2)
 
     return (
+        mean,
+        variance_om,
         mean_true_rec,
         variance_om_true_rec,
         energy_resolutions,
@@ -181,7 +182,8 @@ def calculate_purity_containment(matched):
         bin_i1 = bins[i + 1]
         mask_above = matched["reco_showers_E"] <= bin_i1
         mask_below = matched["reco_showers_E"] > bin_i
-        mask = mask_below * mask_above
+        mask_check = matched["pred_showers_E"] > 0
+        mask = mask_below * mask_above * mask_check
         fce_e = np.mean(fce[mask])
         fce_var = np.var(fce[mask])
         purity_e = np.mean(purity[mask])
@@ -201,19 +203,21 @@ def calculate_purity_containment(matched):
     )
 
 
-def obtain_metrics(sd, matched):
+def obtain_metrics(sd, matched, pandora=False):
 
     eff, energy_eff = calculate_eff(sd)
 
     fake_rate, energy_fakes = calculate_fakes(sd, matched)
 
     (
+        mean,
+        variance_om,
         mean_true_rec,
         variance_om_true_rec,
         energy_resolutions,
         energy_resolutions_reco,
         dic_histograms,
-    ) = calculate_response(matched)
+    ) = calculate_response(matched, pandora)
 
     (
         fce_energy,
@@ -228,6 +232,8 @@ def obtain_metrics(sd, matched):
         "eff": eff,
         "energy_fakes": energy_fakes,
         "fake_rate": fake_rate,
+        "mean": mean,
+        "variance_om": variance_om,
         "mean_true_rec": mean_true_rec,
         "variance_om_true_rec": variance_om_true_rec,
         "fce_energy": fce_energy,

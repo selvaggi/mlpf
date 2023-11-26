@@ -23,8 +23,10 @@ all_E = True
 neutrals_only = False
 if all_E:
     path_hgcal = None  # "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
-    path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None.pt"
-    path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None_pandora.pt"
+    # path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None.pt"
+    # path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation/0_0_None_pandora.pt"
+    path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation_all_E_notrackeri/0_0_None.pt"
+    path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation_all_E_notrackeri/0_0_None_pandora.pt"
 else:
     path_hgcal = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
     path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/2309/mlpf/mlpf_v3/showers_df_evaluation/0_0_None.pt"
@@ -46,7 +48,7 @@ def main():
         dict_2 = obtain_metrics(sd, matched)
 
         sd, matched = open_mlpf_dataframe(path_pandora, neutrals_only)
-        dict_3 = obtain_metrics(sd, matched)
+        dict_3 = obtain_metrics(sd, matched, pandora=True)
 
     plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
     plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3)

@@ -14,7 +14,7 @@ from sklearn.metrics import confusion_matrix
 from pathlib import Path
 import os
 import pickle
-from src.models.gravnet_3 import object_condensation_loss2
+from src.models.gravnet_calibration import object_condensation_loss2
 from src.layers.inference_oc import create_and_store_graph_output
 from src.layers.object_cond import (
     onehot_particles_arr,
@@ -154,7 +154,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-
+                loss = loss + 20 * losses[2]  # add energy loss
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
@@ -248,29 +248,29 @@ def train_regression(
                 pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
-                fig, ax = plt.subplots()
-                repulsive, attractive = (
-                    lst_nonzero(losses[16].detach().cpu().flatten()),
-                    lst_nonzero(losses[17].detach().cpu().flatten()),
-                )
-                ax.hist(
-                    repulsive.view(-1),
-                    bins=100,
-                    alpha=0.5,
-                    label="repulsive",
-                    color="r",
-                )
-                ax.hist(
-                    attractive.view(-1),
-                    bins=100,
-                    alpha=0.5,
-                    label="attractive",
-                    color="b",
-                )
-                ax.set_yscale("log")
-                ax.legend()
-                wandb.log({"rep. and att. norms": wandb.Image(fig)})
-                plt.close(fig)
+                # fig, ax = plt.subplots()
+                # repulsive, attractive = (
+                #     lst_nonzero(losses[16].detach().cpu().flatten()),
+                #     lst_nonzero(losses[17].detach().cpu().flatten()),
+                # )
+                # ax.hist(
+                #     repulsive.view(-1),
+                #     bins=100,
+                #     alpha=0.5,
+                #     label="repulsive",
+                #     color="r",
+                # )
+                # ax.hist(
+                #     attractive.view(-1),
+                #     bins=100,
+                #     alpha=0.5,
+                #     label="attractive",
+                #     color="b",
+                # )
+                # ax.set_yscale("log")
+                # ax.legend()
+                # wandb.log({"rep. and att. norms": wandb.Image(fig)})
+                # plt.close(fig)
                 wandb.log(
                     {
                         "loss regression": loss,
