@@ -296,10 +296,10 @@ def calc_LV_Lbeta(
         positions_particles_pred + distance_threshold[is_sig][index_alpha]
     )
 
-    #e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
-    #e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
+    # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
+    # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
     # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
-    #e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+    # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
         batch,
         g,
@@ -312,7 +312,6 @@ def calc_LV_Lbeta(
         momentum,
     )
 
-  
     if fill_loss_weight > 0:
         fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
     else:
@@ -364,12 +363,18 @@ def calc_LV_Lbeta(
     #         pid_particles_pred,
     #     )
 
-    e_particles_pred_per_object = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index) #*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
-    e_particle_pred_per_particle = e_particles_pred_per_object[object_index]*energy_correction[is_sig].view(-1)
-    e_true_particle = y[:,3][object_index]
-    L_i = (e_particle_pred_per_particle-e_true_particle)**2/e_true_particle
+    e_particles_pred_per_object = scatter_add(
+        g.ndata["e_hits"][is_sig].view(-1), object_index
+    )  # *energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+    e_particle_pred_per_particle = e_particles_pred_per_object[
+        object_index
+    ] * energy_correction[is_sig].view(-1)
+    e_true = y[:, 3].clone()
+    e_true = e_true.to(e_particles_pred_per_object.device)
+    e_true_particle = e_true[object_index]
+    L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
     B_i = (beta[is_sig].arctanh() / 1.01) ** 2
-    loss_E = torch.sum(L_i*B_i)/torch.sum(B_i)
+    loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
 
     # loss_E = torch.mean(
     #     torch.square(
