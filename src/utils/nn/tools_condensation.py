@@ -155,8 +155,10 @@ def train_regression(
                     hgcalloss=args.hgcalloss,
                 )
                 print("loss", loss)
+                print("losses[0]", losses[0])
+                print("losses[1]", losses[1])
                 print("losses[2]", losses[2])
-                loss = loss + 20 * losses[2]  # add energy loss
+                loss = loss  # + 20 * losses[2]  # add energy loss
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
