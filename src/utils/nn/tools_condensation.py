@@ -154,6 +154,8 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
+                print("loss", loss)
+                print("losses[2]", losses[2])
                 loss = loss + 20 * losses[2]  # add energy loss
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
