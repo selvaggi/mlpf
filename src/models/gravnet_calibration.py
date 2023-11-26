@@ -108,8 +108,10 @@ class GravnetModel(nn.Module):
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-        self.pred_energy =  nn.Sequential(nn.Linear(64, 1, bias=False),
-        nn.ELU(), )
+        self.pred_energy = nn.Sequential(
+            nn.Linear(64, 1, bias=False),
+            nn.ELU(),
+        )
 
         init_weights_ = True
         if init_weights_:
@@ -169,7 +171,8 @@ class GravnetModel(nn.Module):
         x = self.postgn_dense(x)
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
-        pred_energy_corr =  torch.ones_like(x) + self.pred_energy(x)
+        pred_energy_corr = self.pred_energy(x)
+        pred_energy_corr = torch.ones_like(pred_energy_corr) + pred_energy_corr
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
@@ -180,7 +183,9 @@ class GravnetModel(nn.Module):
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
             )
-        x = torch.cat((x_cluster_coord, beta.view(-1, 1), pred_energy_corr.view(-1,1)), dim=1)
+        x = torch.cat(
+            (x_cluster_coord, beta.view(-1, 1), pred_energy_corr.view(-1, 1)), dim=1
+        )
         assert x.device == device
 
         if self.return_graphs:
@@ -454,11 +459,15 @@ def init_weights(m):
         m.bias.data.fill_(0.00)
 
 
-
-def calc_energy_correction_factor_loss(self,
-        t_energy, t_dep_energies,
-        pred_energy, pred_uncertainty_low, pred_uncertainty_high,
-        return_concat=False):
+def calc_energy_correction_factor_loss(
+    self,
+    t_energy,
+    t_dep_energies,
+    pred_energy,
+    pred_uncertainty_low,
+    pred_uncertainty_high,
+    return_concat=False,
+):
     """
     This loss uses a Bayesian approach to predict an energy uncertainty.
     * t_energy              -> Truth energy of shower
@@ -468,18 +477,21 @@ def calc_energy_correction_factor_loss(self,
     * pred_uncertainty_high -> predicted uncertainty (should be equal to ...low)
     """
 
-
-    t_energy = tf.clip_by_value(t_energy,0.,1e12)
-    t_dep_energies = tf.clip_by_value(t_dep_energies,0.,1e12)
-    t_dep_energies = tf.where(t_dep_energies / t_energy > 2.0, 2.0 * t_energy, t_dep_energies)
-    t_dep_energies = tf.where(t_dep_energies / t_energy < 0.5, 0.5 * t_energy, t_dep_energies)
+    t_energy = tf.clip_by_value(t_energy, 0.0, 1e12)
+    t_dep_energies = tf.clip_by_value(t_dep_energies, 0.0, 1e12)
+    t_dep_energies = tf.where(
+        t_dep_energies / t_energy > 2.0, 2.0 * t_energy, t_dep_energies
+    )
+    t_dep_energies = tf.where(
+        t_dep_energies / t_energy < 0.5, 0.5 * t_energy, t_dep_energies
+    )
 
     epred = pred_energy * t_dep_energies
     sigma = pred_uncertainty_high * t_dep_energies + 1.0
 
     # Uncertainty 'sigma' must minimize this term:
     # ln(2*pi*sigma^2) + (E_true - E-pred)^2/sigma^2
-    matching_loss = (pred_uncertainty_low - pred_uncertainty_high)**2
+    matching_loss = (pred_uncertainty_low - pred_uncertainty_high) ** 2
     # prediction_loss = tf.math.divide_no_nan((t_energy - epred)**2, sigma**2)
     prediction_loss = tf.math.divide_no_nan((t_energy - epred), sigma)
     prediction_loss = huber(prediction_loss, d=2)
