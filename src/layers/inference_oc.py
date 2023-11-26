@@ -116,6 +116,7 @@ def create_and_store_graph_output(
                     row_ind_pandora,
                     col_ind_pandora,
                     i_m_w_pandora,
+                    pandora=True,
                 )
                 df_list_pandora.append(df_event_pandora)
 
@@ -174,20 +175,13 @@ def log_efficiency(df, pandora=False):
 
 
 def generate_showers_data_frame(
-    labels,
-    dic,
-    shower_p_unique,
-    particle_ids,
-    row_ind,
-    col_ind,
-    i_m_w,
-    # labels_pandora,
-    # shower_p_unique_pandora,
-    # row_ind_pandora,
-    # col_ind_pandora,
-    # i_m_w_pandora,
+    labels, dic, shower_p_unique, particle_ids, row_ind, col_ind, i_m_w, pandora=False
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
+    if pandora:
+        e_pred_showers_cali = scatter_mean(
+            dic["graph"].ndata["pandora_cluster_energy"].view(-1), labels
+        )
 
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
@@ -197,15 +191,6 @@ def generate_showers_data_frame(
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
-
-    # e_pred_showers_pandora = scatter_add(
-    #     dic["graph"].ndata["e_hits"].view(-1), labels_pandora
-    # )
-    # row_ind_pandora = torch.Tensor(row_ind_pandora).to(e_pred_showers.device).long()
-    # col_ind_pandora = torch.Tensor(col_ind_pandora).to(e_pred_showers.device).long()
-    # pred_showers_pandora = shower_p_unique_pandora
-
-    # Add true showers (matched and unmatched)
     energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
 
     pid_t = dic["part_true"][:, -2].to(e_pred_showers.device)
@@ -214,37 +199,20 @@ def generate_showers_data_frame(
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
     matched_es = matched_es.to(e_pred_showers.device)
 
-    # index_matches_pandora = col_ind_pandora + 1
-    # index_matches_pandora = index_matches_pandora.to(e_pred_showers.device).long()
-    # matched_es_pandora = torch.zeros_like(energy_t) * (-100)
-    # matched_es_pandora = matched_es_pandora.to(e_pred_showers.device)
-
     matched_es[row_ind] = e_pred_showers[index_matches]
-    # matched_es_pandora[row_ind_pandora] = e_pred_showers_pandora[index_matches_pandora]
+    if pandora:
+        matched_es_cali = matched_es
+        matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
 
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
     intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
 
-    # intersection_E_pandora = torch.zeros_like(energy_t) * (-100)
-    # ie_e_pandora = obtain_intersection_values(
-    #     i_m_w_pandora, row_ind_pandora, col_ind_pandora
-    # )
-    # intersection_E_pandora[row_ind_pandora] = ie_e_pandora.to(e_pred_showers.device)
-
-    # pred_showers_pandora[index_matches_pandora] = -1
-    # mask = pred_showers_pandora != -1
-    # fake_showers_e_pandora = pred_showers_pandora[mask]
-    # fake_showers_showers_e_truw_pandora = torch.zeros(
-    #     (fake_showers_e_pandora.shape[0])
-    # ) * (-100)
-    # fake_showers_showers_e_truw_pandora = fake_showers_showers_e_truw_pandora.to(
-    #     e_pred_showers.device
-    # )
-
     pred_showers[index_matches] = -1
     mask = pred_showers != -1
     fake_showers_e = e_pred_showers[mask]
+    if pandora:
+        fake_showers_e_cali = e_pred_showers_cali[mask]
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
 
@@ -258,9 +226,9 @@ def generate_showers_data_frame(
     )
     e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
-    # e_pred_pandora = torch.cat(
-    #     (matched_es_pandora, fake_showers_showers_e_truw), dim=0
-    # )
+    if pandora:
+        e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
+
     e_pred_t = torch.cat(
         (
             intersection_E,
@@ -276,15 +244,27 @@ def generate_showers_data_frame(
     #     ),
     #     dim=0,
     # )
-    d = {
-        "true_showers_E": energy_t.detach().cpu(),
-        "reco_showers_E": e_reco.detach().cpu(),
-        "pred_showers_E": e_pred.detach().cpu(),
-        "e_pred_and_truth": e_pred_t.detach().cpu(),
-        "pid": pid_t.detach().cpu(),
-        # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
-        # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
-    }
+    if pandora:
+        d = {
+            "true_showers_E": energy_t.detach().cpu(),
+            "reco_showers_E": e_reco.detach().cpu(),
+            "pred_showers_E": e_pred.detach().cpu(),
+            "e_pred_and_truth": e_pred_t.detach().cpu(),
+            "pandora_calibrated_E": e_pred_cali.detach().cpu(),
+            "pid": pid_t.detach().cpu(),
+            # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
+            # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
+        }
+    else:
+        d = {
+            "true_showers_E": energy_t.detach().cpu(),
+            "reco_showers_E": e_reco.detach().cpu(),
+            "pred_showers_E": e_pred.detach().cpu(),
+            "e_pred_and_truth": e_pred_t.detach().cpu(),
+            "pid": pid_t.detach().cpu(),
+            # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
+            # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
+        }
     df = pd.DataFrame(data=d)
     return df
 

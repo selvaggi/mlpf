@@ -30,7 +30,7 @@ def get_number_hits(e_hits, part_idx):
     return (number_of_hits[1:].flatten()).tolist()
 
 
-def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
+def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=False):
     """This function remove particles with tracks only and remove particles with low fractions
 
     Args:
@@ -42,7 +42,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
     Returns:
         _type_: _description_
     """
-    energy_cut = 0.50
+    energy_cut = 0.010
     # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
     # print(list_p)
@@ -59,19 +59,38 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y):
         hit_types = np.unique(hit_type_a[mask])
         # if np.array_equal(hit_types, [0, 1]):
         #     print("will remove particle", p)
-        if (
-            np.array_equal(hit_types, [0, 1])
-            or int(p) not in filt1
-            or (number_of_hits[index] < 20)
-        ):  # This is commented to disable filtering
-            list_remove.append(p)
-            print(
-                "percentage of energy, number of hits",
-                part_frac[int(p) - 1],
-                number_of_hits[index],
-                y[index, 3],
-            )
-            # assert part_frac[int(p) - 1] <= energy_cut
+        if predict:
+            if (
+                np.array_equal(hit_types, [0, 1])
+                or int(p) not in filt1
+                or (number_of_hits[index] < 1)
+                or (y[index, 8] == 1)
+            ):  # This is commented to disable filtering
+                list_remove.append(p)
+                print(
+                    "percentage of energy, number of hits",
+                    part_frac[int(p) - 1],
+                    number_of_hits[index],
+                    y[index, 3],
+                    y[index, 7],
+                    y[index, 8],
+                )
+                # assert part_frac[int(p) - 1] <= energy_cut
+        else:
+            if (
+                np.array_equal(hit_types, [0, 1])
+                or int(p) not in filt1
+                or (number_of_hits[index] < 1)
+            ):  # This is commented to disable filtering
+                list_remove.append(p)
+                print(
+                    "percentage of energy, number of hits",
+                    part_frac[int(p) - 1],
+                    number_of_hits[index],
+                    y[index, 3],
+                    y[index, 7],
+                    y[index, 8],
+                )
 
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
@@ -120,13 +139,17 @@ def scatter_count(input: torch.Tensor):
     return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
 
 
-def create_inputs_from_table(output, hits_only):
+def create_inputs_from_table(output, hits_only, prediction=False):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     # print("number_hits", number_hits)
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
+    if prediction:
+        pandora_cluster_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
+    else:
+        pandora_cluster_energy = pandora_cluster
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     features_hits = torch.permute(
         torch.tensor(output["pf_vectors"][0:7, 0:number_hits]), (1, 0)
@@ -155,9 +178,18 @@ def create_inputs_from_table(output, hits_only):
     coord_cart_hits_norm = spherical_to_cartesian(theta, phi, r, normalized=True)
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
+    if prediction:
+        number_particle_features = 11
+    else:
+        number_particle_features = 9
     features_particles = torch.permute(
-        torch.tensor(output["pf_features"][4:9, list(unique_list_particles)]), (1, 0)
-    )
+        torch.tensor(
+            output["pf_features"][
+                4:number_particle_features, list(unique_list_particles)
+            ]
+        ),
+        (1, 0),
+    )  # 4:9
     particle_coord = spherical_to_cartesian(
         features_particles[:, 0],
         features_particles[:, 1],
@@ -167,20 +199,39 @@ def create_inputs_from_table(output, hits_only):
     y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
     y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
     y_energy = torch.sqrt(y_mass**2 + y_mom**2)
-    y_data_graph = torch.cat(
-        (
-            particle_coord,
-            y_energy,
-            y_mom,
-            y_mass,
-            features_particles[:, 4].view(-1).unsqueeze(1),  # particle ID (discrete)
-        ),
-        dim=1,
-    )
+    if prediction:
+        y_data_graph = torch.cat(
+            (
+                particle_coord,
+                y_energy,
+                y_mom,
+                y_mass,
+                features_particles[:, 4]
+                .view(-1)
+                .unsqueeze(1),  # particle ID (discrete)
+                features_particles[:, 5].view(-1).unsqueeze(1),  # decayed in calo
+                features_particles[:, 6].view(-1).unsqueeze(1),  # decayed in tracker
+            ),
+            dim=1,
+        )
+    else:
+        y_data_graph = torch.cat(
+            (
+                particle_coord,
+                y_energy,
+                y_mom,
+                y_mass,
+                features_particles[:, 4]
+                .view(-1)
+                .unsqueeze(1),  # particle ID (discrete)
+            ),
+            dim=1,
+        )
+
     assert len(y_data_graph) == len(unique_list_particles)
     # old_cluster_id = cluster_id
     mask_hits, mask_particles = find_mask_no_energy(
-        cluster_id, hit_type_feature, e_hits, y_data_graph
+        cluster_id, hit_type_feature, e_hits, y_data_graph, prediction
     )
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
@@ -199,13 +250,14 @@ def create_inputs_from_table(output, hits_only):
         theta[~mask_hits],
         phi[~mask_hits],
         pandora_cluster[~mask_hits],
+        pandora_cluster_energy[~mask_hits],
     ]
     hit_type = result[5].argmax(dim=1)
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
         result[0] = hit_mask.sum()
-        for i in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
+        for i in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]:
             result[i] = result[i][hit_mask]
 
     return result
@@ -310,12 +362,17 @@ def to_hetero(g, all_hit_types=[2, 3]):
     return g
 
 
-def create_graph(output, config=None, n_noise=0):
+def create_graph(
+    output,
+    config=None,
+    n_noise=0,
+):
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
     standardize_coords = config.graph_config.get("standardize_coords", False)
     extended_coords = config.graph_config.get("extended_coords", False)
+    prediction = config.graph_config.get("prediction", False)
     (
         number_hits,
         number_part,
@@ -331,7 +388,8 @@ def create_graph(output, config=None, n_noise=0):
         theta_hits,
         phi_hits,
         pandora_cluster,
-    ) = create_inputs_from_table(output, hits_only=hits_only)
+        pandora_cluster_energy,
+    ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     pos_xyz_hits = pos_xyz_hits  # / 3330  # divide by detector size
     if standardize_coords:
         # Standardize the coordinates of the hits
@@ -381,6 +439,8 @@ def create_graph(output, config=None, n_noise=0):
         g.ndata["theta_hits"] = theta_hits
         g.ndata["phi_hits"] = phi_hits
         g.ndata["pandora_cluster"] = pandora_cluster
+        if prediction:
+            g.ndata["pandora_cluster_energy"] = pandora_cluster_energy
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
