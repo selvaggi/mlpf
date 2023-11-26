@@ -373,7 +373,7 @@ def calc_LV_Lbeta(
     e_true = e_true.to(e_particles_pred_per_object.device)
     e_true_particle = e_true[object_index]
     L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
-    B_i = (beta[is_sig].arctanh() / 1.01) ** 2
+    B_i = ((beta[is_sig].arctanh() / 1.01) ** 2+1e-3)
     loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
 
     # loss_E = torch.mean(
