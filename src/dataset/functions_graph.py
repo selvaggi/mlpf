@@ -88,8 +88,6 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
                     part_frac[int(p) - 1],
                     number_of_hits[index],
                     y[index, 3],
-                    y[index, 7],
-                    y[index, 8],
                 )
 
     if len(list_remove) > 0:
