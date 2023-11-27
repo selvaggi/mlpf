@@ -234,7 +234,7 @@ def train_regression(
                         )
 
             if logwandb and ((num_batches - 1) % 10) == 0 and local_rank == 0:
-                pid_true, pid_pred = losses[7], losses[8]
+                # pid_true, pid_pred = losses[7], losses[8]
                 loss_epoch_total.append(loss)
                 losses_epoch_total.append(losses)
                 # fig, ax = plt.subplots()
