@@ -42,7 +42,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
     Returns:
         _type_: _description_
     """
-    energy_cut = 0.10
+    energy_cut = 0.01
     # REMOVE THE WEIRD ONES
     list_p = np.unique(hit_particle_link)
     # print(list_p)
