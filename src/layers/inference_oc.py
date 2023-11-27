@@ -206,12 +206,12 @@ def generate_showers_data_frame(
 
     matched_es[row_ind] = e_pred_showers[index_matches]
     if pandora:
-        matched_es_cali = matched_es
+        matched_es_cali = matched_es.clone()
         matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
     else:
-        matched_es_cali = matched_es
+        matched_es_cali = matched_es.clone()
         matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
-        calibration_per_shower = matched_es
+        calibration_per_shower = matched_es.clone()
         calibration_per_shower[row_ind] = corrections_per_shower[index_matches]
 
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
