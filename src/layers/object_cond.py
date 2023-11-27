@@ -572,8 +572,10 @@ def calc_LV_Lbeta(
         eps = 1e-3
         beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
         beta_pen = 1 - eps * torch.log(beta_per_object)
-        beta_pen = beta_pen + 1 - torch.clip(beta_per_object, 0, 1)
-        L_beta_sig = torch.mean(beta_pen) / 4
+        beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
+        L_beta_sig = beta_pen.sum() / len(beta_pen)
+        L_beta_sig = L_beta_sig / 4
         # ? note: the training that worked quite well was dividing this by the batch size (1/4)
 
     elif beta_term_option == "paper":
