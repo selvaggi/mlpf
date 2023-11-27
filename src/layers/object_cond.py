@@ -373,7 +373,7 @@ def calc_LV_Lbeta(
     e_true = e_true.to(e_particles_pred_per_object.device)
     e_true_particle = e_true[object_index]
     L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
-    B_i = ((beta[is_sig].arctanh() / 1.01) ** 2+1e-3)
+    B_i = (beta[is_sig].arctanh() / 1.01) ** 2 + 1e-3
     loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
 
     # loss_E = torch.mean(
@@ -561,17 +561,20 @@ def calc_LV_Lbeta(
     # -------
     # L_beta signal term
     if hgcal_implementation:
-        # eps = 1e-3
-        # beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
-        # beta_pen = 1 - eps * torch.log(beta_per_object)
-        beta_per_object_c = scatter_add(beta[is_sig], object_index)
-        # beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
-        # L_beta_sig = beta_pen.sum() / len(beta_pen)
-        #! one beta alpha per object
-        beta_alpha = beta[is_sig][index_alpha]
-        L_beta_sig = torch.mean(
-            1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
-        )  # this is also per object so not dividing by batch size
+        # version one:
+        # beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        # beta_alpha = beta[is_sig][index_alpha]
+        # L_beta_sig = torch.mean(
+        #     1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
+        # this is also per object so not dividing by batch size
+
+        # version 2 with the LSE approximation for the max
+        eps = 1e-3
+        beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
+        beta_pen = 1 - eps * torch.log(beta_per_object)
+        beta_pen = beta_pen + 1 - torch.clip(beta_per_object, 0, 1)
+        L_beta_sig = torch.mean(beta_pen) / 4
+        # ? note: the training that worked quite well was dividing this by the batch size (1/4)
 
     elif beta_term_option == "paper":
         beta_alpha = beta[is_sig][index_alpha]
