@@ -569,6 +569,7 @@ def calc_LV_Lbeta(
         # this is also per object so not dividing by batch size
 
         # version 2 with the LSE approximation for the max
+        print(beta)
         eps = 1e-3
         beta_per_object = scatter_add(torch.exp(beta[is_sig] / eps), object_index)
         beta_pen = 1 - eps * torch.log(beta_per_object)
