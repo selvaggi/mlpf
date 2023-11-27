@@ -282,12 +282,12 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
     ax[3, 1].set_ylim([0, 1.5])
     if neutrals_only:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_neutrals.png",
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated_neutrals.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68.png",
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated.png",
             bbox_inches="tight",
         )
 

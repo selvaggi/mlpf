@@ -20,6 +20,7 @@ from src.data.preprocess import (
     WeightMaker,
 )
 from src.dataset.functions_graph import create_graph, create_graph_synthetic
+from src.dataset.functions_graph_tracking import create_graph_tracking
 
 
 def _finalize_inputs(table, data_config):
@@ -116,7 +117,6 @@ class _SimpleIter(object):
             print("!!! Dataset_cap flag set, disabling shuffling")
         else:
             self.dataset_cap = None
-
 
         # executor to read files and run preprocessing asynchronously
         self.executor = ThreadPoolExecutor(max_workers=1) if self._async_load else None
@@ -287,11 +287,22 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
         if not self.synthetic:
-            [g, features_partnn], graph_empty = create_graph(X, self._data_config, n_noise=self.n_noise)
+            if self._data_config.graph_config.get("tracking", False):
+                [g, features_partnn], graph_empty = create_graph_tracking(
+                    X,
+                )
+            else:
+                [g, features_partnn], graph_empty = create_graph(
+                    X, self._data_config, n_noise=self.n_noise
+                )
         else:
             npart_min, npart_max = self.synthetic_npart_min, self.synthetic_npart_max
-            [g, features_partnn], graph_empty = create_graph_synthetic(self._data_config, n_noise=self.n_noise,
-                                                                       npart_min=npart_min, npart_max=npart_max)
+            [g, features_partnn], graph_empty = create_graph_synthetic(
+                self._data_config,
+                n_noise=self.n_noise,
+                npart_min=npart_min,
+                npart_max=npart_max,
+            )
         return [g, features_partnn], graph_empty
 
 
@@ -342,7 +353,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         n_noise=0,
         synthetic=False,
         synthetic_npart_min=2,
-        synthetic_npart_max=5
+        synthetic_npart_max=5,
     ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())

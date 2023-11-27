@@ -171,6 +171,7 @@ def calc_LV_Lbeta(
     use_average_cc_pos=0.0,
     hgcal_implementation=False,
     hit_energies=None,
+    tracking = False
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -290,27 +291,28 @@ def calc_LV_Lbeta(
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
     assert beta_alpha.size() == (n_objects,)
-
-    positions_particles_pred = g.ndata["pos_hits_norm"][is_sig][index_alpha]
-    positions_particles_pred = (
-        positions_particles_pred + distance_threshold[is_sig][index_alpha]
-    )
+    
+    if not tracking:
+        positions_particles_pred = g.ndata["pos_hits_norm"][is_sig][index_alpha]
+        positions_particles_pred = (
+            positions_particles_pred + distance_threshold[is_sig][index_alpha]
+        )
 
     # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
     # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
     # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
     # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
-    e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
-        batch,
-        g,
-        cluster_index_per_event,
-        is_sig,
-        q,
-        beta,
-        energy_correction,
-        predicted_pid,
-        momentum,
-    )
+        e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
+            batch,
+            g,
+            cluster_index_per_event,
+            is_sig,
+            q,
+            beta,
+            energy_correction,
+            predicted_pid,
+            momentum,
+        )
 
     if fill_loss_weight > 0:
         fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
@@ -322,25 +324,26 @@ def calc_LV_Lbeta(
     # pid_particles_pred = calc_pred_pid(
     #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
     # )
-    x_particles = y[:, 0:3]
-    e_particles = y[:, 3]
-    mom_particles_true = y[:, 4]
-    mass_particles_true = y[:, 5]
-    # particles_mask = y[:, 6]
-    mom_particles_true = mom_particles_true.to(device)
-    mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
-    mass_particles_true = mass_particles_true.to(device)
-    mass_particles_pred[mass_particles_pred < 0] = 0.0
-    mass_particles_pred = torch.sqrt(mass_particles_pred)
-    loss_mass = torch.nn.MSELoss()(
-        mass_particles_true, mass_particles_pred
-    )  # only logging this, not using it in the loss func
-    pid_id_particles = y[:, 6].unsqueeze(1).long()
-    pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
-    part_idx_onehot = [
-        safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()
-    ]
-    pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.0
+    if not tracking:
+        x_particles = y[:, 0:3]
+        e_particles = y[:, 3]
+        mom_particles_true = y[:, 4]
+        mass_particles_true = y[:, 5]
+        # particles_mask = y[:, 6]
+        mom_particles_true = mom_particles_true.to(device)
+        mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
+        mass_particles_true = mass_particles_true.to(device)
+        mass_particles_pred[mass_particles_pred < 0] = 0.0
+        mass_particles_pred = torch.sqrt(mass_particles_pred)
+        loss_mass = torch.nn.MSELoss()(
+            mass_particles_true, mass_particles_pred
+        )  # only logging this, not using it in the loss func
+        pid_id_particles = y[:, 6].unsqueeze(1).long()
+        pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
+        part_idx_onehot = [
+            safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()
+        ]
+        pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.0
 
     # if return_regression_resolution:
     #     e_particles_pred = e_particles_pred.detach().flatten()
@@ -363,34 +366,34 @@ def calc_LV_Lbeta(
     #         pid_particles_pred,
     #     )
 
-    e_particles_pred_per_object = scatter_add(
-        g.ndata["e_hits"][is_sig].view(-1), object_index
-    )  # *energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
-    e_particle_pred_per_particle = e_particles_pred_per_object[
-        object_index
-    ] * energy_correction[is_sig].view(-1)
-    e_true = y[:, 3].clone()
-    e_true = e_true.to(e_particles_pred_per_object.device)
-    e_true_particle = e_true[object_index]
-    L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
-    B_i = (beta[is_sig].arctanh() / 1.01) ** 2 + 1e-3
-    loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
+        e_particles_pred_per_object = scatter_add(
+            g.ndata["e_hits"][is_sig].view(-1), object_index
+        )  # *energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+        e_particle_pred_per_particle = e_particles_pred_per_object[
+            object_index
+        ] * energy_correction[is_sig].view(-1)
+        e_true = y[:, 3].clone()
+        e_true = e_true.to(e_particles_pred_per_object.device)
+        e_true_particle = e_true[object_index]
+        L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
+        B_i = (beta[is_sig].arctanh() / 1.01) ** 2 + 1e-3
+        loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
 
-    # loss_E = torch.mean(
-    #     torch.square(
-    #         (e_particles_pred.to(device) - e_particles.to(device))
-    #         / e_particles.to(device)
-    #     )
-    # )
-    loss_momentum = torch.mean(
-        torch.square(
-            (mom_particles_pred.to(device) - mom_particles_true.to(device))
-            / mom_particles_true.to(device)
+        # loss_E = torch.mean(
+        #     torch.square(
+        #         (e_particles_pred.to(device) - e_particles.to(device))
+        #         / e_particles.to(device)
+        #     )
+        # )
+        loss_momentum = torch.mean(
+            torch.square(
+                (mom_particles_pred.to(device) - mom_particles_true.to(device))
+                / mom_particles_true.to(device)
+            )
         )
-    )
-    # loss_ce = torch.nn.BCELoss()
-    loss_mse = torch.nn.MSELoss()
-    loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
+        # loss_ce = torch.nn.BCELoss()
+        loss_mse = torch.nn.MSELoss()
+        loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
     # loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
     # loss_particle_ids = loss_ce(
     #     pid_particles_pred.to(device), pid_particles_true.to(device)
@@ -680,47 +683,57 @@ def calc_LV_Lbeta(
     #    pass
     L_exp = L_beta
     if hgcal_implementation:
-        return (
-            L_V,  # 0
-            L_beta,
-            loss_E,
-            loss_x,
-            None,  # loss_particle_ids0,  # 4
-            loss_momentum,
-            loss_mass,
-            None,  # pid_true,
-            None,  # pid_pred,
-            resolutions,
-            L_clusters,  # 10
-            fill_loss,
-            L_V_attractive,
-            L_V_repulsive,
-            L_alpha_coordinates,
-            L_exp,
-            norms_rep,  # 16
-            norms_att,  # 17
-        )
+        if not tracking:
+            return (
+                L_V,  # 0
+                L_beta,
+                loss_E,
+                loss_x,
+                None,  # loss_particle_ids0,  # 4
+                loss_momentum,
+                loss_mass,
+                None,  # pid_true,
+                None,  # pid_pred,
+                resolutions,
+                L_clusters,  # 10
+                fill_loss,
+                L_V_attractive,
+                L_V_repulsive,
+                L_alpha_coordinates,
+                L_exp,
+                norms_rep,  # 16
+                norms_att,  # 17
+            )
+        else:
+            return (
+                L_V,  # 0
+                L_beta,
+                L_V_attractive,
+                L_V_repulsive,
+            )
     else:
-        return (
-            L_V / batch_size,  # 0
-            L_beta / batch_size,
-            loss_E,
-            loss_x,
-            None,  # loss_particle_ids0,  # 4
-            loss_momentum,
-            loss_mass,
-            None,  # pid_true,
-            None,  # pid_pred,
-            resolutions,
-            L_clusters,  # 10
-            fill_loss,
-            L_V_attractive / batch_size,
-            L_V_repulsive / batch_size,
-            L_alpha_coordinates,
-            L_exp,
-            norms_rep,  # 16
-            norms_att,  # 17
-        )
+        if not tracking:
+            return (
+                L_V / batch_size,  # 0
+                L_beta / batch_size,
+                loss_E,
+                loss_x,
+                None,  # loss_particle_ids0,  # 4
+                loss_momentum,
+                loss_mass,
+                None,  # pid_true,
+                None,  # pid_pred,
+                resolutions,
+                L_clusters,  # 10
+                fill_loss,
+                L_V_attractive / batch_size,
+                L_V_repulsive / batch_size,
+                L_alpha_coordinates,
+                L_exp,
+                norms_rep,  # 16
+                norms_att,  # 17
+            )
+        
 
 
 def calc_LV_Lbeta_inference(

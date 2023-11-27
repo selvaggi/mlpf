@@ -99,7 +99,7 @@ def calculate_response(matched, pandora):
         if pandora:
             pred_e = matched.pandora_calibrated_E[mask]
         else:
-            pred_e = matched.pred_showers_E[mask]
+            pred_e = matched.calibrated_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
             if i in bins_plot_histogram:
