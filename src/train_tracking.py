@@ -55,7 +55,6 @@ def _main(args):
         from src.utils.nn.tools_condensation_tracking import (
             evaluate_regression as evaluate,
         )
-        from src.utils.nn.tools_condensation_tracking import plot_regression_resolution
     else:
         from src.utils.nn.tools import train_regression as train
         from src.utils.nn.tools import evaluate_regression as evaluate
