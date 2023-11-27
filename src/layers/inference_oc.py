@@ -222,7 +222,8 @@ def generate_showers_data_frame(
     mask = pred_showers != -1
     fake_showers_e = e_pred_showers[mask]
     fake_showers_e_cali = e_pred_showers_cali[mask]
-    fake_showers_e_cali_factor = corrections_per_shower[mask]
+    if not pandora:
+        fake_showers_e_cali_factor = corrections_per_shower[mask]
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
 
