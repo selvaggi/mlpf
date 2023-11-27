@@ -158,7 +158,7 @@ def train_regression(
                 print("losses[0]", losses[0])
                 print("losses[1]", losses[1])
                 print("losses[2]", losses[2])
-                loss = loss + 0.5*losses[2]  # add energy loss
+                loss = loss + (1 / 20) * losses[2]  # add energy loss
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
