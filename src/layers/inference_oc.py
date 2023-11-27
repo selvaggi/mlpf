@@ -24,6 +24,7 @@ def create_and_store_graph_output(
 ):
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
+    batch_g.ndata["correction"] = model_output[:, 4]
     graphs = dgl.unbatch(batch_g)
     batch_id = y[:, -1].view(-1)
     df_list = []
@@ -35,6 +36,7 @@ def create_and_store_graph_output(
         dic["part_true"] = y[mask]
 
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
+        correction_e = dic["graph"].ndata["correction"].view(-1)
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
         if clustering_mode == "clustering_normal":
@@ -182,6 +184,9 @@ def generate_showers_data_frame(
         e_pred_showers_cali = scatter_mean(
             dic["graph"].ndata["pandora_cluster_energy"].view(-1), labels
         )
+    else:
+        corrections_per_shower = get_correction_per_shower(labels, dic)
+        e_per_shower_calibrated = e_pred_showers * corrections_per_shower
 
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
@@ -203,6 +208,11 @@ def generate_showers_data_frame(
     if pandora:
         matched_es_cali = matched_es
         matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
+    else:
+        matched_es_cali = matched_es
+        matched_es_cali[row_ind] = e_per_shower_calibrated[index_matches]
+        calibration_per_shower = matched_es
+        calibration_per_shower[row_ind] = corrections_per_shower[index_matches]
 
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
@@ -211,8 +221,8 @@ def generate_showers_data_frame(
     pred_showers[index_matches] = -1
     mask = pred_showers != -1
     fake_showers_e = e_pred_showers[mask]
-    if pandora:
-        fake_showers_e_cali = e_pred_showers_cali[mask]
+    fake_showers_e_cali = e_pred_showers_cali[mask]
+    fake_showers_e_cali_factor = corrections_per_shower[mask]
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
 
@@ -226,8 +236,12 @@ def generate_showers_data_frame(
     )
     e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
-    if pandora:
-        e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
+
+    e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
+    if not pandora:
+        calibration_factor = torch.cat(
+            (calibration_per_shower, fake_showers_e_cali_factor), dim=0
+        )
 
     e_pred_t = torch.cat(
         (
@@ -262,11 +276,26 @@ def generate_showers_data_frame(
             "pred_showers_E": e_pred.detach().cpu(),
             "e_pred_and_truth": e_pred_t.detach().cpu(),
             "pid": pid_t.detach().cpu(),
+            "calibration_factor": calibration_factor.detach().cpu(),
+            "calibrated_E": e_pred_cali.detach().cpu(),
             # "pred_showers_E_pandora": e_pred_pandora.detach().cpu(),
             # "e_pred_and_truth_pandora": e_pred_t_pandora.detach().cpu(),
         }
     df = pd.DataFrame(data=d)
     return df
+
+
+def get_correction_per_shower(labels, dic):
+    unique_labels = torch.unique(labels)
+    list_corr = []
+    for pred_label in unique_labels:
+        mask = labels == pred_label
+        corrections_E_label = dic["graph"].ndata["correction"][mask]
+        betas_label_indmax = torch.argmax(dic["graph"].ndata["beta"][mask])
+        list_corr.append(corrections_E_label[betas_label_indmax].view(-1))
+
+    corrections = torch.cat(list_corr, dim=0)
+    return corrections
 
 
 def obtain_intersection_matrix(shower_p_unique, particle_ids, labels, dic, e_hits):
