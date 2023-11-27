@@ -105,6 +105,7 @@ def create_graph_tracking(
         g.ndata["hit_type"] = hit_type_one_hot
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
+        g.ndata["pos_hits_xyz"] = hit_features_graph[:, 0:3]
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
