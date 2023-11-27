@@ -186,7 +186,7 @@ def generate_showers_data_frame(
         )
     else:
         corrections_per_shower = get_correction_per_shower(labels, dic)
-        e_per_shower_calibrated = e_pred_showers * corrections_per_shower
+        e_pred_showers_cali = e_pred_showers * corrections_per_shower
 
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
@@ -210,7 +210,7 @@ def generate_showers_data_frame(
         matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
     else:
         matched_es_cali = matched_es
-        matched_es_cali[row_ind] = e_per_shower_calibrated[index_matches]
+        matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
         calibration_per_shower = matched_es
         calibration_per_shower[row_ind] = corrections_per_shower[index_matches]
 
