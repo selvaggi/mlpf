@@ -171,7 +171,7 @@ def calc_LV_Lbeta(
     use_average_cc_pos=0.0,
     hgcal_implementation=False,
     hit_energies=None,
-    tracking = False
+    tracking=False,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -291,17 +291,17 @@ def calc_LV_Lbeta(
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
     assert beta_alpha.size() == (n_objects,)
-    
+
     if not tracking:
         positions_particles_pred = g.ndata["pos_hits_norm"][is_sig][index_alpha]
         positions_particles_pred = (
             positions_particles_pred + distance_threshold[is_sig][index_alpha]
         )
 
-    # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
-    # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
-    # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
-    # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
+        # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
+        # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
+        # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
+        # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
         e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
             batch,
             g,
@@ -341,30 +341,33 @@ def calc_LV_Lbeta(
         pid_id_particles = y[:, 6].unsqueeze(1).long()
         pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
         part_idx_onehot = [
-            safe_index(onehot_particles_arr, i) for i in pid_id_particles.flatten().tolist()
+            safe_index(onehot_particles_arr, i)
+            for i in pid_id_particles.flatten().tolist()
         ]
-        pid_particles_true[torch.arange(pid_id_particles.shape[0]), part_idx_onehot] = 1.0
+        pid_particles_true[
+            torch.arange(pid_id_particles.shape[0]), part_idx_onehot
+        ] = 1.0
 
-    # if return_regression_resolution:
-    #     e_particles_pred = e_particles_pred.detach().flatten()
-    #     e_particles = e_particles.detach().flatten()
-    #     positions_particles_pred = positions_particles_pred.detach().flatten()
-    #     x_particles = x_particles.detach().flatten()
-    #     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
-    #     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-    #     return (
-    #         {
-    #             "momentum_res": (
-    #                 (mom_particles_pred - mom_particles_true) / mom_particles_true
-    #             ).tolist(),
-    #             "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-    #             "pos_res": (
-    #                 (positions_particles_pred - x_particles) / x_particles
-    #             ).tolist(),
-    #         },
-    #         pid_particles_true,
-    #         pid_particles_pred,
-    #     )
+        # if return_regression_resolution:
+        #     e_particles_pred = e_particles_pred.detach().flatten()
+        #     e_particles = e_particles.detach().flatten()
+        #     positions_particles_pred = positions_particles_pred.detach().flatten()
+        #     x_particles = x_particles.detach().flatten()
+        #     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+        #     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
+        #     return (
+        #         {
+        #             "momentum_res": (
+        #                 (mom_particles_pred - mom_particles_true) / mom_particles_true
+        #             ).tolist(),
+        #             "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+        #             "pos_res": (
+        #                 (positions_particles_pred - x_particles) / x_particles
+        #             ).tolist(),
+        #         },
+        #         pid_particles_true,
+        #         pid_particles_pred,
+        #     )
 
         e_particles_pred_per_object = scatter_add(
             g.ndata["e_hits"][is_sig].view(-1), object_index
@@ -663,19 +666,22 @@ def calc_LV_Lbeta(
         print(L_beta, batch_size)
         print("L_beta_noise", L_beta_noise)
         print("L_beta_sig", L_beta_sig)
-    e_particles_pred = e_particles_pred.detach().to("cpu").flatten()
-    e_particles = e_particles.detach().to("cpu").flatten()
-    positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
-    x_particles = x_particles.detach().to("cpu").flatten()
-    mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
-    mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-    resolutions = {
-        "momentum_res": (
-            (mom_particles_pred - mom_particles_true) / mom_particles_true
-        ),
-        "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-        "pos_res": ((positions_particles_pred - x_particles) / x_particles).tolist(),
-    }
+    if not tracking:
+        e_particles_pred = e_particles_pred.detach().to("cpu").flatten()
+        e_particles = e_particles.detach().to("cpu").flatten()
+        positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
+        x_particles = x_particles.detach().to("cpu").flatten()
+        mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+        mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
+        resolutions = {
+            "momentum_res": (
+                (mom_particles_pred - mom_particles_true) / mom_particles_true
+            ),
+            "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+            "pos_res": (
+                (positions_particles_pred - x_particles) / x_particles
+            ).tolist(),
+        }
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
     # try:
     #    L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
@@ -733,7 +739,6 @@ def calc_LV_Lbeta(
                 norms_rep,  # 16
                 norms_att,  # 17
             )
-        
 
 
 def calc_LV_Lbeta_inference(
@@ -866,6 +871,7 @@ def calc_LV_Lbeta_inference(
     )
 
     is_sig_everything = torch.ones_like(batch).bool()
+
     e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
         batch,
         g,
