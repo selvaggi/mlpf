@@ -675,47 +675,47 @@ def evaluate_regression(
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
-                if args.predict:
-                    df_batch, df_batch_pandora = create_and_store_graph_output(
-                        batch_g,
-                        model_output,
-                        y,
-                        local_rank,
-                        step,
-                        epoch,
-                        path_save=args.model_prefix + "/showers_df_evaluation",
-                        store=False,
-                        predict=True,
-                    )
-                    df_showers.append(df_batch)
-                    df_showers_pandora.append(df_batch_pandora)
+                # if args.predict:
+                #     df_batch, df_batch_pandora = create_and_store_graph_output(
+                #         batch_g,
+                #         model_output,
+                #         y,
+                #         local_rank,
+                #         step,
+                #         epoch,
+                #         path_save=args.model_prefix + "/showers_df_evaluation",
+                #         store=False,
+                #         predict=True,
+                #     )
+                #     df_showers.append(df_batch)
+                #     df_showers_pandora.append(df_batch_pandora)
     # calculate showers at the end of every epoch
-    if logwandb and local_rank == 0:
-        if args.predict:
-            from src.layers.inference_oc import store_at_batch_end
-            import pandas as pd
+    # if logwandb and local_rank == 0:
+    #     if args.predict:
+    #         from src.layers.inference_oc import store_at_batch_end
+    #         import pandas as pd
 
-            df_showers = pd.concat(df_showers)
-            df_showers_pandora = pd.concat(df_showers_pandora)
-            store_at_batch_end(
-                path_save=args.model_prefix + "/showers_df_evaluation",
-                df_batch=df_showers,
-                df_batch_pandora=df_showers_pandora,
-                step=0,
-                predict=True,
-            )
-        else:
-            create_and_store_graph_output(
-                batch_g,
-                model_output,
-                y,
-                local_rank,
-                step,
-                epoch,
-                path_save=args.model_prefix + "/showers_df_evaluation",
-                store=True,
-                predict=False,
-            )
+    #         df_showers = pd.concat(df_showers)
+    #         df_showers_pandora = pd.concat(df_showers_pandora)
+    #         store_at_batch_end(
+    #             path_save=args.model_prefix + "/showers_df_evaluation",
+    #             df_batch=df_showers,
+    #             df_batch_pandora=df_showers_pandora,
+    #             step=0,
+    #             predict=True,
+    #         )
+    #     else:
+    #         create_and_store_graph_output(
+    #             batch_g,
+    #             model_output,
+    #             y,
+    #             local_rank,
+    #             step,
+    #             epoch,
+    #             path_save=args.model_prefix + "/showers_df_evaluation",
+    #             store=True,
+    #             predict=False,
+    #         )
     if logwandb and local_rank == 0:
 
         wandb.log(
