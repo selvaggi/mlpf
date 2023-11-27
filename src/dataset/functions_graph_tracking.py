@@ -46,7 +46,6 @@ def create_inputs_from_table(output):
         torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
     )
     hit_type = features_hits[:, -1].clone()
-    print(hit_type)
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type.long(), num_classes=2)
     # build the features (theta,phi,p)
 
@@ -99,7 +98,7 @@ def create_graph_tracking(
         g.add_nodes(hit_type_one_hot.shape[0])
 
         hit_features_graph = torch.cat(
-            (features_hits, hit_type_one_hot), dim=1
+            (features_hits[:, 0:-1], hit_type_one_hot), dim=1
         )  # dims = 9
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
