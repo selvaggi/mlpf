@@ -323,7 +323,7 @@ def object_condensation_loss2(
             return loss, a, 0, 0
         else:
             return loss, a, 0, 0
-    return loss, a, 0, 0
+    return loss, a, a[2], 0
 
 
 def object_condensation_inference(self, batch, pred):

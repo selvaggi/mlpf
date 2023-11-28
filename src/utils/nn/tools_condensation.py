@@ -144,12 +144,7 @@ def train_regression(
                     else:
                         model_output = model(batch_g, 1)
                 preds = model_output.squeeze()
-                (
-                    loss,
-                    losses,
-                    loss_E_frac,
-                    loss_E_frac_true,
-                ) = object_condensation_loss2(
+                (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
                     batch_g,
                     model_output,
                     y,
@@ -164,7 +159,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                loss = losses[2]  # add energy loss # loss +
+                loss = loss_E  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
