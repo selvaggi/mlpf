@@ -49,7 +49,7 @@ def clip_list(l, clip_val=4.0):
 def turn_grads_off(model):
     for name, param in model.named_parameters():
         print(name, name == "mod.pred_energy.0.weight")
-        if name == "module.pred_energy.0.weight":
+        if name == "module.mod.pred_energy.0.weight":
             param.requires_grad = True
             print("turining grad on", name, param.requires_grad)
         else:
