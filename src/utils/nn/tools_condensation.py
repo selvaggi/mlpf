@@ -48,7 +48,6 @@ def clip_list(l, clip_val=4.0):
 
 def turn_grads_off(model):
     for name, param in model.named_parameters():
-        print(name, name == "mod.pred_energy.0.weight")
         if name == "module.mod.pred_energy.0.weight":
             param.requires_grad = True
             print("turining grad on", name, param.requires_grad)
@@ -199,13 +198,13 @@ def train_regression(
                 grad_scaler.update()
             step_end_time = time.time()
 
-            if clust_loss_only and calc_e_frac_loss and logwandb and local_rank == 0:
-                wandb.log(
-                    {
-                        "loss e frac": loss_E_frac,
-                        "loss e frac true": loss_E_frac_true,
-                    }
-                )
+            # if clust_loss_only and calc_e_frac_loss and logwandb and local_rank == 0:
+            #     wandb.log(
+            #         {
+            #             "loss e frac": loss_E_frac,
+            #             "loss e frac true": loss_E_frac_true,
+            #         }
+            #     )
             if logwandb and (num_batches % 10) == 0 and local_rank == 0:
                 wandb.log(
                     {
