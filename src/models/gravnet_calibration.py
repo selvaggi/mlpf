@@ -318,11 +318,11 @@ def object_condensation_loss2(
                 5
             ]  # TODO: the last term is the PID classification loss, explore this yet
         )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
-    if clust_loss_only:
-        if calc_e_frac_loss:
-            return loss, a, 0, 0
-        else:
-            return loss, a, a[2], 0
+    # if clust_loss_only:
+    #     if calc_e_frac_loss:
+    #         return loss, a, 0, 0
+    #     else:
+    #         return loss, a, a[2], 0
     return loss, a, a[2], 0
 
 
