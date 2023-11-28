@@ -140,10 +140,11 @@ def train_regression(
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
                     if local_rank == 0:
-                        model_output = model(batch_g, step_count)
+                        model_output, e_cor = model(batch_g, step_count)
                     else:
-                        model_output = model(batch_g, 1)
+                        model_output, e_cor = model(batch_g, 1)
                 preds = model_output.squeeze()
+                model_output = torch.cat((model_output, e_cor), dim=1)
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
                     batch_g,
                     model_output,

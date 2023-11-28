@@ -183,15 +183,13 @@ class GravnetModel(nn.Module):
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
             )
-        x = torch.cat(
-            (x_cluster_coord, beta.view(-1, 1), pred_energy_corr.view(-1, 1)), dim=1
-        )
+        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         assert x.device == device
 
         if self.return_graphs:
             return x, graphs
         else:
-            return x  # , loss_regularizing_neig, loss_ll
+            return x, pred_energy_corr.view(-1, 1)  # , loss_regularizing_neig, loss_ll
 
 
 def object_condensation_loss2(
