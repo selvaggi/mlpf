@@ -643,14 +643,17 @@ def model_setup(args, data_config):
     if args.load_model_weights:
         print("Loading model state from %s" % args.load_model_weights)
         model_state = torch.load(args.load_model_weights, map_location="cpu")
+        model_dict = model.state_dict()
+        model_state = {k: v for k, v in model_state.items() if k in model_dict}
+        model_dict.update(model_state)
         missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
         _logger.info(
             "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
             % (args.load_model_weights, missing_keys, unexpected_keys)
         )
-    if args.copy_core_for_beta:
-        model.mod.create_separate_beta_core()
-        print("Created separate beta core")
+        if args.copy_core_for_beta:
+            model.mod.create_separate_beta_core()
+            print("Created separate beta core")
     # _logger.info(model)
     # flops(model, model_info) # commented before it adds lodel to gpu
     # loss function
@@ -747,3 +750,38 @@ def save_parquet(args, output_path, scores, labels, observers):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.mod.parameters() if p.requires_grad)
+
+
+def model_setup1(args, data_config):
+    """
+    Loads the model
+    :param args:
+    :param data_config:
+    :return: model, model_info, network_module, network_options
+    """
+    network_module = import_module(args.network_config1, name="_network_module")
+    network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
+    network_options.update(data_config.custom_model_kwargs)
+    if args.gpus:
+        gpus = [int(i) for i in args.gpus.split(",")]  # ?
+        dev = torch.device(gpus[0])
+    else:
+        gpus = None
+        local_rank = 0
+        dev = torch.device("cpu")
+    model, model_info = network_module.get_model(
+        data_config, args=args, dev=dev, **network_options
+    )
+
+    if args.load_model_weights_1:
+        print("Loading model state from %s" % args.load_model_weights_1)
+        model_state = torch.load(args.load_model_weights_1, map_location="cpu")
+        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+        _logger.info(
+            "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
+            % (args.load_model_weights, missing_keys, unexpected_keys)
+        )
+
+    loss_func = torch.nn.CrossEntropyLoss()
+
+    return model, model_info, loss_func

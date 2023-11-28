@@ -46,6 +46,15 @@ def clip_list(l, clip_val=4.0):
     return result
 
 
+def turn_grads_off(model):
+    for name, param in model.named_parameters():
+        if name == "mod.pred_energy.0.weight":
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+    return model
+
+
 def train_regression(
     model,
     loss_func,
@@ -66,6 +75,7 @@ def train_regression(
     alternate_steps=None,  # alternate_steps: after how many steps to switch between beta and clustering loss
 ):
     model.train()
+    model = turn_grads_off(model)
     # print("starting to train")
     iterator = iter(train_loader)
     g, y = next(iterator)
@@ -154,11 +164,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                print("loss", loss)
-                print("losses[0]", losses[0])
-                print("losses[1]", losses[1])
-                print("losses[2]", losses[2])
-                loss = loss + (1 / 20) * losses[2]  # add energy loss
+                loss = losses[2]  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
