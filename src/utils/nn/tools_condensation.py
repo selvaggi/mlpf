@@ -144,10 +144,11 @@ def train_regression(
                     else:
                         model_output, e_cor = model(batch_g, 1)
                 preds = model_output.squeeze()
-                model_output = torch.cat((model_output, e_cor), dim=1)
+            
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
                     batch_g,
                     model_output,
+                    e_cor,
                     y,
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,

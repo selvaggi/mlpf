@@ -195,6 +195,7 @@ class GravnetModel(nn.Module):
 def object_condensation_loss2(
     batch,
     pred,
+    pred_2,
     y,
     return_resolution=False,
     clust_loss_only=False,
@@ -231,7 +232,7 @@ def object_condensation_loss2(
 
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
-    energy_correction = pred[:, -1]
+    energy_correction = pred_2
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
     if clust_space_norm == "twonorm":
         xj = torch.nn.functional.normalize(xj, dim=1)  # 0, 1, 2: cluster space coords
