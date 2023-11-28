@@ -172,7 +172,10 @@ class GravnetModel(nn.Module):
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         pred_energy_corr = self.pred_energy(x)
+        print("required grad ", self.pred_energy[0].weight.requires_grad)
+        print("required grad ", pred_energy_corr.grad_fn)
         pred_energy_corr = torch.ones_like(pred_energy_corr) + pred_energy_corr
+        print("pred_energy_corr grad ", pred_energy_corr.grad_fn)
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
