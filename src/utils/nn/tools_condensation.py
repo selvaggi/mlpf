@@ -50,8 +50,10 @@ def turn_grads_off(model):
     for name, param in model.named_parameters():
         if name == "mod.pred_energy.0.weight":
             param.requires_grad = True
+            print("turining grad on", name, param.requires_grad)
         else:
             param.requires_grad = False
+
     return model
 
 
