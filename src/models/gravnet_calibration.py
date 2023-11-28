@@ -322,7 +322,7 @@ def object_condensation_loss2(
         if calc_e_frac_loss:
             return loss, a, 0, 0
         else:
-            return loss, a, 0, 0
+            return loss, a, a[2], 0
     return loss, a, a[2], 0
 
 
