@@ -50,7 +50,6 @@ def turn_grads_off(model):
     for name, param in model.named_parameters():
         if name == "module.mod.pred_energy.0.weight":
             param.requires_grad = True
-            print("turining grad on", name, param.requires_grad)
         else:
             param.requires_grad = False
 
@@ -743,7 +742,7 @@ def evaluate_regression(
                         step_plotting = 0
                     else:
                         step_plotting = 1
-                    model_output = model(batch_g, step_plotting)
+                    model_output, e_corr = model(batch_g, step_plotting)
                 (
                     loss,
                     losses,
@@ -752,6 +751,7 @@ def evaluate_regression(
                 ) = object_condensation_loss2(
                     batch_g,
                     model_output,
+                    e_corr,
                     y,
                     frac_clustering_loss=0,
                     q_min=args.qmin,
