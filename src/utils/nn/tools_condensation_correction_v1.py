@@ -48,12 +48,18 @@ def clip_list(l, clip_val=4.0):
 
 def turn_grads_off(model):
     for name, param in model.named_parameters():
-        if name == "module.mod.pred_energy.0.weight":
+        if name.split(".")[2] == "GatedGCNNet":
             param.requires_grad = True
         else:
             param.requires_grad = False
 
     return model
+
+
+def loss_reco_true(e_cor, true_e, sum_e):
+    loss = torch.square((e_cor * sum_e - true_e) / true_e)
+    loss = torch.mean(loss)
+    return loss
 
 
 def train_regression(
@@ -141,11 +147,14 @@ def train_regression(
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
                     if local_rank == 0:
-                        model_output, e_cor = model(batch_g, step_count)
-                        print("e_cor", e_cor.grad_fn)
+                        model_output, e_cor, true_e, sum_e = model(
+                            batch_g, step_count, y, local_rank
+                        )
                     else:
-                        model_output, e_cor = model(batch_g, 1)
-                        print("e_cor", e_cor.grad_fn)
+                        model_output, e_cor, true_e, sum_e = model(
+                            batch_g, 1, y, local_rank
+                        )
+
                 preds = model_output.squeeze()
 
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -164,7 +173,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                loss = loss_E  # add energy loss # loss +
+                loss = loss_reco_true(e_cor, true_e, sum_e)  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
@@ -742,7 +751,9 @@ def evaluate_regression(
                         step_plotting = 0
                     else:
                         step_plotting = 1
-                    model_output, e_corr = model(batch_g, step_plotting)
+                    model_output, e_corr, _, _ = model(
+                        batch_g, step_plotting, y, local_rank
+                    )
                 (
                     loss,
                     losses,
