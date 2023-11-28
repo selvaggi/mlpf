@@ -141,10 +141,12 @@ def train_regression(
                 else:
                     if local_rank == 0:
                         model_output, e_cor = model(batch_g, step_count)
+                        print("e_cor", e_cor.grad_fn)
                     else:
                         model_output, e_cor = model(batch_g, 1)
+                        print("e_cor", e_cor.grad_fn)
                 preds = model_output.squeeze()
-            
+
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
                     batch_g,
                     model_output,
