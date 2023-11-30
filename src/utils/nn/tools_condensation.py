@@ -74,7 +74,7 @@ def train_regression(
     args=None,
     args_model=None,
     alternate_steps=None,  # alternate_steps: after how many steps to switch between beta and clustering loss
-    finetune_model = False
+    finetune_model=False,
 ):
     model.train()
     if finetune_model:
@@ -144,10 +144,10 @@ def train_regression(
                 else:
                     if local_rank == 0:
                         model_output, e_cor = model(batch_g, step_count)
-                        print("e_cor", e_cor.grad_fn)
+                        # print("e_cor", e_cor.grad_fn)
                     else:
                         model_output, e_cor = model(batch_g, 1)
-                        print("e_cor", e_cor.grad_fn)
+                        # print("e_cor", e_cor.grad_fn)
                 preds = model_output.squeeze()
 
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -166,7 +166,7 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                loss = loss_E  # add energy loss # loss +
+                loss = loss + 1 / 20 * loss_E  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
