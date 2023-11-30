@@ -22,7 +22,7 @@ from src.layers.object_cond import (
     calc_LV_Lbeta_inference,
 )
 from src.utils.logger_wandb import plot_clust
-
+import torch.nn as nn
 
 class_names = ["other"] + [str(i) for i in onehot_particles_arr]  # quick fix
 
@@ -57,9 +57,16 @@ def turn_grads_off(model):
 
 
 def loss_reco_true(e_cor, true_e, sum_e):
+    m = nn.ELU()
+    e_cor = m(e_cor)
+    print("corection", e_cor[0:5])
+    print("sum_e", sum_e[0:5])
+    print("true_e", true_e[0:5])
     loss = torch.square((e_cor * sum_e - true_e) / true_e)
+    loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
+    loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
     loss = torch.mean(loss)
-    return loss
+    return loss, loss_abs, loss_abs_nocali
 
 
 def train_regression(
@@ -156,11 +163,11 @@ def train_regression(
                         )
 
                 preds = model_output.squeeze()
-
+                e_corr1 = torch.ones_like(model_output[:, 0])
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
                     batch_g,
                     model_output,
-                    e_cor,
+                    e_corr1,
                     y,
                     clust_loss_only=clust_loss_only,
                     add_energy_loss=add_energy_loss,
@@ -173,7 +180,9 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                loss = loss_reco_true(e_cor, true_e, sum_e)  # add energy loss # loss +
+                loss, loss_abs, loss_abs_nocali = loss_reco_true(
+                    e_cor, true_e, sum_e
+                )  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
@@ -293,6 +302,8 @@ def train_regression(
                 wandb.log(
                     {
                         "loss regression": loss,
+                        "loss regression abs": loss_abs,
+                        "loss_abs_nocali": loss_abs_nocali,
                         "loss lv": losses[0],
                         "loss beta": losses[1],
                         "loss E": losses[2],
@@ -754,6 +765,7 @@ def evaluate_regression(
                     model_output, e_corr, _, _ = model(
                         batch_g, step_plotting, y, local_rank
                     )
+                e_corr1 = torch.ones_like(model_output[:, 0])
                 (
                     loss,
                     losses,
@@ -762,7 +774,7 @@ def evaluate_regression(
                 ) = object_condensation_loss2(
                     batch_g,
                     model_output,
-                    e_corr,
+                    e_corr1,
                     y,
                     frac_clustering_loss=0,
                     q_min=args.qmin,
@@ -806,10 +818,10 @@ def evaluate_regression(
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
                 if args.predict:
-                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                    
                     df_batch, df_batch_pandora = create_and_store_graph_output(
                         batch_g,
-                        model_output1,
+                        model_output,
                         y,
                         local_rank,
                         step,
@@ -817,6 +829,7 @@ def evaluate_regression(
                         path_save=args.model_prefix + "/showers_df_evaluation",
                         store=False,
                         predict=True,
+                        e_corr =e_corr
                     )
                     df_showers.append(df_batch)
                     df_showers_pandora.append(df_batch_pandora)
@@ -836,10 +849,10 @@ def evaluate_regression(
                 predict=True,
             )
         else:
-            model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+            
             create_and_store_graph_output(
                 batch_g,
-                model_output1,
+                model_output,
                 y,
                 local_rank,
                 step,
@@ -847,6 +860,7 @@ def evaluate_regression(
                 path_save=args.model_prefix + "/showers_df_evaluation",
                 store=True,
                 predict=False,
+                e_corr =e_corr
             )
     if logwandb and local_rank == 0:
         # pid_true, pid_pred = torch.cat(

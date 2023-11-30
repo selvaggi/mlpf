@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.rc("font", size=20)
+matplotlib.rc("font", size=25)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,10 +8,13 @@ import mplhep as hep
 import seaborn as sns
 
 hep.style.use("CMS")
-colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
+# colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
+colors_list = ["#fff7bc", "#b82d7dff", "#b143b9ff"]  # color list poster neurips
+marker_size = 20
 
 
 def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list):
+    marker_size = 15
     fig, ax = plt.subplots(4, 2, figsize=(18, 8 * 4))
     # efficiency plot
     if dic1:
@@ -21,6 +24,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[0, 0].scatter(
@@ -28,7 +32,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["eff"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[0, 0].scatter(
             dict_3["energy_eff"],
@@ -37,6 +42,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
+            s=70,
         )
     ax[0, 0].set_xlabel("True Energy [GeV]")
     ax[0, 0].set_ylabel("Efficiency")
@@ -51,6 +57,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[0, 1].scatter(
@@ -58,7 +65,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["fake_rate"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[0, 1].scatter(
             dict_3["energy_fakes"],
@@ -66,6 +74,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
+            s=70,
             marker="^",
         )
     ax[0, 1].set_xlabel("Reconstructed Energy [GeV]")
@@ -82,6 +91,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[1, 0].scatter(
@@ -89,7 +99,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["mean_true_rec"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[1, 0].scatter(
             dict_3["energy_resolutions_reco"],
@@ -98,12 +109,12 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
+            s=70,
         )
     ax[1, 0].set_xlabel("Reco Energy [GeV]")
     ax[1, 0].set_ylabel("Response")
     ax[1, 0].grid()
     ax[1, 0].legend(loc="lower right")
-    ax[1, 0].set_ylim([0, 1.5])
 
     # response
     if dic1:
@@ -113,6 +124,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[1, 1].scatter(
@@ -120,7 +132,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["variance_om_true_rec"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[1, 1].scatter(
             dict_3["energy_resolutions_reco"],
@@ -129,13 +142,14 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
+            s=70,
         )
     ax[1, 1].set_xlabel("Reco Energy [GeV]")
     ax[1, 1].set_ylabel("Resolution")
     ax[1, 1].grid()
     ax[1, 1].set_yscale("log")
     ax[1, 1].legend(loc="upper right")
-    ax[1, 1].set_ylim([0, 1])
+    # ax[1, 1].set_ylim([0, 1])
 
     if dic1:
         ax[2, 0].scatter(
@@ -144,6 +158,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[2, 0].scatter(
@@ -151,7 +166,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["mean"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[2, 0].scatter(
             dict_3["energy_resolutions"],
@@ -160,12 +176,13 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
+            s=70,
         )
     ax[2, 0].set_xlabel("True Energy [GeV]")
     ax[2, 0].set_ylabel("Response")
     ax[2, 0].grid()
     ax[2, 0].legend(loc="lower right")
-    ax[2, 0].set_ylim([0, 1.5])
+    # ax[2, 0].set_ylim([0, 1.5])
 
     # response
     if dic1:
@@ -175,6 +192,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
             label="Hgcal",
+            s=70,
         )
     if dic2:
         ax[2, 1].scatter(
@@ -182,7 +200,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_2["variance_om"],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
-            label="ML_Pytorch",
+            label="GNN",
+            s=70,
         )
         ax[2, 1].scatter(
             dict_3["energy_resolutions"],
@@ -191,13 +210,13 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
+            s=70,
         )
     ax[2, 1].set_xlabel("True Energy [GeV]")
     ax[2, 1].set_ylabel("Resolution")
     ax[2, 1].set_yscale("log")
     ax[2, 1].grid()
     ax[2, 1].legend(loc="upper right")
-    ax[2, 1].set_ylim([0, 1])
 
     # purity
     if dic1:
@@ -207,8 +226,9 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_1["fce_var_energy"]),
             marker="o",
             mec=colors_list[0],
+            mfc=colors_list[0],
             ecolor=colors_list[0],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -217,10 +237,11 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_2["energy_ms"]),
             np.array(dict_2["fce_energy"]),
             np.array(dict_2["fce_var_energy"]),
-            marker="o",
+            marker=".",
+            mfc=colors_list[1],
             mec=colors_list[1],
             ecolor=colors_list[1],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -229,9 +250,10 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_3["fce_energy"]),
             np.array(dict_3["fce_var_energy"]),
             marker="^",
+            mfc=colors_list[2],
             mec=colors_list[2],
             ecolor=colors_list[2],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -247,8 +269,9 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_1["purity_var_energy"]),
             marker=".",
             mec=colors_list[0],
+            mfc=colors_list[0],
             ecolor=colors_list[0],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -259,8 +282,9 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_2["purity_var_energy"]),
             marker=".",
             mec=colors_list[1],
+            mfc=colors_list[1],
             ecolor=colors_list[1],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -270,8 +294,9 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             np.array(dict_3["purity_var_energy"]),
             marker="^",
             mec=colors_list[2],
+            mfc=colors_list[2],
             ecolor=colors_list[2],
-            ms=5,
+            ms=marker_size,
             mew=4,
             linestyle="",
         )
@@ -279,7 +304,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
     ax[3, 1].set_xlabel("Reco Energy [GeV]")
     ax[3, 1].set_ylabel("Purity")
     ax[3, 1].grid()
-    ax[3, 1].set_ylim([0, 1.5])
+    # ax[3, 1].set_ylim([0, 1.5])
     if neutrals_only:
         fig.savefig(
             "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated_neutrals.png",
@@ -292,7 +317,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
         )
 
 
-def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3):
+def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
     bins_plot_histogram = [0, 5, 10, 20]
     fig, ax = plt.subplots(4, 2, figsize=(18, 25))
 
@@ -335,7 +360,7 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3):
             ax=ax[i, 1],
         )
         ax[i, 1].set_xlabel("E pred / True Energy [GeV]")
-        ax[i, 1].set_xlim([0, 2])
+        # ax[i, 1].set_xlim([0, 2])
         ax[i, 1].grid()
         ax[i, 1].legend(loc="upper right")
         ax[i, 1].set_title(
@@ -343,14 +368,20 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3):
         )
         ax[i, 0].set_xlabel("E pred / Reco Energy [GeV]")
         ax[i, 0].grid()
-        ax[i, 0].set_xlim([0, 2])
+        # ax[i, 0].set_xlim([0, 2])
         ax[i, 0].legend(loc="upper right")
         ax[i, 0].set_title(
             "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
         )
         # ax[i, 0].set_yscale("log")
     fig.tight_layout(pad=2.0)
-    fig.savefig(
-        "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy.png",
-        bbox_inches="tight",
-    )
+    if neutrals_only:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_neutrals_only.png",
+            bbox_inches="tight",
+        )
+    else:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy.png",
+            bbox_inches="tight",
+        )

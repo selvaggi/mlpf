@@ -74,9 +74,11 @@ def train_regression(
     args=None,
     args_model=None,
     alternate_steps=None,  # alternate_steps: after how many steps to switch between beta and clustering loss
+    finetune_model = False
 ):
     model.train()
-    model = turn_grads_off(model)
+    if finetune_model:
+        model = turn_grads_off(model)
     # print("starting to train")
     iterator = iter(train_loader)
     g, y = next(iterator)

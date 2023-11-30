@@ -56,7 +56,10 @@ def calculate_response(matched, pandora):
     bins = np.arange(0, 51, 2)
 
     bins_plot_histogram = [0, 5, 10, 20]
-    bins_per_binned_E = np.arange(0, 3, 0.001)
+    if pandora:
+        bins_per_binned_E = np.arange(0, 3, 0.001)
+    else:
+        bins_per_binned_E = np.arange(0, 3, 0.001)
     mean = []
     variance_om = []
     mean_true_rec = []
@@ -88,6 +91,10 @@ def calculate_response(matched, pandora):
             variance_om_true_rec.append(variance_om_true_rec_)
             energy_resolutions_reco.append((bin_i1 + bin_i) / 2)
     # TODO change the pred_showers_E to the pandora calibrated E and the calibrated E for the model pandora_calibrated_E
+    if pandora:
+        bins_per_binned_E = np.arange(0, 3, 0.05)
+    else:
+        bins_per_binned_E = np.arange(0, 3, 0.005)
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
