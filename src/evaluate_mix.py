@@ -42,27 +42,27 @@ else:
 
 def main():
 
-    print(torch.cuda.is_available())
-    print(torch.cuda.device_count())
+    # print(torch.cuda.is_available())
+    # print(torch.cuda.device_count())
 
-    # dic1 = False
-    # dic2 = False
-    # if path_hgcal is not None:
-    #     dic1 = True
-    #     sd, ms = open_hgcal(path_hgcal, neutrals_only)
-    #     dict_1 = obtain_metrics_hgcal(sd, matched, ms)
-    # else:
-    #     dict_1 = None
-    # if path_mlpf is not None:
-    #     dic2 = True
-    #     sd, matched = open_mlpf_dataframe(path_mlpf, neutrals_only)
-    #     dict_2 = obtain_metrics(sd, matched)
+    dic1 = False
+    dic2 = False
+    if path_hgcal is not None:
+        dic1 = True
+        sd, ms = open_hgcal(path_hgcal, neutrals_only)
+        dict_1 = obtain_metrics_hgcal(sd, matched, ms)
+    else:
+        dict_1 = None
+    if path_mlpf is not None:
+        dic2 = True
+        sd, matched = open_mlpf_dataframe(path_mlpf, neutrals_only)
+        dict_2 = obtain_metrics(sd, matched)
 
-    #     sd, matched = open_mlpf_dataframe(path_pandora, neutrals_only)
-    #     dict_3 = obtain_metrics(sd, matched, pandora=True)
+        sd, matched = open_mlpf_dataframe(path_pandora, neutrals_only)
+        dict_3 = obtain_metrics(sd, matched, pandora=True)
 
-    # plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
-    # plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3)
+    plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
+    plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3)
 
 
 if __name__ == "__main__":
