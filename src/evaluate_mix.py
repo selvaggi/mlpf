@@ -6,9 +6,6 @@ matplotlib.rc("font", size=25)
 import numpy as np
 import pandas as pd
 import os
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-# from mycolorpy import colorlist as mcp
 import numpy as np
 from utils.inference.inference_metrics_hgcal import obtain_metrics_hgcal
 from utils.inference.inference_metrics import obtain_metrics
