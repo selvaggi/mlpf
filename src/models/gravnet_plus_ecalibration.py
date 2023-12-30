@@ -20,7 +20,8 @@ from src.models.gravnet_model import (
     global_exchange,
 )
 
-from src.models.GattedGCN_correction import GraphTransformerNet
+from src.models.GattedGCN_correction import GraphTransformerNet, GCNNet
+import torch_cmspepr
 
 
 class GravnetModel(nn.Module):
@@ -183,7 +184,10 @@ class GravnetModel(nn.Module):
         graphs_new, true_new, sum_e = obtain_clustering_for_matched_showers(
             g, x, y, local_rank
         )
+        graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
         e_correction = self.GatedGCNNet(graphs_new)
+        print("e_correction", e_correction)
+        e_correction = torch.ones_like(e_correction) + e_correction
         return x, e_correction, true_new, sum_e  # , loss_regularizing_neig, loss_ll
 
 
@@ -577,13 +581,19 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
             for unique_showers_label in shower_p_unique:
                 if torch.sum(unique_showers_label == index_matches) == 1:
                     index_in_matched = torch.argmax(
-                        unique_showers_label == index_matches
+                        (unique_showers_label == index_matches) * 1
                     )
                     mask = labels == unique_showers_label
-                    non_graph = torch.sum(mask)
-                    g = dgl.DGLGraph()
-                    g.add_nodes(non_graph)
-                    g.to(model_output.device)
+                    # non_graph = torch.sum(mask)
+                    sls_graph = graphs[i].ndata["h"][mask][:, 0:3]
+                    k = 7
+                    edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+                    g = dgl.graph(
+                        (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+                    )
+                    g = dgl.remove_self_loop(g)
+                    # g = dgl.DGLGraph().to(graphs[i].device)
+                    # g.add_nodes(non_graph.detach().cpu())
                     g.ndata["h"] = torch.cat(
                         (
                             graphs[i].ndata["h"][mask],
@@ -592,12 +602,12 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
                         dim=1,
                     )
                     energy_t = dic["part_true"][:, 3].to(model_output.device)
-                    true_energy_shower = energy_t[index_in_matched[index_in_matched]]
+                    true_energy_shower = energy_t[row_ind[index_in_matched]]
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)
-                    true_energy_showers.append(true_energy_shower)
-                    reco_energy_showers.append(reco_energy_shower)
+                    true_energy_showers.append(true_energy_shower.view(-1))
+                    reco_energy_showers.append(reco_energy_shower.view(-1))
     graphs_showers_matched = dgl.batch(graphs_showers_matched)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
-    return graphs_showers_matched, true_energy_shower, reco_energy_showers
+    return graphs_showers_matched, true_energy_showers, reco_energy_showers

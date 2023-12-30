@@ -56,9 +56,15 @@ def _main(args):
             evaluate_regression as evaluate,
         )
     else:
-        from src.utils.nn.tools import train_regression as train
-        from src.utils.nn.tools import evaluate_regression as evaluate
-        from src.utils.nn.tools_condensation import plot_regression_resolution
+        from src.utils.nn.tools_condensation_correction_v1 import (
+            train_regression as train,
+        )
+        from src.utils.nn.tools_condensation_correction_v1 import (
+            evaluate_regression as evaluate,
+        )
+        from src.utils.nn.tools_condensation_correction_v1 import (
+            plot_regression_resolution,
+        )
 
     # training/testing mode
     training_mode = not args.predict

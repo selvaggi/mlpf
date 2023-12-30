@@ -4,15 +4,18 @@ matplotlib.rc("font", size=25)
 import numpy as np
 
 
-def calculate_eff(sd):
-    bins = np.arange(0, 51, 2)
+def calculate_eff(sd, log_scale=False):
+    if log_scale:
+        bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    else:
+        bins = np.arange(0, 51, 2)
     eff = []
     energy_eff = []
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
-        mask_above = sd.true_showers_E.values <= bin_i1
-        mask_below = sd.true_showers_E.values > bin_i
+        mask_above = sd.reco_showers_E.values <= bin_i1
+        mask_below = sd.reco_showers_E.values > bin_i
         mask = mask_below * mask_above
         number_of_non_reconstructed_showers = np.sum(
             np.isnan(sd.pred_showers_E.values)[mask]
@@ -27,8 +30,11 @@ def calculate_eff(sd):
     return eff, energy_eff
 
 
-def calculate_fakes(sd, matched):
-    bins_fakes = np.arange(0, 51, 2)
+def calculate_fakes(sd, matched, log_scale=False):
+    if log_scale:
+        bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    else:
+        bins_fakes = np.arange(0, 51, 2)
     fake_rate = []
     energy_fakes = []
     total_true_showers = np.sum(
@@ -52,10 +58,13 @@ def calculate_fakes(sd, matched):
     return fake_rate, energy_fakes
 
 
-def calculate_response(matched, pandora):
-    bins = np.arange(0, 51, 2)
+def calculate_response(matched, pandora, log_scale=False):
+    if log_scale:
+        bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    else:
+        bins = np.arange(0, 51, 2)
 
-    bins_plot_histogram = [0, 5, 10, 20]
+    bins_plot_histogram = [5, 6, 10, 20]
     if pandora:
         bins_per_binned_E = np.arange(0, 3, 0.001)
     else:
@@ -67,21 +76,33 @@ def calculate_response(matched, pandora):
     energy_resolutions = []
     energy_resolutions_reco = []
     dic_histograms = {}
+    print("total number of bins", len(bins))
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
-        mask_above = matched["reco_showers_E"] <= bin_i1
+        mask_above = (
+            matched["reco_showers_E"] <= bin_i1
+        )  # true_showers_E, reco_showers_E
         mask_below = matched["reco_showers_E"] > bin_i
         mask_check = matched["pred_showers_E"] > 0
         mask = mask_below * mask_above * mask_check
 
         pred_e = matched.pred_showers_E[mask]
         true_rec = matched.reco_showers_E[mask]
+        true_e = matched.true_showers_E[mask]
+        if pandora:
+            pred_e_corrected = matched.pandora_calibrated_E[mask]
+        else:
+            pred_e_corrected = matched.calibrated_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_rec = pred_e / true_rec
             if i in bins_plot_histogram:
+                print("storing bin index", i, bin_i)
                 dic_histograms[str(i) + "reco"] = e_over_rec
-
+                dic_histograms[str(i) + "reco_baseline"] = true_rec
+                dic_histograms[str(i) + "pred_corr_e"] = pred_e_corrected
+                dic_histograms[str(i) + "true_baseline"] = true_e
+                dic_histograms[str(i) + "pred_e"] = pred_e
             mean_predtored, variance_om_true_rec_ = obtain_MPV_and_68(
                 e_over_rec, bins_per_binned_E
             )
@@ -103,14 +124,18 @@ def calculate_response(matched, pandora):
         mask_check = matched["pred_showers_E"] > 0
         mask = mask_below * mask_above * mask_check
         true_e = matched.true_showers_E[mask]
+        true_rec = matched.reco_showers_E[mask]
         if pandora:
             pred_e = matched.pandora_calibrated_E[mask]
         else:
             pred_e = matched.calibrated_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
+            e_rec_over_true = true_rec / true_e
             if i in bins_plot_histogram:
+                print("storing bin index true", i, bin_i)
                 dic_histograms[str(i) + "true"] = e_over_true
+                dic_histograms[str(i) + "reco_showers"] = e_rec_over_true
             mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
                 e_over_true, bins_per_binned_E
             )
@@ -174,8 +199,11 @@ def get_std68(theHist, bin_edges, percentage=0.683):
     return 0.5 * (high - low), low, high
 
 
-def calculate_purity_containment(matched):
-    bins = np.arange(0, 51, 2)
+def calculate_purity_containment(matched, log_scale=False):
+    if log_scale:
+        bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    else:
+        bins = np.arange(0, 51, 2)
     fce_energy = []
     fce_var_energy = []
     energy_ms = []
@@ -210,11 +238,11 @@ def calculate_purity_containment(matched):
     )
 
 
-def obtain_metrics(sd, matched, pandora=False):
+def obtain_metrics(sd, matched, pandora=False, log_scale=False):
 
-    eff, energy_eff = calculate_eff(sd)
+    eff, energy_eff = calculate_eff(sd, log_scale)
 
-    fake_rate, energy_fakes = calculate_fakes(sd, matched)
+    fake_rate, energy_fakes = calculate_fakes(sd, matched, log_scale)
 
     (
         mean,
@@ -224,7 +252,7 @@ def obtain_metrics(sd, matched, pandora=False):
         energy_resolutions,
         energy_resolutions_reco,
         dic_histograms,
-    ) = calculate_response(matched, pandora)
+    ) = calculate_response(matched, pandora, log_scale)
 
     (
         fce_energy,
@@ -232,7 +260,7 @@ def obtain_metrics(sd, matched, pandora=False):
         energy_ms,
         purity_energy,
         purity_var_energy,
-    ) = calculate_purity_containment(matched)
+    ) = calculate_purity_containment(matched, log_scale)
 
     dict = {
         "energy_eff": energy_eff,

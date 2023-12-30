@@ -77,7 +77,7 @@ def calc_energy_pred(
     momenta = []
     for i in range(0, batch_number):
         mask_batch = batch == i
-        X = g.ndata["pos_hits_norm"][mask_batch]
+        X = g.ndata["pos_hits_xyz"][mask_batch]
         cluster_index_i = cluster_index_per_event[mask_batch] - 1
         is_sig_i = is_sig[mask_batch]
 
@@ -293,7 +293,7 @@ def calc_LV_Lbeta(
     assert beta_alpha.size() == (n_objects,)
 
     if not tracking:
-        positions_particles_pred = g.ndata["pos_hits_norm"][is_sig][index_alpha]
+        positions_particles_pred = g.ndata["pos_hits_xyz"][is_sig][index_alpha]
         positions_particles_pred = (
             positions_particles_pred + distance_threshold[is_sig][index_alpha]
         )
@@ -482,7 +482,7 @@ def calc_LV_Lbeta(
         #! each shower is account for separately
         V_attractive = V_attractive.sum(dim=0)  # K objects
         #! divide by the number of accounted points
-        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
+        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3) #every object is accounted for equally
 
         #! add to terms function (divide by total number of showers per event)
         # L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
@@ -865,7 +865,7 @@ def calc_LV_Lbeta_inference(
     x_alpha = cluster_space_coords[index_alpha]
     beta_alpha = beta[index_alpha]
 
-    positions_particles_pred = g.ndata["pos_hits_norm"][index_alpha]
+    positions_particles_pred = g.ndata["pos_hits_xyz"][index_alpha]
     positions_particles_pred = (
         positions_particles_pred + distance_threshold[index_alpha]
     )

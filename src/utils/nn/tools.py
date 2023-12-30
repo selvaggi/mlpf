@@ -10,6 +10,161 @@ from src.logger.logger import _logger
 import wandb
 
 
+def _check_scales_centers(iterator):
+    regress_items = ["part_theta", "part_phi"]
+    centers = np.zeros(2)
+    scales = np.zeros(2)
+    for ii, item in enumerate(regress_items):
+        centers[ii] = iterator._data_config.preprocess_params[item]["center"]
+        scales[ii] = iterator._data_config.preprocess_params[item]["scale"]
+    return centers, scales
+
+
+def upd_dict(d, small_dict):
+    for k in small_dict:
+        if k not in d:
+            d[k] = []
+        d[k] += small_dict[k]
+    return d
+
+
+def update_dict(dict1, dict2):
+    for key in dict2:
+        if key not in dict1:
+            dict1[key] = 0.0
+        dict1[key] += dict2[key]
+    return dict1
+
+
+def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
+    bins = np.linspace(0, 200, bins + 1)
+    theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
+    wmin = 0.2
+    wmax = 1.0
+    epsilon = 0.01
+    point = wmin
+    weight = 0.0
+    points = []
+    sums = []
+    # fill list of bin centers and the integral up to those point
+    for i in range(len(bin_edges) - 1):
+        weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
+        points.append([(bin_edges[i + 1] + bin_edges[i]) / 2, weight])
+        sums.append(weight)
+
+    low = wmin
+    high = wmax
+    width = 100
+    for i in range(len(points)):
+        for j in range(i, len(points)):
+            wy = points[j][1] - points[i][1]
+            # print(wy)
+            if abs(wy - percentage) < epsilon:
+                # print("here")
+                wx = points[j][0] - points[i][0]
+                if wx < width:
+                    low = points[i][0]
+                    high = points[j][0]
+                    # print(points[j][0], points[i][0], wy, wx)
+                    width = wx
+                    ii = i
+                    jj = j
+    # print(low, high)
+    return 0.5 * (high - low), low, high
+
+
+def log_losses_wandb(logwandb, num_batches, local_rank, losses, loss, val=False):
+    if val:
+        val_ = " val"
+    else:
+        val_ = ""
+    if logwandb and ((num_batches - 1) % 10) == 0 and local_rank == 0:
+        wandb.log(
+            {
+                "loss" + val_ + " regression": loss,
+                "loss" + val_ + " lv": losses[0],
+                "loss" + val_ + " beta": losses[1],
+                "loss" + val_ + " E": losses[2],
+                "loss" + val_ + " X": losses[3],
+                "loss" + val_ + " PID": losses[4],
+                "loss" + val_ + " momentum": losses[5],
+                "loss" + val_ + " mass (not us. for opt.)": losses[6],
+                "inter-clustering loss" + val_ + "": losses[10],
+                "filling loss" + val_ + "": losses[11],
+                "loss" + val_ + " attractive": losses[12],
+                "loss" + val_ + " repulsive": losses[13],
+                "loss" + val_ + " alpha coord": losses[14],
+                "loss" + val_ + " beta zeros": losses[15],
+            }
+        )
+
+
+def update_and_log_scheduler(scheduler, args, loss, logwandb, local_rank, opt):
+    if scheduler and getattr(scheduler, "_update_per_step"):
+        if args.lr_scheduler == "reduceplateau":
+            scheduler.step(loss)  # loss
+        else:
+            scheduler.step()  # loss
+        if logwandb and local_rank == 0:
+            if args.lr_scheduler == "reduceplateau":
+                wandb.log({"lr": opt.param_groups[0]["lr"]})
+            else:
+                wandb.log({"lr": scheduler.get_last_lr()[0]})
+
+
+def lst_nonzero(x):
+    return x[x != 0.0]
+
+
+def clip_list(l, clip_val=4.0):
+    result = []
+    for item in l:
+        if abs(item) > clip_val:
+            if item > 0:
+                result.append(clip_val)
+            else:
+                result.append(-clip_val)
+        elif np.isnan(item):
+            result.append(0.0)  # i don't know why the hell we need this
+        else:
+            result.append(item)
+    return result
+
+
+def turn_grads_off(model):
+    for name, param in model.named_parameters():
+        if name == "module.mod.pred_energy.0.weight":
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+
+    return model
+
+
+def log_step_time(
+    logwandb, num_batches, local_rank, load_end_time, prev_time, step_end_time
+):
+    if logwandb and (num_batches % 100) == 0 and local_rank == 0:
+        wandb.log(
+            {
+                "load_time": load_end_time - prev_time,
+                "step_time": step_end_time - load_end_time,
+            }
+        )  # , step=step_count)
+
+
+def log_betas_hist(logwandb, local_rank, num_batches, betas, args):
+    if logwandb and local_rank == 0 and (num_batches % 100) == 0:
+        wandb.log(
+            {
+                "betas": wandb.Histogram(torch.nan_to_num(torch.tensor(betas), 0.0)),
+                "qs": wandb.Histogram(
+                    np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2 + args.qmin
+                ),
+            }
+        )  # , step=step_count)
+
+
 def _flatten_label(label, mask=None):
     if label.ndim > 1:
         label = label.view(-1)
@@ -316,6 +471,3 @@ def evaluate_regression(
         # convert 2D labels/scores
         observers = {k: _concat(v) for k, v in observers.items()}
         return total_loss / count, scores, labels, observers
-
-
-

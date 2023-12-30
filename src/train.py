@@ -51,19 +51,24 @@ def find_free_port():
 def _main(args):
     warnings.filterwarnings("ignore")
     if args.condensation:
+        # if the model is the gravnet basic it trains the clustering and with correction 1, if it is the gravnet_calibration it trains the calibration as well
+
         from src.utils.nn.tools_condensation import train_regression as train
         from src.utils.nn.tools_condensation import evaluate_regression as evaluate
-        from src.utils.nn.tools_condensation import plot_regression_resolution
+
+        # from src.utils.nn.tools_condensation import plot_regression_resolution
     else:
+        # this trains a correction per graph
         from src.utils.nn.tools_condensation_correction_v1 import (
             train_regression as train,
         )
         from src.utils.nn.tools_condensation_correction_v1 import (
             evaluate_regression as evaluate,
         )
-        from src.utils.nn.tools_condensation_correction_v1 import (
-            plot_regression_resolution,
-        )
+
+        # from src.utils.nn.tools_condensation_correction_v1 import (
+        #     plot_regression_resolution,
+        # )
 
     # training/testing mode
     training_mode = not args.predict
@@ -99,7 +104,6 @@ def _main(args):
     from src.utils.train_utils import count_parameters
 
     num_parameters_counted = count_parameters(model)
-    print(num_parameters_counted)
 
     # note: we should always save/load the state_dict of the original model, not the one wrapped by nn.DataParallel
     # so we do not convert it to nn.DataParallel now

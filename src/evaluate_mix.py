@@ -2,7 +2,7 @@ import gzip
 import pickle
 import matplotlib
 
-matplotlib.rc("font", size=25)
+matplotlib.rc("font", size=35)
 import numpy as np
 import pandas as pd
 import os
@@ -10,7 +10,12 @@ import numpy as np
 from utils.inference.inference_metrics_hgcal import obtain_metrics_hgcal
 from utils.inference.inference_metrics import obtain_metrics
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
-from utils.inference.plots import plot_metrics, plot_histograms_energy
+from utils.inference.plots import (
+    plot_metrics,
+    plot_histograms_energy,
+    plot_correction,
+    plot_for_jan,
+)
 import matplotlib.pyplot as plt
 import mplhep as hep
 import torch
@@ -18,10 +23,12 @@ import torch
 hep.style.use("CMS")
 # colors_list = mcp.gen_color(cmap="cividis", n=3)
 # colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
-colors_list = ["#fff7bc", "#b82d7dff", "#b143b9ff"]  # color list poster neurips
+# colors_list = ["#fff7bc", "#b82d7dff", "#b143b9ff"]  # color list poster neurips
+colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
 
 all_E = True
-neutrals_only = False
+neutrals_only = True
+log_scale = True
 if all_E:
     path_hgcal = None  # "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
     # evalutation on original test dataset
@@ -31,9 +38,11 @@ if all_E:
     # path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation_all_E_notrackeri/0_0_None.pt"
     # path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_loss/showers_df_evaluation_all_E_notrackeri/0_0_None_pandora.pt"
     # eval with calibration
+
+    # the latest version of this is the v_0
     path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_v3/showers_df_evaluation/0_0_None.pt"
     path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/mlpf/mlpf_all_energies_hgcal_v3/showers_df_evaluation/0_0_None_pandora.pt"
-
+    # after this one I included a threshold on the iou to remove pandora particles that were associated with a zero iou
 else:
     path_hgcal = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/all_energies_10_15/hgcal/logs_1015_1911/pandora/analysis/out.bin.gz"
     path_mlpf = "/eos/user/m/mgarciam/datasets_mlpf/models_trained/2309/mlpf/mlpf_v3/showers_df_evaluation/0_0_None.pt"
@@ -56,13 +65,24 @@ def main():
     if path_mlpf is not None:
         dic2 = True
         sd, matched = open_mlpf_dataframe(path_mlpf, neutrals_only)
-        dict_2 = obtain_metrics(sd, matched)
+        dict_2 = obtain_metrics(sd, matched, log_scale=log_scale)
 
         sd, matched = open_mlpf_dataframe(path_pandora, neutrals_only)
-        dict_3 = obtain_metrics(sd, matched, pandora=True)
-
+        dict_3 = obtain_metrics(sd, matched, pandora=True, log_scale=log_scale)
+    # np.save(
+    #     "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/dic2.npy",
+    #     dict_2,
+    # )
+    # np.save(
+    #     "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/dic2.npy",
+    #     dict_2,
+    # )
+    print("finished collection of data and started plotting")
     plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
+    # plot_for_jan(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
+    print("finished metrics")
     plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3)
+    plot_correction(dic1, dic2, dict_1, dict_2, dict_3)
 
 
 if __name__ == "__main__":

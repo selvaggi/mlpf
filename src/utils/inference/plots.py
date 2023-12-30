@@ -1,6 +1,6 @@
 import matplotlib
 
-matplotlib.rc("font", size=25)
+matplotlib.rc("font", size=35)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,184 +9,16 @@ import seaborn as sns
 
 hep.style.use("CMS")
 # colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
-colors_list = ["#fff7bc", "#b82d7dff", "#b143b9ff"]  # color list poster neurips
+colors_list = ["#fde0dd", "#c994c7", "#dd1c77"]  # color list poster neurips
 marker_size = 20
 
 
-def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list):
+def plot_for_jan(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list):
     marker_size = 15
-    fig, ax = plt.subplots(4, 2, figsize=(18, 8 * 4))
-    # efficiency plot
+    log_scale = False
+    fig = plt.figure()
     if dic1:
-        ax[0, 0].scatter(
-            dict_1["energy_eff"],
-            dict_1["eff"],
-            facecolors=colors_list[0],
-            edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
-        )
-    if dic2:
-        ax[0, 0].scatter(
-            dict_2["energy_eff"],
-            dict_2["eff"],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
-            label="GNN",
-            s=70,
-        )
-        ax[0, 0].scatter(
-            dict_3["energy_eff"],
-            dict_3["eff"],
-            facecolors=colors_list[2],
-            edgecolors=colors_list[2],
-            label="Pandora",
-            marker="^",
-            s=70,
-        )
-    ax[0, 0].set_xlabel("True Energy [GeV]")
-    ax[0, 0].set_ylabel("Efficiency")
-    ax[0, 0].grid()
-    ax[0, 0].legend(loc="lower right")
-
-    # fake rates
-    if dic1:
-        ax[0, 1].scatter(
-            dict_1["energy_fakes"],
-            dict_1["fake_rate"],
-            facecolors=colors_list[0],
-            edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
-        )
-    if dic2:
-        ax[0, 1].scatter(
-            dict_2["energy_fakes"],
-            dict_2["fake_rate"],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
-            label="GNN",
-            s=70,
-        )
-        ax[0, 1].scatter(
-            dict_3["energy_fakes"],
-            dict_3["fake_rate"],
-            facecolors=colors_list[2],
-            edgecolors=colors_list[2],
-            label="Pandora",
-            s=70,
-            marker="^",
-        )
-    ax[0, 1].set_xlabel("Reconstructed Energy [GeV]")
-    ax[0, 1].set_ylabel("Fake rate")
-    ax[0, 1].grid()
-    ax[0, 1].set_yscale("log")
-    ax[0, 1].legend(loc="upper right")
-
-    # resolution
-    if dic1:
-        ax[1, 0].scatter(
-            dict_1["energy_resolutions_reco"],
-            dict_1["mean_true_rec"],
-            facecolors=colors_list[0],
-            edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
-        )
-    if dic2:
-        ax[1, 0].scatter(
-            dict_2["energy_resolutions_reco"],
-            dict_2["mean_true_rec"],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
-            label="GNN",
-            s=70,
-        )
-        ax[1, 0].scatter(
-            dict_3["energy_resolutions_reco"],
-            dict_3["mean_true_rec"],
-            facecolors=colors_list[2],
-            edgecolors=colors_list[2],
-            label="Pandora",
-            marker="^",
-            s=70,
-        )
-    ax[1, 0].set_xlabel("Reco Energy [GeV]")
-    ax[1, 0].set_ylabel("Response")
-    ax[1, 0].grid()
-    ax[1, 0].legend(loc="lower right")
-
-    # response
-    if dic1:
-        ax[1, 1].scatter(
-            dict_1["energy_resolutions_reco"],
-            dict_1["variance_om_true_rec"],
-            facecolors=colors_list[0],
-            edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
-        )
-    if dic2:
-        ax[1, 1].scatter(
-            dict_2["energy_resolutions_reco"],
-            dict_2["variance_om_true_rec"],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
-            label="GNN",
-            s=70,
-        )
-        ax[1, 1].scatter(
-            dict_3["energy_resolutions_reco"],
-            dict_3["variance_om_true_rec"],
-            facecolors=colors_list[2],
-            edgecolors=colors_list[2],
-            label="Pandora",
-            marker="^",
-            s=70,
-        )
-    ax[1, 1].set_xlabel("Reco Energy [GeV]")
-    ax[1, 1].set_ylabel("Resolution")
-    ax[1, 1].grid()
-    ax[1, 1].set_yscale("log")
-    ax[1, 1].legend(loc="upper right")
-    # ax[1, 1].set_ylim([0, 1])
-
-    if dic1:
-        ax[2, 0].scatter(
-            dict_1["energy_resolutions"],
-            dict_1["mean"],
-            facecolors=colors_list[0],
-            edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
-        )
-    if dic2:
-        ax[2, 0].scatter(
-            dict_2["energy_resolutions"],
-            dict_2["mean"],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
-            label="GNN",
-            s=70,
-        )
-        ax[2, 0].scatter(
-            dict_3["energy_resolutions"],
-            dict_3["mean"],
-            facecolors=colors_list[2],
-            edgecolors=colors_list[2],
-            label="Pandora",
-            marker="^",
-            s=70,
-        )
-    ax[2, 0].set_xlabel("True Energy [GeV]")
-    ax[2, 0].set_ylabel("Response")
-    ax[2, 0].grid()
-    ax[2, 0].legend(loc="lower right")
-    # ax[2, 0].set_ylim([0, 1.5])
-
-    # response
-    if dic1:
-        ax[2, 1].scatter(
+        plt.scatter(
             dict_1["energy_resolutions"],
             dict_1["variance_om"],
             facecolors=colors_list[0],
@@ -195,7 +27,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             s=70,
         )
     if dic2:
-        ax[2, 1].scatter(
+        plt.scatter(
             dict_2["energy_resolutions"],
             dict_2["variance_om"],
             facecolors=colors_list[1],
@@ -203,7 +35,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             label="GNN",
             s=70,
         )
-        ax[2, 1].scatter(
+        plt.scatter(
             dict_3["energy_resolutions"],
             dict_3["variance_om"],
             facecolors=colors_list[2],
@@ -212,15 +44,277 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             marker="^",
             s=70,
         )
-    ax[2, 1].set_xlabel("True Energy [GeV]")
-    ax[2, 1].set_ylabel("Resolution")
-    ax[2, 1].set_yscale("log")
-    ax[2, 1].grid()
-    ax[2, 1].legend(loc="upper right")
+    if log_scale:
+        plt.xlabel("Log True Energy [GeV]")
+    else:
+        plt.xlabel("True Energy [GeV]")
+    plt.ylabel("Resolution")
+    plt.grid()
+    plt.legend(loc="upper right")
+    plt.xlim([0, 21])
+    plt.yscale("log")
+    fig.tight_layout(pad=2.0)
+    if neutrals_only:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_neutrals_only_jan.png",
+            bbox_inches="tight",
+        )
+    else:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_jan.png",
+            bbox_inches="tight",
+        )
 
-    # purity
+
+def plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     if dic1:
-        ax[3, 0].errorbar(
+        ax[i, j].scatter(
+            dict_1["energy_eff"],
+            dict_1["eff"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_eff"],
+            dict_2["eff"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_eff"],
+            dict_3["eff"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
+            s=70,
+        )
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if log_scale:
+        ax[i, j].set_xlabel("Log True Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("True Energy [GeV]")
+    ax[i, j].set_ylabel("Efficiency")
+    ax[i, j].grid()
+    ax[i, j].legend(loc="lower right")
+    return ax
+
+
+def plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].scatter(
+            dict_1["energy_fakes"],
+            dict_1["fake_rate"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_fakes"],
+            dict_2["fake_rate"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_fakes"],
+            dict_3["fake_rate"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            s=70,
+            marker="^",
+        )
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if log_scale:
+        ax[i, j].set_xlabel("Log Reconstructed Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("Reconstructed Energy [GeV]")
+    ax[i, j].set_ylabel("Fake rate")
+    ax[i, j].grid()
+    ax[i, j].set_yscale("log")
+    ax[i, j].legend(loc="upper right")
+    return ax
+
+
+def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].scatter(
+            dict_1["energy_resolutions_reco"],
+            dict_1["mean_true_rec"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_resolutions_reco"],
+            dict_2["mean_true_rec"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_resolutions_reco"],
+            dict_3["mean_true_rec"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
+            s=70,
+        )
+    if log_scale:
+        ax[i, j].set_xlabel("Log Reco Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("Reco Energy [GeV]")
+    ax[i, j].set_ylabel("Response")
+    ax[i, j].grid()
+    ax[i, j].legend(loc="lower right")
+    return ax
+
+
+def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].scatter(
+            dict_1["energy_resolutions_reco"],
+            dict_1["variance_om_true_rec"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_resolutions_reco"],
+            dict_2["variance_om_true_rec"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_resolutions_reco"],
+            dict_3["variance_om_true_rec"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
+            s=70,
+        )
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if log_scale:
+        ax[i, j].set_xlabel("Log Reco Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("Reco Energy [GeV]")
+    ax[i, j].set_ylabel("Resolution")
+    ax[i, j].grid()
+    ax[i, j].set_yscale("log")
+    ax[i, j].legend(loc="upper right")
+    # ax[1, 1].set_ylim([0, 1])
+    return ax
+
+
+def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].scatter(
+            dict_1["energy_resolutions"],
+            dict_1["mean"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_resolutions"],
+            dict_2["mean"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_resolutions"],
+            dict_3["mean"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
+            s=70,
+        )
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if log_scale:
+        ax[i, j].set_xlabel("Log True Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("True Energy [GeV]")
+    ax[i, j].set_ylabel("Resolution")
+    ax[i, j].set_ylabel("Response")
+    ax[i, j].grid()
+    ax[i, j].legend(loc="lower right")
+    # ax[2, 0].set_ylim([0, 1.5])
+    return ax
+
+
+def plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].scatter(
+            dict_1["energy_resolutions"],
+            dict_1["variance_om"],
+            facecolors=colors_list[0],
+            edgecolors=colors_list[0],
+            label="Hgcal",
+            s=70,
+        )
+    if dic2:
+        ax[i, j].scatter(
+            dict_2["energy_resolutions"],
+            dict_2["variance_om"],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label="GNN",
+            s=70,
+        )
+        ax[i, j].scatter(
+            dict_3["energy_resolutions"],
+            dict_3["variance_om"],
+            facecolors=colors_list[2],
+            edgecolors=colors_list[2],
+            label="Pandora",
+            marker="^",
+            s=70,
+        )
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if log_scale:
+        ax[i, j].set_xlabel("Log True Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("True Energy [GeV]")
+    ax[i, j].set_ylabel("Resolution")
+    ax[i, j].set_ylabel("Resolution")
+    ax[i, j].set_yscale("log")
+    ax[i, j].grid()
+    ax[i, j].legend(loc="upper right")
+    return ax
+
+
+def plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    if dic1:
+        ax[i, j].errorbar(
             np.array(dict_1["energy_ms"]),
             np.array(dict_1["fce_energy"]),
             np.array(dict_1["fce_var_energy"]),
@@ -233,7 +327,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             linestyle="",
         )
     if dic2:
-        ax[3, 0].errorbar(
+        ax[i, j].errorbar(
             np.array(dict_2["energy_ms"]),
             np.array(dict_2["fce_energy"]),
             np.array(dict_2["fce_var_energy"]),
@@ -245,7 +339,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             mew=4,
             linestyle="",
         )
-        ax[3, 0].errorbar(
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        ax[i, j].errorbar(
             np.array(dict_3["energy_ms"]),
             np.array(dict_3["fce_energy"]),
             np.array(dict_3["fce_var_energy"]),
@@ -257,13 +352,20 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             mew=4,
             linestyle="",
         )
+    if log_scale:
+        ax[i, j].set_xlabel("Log Reco Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("Reco Energy [GeV]")
+    ax[i, j].set_ylabel("Containment")
+    ax[i, j].grid()
+    # ax[3, 0].set_yscale("log")
+    return ax
 
-    ax[3, 0].set_xlabel("Reco Energy [GeV]")
-    ax[3, 0].set_ylabel("Containment")
-    ax[3, 0].grid()
 
+def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     if dic1:
-        ax[3, 1].errorbar(
+        ax[i, j].errorbar(
             np.array(dict_1["energy_ms"]),
             np.array(dict_1["purity_energy"]),
             np.array(dict_1["purity_var_energy"]),
@@ -276,7 +378,7 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             linestyle="",
         )
     if dic2:
-        ax[3, 1].errorbar(
+        ax[i, j].errorbar(
             np.array(dict_2["energy_ms"]),
             np.array(dict_2["purity_energy"]),
             np.array(dict_2["purity_var_energy"]),
@@ -288,7 +390,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             mew=4,
             linestyle="",
         )
-        ax[3, 1].errorbar(
+        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        ax[i, j].errorbar(
             np.array(dict_3["energy_ms"]),
             np.array(dict_3["purity_energy"]),
             np.array(dict_3["purity_var_energy"]),
@@ -301,10 +404,51 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             linestyle="",
         )
 
-    ax[3, 1].set_xlabel("Reco Energy [GeV]")
-    ax[3, 1].set_ylabel("Purity")
-    ax[3, 1].grid()
+    if log_scale:
+        ax[i, j].set_xlabel("Log Reco Energy [GeV]")
+        ax[i, j].set_xscale("log")
+    else:
+        ax[i, j].set_xlabel("Reco Energy [GeV]")
+    ax[i, j].set_ylabel("Purity")
+    ax[i, j].grid()
+    # ax[3, 1].set_yscale("log")
     # ax[3, 1].set_ylim([0, 1.5])
+    return ax
+
+
+def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list):
+    marker_size = 15
+    log_scale = True
+    fig, ax = plt.subplots(4, 4, figsize=(9 * 4, 8 * 4))
+    # efficiency plot
+    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 0, 0)
+    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 0, 2)
+
+    # fake rates
+    ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 0, 1)
+    ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 0, 3)
+
+    # resolution
+    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 0)
+    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 2)
+
+    # response
+    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 1)
+    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 3)
+
+    # resolution true_e
+    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 0)
+    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 2)
+    # response
+    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 1)
+    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 3)
+    # containment
+    ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 3, 0)
+    ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 3, 2)
+    # containment
+    ax = plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 3, 1)
+    ax = plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 3, 3)
+
     if neutrals_only:
         fig.savefig(
             "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated_neutrals.png",
@@ -318,7 +462,8 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
 
 
 def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
-    bins_plot_histogram = [0, 5, 10, 20]
+    bins_plot_histogram = [5, 6, 10, 20]
+    bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     fig, ax = plt.subplots(4, 2, figsize=(18, 25))
 
     for i in range(0, 4):
@@ -331,6 +476,7 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 0],
+            linewidth=5,
         )
         sns.histplot(
             dict_3["dic_histograms"][str(bin_name) + "reco"],
@@ -340,6 +486,7 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 0],
+            linewidth=5,
         )
         sns.histplot(
             dict_2["dic_histograms"][str(bin_name) + "true"],
@@ -349,6 +496,7 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 1],
+            linewidth=5,
         )
         sns.histplot(
             dict_3["dic_histograms"][str(bin_name) + "true"],
@@ -358,30 +506,115 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 1],
+            linewidth=5,
+        )
+        sns.histplot(
+            dict_2["dic_histograms"][str(bin_name) + "reco_showers"],
+            label="Reco",
+            stat="percent",
+            color=colors_list[0],
+            element="step",
+            fill=False,
+            ax=ax[i, 1],
+            linewidth=5,
         )
         ax[i, 1].set_xlabel("E pred / True Energy [GeV]")
         # ax[i, 1].set_xlim([0, 2])
         ax[i, 1].grid()
         ax[i, 1].legend(loc="upper right")
         ax[i, 1].set_title(
-            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+            "["
+            + str(np.round(bins[bin_name], 2))
+            + ", "
+            + str(np.round(bins[bin_name + 1], 2))
+            + "]"
+            + " GeV"
         )
         ax[i, 0].set_xlabel("E pred / Reco Energy [GeV]")
+        ax[i, 0].grid()
+        ax[i, 0].set_xlim([0, 2])
+        ax[i, 0].legend(loc="upper right")
+        ax[i, 0].set_title(
+            "["
+            + str(np.round(bins[bin_name], 2))
+            + ", "
+            + str(np.round(bins[bin_name + 1], 2))
+            + "]"
+            + " GeV"
+        )
+        # ax[i, 0].set_yscale("log")
+    fig.tight_layout(pad=2.0)
+    if neutrals_only:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_neutrals_only_iou_th.png",
+            bbox_inches="tight",
+        )
+    else:
+        fig.savefig(
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_iou_th.png",
+            bbox_inches="tight",
+        )
+
+
+def plot_correction(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
+    bins_plot_histogram = [0, 5, 10, 20]
+    fig, ax = plt.subplots(4, 3, figsize=(9 * 3, 25))
+
+    for i in range(0, 4):
+        bin_name = bins_plot_histogram[i]
+        ax[i, 0].scatter(
+            dict_3["dic_histograms"][str(bin_name) + "pred_e"],
+            dict_3["dic_histograms"][str(bin_name) + "pred_corr_e"],
+            label="Pandora",
+            color=colors_list[2],
+        )
+        ax[i, 1].scatter(
+            dict_2["dic_histograms"][str(bin_name) + "pred_e"],
+            dict_2["dic_histograms"][str(bin_name) + "pred_corr_e"],
+            label="MLPF",
+            c=colors_list[1],
+            marker="^",
+        )
+        ax[i, 2].scatter(
+            dict_2["dic_histograms"][str(bin_name) + "reco_baseline"],
+            dict_2["dic_histograms"][str(bin_name) + "true_baseline"],
+            label="True",
+            color=colors_list[0],
+        )
+
+        ax[i, 0].set_xlabel("E pred [GeV]")
+        ax[i, 0].set_ylabel("E calibrated[GeV]")
         ax[i, 0].grid()
         # ax[i, 0].set_xlim([0, 2])
         ax[i, 0].legend(loc="upper right")
         ax[i, 0].set_title(
             "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
         )
+        ax[i, 1].set_xlabel("E pred [GeV]")
+        ax[i, 1].set_ylabel("E calibrated[GeV]")
+        ax[i, 1].grid()
+        # ax[i, 0].set_xlim([0, 2])
+        ax[i, 1].legend(loc="upper right")
+        ax[i, 1].set_title(
+            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+        )
+        ax[i, 2].set_xlabel("E pred [GeV]")
+        ax[i, 2].set_ylabel("E calibrated[GeV]")
+        ax[i, 2].grid()
+        # ax[i, 0].set_xlim([0, 2])
+        ax[i, 2].legend(loc="upper right")
+        ax[i, 2].set_title(
+            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+        )
         # ax[i, 0].set_yscale("log")
     fig.tight_layout(pad=2.0)
     if neutrals_only:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_neutrals_only.png",
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/correction_energy_neutrals_only.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy.png",
+            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/correction_energy.png",
             bbox_inches="tight",
         )

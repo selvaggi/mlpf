@@ -57,8 +57,8 @@ def turn_grads_off(model):
 
 
 def loss_reco_true(e_cor, true_e, sum_e):
-    m = nn.ELU()
-    e_cor = m(e_cor)
+    # m = nn.ELU()
+    # e_cor = m(e_cor)
     print("corection", e_cor[0:5])
     print("sum_e", sum_e[0:5])
     print("true_e", true_e[0:5])

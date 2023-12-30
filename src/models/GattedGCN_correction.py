@@ -27,13 +27,13 @@ class GraphTransformerNet(nn.Module):
         hidden_dim = 80  # before 80
         out_dim = 80
         n_classes = 4
-        num_heads = 8
+        num_heads = 4
         in_feat_dropout = 0.0
         dropout = 0.0
         n_layers = 3
         self.n_layers = n_layers
         self.layer_norm = False
-        self.batch_norm = False
+        self.batch_norm = True
         self.residual = True
         self.dropout = dropout
         self.n_classes = n_classes
@@ -41,7 +41,7 @@ class GraphTransformerNet(nn.Module):
         self.lap_pos_enc = False
         self.wl_pos_enc = False
         max_wl_role_index = 100
-        self.readout = "sum"
+        self.readout = "mean"
         self.output_dim = n_classes
 
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
@@ -74,6 +74,7 @@ class GraphTransformerNet(nn.Module):
             )
         )
         self.MLP_layer = MLPReadout(out_dim, 1)
+        self.elu = nn.ELU()
 
     def forward(self, g_batch):
         g = g_batch
@@ -89,10 +90,10 @@ class GraphTransformerNet(nn.Module):
         for conv in self.layers:
             h = conv(g, h)
         g.ndata["h1"] = h
-        hg = dgl.sum_nodes(g, "h1")
-
-        output = self.MLP_layer(hg)
-        return output
+        hg = dgl.mean_nodes(g, "h1")
+        hg = self.MLP_layer(hg)
+        hg = self.elu(hg)
+        return hg
 
 
 class GCNNet(nn.Module):
@@ -132,6 +133,7 @@ class GCNNet(nn.Module):
             )
         )
         self.MLP_layer = MLPReadout(out_dim, 1)  # 1 out dim since regression problem
+        self.elu = nn.ELU()
 
     def forward(self, g):
         h = g.ndata["h"]
@@ -151,5 +153,6 @@ class GCNNet(nn.Module):
             hg = dgl.mean_nodes(g, "h")
         else:
             hg = dgl.mean_nodes(g, "h")  # default readout is mean nodes
-
-        return self.MLP_layer(hg)
+        hg = self.MLP_layer(hg)
+        hg = self.elu(hg)
+        return hg
