@@ -52,8 +52,8 @@ inputs:
          - [hit_x, null]
          - [hit_y, null]
          - [hit_z, null]
-         - [hit_theta, null]
-         - [hit_phi , null]
+         # - [hit_theta, null]
+         # - [hit_phi , null]
    pf_features:
       pad_mode: wrap
       length: 25000
@@ -65,8 +65,8 @@ inputs:
       ###              clip_min(optional, default=-5),
       ###              clip_max(optional, default=5),
       ###              pad_value(optional, default=0)]
-         - [hit_theta, null]
-         - [hit_phi, null]
+         # - [hit_theta, null]
+         # - [hit_phi, null]
          - [hit_p, null]
          - [hit_e, null]
          - [part_theta , null]
@@ -77,6 +77,7 @@ inputs:
          - [part_isDecayedInCalorimeter, null]
          - [part_isDecayedInTracker, null]
          - [hit_pandora_cluster_energy, null]
+         - [hit_pandora_pfo_energy, null]
 
 
    pf_vectors:
@@ -85,12 +86,12 @@ inputs:
       vars:
          - [hit_type_nn, null] #0
          - [hit_e_nn, null] #1
-         #labels
-         - [part_p1, null]  #2
-         - [part_theta1, null] #3
-         - [part_phi1, null] #4
-         - [part_m1, null]  #15
-         - [part_pid1, null]  #6
+         # #labels
+         # - [part_p1, null]  #2
+         # - [part_theta1, null] #3
+         # - [part_phi1, null] #4
+         # - [part_m1, null]  #15
+         # - [part_pid1, null]  #6
    pf_vectoronly:
       length: 25000
       pad_mode: wrap
