@@ -9,5 +9,5 @@
 ml purge
 ml OpenMPI/4.1.4-GCC-11.3.0
 
-srun hostname | sort | uniq -c
+srun train_CLD01.sh
 
