@@ -148,7 +148,32 @@ def train_regression(
                 losses,
                 loss,
             )
+            if (local_rank == 0) and (num_batches % 500) == 0:
+                dirname = os.path.dirname(args.model_prefix)
+                if dirname and not os.path.exists(dirname):
+                    os.makedirs(dirname)
+                state_dict = (
+                    model.module.state_dict()
+                    if isinstance(
+                        model,
+                        (
+                            torch.nn.DataParallel,
+                            torch.nn.parallel.DistributedDataParallel,
+                        ),
+                    )
+                    else model.state_dict()
+                )
+                PATH = args.model_prefix + "_checkpoint-%d.pt" % num_batches
 
+                torch.save(
+                    {
+                        "model_state_dict": state_dict,
+                        "optimizer_state_dict": opt.state_dict(),
+                        "loss": loss,
+                        "epoch": epoch,
+                    },
+                    PATH,
+                )
             if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                 break
             prev_time = time.time()
