@@ -84,8 +84,8 @@ class GravnetModel(nn.Module):
             postgn_dense_modules.extend(
                 [
                     nn.Linear(
-                        TOTAL_ITERATIONS * self.d_shape + 64 if i == 0 else 64, 64
-                    ),
+                        64, 64
+                    ),  # TOTAL_ITERATIONS * self.d_shape + 64 if i == 0 else
                     self.act,  # ,
                 ]
             )
@@ -163,7 +163,7 @@ class GravnetModel(nn.Module):
             # if len(allfeat) > 1:
             #     x = torch.concatenate(allfeat, dim=1)
 
-        x = torch.cat(allfeat, dim=-1)
+        # x = torch.cat(allfeat, dim=-1)
         assert x.device == device
         x = self.postgn_dense(x)
         x = self.ScaledGooeyBatchNorm2_2(x)
