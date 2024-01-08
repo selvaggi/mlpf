@@ -196,7 +196,7 @@ def create_graph(
             )  # dims = 3+4+1+1+1+1
         else:
             hit_features_graph = torch.cat(
-                (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
+                (graph_coordinates / 3330, hit_type_one_hot, e_hits, p_hits), dim=1
             )  # dims = 9
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
