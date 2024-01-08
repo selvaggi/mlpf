@@ -81,7 +81,9 @@ class GravnetModel(nn.Module):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
+                    nn.Linear(
+                        TOTAL_ITERATIONS * self.d_shape + 64 if i == 0 else 64, 64
+                    ),
                     self.act,  # ,
                 ]
             )
@@ -425,6 +427,7 @@ class GravNetBlock(nn.Module):
         outdir,
         num_layer,
     ) -> Tensor:
+        print("pregravnet", x.shape)
         x = self.pre_gravnet(x)
         x = self.batchnorm_gravnet1(x)
         x_input = x
