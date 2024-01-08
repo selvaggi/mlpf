@@ -162,11 +162,13 @@ class GravnetModel(nn.Module):
 
         x = torch.cat(allfeat, dim=-1)
         assert x.device == device
-
+        print("postgn_dense", x.shape)
         x = self.postgn_dense(x)
         x = self.ScaledGooeyBatchNorm2_2(x)
+        print("clustering", x.shape)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
+        print(x_cluster_coord.shape, beta.shape)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if step_count % 100:
