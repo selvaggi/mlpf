@@ -68,7 +68,7 @@ class GravnetModel(nn.Module):
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (self.d_shape * i + 64),
+                    64 if i == 0 else (self.d_shape),  # * i + 64
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -157,8 +157,8 @@ class GravnetModel(nn.Module):
                 loss_regularizing_neig_block + loss_regularizing_neig
             )
             loss_ll = loss_ll_ + loss_ll
-            if len(allfeat) > 1:
-                x = torch.concatenate(allfeat, dim=1)
+            # if len(allfeat) > 1:
+            #     x = torch.concatenate(allfeat, dim=1)
 
         x = torch.cat(allfeat, dim=-1)
         assert x.device == device
