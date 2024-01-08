@@ -64,7 +64,7 @@ class GravnetModel(nn.Module):
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
-        self.d_shape = 32 * 4
+        self.d_shape = 32 * 2
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
@@ -376,7 +376,7 @@ class GravNetBlock(nn.Module):
         weird_batchnom=False,
     ):
         super(GravNetBlock, self).__init__()
-        self.d_shape = 32 * 4
+        self.d_shape = 32 * 2
         out_channels = self.d_shape
         if weird_batchnom:
             self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
