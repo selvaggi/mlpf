@@ -482,14 +482,17 @@ def calc_LV_Lbeta(
         #! each shower is account for separately
         V_attractive = V_attractive.sum(dim=0)  # K objects
         #! divide by the number of accounted points
-        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3) #every object is accounted for equally
+        V_attractive = V_attractive.view(-1) / (
+            N_k.view(-1) + 1e-3
+        )  # every object is accounted for equally
 
         #! add to terms function (divide by total number of showers per event)
         # L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
-        L_V_attractive = torch.mean(
-            V_attractive
-        )  # V_attractive size n_objects, so per shower metric
-
+        # L_V_attractive = torch.mean(
+        #     V_attractive
+        # )  # V_attractive size n_objects, so per shower metric
+        per_shower_weight = torch.exp(1 / e_particles_pred_per_object)
+        L_V_attractive = torch.mean(V_attractive * per_shower_weight)
     else:
         #! in comparison this works per hit
         V_attractive = (
@@ -528,7 +531,9 @@ def calc_LV_Lbeta(
         ) / number_of_repulsive_terms_per_object.view(-1)
         #! add to terms function (divide by total number of showers per event)
         # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
-        L_V_repulsive = torch.mean(L_V_repulsive)
+        per_shower_weight = torch.exp(1 / e_particles_pred_per_object)
+        L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
+        # L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
