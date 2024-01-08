@@ -532,6 +532,7 @@ def calc_LV_Lbeta(
         #! add to terms function (divide by total number of showers per event)
         # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
         per_shower_weight = torch.exp(1 / e_particles_pred_per_object)
+        print(per_shower_weight)
         L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
         # L_V_repulsive = torch.mean(L_V_repulsive)
     else:
