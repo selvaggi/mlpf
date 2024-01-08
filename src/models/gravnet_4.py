@@ -167,7 +167,7 @@ class GravnetModel(nn.Module):
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
-        print(x_cluster_coord)
+        print("x cluster coords", x_cluster_coord)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if step_count % 100:
