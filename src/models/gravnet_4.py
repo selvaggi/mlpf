@@ -60,7 +60,7 @@ class GravnetModel(nn.Module):
             self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
-        self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
+        # self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
