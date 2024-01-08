@@ -129,6 +129,7 @@ class GravnetModel(nn.Module):
         batch = obtain_batch_numbers(x, g)
         x = self.ScaledGooeyBatchNorm2_1(x)
         x = self.Dense_1(x)
+        print("dense x", x)
         assert x.device == device
 
         allfeat = []  # To store intermediate outputs
@@ -150,7 +151,7 @@ class GravnetModel(nn.Module):
                 self.args.model_prefix,
                 num_layer,
             )
-
+            print("gravnet_block", num_layer, x)
             allfeat.append(x)
             graphs.append(graph)
             loss_regularizing_neig = (
@@ -428,11 +429,13 @@ class GravNetBlock(nn.Module):
         num_layer,
     ) -> Tensor:
         x = self.pre_gravnet(x)
+        print("pregravnet", x)
         x = self.batchnorm_gravnet1(x)
         x_input = x
         xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
             g, x, original_coords, batch
         )
+        print("gravnet_layer", x)
         g.ndata["gncoords"] = gncoords
         if step_count % 50:
             PlotCoordinates(
