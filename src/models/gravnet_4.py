@@ -57,7 +57,9 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(
+                self.input_dim
+            )  # , momentum=0.01)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         # self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
@@ -119,7 +121,7 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
         else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
