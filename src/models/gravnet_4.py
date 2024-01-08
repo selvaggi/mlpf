@@ -376,7 +376,7 @@ class GravNetBlock(nn.Module):
         weird_batchnom=False,
     ):
         super(GravNetBlock, self).__init__()
-        self.d_shape = 32
+        self.d_shape = 32 * 4
         out_channels = self.d_shape
         if weird_batchnom:
             self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
@@ -427,7 +427,6 @@ class GravNetBlock(nn.Module):
         outdir,
         num_layer,
     ) -> Tensor:
-        print("pregravnet", x.shape)
         x = self.pre_gravnet(x)
         x = self.batchnorm_gravnet1(x)
         x_input = x
