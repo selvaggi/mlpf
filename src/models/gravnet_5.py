@@ -70,7 +70,7 @@ class GravnetModel(nn.Module):
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (self.d_shape),  # * i + 64
+                    64 if i == 0 else (self.d_shape) * i + 64,
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
