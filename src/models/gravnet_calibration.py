@@ -297,7 +297,7 @@ def object_condensation_loss2(
     if return_resolution:
         return a
     if clust_loss_only:
-        loss = a[0] + a[1]  # + 5 * a[14]
+        loss = 1 * a[0] + a[1]  # + 5 * a[14]
         # if calc_e_frac_loss:
         #     loss_E_frac, loss_E_frac_true = calc_energy_loss(
         #         batch, xj, bj.view(-1), qmin=q_min
