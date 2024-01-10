@@ -416,7 +416,9 @@ def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list):
+def plot_metrics(
+    neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list, PATH_store
+):
     marker_size = 15
     log_scale = True
     fig, ax = plt.subplots(4, 4, figsize=(9 * 4, 8 * 4))
@@ -451,17 +453,19 @@ def plot_metrics(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
 
     if neutrals_only:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated_neutrals.png",
+            PATH_store + "testeq_rec_comp_MVP_68_calibrated_neutrals.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/testeq_rec_comp_MVP_68_calibrated.png",
+            PATH_store + "testeq_rec_comp_MVP_68_calibrated.png",
             bbox_inches="tight",
         )
 
 
-def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
+def plot_histograms_energy(
+    dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False, PATH_store=None
+):
     bins_plot_histogram = [5, 6, 10, 20]
     bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     fig, ax = plt.subplots(4, 2, figsize=(18, 25))
@@ -469,14 +473,15 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
     for i in range(0, 4):
         bin_name = bins_plot_histogram[i]
         sns.histplot(
-            dict_2["dic_histograms"][str(bin_name) + "reco"],
+            data=np.array(dict_2["dic_histograms"][str(bin_name) + "reco"]),
             label="MLPF",
             stat="percent",
             color=colors_list[1],
             element="step",
+            binwidth=0.02,
             fill=False,
             ax=ax[i, 0],
-            linewidth=5,
+            linewidth=2,
         )
         sns.histplot(
             dict_3["dic_histograms"][str(bin_name) + "reco"],
@@ -486,7 +491,8 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 0],
-            linewidth=5,
+            binwidth=0.02,
+            linewidth=2,
         )
         sns.histplot(
             dict_2["dic_histograms"][str(bin_name) + "true"],
@@ -496,7 +502,8 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 1],
-            linewidth=5,
+            binwidth=0.02,
+            linewidth=2,
         )
         sns.histplot(
             dict_3["dic_histograms"][str(bin_name) + "true"],
@@ -506,8 +513,10 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 1],
-            linewidth=5,
+            binwidth=0.02,
+            linewidth=2,
         )
+
         sns.histplot(
             dict_2["dic_histograms"][str(bin_name) + "reco_showers"],
             label="Reco",
@@ -516,7 +525,8 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
             element="step",
             fill=False,
             ax=ax[i, 1],
-            linewidth=5,
+            binwidth=0.02,
+            linewidth=2,
         )
         ax[i, 1].set_xlabel("E pred / True Energy [GeV]")
         # ax[i, 1].set_xlim([0, 2])
@@ -546,18 +556,20 @@ def plot_histograms_energy(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=Fal
     fig.tight_layout(pad=2.0)
     if neutrals_only:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_neutrals_only_iou_th.png",
+            PATH_store + "histograms_energy_neutrals_only_iou_th.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/histograms_energy_iou_th.png",
+            PATH_store + "histograms_energy_iou_th.png",
             bbox_inches="tight",
         )
 
 
-def plot_correction(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
-    bins_plot_histogram = [0, 5, 10, 20]
+def plot_correction(
+    dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False, PATH_store=None
+):
+    bins_plot_histogram = [5, 6, 10, 20]
     fig, ax = plt.subplots(4, 3, figsize=(9 * 3, 25))
 
     for i in range(0, 4):
@@ -610,11 +622,11 @@ def plot_correction(dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False):
     fig.tight_layout(pad=2.0)
     if neutrals_only:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/correction_energy_neutrals_only.png",
+            PATH_store + "correction_energy_neutrals_only.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            "/afs/cern.ch/work/m/mgarciam/private/mlpf/summ_results/Pandora_mix/correction_energy.png",
+            PATH_store + "correction_energy.png",
             bbox_inches="tight",
         )
