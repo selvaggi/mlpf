@@ -69,7 +69,7 @@ def main():
     for name in glob.glob("{}/*.root".format(outdir)):
         list_of_outfiles.append(name)
 
-    script = "run_sequence_update_spread.sh"
+    script = "run_sequence_update_spread_eval.sh"
 
     jobCount = 0
 
