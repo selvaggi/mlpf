@@ -122,10 +122,12 @@ class GravNetConv(MessagePassing):
         # average dist per node and divide by the number of neighbourgs
         graph.update_all(fn.u_mul_e("ones", "dist", "m"), fn.mean("m", "dist"))
         avdist = graph.ndata["dist"]
-        loss_regularizing_neig = 1e-2 * torch.mean(torch.square(avdist - 0.5))
+        loss_regularizing_neig = 1e-3 * torch.mean(torch.square(avdist - 0.5))
         # propagate_type: (x: OptPairTensor, edge_weight: OptTensor)
 
         #! LLRegulariseGravNetSpace
+        #! mean distance in original space vs distance in gravnet space between the neigh
+        #? This code was checked on 12.01.24 and is correct 
         graph.edata["_edge_w"] = dist
         graph.update_all(fn.copy_e("_edge_w", "m"), fn.sum("m", "in_weight"))
         degs = graph.dstdata["in_weight"] + 1e-4
@@ -136,6 +138,7 @@ class GravNetConv(MessagePassing):
         dist = graph.edata["_norm_edge_weights"]
 
         original_coord = g.ndata["pos_hits_xyz"]
+        #! distance in original coordinates 
         gndist = (
             (original_coord[edge_index[0]] - original_coord[edge_index[1]])
             .pow(2)
@@ -151,7 +154,7 @@ class GravNetConv(MessagePassing):
             lambda e: {"_norm_edge_weights_gn": e.dst["_dst_in_w"] * e.data["_edge_w"]}
         )
         gndist = graph.edata["_norm_edge_weights_gn"]
-        loss_llregulariser = 0.1 * torch.mean(torch.square(dist - gndist))
+        loss_llregulariser =  torch.mean(torch.square(dist - gndist))
         # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
         edge_weight = torch.sqrt(edge_weight + 1e-6)
@@ -228,9 +231,9 @@ class WeirdBatchNorm(nn.Module):
         print("self beta requires grad", self.beta.requires_grad)
         self.mean = torch.zeros(self.n_neurons)
         self.den = torch.ones(self.n_neurons)
-        self.viscosity = 0.999999
+        self.viscosity = 0.5
         self.epsilon = eps
-        self.fluidity_decay = 0.01
+        self.fluidity_decay = 1e-4
         self.max_viscosity = 1
 
     def forward(self, input):

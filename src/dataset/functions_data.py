@@ -106,13 +106,6 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
 
     else:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
-    # print(
-    #     "removing",
-    #     np.sum(mask_particles),
-    #     "particles out of ",
-    #     len(list_p),
-    #     np.sum(mask_particles) / len(list_p),
-    # )
     return mask, mask_particles
 
 
@@ -191,6 +184,7 @@ def get_hit_features(output, number_hits, prediction):
     # identification of particles, clusters, pfos
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
+    pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
     if prediction:
         pandora_cluster_energy = torch.tensor(output["pf_features"][-2, 0:number_hits])
         pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
@@ -219,7 +213,8 @@ def get_hit_features(output, number_hits, prediction):
 
     return (
         pos_xyz_hits,
-        p_hits,
+        p_hits
+        / 2,  #! this is a fix for CLD since the B was set wrong for data generation (wrong only for tracks)
         e_hits,
         hit_type_one_hot,
         hit_particle_link,
@@ -229,6 +224,7 @@ def get_hit_features(output, number_hits, prediction):
         unique_list_particles,
         cluster_id,
         hit_type_feature,
+        pandora_pfo_link,
     )
 
 

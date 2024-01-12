@@ -295,6 +295,7 @@ def evaluate_regression(
                         path_save=args.model_prefix + "showers_df_evaluation",
                         store=False,
                         predict=True,
+                        tracks=args.tracks
                     )
                     df_showers.append(df_batch)
                     df_showers_pandora.append(df_batch_pandora)
@@ -325,6 +326,7 @@ def evaluate_regression(
                 path_save=args.model_prefix + "showers_df_evaluation",
                 store=True,
                 predict=False,
+                tracks=args.tracks
             )
     if logwandb and local_rank == 0:
 

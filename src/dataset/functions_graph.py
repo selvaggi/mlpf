@@ -14,6 +14,16 @@ from src.dataset.functions_data import (
 
 
 def create_inputs_from_table(output, hits_only, prediction=False):
+    """Used by graph creation to get nodes and edge features
+
+    Args:
+        output (_type_): input from the root reading
+        hits_only (_type_): reading only hits or also tracks
+        prediction (bool, optional): if running in eval mode. Defaults to False.
+
+    Returns:
+        _type_: all information to construct a graph
+    """
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
 
@@ -29,31 +39,36 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         unique_list_particles,
         cluster_id,
         hit_type_feature,
+        pandora_pfo_link,
     ) = get_hit_features(output, number_hits, prediction)
 
     # features particles
     y_data_graph = get_particle_features(unique_list_particles, output, prediction)
 
     assert len(y_data_graph) == len(unique_list_particles)
-    # old_cluster_id = cluster_id
+    # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
         cluster_id, hit_type_feature, e_hits, y_data_graph, prediction
     )
+    # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
 
     result = [
         y_data_graph[~mask_particles],
-        hit_type_one_hot[~mask_hits],  # [no_tracks],
-        p_hits[~mask_hits],  # [no_tracks],
-        e_hits[~mask_hits],  # [no_tracks],
+        hit_type_one_hot[~mask_hits],
+        p_hits[~mask_hits],
+        e_hits[~mask_hits],
         cluster_id,
         hit_particle_link[~mask_hits],
         pos_xyz_hits[~mask_hits],
         pandora_cluster[~mask_hits],
         pandora_cluster_energy[~mask_hits],
         pfo_energy[~mask_hits],
+        pandora_pfo_link[~mask_hits],
     ]
     hit_type = result[1].argmax(dim=1)
+
+    # if hits only remove tracks, otherwise leave tracks
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
@@ -61,97 +76,6 @@ def create_inputs_from_table(output, hits_only, prediction=False):
             result[i] = result[i][hit_mask]
 
     return result
-
-
-def create_graph_synthetic(config, n_noise=0, npart_min=3, npart_max=5):
-    num_hits_per_particle_min, num_hits_per_particle_max = 5, 60
-    num_part = np.random.randint(npart_min, npart_max)
-    num_hits_per_particle = np.random.randint(
-        num_hits_per_particle_min, num_hits_per_particle_max, size=(num_part,)
-    )
-    # create a synthetic graph - random hits uniformly between -4 and 4, distribution of hits is gaussian
-    y_coords = torch.zeros((num_part, 3)).float()
-    # uniformly picked x,y,z coords saved in y_coords
-    y_coords[:, 0] = torch.rand((num_part)).float() * 8 - 4
-    y_coords[:, 1] = torch.rand((num_part)).float() * 8 - 4
-    y_coords[:, 2] = torch.rand((num_part)).float() * 8 - 4
-    nh = np.sum(num_hits_per_particle)
-    graph_coordinates = torch.zeros((nh, 3)).float()
-    hit_type_one_hot = torch.zeros((nh, 4)).float()
-    e_hits = torch.zeros((nh, 1)).float() + 1.0
-    p_hits = torch.zeros((nh, 1)).float() + 1.0  # to avoid nans
-    for i in range(num_part):
-        index = np.sum(num_hits_per_particle[:i])
-        graph_coordinates[index : index + num_hits_per_particle[i]] = (
-            torch.randn((num_hits_per_particle[i], 3)).float()
-            * torch.tensor([0.12, 0.5, 0.4])
-            + y_coords[i]
-        )
-        hit_type_one_hot[index : index + num_hits_per_particle[i], 3] = 1.0
-    g = dgl.knn_graph(
-        graph_coordinates, config.graph_config.get("k", 7), exclude_self=True
-    )
-    i, j = g.edges()
-    edge_attr = torch.norm(
-        graph_coordinates[i] - graph_coordinates[j], p=2, dim=1
-    ).view(-1, 1)
-    hit_features_graph = torch.cat(
-        (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-    )
-    hit_particle_link = torch.zeros((nh, 1)).float()
-    for i in range(num_part):
-        index = np.sum(num_hits_per_particle[:i])
-        hit_particle_link[index : index + num_hits_per_particle[i]] = (
-            i + 1
-        )  # 0 is for noise
-    if n_noise > 0:
-        noise = torch.zeros((p_hits.shape[0], n_noise)).float()
-        noise.normal_(mean=0, std=1)
-        hit_features_graph = torch.cat(
-            (graph_coordinates, hit_type_one_hot, e_hits, p_hits, noise), dim=1
-        )
-    g.ndata["h"] = hit_features_graph
-    g.ndata["pos_hits"] = graph_coordinates
-    g.ndata["pos_hits_xyz"] = graph_coordinates
-    g.ndata["pos_hits_norm"] = graph_coordinates
-    g.ndata["hit_type"] = hit_type_one_hot
-    g.ndata["p_hits"] = p_hits
-    g.ndata["e_hits"] = e_hits
-    g.ndata["particle_number"] = hit_particle_link
-    g.ndata["particle_number_nomap"] = hit_particle_link
-    g.edata["h"] = edge_attr
-
-    y_data_graph = torch.cat(
-        (
-            y_coords,
-            torch.zeros((num_part, 4)).float(),
-        ),
-        dim=1,
-    )
-    return [g, y_data_graph], False
-
-
-def to_hetero(g, all_hit_types=[2, 3]):
-    # Convert the dgl graph object to a heterograph
-    # We probably won't be using this
-    hit_types = g.ndata["hit_type"]
-    hit_types = torch.argmax(hit_types, dim=1)
-    ht_idx = [all_hit_types.index(i) for i in hit_types]
-    edges = g.edges()
-    graph_data = {}
-    for i in all_hit_types:
-        for j in all_hit_types:
-            edge_mask = hit_types[edges[0]] == i
-            edge_mask = edge_mask & (hit_types[edges[1]] == j)
-            graph_data[(str(i), "-", str(j))] = (
-                edges[0][edge_mask],
-                edges[1][edge_mask],
-            )
-    old_g = g
-    g = dgl.heterograph(graph_data)
-    g.nodes["2"].data = {key: old_g.ndata[key][ht_idx == 2] for key in old_g.ndata}
-    g.nodes["3"].data = {key: old_g.ndata[key][ht_idx == 3] for key in old_g.ndata}
-    return g
 
 
 def create_graph(
@@ -176,6 +100,7 @@ def create_graph(
         pandora_cluster,
         pandora_cluster_energy,
         pandora_pfo_energy,
+        pandora_pfo_link,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
 
@@ -194,6 +119,10 @@ def create_graph(
                 ),
                 dim=1,
             )  # dims = 3+4+1+1+1+1
+        elif hits_only == False:
+            hit_features_graph = torch.cat(
+                (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
+            )  # dims = 8
         else:
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
@@ -204,14 +133,17 @@ def create_graph(
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
         # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type_one_hot
-        g.ndata["p_hits"] = p_hits
-        g.ndata["e_hits"] = e_hits
+        # g.ndata["p_hits"] = p_hits
+        g.ndata["e_hits"] = (
+            e_hits + p_hits
+        )  # if no tracks this is e and if there are tracks this fills the tracks e values with p
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
         # g.ndata["theta_hits"] = theta_hits
         # g.ndata["phi_hits"] = phi_hits
-        g.ndata["pandora_cluster"] = pandora_cluster
         if prediction:
+            g.ndata["pandora_cluster"] = pandora_cluster
+            g.ndata["pandora_pfo"] = pandora_pfo_link
             g.ndata["pandora_cluster_energy"] = pandora_cluster_energy
             g.ndata["pandora_pfo_energy"] = pandora_pfo_energy
         if len(y_data_graph) < 4:

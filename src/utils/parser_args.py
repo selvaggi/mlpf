@@ -487,10 +487,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--beta_zeros",
-    action="store_true",
-    default=False,
-    help="Add beta zeros loss"
+    "--beta_zeros", action="store_true", default=False, help="Add beta zeros loss"
 )
 
 
@@ -498,7 +495,7 @@ parser.add_argument(
     "--copy_core_for_beta",
     action="store_true",
     default=False,
-    help="Copy the core of the model for the beta head (the clustering core remains frozen)"
+    help="Copy the core of the model for the beta head (the clustering core remains frozen)",
 )
 
 
@@ -517,3 +514,9 @@ parser.add_argument(
     help="For inference_summary.py, specify the output directory. Otherwise, leave empty.",
 )
 
+parser.add_argument(
+    "--tracks",
+    action="store_true",
+    default=False,
+    help="Are we using track information",
+)
