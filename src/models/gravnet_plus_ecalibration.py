@@ -261,7 +261,7 @@ def object_condensation_loss2(
             :, 5 + clust_space_dim : 27 + clust_space_dim
         ]  # 8:30: predicted particle one-hot encoding
     dev = batch.device
-    clustering_index_l = batch.ndata["particle_number"]
+    clustering_index_l = batch.ndata["particle_number"] # this starts at 1 because index 0 is for noise cluster 
 
     len_batch = len(batch.batch_num_nodes())
     batch_numbers = torch.repeat_interleave(

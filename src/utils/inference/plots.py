@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mplhep as hep
 import seaborn as sns
+from scipy.optimize import curve_fit
 
 hep.style.use("CMS")
 # colors_list = ["#fff7bc", "#fec44f", "#d95f0e"]
@@ -147,7 +148,8 @@ def plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+    # Energy resolution is parametrized
     if dic1:
         ax[i, j].scatter(
             dict_1["energy_resolutions_reco"],
@@ -186,7 +188,55 @@ def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_fit_energy_resolution(
+    ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j, reco=False
+):
+    if reco:
+        energies = np.array(dict_2["energy_resolutions_reco"])
+        errors = np.array(dict_2["variance_om_true_rec"])
+    else:
+        energies = np.array(dict_2["energy_resolutions"])
+        errors = np.array(dict_2["variance_om"])
+    mask = (energies > 1.0) * (errors < 0.38)
+    energies = energies[mask]
+    errors = errors[mask]
+    popt, pcov = curve_fit(resolution, energies, errors)
+    xdata = np.arange(1, 51, 0.1)
+    ax[i, j].plot(
+        xdata,
+        resolution(xdata, *popt),
+        "-",
+        c=colors_list[1],
+        label="fit GNN: a=%5.3f, b=%5.3f, c=%5.3f" % tuple(popt),
+    )
+
+    if reco:
+        energies = np.array(dict_3["energy_resolutions_reco"])
+        errors = np.array(dict_3["variance_om_true_rec"])
+    else:
+        energies = np.array(dict_3["energy_resolutions"])
+        errors = np.array(dict_3["variance_om"])
+    mask = (energies > 1.0) * (errors < 0.38)
+    energies = energies[mask]
+    errors = errors[mask]
+    popt, pcov = curve_fit(resolution, energies, errors)
+    xdata = np.arange(1, 51, 0.1)
+    ax[i, j].plot(
+        xdata,
+        resolution(xdata, *popt),
+        "-",
+        c=colors_list[2],
+        label="fit Pandora: a=%5.3f, b=%5.3f, c=%5.3f" % tuple(popt),
+    )
+    ax[i, j].legend(loc="upper right")
+    return ax
+
+
+def resolution(E, a, b, c):
+    return (a**2 / E + c**2 + b**2 / E**2) ** 0.5
+
+
+def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     if dic1:
         ax[i, j].scatter(
             dict_1["energy_resolutions_reco"],
@@ -228,7 +278,7 @@ def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     if dic1:
         ax[i, j].scatter(
             dict_1["energy_resolutions"],
@@ -270,7 +320,7 @@ def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, 
     return ax
 
 
-def plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     if dic1:
         ax[i, j].scatter(
             dict_1["energy_resolutions"],
@@ -430,20 +480,33 @@ def plot_metrics(
     ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 0, 1)
     ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 0, 3)
 
-    # resolution
-    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 0)
-    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 2)
-
     # response
-    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 1)
-    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 3)
+    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 0)
+    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 2)
+
+    # resolution
+    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 1)
+    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 3)
+    ax = plot_fit_energy_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 1, 1, reco=True
+    )
+    ax = plot_fit_energy_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 1, 3, reco=True
+    )
+
+    # response true_e
+    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 0)
+    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 2)
 
     # resolution true_e
-    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 0)
-    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 2)
-    # response
-    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 1)
-    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 3)
+    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 1)
+    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 3)
+    ax = plot_fit_energy_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 2, 1, reco=False
+    )
+    ax = plot_fit_energy_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 2, 3, reco=False
+    )
     # containment
     ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 3, 0)
     ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 3, 2)
@@ -569,6 +632,7 @@ def plot_histograms_energy(
 def plot_correction(
     dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False, PATH_store=None
 ):
+    bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     bins_plot_histogram = [5, 6, 10, 20]
     fig, ax = plt.subplots(4, 3, figsize=(9 * 3, 25))
 
@@ -600,7 +664,12 @@ def plot_correction(
         # ax[i, 0].set_xlim([0, 2])
         ax[i, 0].legend(loc="upper right")
         ax[i, 0].set_title(
-            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+            "["
+            + str(np.round(bins[bin_name], 2))
+            + ", "
+            + str(np.round(bins[bin_name + 1], 2))
+            + "]"
+            + " GeV"
         )
         ax[i, 1].set_xlabel("E pred [GeV]")
         ax[i, 1].set_ylabel("E calibrated[GeV]")
@@ -608,7 +677,12 @@ def plot_correction(
         # ax[i, 0].set_xlim([0, 2])
         ax[i, 1].legend(loc="upper right")
         ax[i, 1].set_title(
-            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+            "["
+            + str(np.round(bins[bin_name], 2))
+            + ", "
+            + str(np.round(bins[bin_name + 1], 2))
+            + "]"
+            + " GeV"
         )
         ax[i, 2].set_xlabel("E pred [GeV]")
         ax[i, 2].set_ylabel("E calibrated[GeV]")
@@ -616,7 +690,12 @@ def plot_correction(
         # ax[i, 0].set_xlim([0, 2])
         ax[i, 2].legend(loc="upper right")
         ax[i, 2].set_title(
-            "[" + str(bin_name * 2) + ", " + str(bin_name * 2 + 2) + "]" + " GeV"
+            "["
+            + str(np.round(bins[bin_name], 2))
+            + ", "
+            + str(np.round(bins[bin_name + 1], 2))
+            + "]"
+            + " GeV"
         )
         # ax[i, 0].set_yscale("log")
     fig.tight_layout(pad=2.0)

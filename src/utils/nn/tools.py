@@ -73,7 +73,9 @@ def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
     return 0.5 * (high - low), low, high
 
 
-def log_losses_wandb(logwandb, num_batches, local_rank, losses, loss, val=False):
+def log_losses_wandb(
+    logwandb, num_batches, local_rank, losses, loss, loss_ll, val=False
+):
     if val:
         val_ = " val"
     else:
@@ -95,6 +97,7 @@ def log_losses_wandb(logwandb, num_batches, local_rank, losses, loss, val=False)
                 "loss" + val_ + " repulsive": losses[13],
                 "loss" + val_ + " alpha coord": losses[14],
                 "loss" + val_ + " beta zeros": losses[15],
+                "loss regularization gravnet" + val_: loss_ll,
             }
         )
 

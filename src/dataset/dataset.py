@@ -19,7 +19,7 @@ from src.data.preprocess import (
     AutoStandardizer,
     WeightMaker,
 )
-from src.dataset.functions_graph import create_graph, create_graph_synthetic
+from src.dataset.functions_graph import create_graph
 from src.dataset.functions_graph_tracking import create_graph_tracking
 
 

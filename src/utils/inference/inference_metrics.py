@@ -158,19 +158,18 @@ def calculate_response(matched, pandora, log_scale=False):
     )
 
 
-def obtain_MPV_and_68(data_for_hist, bins_per_binned_E):
+def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
     MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
-    std68, low, high = get_std68(hist, bin_edges)
+    std68, low, high = get_std68(hist, bin_edges, epsilon=epsilon)
     return MPV, std68 / MPV
 
 
-def get_std68(theHist, bin_edges, percentage=0.683):
+def get_std68(theHist, bin_edges, percentage=0.683, epsilon=0.01):
     # theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
     wmin = 0.2
     wmax = 1.0
-    epsilon = 0.01
 
     weight = 0.0
     points = []
@@ -181,7 +180,6 @@ def get_std68(theHist, bin_edges, percentage=0.683):
         weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
         points.append([(bin_edges[i + 1] + bin_edges[i]) / 2, weight])
         sums.append(weight)
-
     low = wmin
     high = wmax
     width = 100
@@ -194,8 +192,9 @@ def get_std68(theHist, bin_edges, percentage=0.683):
                     low = points[i][0]
                     high = points[j][0]
                     width = wx
-                    ii = i
-                    jj = j
+                    # ii = i
+                    # jj = j
+
     return 0.5 * (high - low), low, high
 
 

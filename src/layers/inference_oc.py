@@ -23,6 +23,7 @@ def create_and_store_graph_output(
     predict=False,
     tracking=False,
     e_corr=None,
+    tracks=False,
 ):
     number_of_showers_total = 0
     batch_g.ndata["coords"] = model_output[:, 0:3]
@@ -61,15 +62,18 @@ def create_and_store_graph_output(
                 .cpu()
                 .numpy()[0]
             )
-            # print("distance_scale", distance_scale)
-            # distance_scale = 0.1
+
             db = DBSCAN(eps=distance_scale, min_samples=15).fit(X.detach().cpu())
+            # DBSCAN has clustering labels -1,0,.., our cluster 0 is noise so we add 1
             labels = db.labels_ + 1
             labels = np.reshape(labels, (-1))
             labels = torch.Tensor(labels).long().to(model_output.device)
         if predict:
-            labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
-            labels_pandora = labels_pandora + 1  # [labels_pandora == -1] = 0
+            if tracks:
+                labels_pandora = dic["graph"].ndata["pandora_pfo"].long()
+            else:
+                labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
+            labels_pandora = labels_pandora + 1
             map_from = list(np.unique(labels_pandora.detach().cpu()))
             cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
             labels_pandora = (
@@ -79,7 +83,14 @@ def create_and_store_graph_output(
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
         shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
-            labels, dic, particle_ids, model_output, local_rank, i, path_save
+            labels,
+            dic,
+            particle_ids,
+            model_output,
+            local_rank,
+            i,
+            path_save,
+            tracks=tracks,
         )
         if predict:
             (
@@ -96,6 +107,7 @@ def create_and_store_graph_output(
                 i,
                 path_save,
                 pandora=True,
+                tracks=tracks,
             )
 
         # if len(shower_p_unique) < len(particle_ids) - 3:
@@ -124,6 +136,7 @@ def create_and_store_graph_output(
                 number_of_showers_total=number_of_showers_total,
                 step=step,
                 number_in_batch=i,
+                tracks=tracks,
             )
             df_list.append(df_event)
             if predict:
@@ -139,6 +152,7 @@ def create_and_store_graph_output(
                     tracking=tracking,
                     step=step,
                     number_in_batch=i,
+                    tracks=tracks,
                 )
                 df_list_pandora.append(df_event_pandora)
 
@@ -210,6 +224,7 @@ def generate_showers_data_frame(
     number_of_showers_total=None,
     step=0,
     number_in_batch=0,
+    tracks=False,
 ):
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     if pandora:
@@ -461,7 +476,15 @@ def plot_iou_matrix(iou_matrix, image_path):
 
 
 def match_showers(
-    labels, dic, particle_ids, model_output, local_rank, i, path_save, pandora=False
+    labels,
+    dic,
+    particle_ids,
+    model_output,
+    local_rank,
+    i,
+    path_save,
+    pandora=False,
+    tracks=False,
 ):
     iou_threshold = 0.3
     shower_p_unique = torch.unique(labels)
