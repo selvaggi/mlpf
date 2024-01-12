@@ -82,7 +82,9 @@ class GravnetModel(nn.Module):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
+                    nn.Linear(
+                        len(N_NEIGHBOURS) * self.d_shape + 64 if i == 0 else 64, 64
+                    ),
                     self.act,  # ,
                 ]
             )
@@ -156,12 +158,10 @@ class GravnetModel(nn.Module):
                 loss_regularizing_neig_block + loss_regularizing_neig
             )
             loss_ll = loss_ll_ + loss_ll
-            print("x gravnet", x.shape)
             if len(allfeat) > 1:
                 x = torch.concatenate(allfeat, dim=1)
 
         x = torch.cat(allfeat, dim=-1)
-        print("x after gravnet layers", x.shape)
         assert x.device == device
 
         x = self.postgn_dense(x)
