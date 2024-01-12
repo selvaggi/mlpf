@@ -151,15 +151,17 @@ class GravnetModel(nn.Module):
             )
 
             allfeat.append(x)
-            graphs.append(graph)
+            # graphs.append(graph)
             loss_regularizing_neig = (
                 loss_regularizing_neig_block + loss_regularizing_neig
             )
             loss_ll = loss_ll_ + loss_ll
+            print("x gravnet", x.shape)
             if len(allfeat) > 1:
                 x = torch.concatenate(allfeat, dim=1)
 
         x = torch.cat(allfeat, dim=-1)
+        print("x after gravnet layers", x.shape)
         assert x.device == device
 
         x = self.postgn_dense(x)
@@ -182,7 +184,7 @@ class GravnetModel(nn.Module):
         # if self.return_graphs:
         #     return x, graphs
         # else:
-        return x, pred_energy_corr, loss_ll #  , loss_regularizing_neig, loss_ll
+        return x, pred_energy_corr, loss_ll  #  , loss_regularizing_neig, loss_ll
 
 
 def object_condensation_loss2(
@@ -202,7 +204,7 @@ def object_condensation_loss2(
     hgcalloss=False,
     output_dim=4,
     clust_space_norm="none",
-    tracking=False
+    tracking=False,
 ):
     """
 
@@ -286,7 +288,7 @@ def object_condensation_loss2(
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
         hgcal_implementation=hgcalloss,
-        tracking=tracking
+        tracking=tracking,
     )
     if return_resolution:
         return a
@@ -469,22 +471,19 @@ def object_condensation_loss_tracking(
     hgcalloss=False,
     output_dim=4,
     clust_space_norm="none",
-    tracking=False
+    tracking=False,
 ):
-    
+
     _, S = pred.shape
     if clust_loss_only:
         clust_space_dim = output_dim - 1
     else:
         clust_space_dim = output_dim - 28
 
-    
-
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
 
-  
     dev = batch.device
     clustering_index_l = batch.ndata["particle_number"]
 
@@ -517,10 +516,9 @@ def object_condensation_loss_tracking(
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
         hgcal_implementation=hgcalloss,
-        tracking=tracking
+        tracking=tracking,
     )
-    
-    
+
     loss = a[0] + a[1]  # + 5 * a[14]
-  
+
     return loss, a
