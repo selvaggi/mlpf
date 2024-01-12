@@ -30,10 +30,10 @@ class GravnetModel(nn.Module):
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
-        clust_space_norm: str = "none",
+        clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
         activation: str = "elu",
-        weird_batchnom=False,
+        weird_batchnom=True,
     ):
 
         super(GravnetModel, self).__init__()
@@ -47,7 +47,7 @@ class GravnetModel(nn.Module):
         }
         self.act = acts[activation]
 
-        N_NEIGHBOURS = [4, 16, 7, 11, 8, 16]
+        N_NEIGHBOURS = [128, 64, 64, 64, 128]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim
@@ -57,20 +57,19 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(
-                self.input_dim
-            )  # , momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
+        print("clust_space_norm", clust_space_norm)
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
-        self.d_shape = 32 * 2
+        self.d_shape = 32
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (self.d_shape),  # * i + 64
+                    64 if i == 0 else (self.d_shape * i + 64),
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -83,9 +82,7 @@ class GravnetModel(nn.Module):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(
-                        64, 64
-                    ),  # TOTAL_ITERATIONS * self.d_shape + 64 if i == 0 else
+                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
                     self.act,  # ,
                 ]
             )
@@ -121,7 +118,7 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
         else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
+            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
@@ -152,17 +149,19 @@ class GravnetModel(nn.Module):
                 self.args.model_prefix,
                 num_layer,
             )
+
             allfeat.append(x)
             graphs.append(graph)
             loss_regularizing_neig = (
                 loss_regularizing_neig_block + loss_regularizing_neig
             )
             loss_ll = loss_ll_ + loss_ll
-            # if len(allfeat) > 1:
-            #     x = torch.concatenate(allfeat, dim=1)
+            if len(allfeat) > 1:
+                x = torch.concatenate(allfeat, dim=1)
 
-        # x = torch.cat(allfeat, dim=-1)
+        x = torch.cat(allfeat, dim=-1)
         assert x.device == device
+
         x = self.postgn_dense(x)
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
@@ -183,7 +182,7 @@ class GravnetModel(nn.Module):
         # if self.return_graphs:
         #     return x, graphs
         # else:
-        return x, pred_energy_corr  # , loss_regularizing_neig, loss_ll
+        return x, pred_energy_corr, loss_ll #  , loss_regularizing_neig, loss_ll
 
 
 def object_condensation_loss2(
@@ -203,7 +202,7 @@ def object_condensation_loss2(
     hgcalloss=False,
     output_dim=4,
     clust_space_norm="none",
-    tracking=False,
+    tracking=False
 ):
     """
 
@@ -287,7 +286,7 @@ def object_condensation_loss2(
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
         hgcal_implementation=hgcalloss,
-        tracking=tracking,
+        tracking=tracking
     )
     if return_resolution:
         return a
@@ -373,10 +372,10 @@ class GravNetBlock(nn.Module):
         propagate_dimensions: int = 22,
         k: int = 40,
         # batchnorm: bool = True
-        weird_batchnom=False,
+        weird_batchnom=True,
     ):
         super(GravNetBlock, self).__init__()
-        self.d_shape = 32 * 2
+        self.d_shape = 32
         out_channels = self.d_shape
         if weird_batchnom:
             self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
@@ -470,19 +469,22 @@ def object_condensation_loss_tracking(
     hgcalloss=False,
     output_dim=4,
     clust_space_norm="none",
-    tracking=False,
+    tracking=False
 ):
-
+    
     _, S = pred.shape
     if clust_loss_only:
         clust_space_dim = output_dim - 1
     else:
         clust_space_dim = output_dim - 28
 
+    
+
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
 
+  
     dev = batch.device
     clustering_index_l = batch.ndata["particle_number"]
 
@@ -515,9 +517,10 @@ def object_condensation_loss_tracking(
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
         hgcal_implementation=hgcalloss,
-        tracking=tracking,
+        tracking=tracking
     )
-
+    
+    
     loss = a[0] + a[1]  # + 5 * a[14]
-
+  
     return loss, a

@@ -82,9 +82,9 @@ def train_regression(
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
                     if local_rank == 0:
-                        model_output, e_cor = model(batch_g, step_count)
+                        model_output, e_cor, loss_ll = model(batch_g, step_count)
                     else:
-                        model_output, e_cor = model(batch_g, 1)
+                        model_output, e_cor, loss_ll = model(batch_g, 1)
                 preds = model_output.squeeze()
 
                 (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -103,7 +103,9 @@ def train_regression(
                     use_average_cc_pos=args.use_average_cc_pos,
                     hgcalloss=args.hgcalloss,
                 )
-                loss = loss  # + 1 / 20 * loss_E  # add energy loss # loss +
+                loss = (
+                    loss + 0.01 * loss_ll
+                )  # + 1 / 20 * loss_E  # add energy loss # loss +
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
                 betas = (
@@ -141,13 +143,7 @@ def train_regression(
 
             update_and_log_scheduler(scheduler, args, loss, logwandb, local_rank, opt)
 
-            log_losses_wandb(
-                logwandb,
-                num_batches,
-                local_rank,
-                losses,
-                loss,
-            )
+            log_losses_wandb(logwandb, num_batches, local_rank, losses, loss, loss_ll)
             if (local_rank == 0) and (num_batches % 500) == 0:
                 dirname = os.path.dirname(args.model_prefix)
                 if dirname and not os.path.exists(dirname):
@@ -253,7 +249,7 @@ def evaluate_regression(
                         step_plotting = 0
                     else:
                         step_plotting = 1
-                    model_output, e_corr = model(batch_g, step_plotting)
+                    model_output, e_corr, loss_ll = model(batch_g, step_plotting)
                 (
                     loss,
                     losses,
@@ -283,7 +279,7 @@ def evaluate_regression(
                     }
                 )
                 log_losses_wandb(
-                    logwandb, num_batches, local_rank, losses, loss, val=True
+                    logwandb, num_batches, local_rank, losses, loss, loss_ll, val=True
                 )
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
