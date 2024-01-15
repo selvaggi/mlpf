@@ -26,7 +26,7 @@ class GravnetModel(nn.Module):
         self,
         args,
         dev,
-        input_dim: int = 8,
+        input_dim: int = 5,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
@@ -47,7 +47,7 @@ class GravnetModel(nn.Module):
         }
         self.act = acts[activation]
 
-        N_NEIGHBOURS = [16, 128, 16, 256]
+        N_NEIGHBOURS = [7, 16, 11, 30]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim

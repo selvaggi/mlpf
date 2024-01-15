@@ -38,16 +38,18 @@ def create_inputs_from_table(output):
     number_part = np.int32(np.sum(output["pf_mask"][1]))
     #! idx of particle does not start at 1
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
-    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
+
     features_hits = torch.permute(
         torch.tensor(output["pf_features"][:, 0:number_hits]), (1, 0)
     )
-    # pos_hits = torch.permute(
-    #     torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
-    # )
     hit_type = features_hits[:, -1].clone()
+    mask_DC = hit_type == 0
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type.long(), num_classes=2)
-    # build the features (theta,phi,p)
+    hit_type_one_hot = hit_type_one_hot[mask_DC]
+    features_hits = features_hits[mask_DC]
+    hit_particle_link = hit_particle_link[mask_DC]
+
+    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
 
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
@@ -97,9 +99,10 @@ def create_graph_tracking(
         g = dgl.DGLGraph()
         g.add_nodes(hit_type_one_hot.shape[0])
 
-        hit_features_graph = torch.cat(
-            (features_hits[:, 4:-1], hit_type_one_hot), dim=1
-        )  # dims = 7
+        # hit_features_graph = torch.cat(
+        #     (features_hits[:, 4:-1], hit_type_one_hot), dim=1
+        # )  # dims = 7
+        hit_features_graph = features_hits[:, 4:-1]
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["hit_type"] = hit_type_one_hot
