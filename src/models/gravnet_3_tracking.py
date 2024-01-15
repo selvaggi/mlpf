@@ -122,6 +122,7 @@ class GravnetModel(nn.Module):
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
+        print("x", x.shape)
         device = x.device
         original_coords = g.ndata["pos_hits_xyz"]
         g.ndata["original_coords"] = original_coords
