@@ -409,7 +409,6 @@ def evaluate_regression(
             path_save=args.model_prefix + "showers_df_evaluation",
             store=True,
             predict=False,
-            tracks=args.tracks,
         )
     time_diff = time.time() - start_time
     _logger.info(
