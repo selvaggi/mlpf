@@ -143,18 +143,22 @@ def generate_showers_data_frame(
     step=0,
     number_in_batch=0,
 ):
+
     e_pred_showers = 1.0 * scatter_add(
         torch.ones_like(labels).view(-1),
         labels.long(),
     )
-
+    print("e_pred_showers", e_pred_showers)
     e_reco_showers = scatter_add(
         torch.ones_like(labels).view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
+    print("e_reco_showers0", e_reco_showers)
     e_reco_showers = e_reco_showers[1:]
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
+    print("row_ind", row_ind)
+    print("col_ind", col_ind)
     pred_showers = shower_p_unique
 
     index_matches = col_ind + 1
