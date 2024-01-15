@@ -26,14 +26,14 @@ class GravnetModel(nn.Module):
         self,
         args,
         dev,
-        input_dim: int = 9,
+        input_dim: int = 8,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
         clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
         activation: str = "elu",
-        weird_batchnom=False,
+        weird_batchnom=True,
     ):
 
         super(GravnetModel, self).__init__()
@@ -57,7 +57,7 @@ class GravnetModel(nn.Module):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.5)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
@@ -122,9 +122,9 @@ class GravnetModel(nn.Module):
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
-        original_coords = x[:, 0:3]
-        g.ndata["original_coords"] = original_coords
         device = x.device
+        original_coords = g.ndata["pos_hits_xyz"]
+        g.ndata["original_coords"] = original_coords
         batch = obtain_batch_numbers(x, g)
         x = self.ScaledGooeyBatchNorm2_1(x)
         x = self.Dense_1(x)

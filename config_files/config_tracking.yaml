@@ -53,10 +53,12 @@ inputs:
          - [hit_y, null] #VX
          - [hit_z, null] #VX
          - [hit_EDep, null] # VX DC
-         - [hit_type, null] # VX DC
-         - [cell_ID, null] # VX DC
+         - [superLayer, null] # DC
+         - [layer, null] # DC
+         - [phi, null] #  DC
          - [distance_to_wire, null] # DC
          - [z_position_along_wire, null] # DC
+         - [hit_type, null] # VX DC
          #- [cluster_count, null] # DC
 
    pf_vectors:

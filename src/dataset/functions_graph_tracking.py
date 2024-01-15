@@ -42,9 +42,9 @@ def create_inputs_from_table(output):
     features_hits = torch.permute(
         torch.tensor(output["pf_features"][:, 0:number_hits]), (1, 0)
     )
-    pos_hits = torch.permute(
-        torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
-    )
+    # pos_hits = torch.permute(
+    #     torch.tensor(output["pf_points"][:, 0:number_hits]), (1, 0)
+    # )
     hit_type = features_hits[:, -1].clone()
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type.long(), num_classes=2)
     # build the features (theta,phi,p)
@@ -98,14 +98,14 @@ def create_graph_tracking(
         g.add_nodes(hit_type_one_hot.shape[0])
 
         hit_features_graph = torch.cat(
-            (features_hits[:, 0:-1], hit_type_one_hot), dim=1
-        )  # dims = 9
+            (features_hits[:, 4:-1], hit_type_one_hot), dim=1
+        )  # dims = 7
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["hit_type"] = hit_type_one_hot
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
-        g.ndata["pos_hits_xyz"] = hit_features_graph[:, 0:3]
+        g.ndata["pos_hits_xyz"] = features_hits[:, 0:3]
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
