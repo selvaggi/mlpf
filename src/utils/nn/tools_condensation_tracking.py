@@ -103,7 +103,7 @@ def train_regression(
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
                     if local_rank == 0:
-                        model_output = model(batch_g, step_count, tracking=True)
+                        model_output = model(batch_g, step_count)
                     else:
                         model_output = model(batch_g, 1)
                 preds = model_output.squeeze()
