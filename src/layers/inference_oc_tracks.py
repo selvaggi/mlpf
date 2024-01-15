@@ -163,7 +163,7 @@ def generate_showers_data_frame(
 
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
-    matched_es = torch.zeros_like(labels) * (torch.nan)
+    matched_es = torch.zeros_like(e_reco_showers) * (torch.nan)
     matched_es = matched_es.to(e_pred_showers.device)
 
     matched_es[row_ind] = e_pred_showers[index_matches]
