@@ -183,10 +183,6 @@ def generate_showers_data_frame(
 
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
-    pid_t = torch.cat(
-        (pid_t, fake_showers_showers_e_truw),
-        dim=0,
-    )
     e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
 
