@@ -193,7 +193,7 @@ def generate_showers_data_frame(
         ),
         dim=0,
     )
-
+    print(e_reco.shape, e_pred.shape, e_pred_t.shape)
     d = {
         "reco_showers_E": e_reco.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
@@ -268,8 +268,6 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
 
 
 def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
-    print("intersection_matrix_w", intersection_matrix_w.shape)
-    print(col_ind.shape)
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
     intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
