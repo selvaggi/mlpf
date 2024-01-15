@@ -143,7 +143,10 @@ def generate_showers_data_frame(
     step=0,
     number_in_batch=0,
 ):
-    e_pred_showers = 1.0 * torch.ones_like(labels).view(-1)
+    e_pred_showers = scatter_add(
+        torch.ones_like(labels).view(-1),
+        labels.long(),
+    )
 
     e_reco_showers = scatter_add(
         torch.ones_like(labels).view(-1),
