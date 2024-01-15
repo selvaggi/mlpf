@@ -37,6 +37,7 @@ class GravnetModel(nn.Module):
     ):
 
         super(GravnetModel, self).__init__()
+        print("input dim", input_dim)
         self.args = args
         assert activation in ["relu", "tanh", "sigmoid", "elu"]
         acts = {
@@ -56,6 +57,7 @@ class GravnetModel(nn.Module):
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
+            print("mean shape", self.ScaledGooeyBatchNorm2_1.mean.shape)
         else:
             self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.5)
 
