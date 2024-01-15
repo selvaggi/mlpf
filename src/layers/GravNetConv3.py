@@ -239,7 +239,6 @@ class WeirdBatchNorm(nn.Module):
     def forward(self, input):
         x = input.detach()
         mu = x.mean(dim=0)
-        print("mu", mu.shape)
         var = x.var(dim=0, unbiased=False)
 
         mu_update = self._calc_update(self.mean, mu)
@@ -262,7 +261,6 @@ class WeirdBatchNorm(nn.Module):
         return out
 
     def _calc_update(self, old, new):
-        print(new.shape, old.shape)
         delta = new - old.to(new.device)
         update = old.to(new.device) + (1 - self.viscosity) * delta.to(new.device)
         update = update.to(new.device)
