@@ -168,7 +168,7 @@ def generate_showers_data_frame(
 
     matched_es[row_ind] = e_pred_showers[index_matches]
 
-    intersection_E = torch.zeros_like(labels) * (torch.nan)
+    intersection_E = torch.zeros_like(e_reco_showers) * (torch.nan)
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
     intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
 
