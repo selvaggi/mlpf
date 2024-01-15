@@ -127,7 +127,7 @@ class GravNetConv(MessagePassing):
 
         #! LLRegulariseGravNetSpace
         #! mean distance in original space vs distance in gravnet space between the neigh
-        #? This code was checked on 12.01.24 and is correct 
+        # ? This code was checked on 12.01.24 and is correct
         graph.edata["_edge_w"] = dist
         graph.update_all(fn.copy_e("_edge_w", "m"), fn.sum("m", "in_weight"))
         degs = graph.dstdata["in_weight"] + 1e-4
@@ -138,7 +138,7 @@ class GravNetConv(MessagePassing):
         dist = graph.edata["_norm_edge_weights"]
 
         original_coord = g.ndata["pos_hits_xyz"]
-        #! distance in original coordinates 
+        #! distance in original coordinates
         gndist = (
             (original_coord[edge_index[0]] - original_coord[edge_index[1]])
             .pow(2)
@@ -154,7 +154,7 @@ class GravNetConv(MessagePassing):
             lambda e: {"_norm_edge_weights_gn": e.dst["_dst_in_w"] * e.data["_edge_w"]}
         )
         gndist = graph.edata["_norm_edge_weights_gn"]
-        loss_llregulariser =  torch.mean(torch.square(dist - gndist))
+        loss_llregulariser = torch.mean(torch.square(dist - gndist))
         # print(torch.square(dist - gndist))
         #! this is the output_feature_transform
         edge_weight = torch.sqrt(edge_weight + 1e-6)
@@ -239,6 +239,7 @@ class WeirdBatchNorm(nn.Module):
     def forward(self, input):
         x = input.detach()
         mu = x.mean(dim=0)
+        print("mu", mu.shape)
         var = x.var(dim=0, unbiased=False)
 
         mu_update = self._calc_update(self.mean, mu)
@@ -261,6 +262,7 @@ class WeirdBatchNorm(nn.Module):
         return out
 
     def _calc_update(self, old, new):
+        print(new.shape, old.shape)
         delta = new - old.to(new.device)
         update = old.to(new.device) + (1 - self.viscosity) * delta.to(new.device)
         update = update.to(new.device)
