@@ -485,18 +485,18 @@ def calc_LV_Lbeta(
         V_attractive = V_attractive.view(-1) / (
             N_k.view(-1) + 1e-3
         )  # every object is accounted for equally
-        if not tracking:
-            #! add to terms function (divide by total number of showers per event)
-            # L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
-            # L_V_attractive = torch.mean(
-            #     V_attractive
-            # )  # V_attractive size n_objects, so per shower metric
-            per_shower_weight = torch.exp(1 / (e_particles_pred_per_object + 0.4))
-            soft_m = torch.nn.Softmax(dim=0)
-            per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
-            L_V_attractive = torch.mean(V_attractive * per_shower_weight)
-        else:
-            L_V_attractive = torch.mean(V_attractive)
+        # if not tracking:
+        #     #! add to terms function (divide by total number of showers per event)
+        #     # L_V_attractive = scatter_add(V_attractive, object_index) / n_objects
+        #     # L_V_attractive = torch.mean(
+        #     #     V_attractive
+        #     # )  # V_attractive size n_objects, so per shower metric
+        #     per_shower_weight = torch.exp(1 / (e_particles_pred_per_object + 0.4))
+        #     soft_m = torch.nn.Softmax(dim=0)
+        #     per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
+        #     L_V_attractive = torch.mean(V_attractive * per_shower_weight)
+        # else:
+        L_V_attractive = torch.mean(V_attractive)
     else:
         #! in comparison this works per hit
         V_attractive = (
@@ -533,15 +533,15 @@ def calc_LV_Lbeta(
         L_V_repulsive = L_V_repulsive.view(
             -1
         ) / number_of_repulsive_terms_per_object.view(-1)
-        if not tracking:
-            #! add to terms function (divide by total number of showers per event)
-            # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
-            per_shower_weight = torch.exp(1 / (e_particles_pred_per_object + 0.4))
-            soft_m = torch.nn.Softmax(dim=0)
-            per_shower_weight = soft_m(per_shower_weight) * len(L_V_repulsive)
-            L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
-        else:
-            L_V_repulsive = torch.mean(L_V_repulsive)
+        # if not tracking:
+        #     #! add to terms function (divide by total number of showers per event)
+        #     # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
+        #     per_shower_weight = torch.exp(1 / (e_particles_pred_per_object + 0.4))
+        #     soft_m = torch.nn.Softmax(dim=0)
+        #     per_shower_weight = soft_m(per_shower_weight) * len(L_V_repulsive)
+        #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
+        # else:
+        L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
