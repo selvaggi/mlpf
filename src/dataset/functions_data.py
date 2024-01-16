@@ -49,9 +49,14 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
     number_of_hits = get_number_hits(hit_energies, hit_particle_link)
     # print(part_frac)
-    filt1 = (
-        (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
-    )  # only keep these particles
+    if predict:
+        energy_cut = 0.1
+        filt1 = (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
+    else:
+        energy_cut = 0.01
+        filt1 = (
+            (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
+        )  # only keep these particles
 
     for index, p in enumerate(list_p):
         mask = hit_particle_link == p
