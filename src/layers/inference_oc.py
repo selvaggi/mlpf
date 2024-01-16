@@ -550,7 +550,9 @@ def match_showers(
 
 
 def hfdb_obtain_labels(X, device):
-    hdb = HDBSCAN().fit(X.detach().cpu())
+    hdb = HDBSCAN(
+        min_cluster_size=5, min_samples=15, cluster_selection_epsilon=0.1
+    ).fit(X.detach().cpu())
     labels_hdb = hdb.labels_ + 1
     labels_hdb = np.reshape(labels_hdb, (-1))
     labels_hdb = torch.Tensor(labels_hdb).long().to(device)
