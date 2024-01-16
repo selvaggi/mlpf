@@ -520,8 +520,8 @@ def match_showers(
     if torch.sum(labels == 0) == 0:
         shower_p_unique = torch.cat(
             (
-                shower_p_unique.view(-1),
                 torch.Tensor([0]).to(shower_p_unique.device).view(-1),
+                shower_p_unique.view(-1),
             ),
             dim=0,
         )
@@ -555,9 +555,9 @@ def match_showers(
 
 
 def hfdb_obtain_labels(X, device):
-    hdb = HDBSCAN(
-        min_cluster_size=5, min_samples=15, cluster_selection_epsilon=0.1
-    ).fit(X.detach().cpu())
+    hdb = HDBSCAN(min_cluster_size=8, min_samples=8, cluster_selection_epsilon=0.1).fit(
+        X.detach().cpu()
+    )
     labels_hdb = hdb.labels_ + 1
     labels_hdb = np.reshape(labels_hdb, (-1))
     labels_hdb = torch.Tensor(labels_hdb).long().to(device)
