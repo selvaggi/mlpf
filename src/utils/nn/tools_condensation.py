@@ -235,6 +235,7 @@ def evaluate_regression(
     step = 0
     df_showers = []
     df_showers_pandora = []
+    df_showes_db = []
     with torch.no_grad():
         with tqdm.tqdm(test_loader) as tq:
             for batch_g, y in tq:
@@ -285,7 +286,11 @@ def evaluate_regression(
                     break
                 if args.predict:
                     model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                    df_batch, df_batch_pandora = create_and_store_graph_output(
+                    (
+                        df_batch,
+                        df_batch_pandora,
+                        df_batch1,
+                    ) = create_and_store_graph_output(
                         batch_g,
                         model_output1,
                         y,
@@ -295,10 +300,11 @@ def evaluate_regression(
                         path_save=args.model_prefix + "showers_df_evaluation",
                         store=False,
                         predict=True,
-                        tracks=args.tracks
+                        tracks=args.tracks,
                     )
                     df_showers.append(df_batch)
                     df_showers_pandora.append(df_batch_pandora)
+                    df_showes_db.append(df_batch1)
     # calculate showers at the end of every epoch
     if logwandb and local_rank == 0:
         if args.predict:
@@ -307,10 +313,12 @@ def evaluate_regression(
 
             df_showers = pd.concat(df_showers)
             df_showers_pandora = pd.concat(df_showers_pandora)
+            df_showes_db = pd.concat(df_showes_db)
             store_at_batch_end(
                 path_save=args.model_prefix + "showers_df_evaluation",
                 df_batch=df_showers,
                 df_batch_pandora=df_showers_pandora,
+                df_batch1=df_showes_db,
                 step=0,
                 predict=True,
             )
@@ -326,7 +334,7 @@ def evaluate_regression(
                 path_save=args.model_prefix + "showers_df_evaluation",
                 store=True,
                 predict=False,
-                tracks=args.tracks
+                tracks=args.tracks,
             )
     if logwandb and local_rank == 0:
 

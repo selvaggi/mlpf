@@ -177,7 +177,7 @@ def create_and_store_graph_output(
             predict=False,
         )
     if predict:
-        return df_batch, df_batch_pandora
+        return df_batch, df_batch_pandora, df_batch1
     else:
         return df_batch
 
