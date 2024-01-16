@@ -103,6 +103,11 @@ def create_graph_tracking(
         #     (features_hits[:, 4:-1], hit_type_one_hot), dim=1
         # )  # dims = 7
         hit_features_graph = features_hits[:, 4:-1]
+        uvz = convert_to_conformal_coordinates(features_hits[:, 0:3])
+        polar = convert_to_polar_coordinates(uvz)
+        hit_features_graph = torch.cat(
+            (features_hits[:, 0:3], uvz, polar), dim=1
+        )  # dim =8
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["hit_type"] = hit_type_one_hot
@@ -119,3 +124,26 @@ def create_graph_tracking(
         graph_empty = True
 
     return [g, y_data_graph], graph_empty
+
+
+def convert_to_conformal_coordinates(xyz):
+    x = xyz[:, 0]
+    y = xyz[:, 1]
+    u = x / (torch.square(x) + torch.square(y))
+    v = y / (torch.square(x) + torch.square(y))
+    uvz = torch.cat((u.view(-1, 1), v.view(-1, 1), xyz[:, 2].view(-1, 1)), dim=1)
+    return uvz
+
+
+def convert_to_polar_coordinates(uvz):
+    cart = uvz[:, 0:2]
+    rho = torch.norm(cart, p=2, dim=-1).view(-1, 1)
+    from math import pi as PI
+
+    theta = torch.atan2(cart[:, 1], cart[:, 0]).view(-1, 1)
+    theta = theta + (theta < 0).type_as(theta) * (2 * PI)
+    rho = rho / (rho.max())
+    # theta = theta / (2 * PI)
+
+    polar = torch.cat([rho, theta], dim=-1)
+    return polar
