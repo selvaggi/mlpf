@@ -1,7 +1,7 @@
 import dgl
 import torch
 import os
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
 
@@ -26,6 +26,7 @@ def create_and_store_graph_output(
     tracks=False,
 ):
     number_of_showers_total = 0
+    number_of_showers_total1 = 0
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
     if not tracking:
@@ -33,7 +34,9 @@ def create_and_store_graph_output(
             batch_g.ndata["correction"] = model_output[:, 4]
     graphs = dgl.unbatch(batch_g)
     batch_id = y[:, -1].view(-1)
+
     df_list = []
+    df_list1 = []
     df_list_pandora = []
     for i in range(0, len(graphs)):
         mask = batch_id == i
@@ -41,49 +44,34 @@ def create_and_store_graph_output(
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
 
-        betas = torch.sigmoid(dic["graph"].ndata["beta"])
+        # betas = torch.sigmoid(dic["graph"].ndata["beta"])
         if not tracking:
             if e_corr is None:
                 correction_e = dic["graph"].ndata["correction"].view(-1)
         X = dic["graph"].ndata["coords"]
-        clustering_mode = "dbscan"
-        if clustering_mode == "clustering_normal":
-            clustering = get_clustering(betas, X)
-        elif clustering_mode == "dbscan":
-            distance_scale = (
-                (
-                    torch.min(
-                        torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])
-                    )
-                    / 30
-                )
-                .view(-1)
-                .detach()
-                .cpu()
-                .numpy()[0]
-            )
-
-            db = DBSCAN(eps=distance_scale, min_samples=15).fit(X.detach().cpu())
-            # DBSCAN has clustering labels -1,0,.., our cluster 0 is noise so we add 1
-            labels = db.labels_ + 1
-            labels = np.reshape(labels, (-1))
-            labels = torch.Tensor(labels).long().to(model_output.device)
+        # clustering_mode = "dbscan"
+        # if clustering_mode == "clustering_normal":
+        #     clustering = get_clustering(betas, X)
+        # elif clustering_mode == "dbscan":
+        labels = dbscan_obtain_labels(X, model_output.device)
+        labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
-            if tracks:
-                labels_pandora = dic["graph"].ndata["pandora_pfo"].long()
-            else:
-                labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
-            labels_pandora = labels_pandora + 1
-            map_from = list(np.unique(labels_pandora.detach().cpu()))
-            cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
-            labels_pandora = (
-                torch.Tensor(list(cluster_id)).long().to(model_output.device)
-            )
+            labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
         shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
             labels,
+            dic,
+            particle_ids,
+            model_output,
+            local_rank,
+            i,
+            path_save,
+            tracks=tracks,
+        )
+        shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb = match_showers(
+            labels_hdb,
             dic,
             particle_ids,
             model_output,
@@ -138,7 +126,22 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
+            df_event1, number_of_showers_total1 = generate_showers_data_frame(
+                labels_hdb,
+                dic,
+                shower_p_unique_hdb,
+                particle_ids,
+                row_ind_hdb,
+                col_ind_hdb,
+                i_m_w_hdb,
+                e_corr=e_corr,
+                number_of_showers_total=number_of_showers_total1,
+                step=step,
+                number_in_batch=i,
+                tracks=tracks,
+            )
             df_list.append(df_event)
+            df_list1.append(df_event1)
             if predict:
                 df_event_pandora = generate_showers_data_frame(
                     labels_pandora,
@@ -157,12 +160,20 @@ def create_and_store_graph_output(
                 df_list_pandora.append(df_event_pandora)
 
     df_batch = pd.concat(df_list)
+    df_batch1 = pd.concat(df_list1)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
     #
     if store:
         store_at_batch_end(
-            path_save, df_batch, df_list_pandora, local_rank, step, epoch, predict=False
+            path_save,
+            df_batch,
+            df_batch1,
+            df_list_pandora,
+            local_rank,
+            step,
+            epoch,
+            predict=False,
         )
     if predict:
         return df_batch, df_batch_pandora
@@ -173,6 +184,7 @@ def create_and_store_graph_output(
 def store_at_batch_end(
     path_save,
     df_batch,
+    df_batch1,
     df_batch_pandora,
     local_rank=0,
     step=0,
@@ -183,6 +195,17 @@ def store_at_batch_end(
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
     df_batch.to_pickle(path_save_)
+    path_save_ = (
+        path_save
+        + "/"
+        + str(local_rank)
+        + "_"
+        + str(step)
+        + "_"
+        + str(epoch)
+        + "_hdbscan.pt"
+    )
+    df_batch1.to_pickle(path_save_)
     if predict:
         path_save_pandora = (
             path_save
@@ -201,8 +224,9 @@ def store_at_batch_end(
 
 
 def log_efficiency(df, pandora=False):
-    eff = np.sum(~np.isnan(df["pred_showers_E"].values)) / len(
-        df["pred_showers_E"].values
+    mask = ~np.isnan(df["reco_showers_E"])
+    eff = np.sum(~np.isnan(df["pred_showers_E"][mask].values)) / len(
+        df["pred_showers_E"][mask].values
     )
     if pandora:
         wandb.log({"efficiency validation pandora": eff})
@@ -523,3 +547,40 @@ def match_showers(
             plot_iou_matrix(iou_matrix, image_path)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
     return shower_p_unique, row_ind, col_ind, i_m_w
+
+
+def hfdb_obtain_labels(X, device):
+    hdb = HDBSCAN().fit(X.detach().cpu())
+    labels_hdb = hdb.labels_ + 1
+    labels_hdb = np.reshape(labels_hdb, (-1))
+    labels_hdb = torch.Tensor(labels_hdb).long().to(device)
+    return labels_hdb
+
+
+def dbscan_obtain_labels(X, device):
+    distance_scale = (
+        (torch.min(torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])) / 30)
+        .view(-1)
+        .detach()
+        .cpu()
+        .numpy()[0]
+    )
+
+    db = DBSCAN(eps=distance_scale, min_samples=15).fit(X.detach().cpu())
+    # DBSCAN has clustering labels -1,0,.., our cluster 0 is noise so we add 1
+    labels = db.labels_ + 1
+    labels = np.reshape(labels, (-1))
+    labels = torch.Tensor(labels).long().to(device)
+    return labels
+
+
+def get_labels_pandora(tracks, dic, device):
+    if tracks:
+        labels_pandora = dic["graph"].ndata["pandora_pfo"].long()
+    else:
+        labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
+    labels_pandora = labels_pandora + 1
+    map_from = list(np.unique(labels_pandora.detach().cpu()))
+    cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
+    labels_pandora = torch.Tensor(list(cluster_id)).long().to(device)
+    return labels_pandora
