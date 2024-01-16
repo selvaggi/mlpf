@@ -79,6 +79,7 @@ def create_and_store_graph_output(
             i,
             path_save,
             tracks=tracks,
+            hdbscan=True,
         )
         if predict:
             (
@@ -486,7 +487,7 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     return torch.cat(list_intersection_E, dim=0)
 
 
-def plot_iou_matrix(iou_matrix, image_path):
+def plot_iou_matrix(iou_matrix, image_path, hdbscan=False):
     iou_matrix = torch.transpose(iou_matrix[1:, :], 1, 0)
     fig, ax = plt.subplots()
     iou_matrix = iou_matrix.detach().cpu().numpy()
@@ -496,7 +497,10 @@ def plot_iou_matrix(iou_matrix, image_path):
             c = np.round(iou_matrix[j, i], 1)
             ax.text(i, j, str(c), va="center", ha="center")
     fig.savefig(image_path, bbox_inches="tight")
-    wandb.log({"iou_matrix": wandb.Image(image_path)})
+    if hdbscan:
+        wandb.log({"iou_matrix_hdbscan": wandb.Image(image_path)})
+    else:
+        wandb.log({"iou_matrix": wandb.Image(image_path)})
 
 
 def match_showers(
@@ -509,6 +513,7 @@ def match_showers(
     path_save,
     pandora=False,
     tracks=False,
+    hdbscan=False,
 ):
     iou_threshold = 0.3
     shower_p_unique = torch.unique(labels)
@@ -544,7 +549,7 @@ def match_showers(
                 image_path = path_save + "/example_1_clustering_pandora.png"
             else:
                 image_path = path_save + "/example_1_clustering.png"
-            plot_iou_matrix(iou_matrix, image_path)
+            plot_iou_matrix(iou_matrix, image_path, hdbscan)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
     return shower_p_unique, row_ind, col_ind, i_m_w
 
