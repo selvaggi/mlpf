@@ -52,8 +52,8 @@ def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
             columns=[k for k in data],
         )
         df["orig_tIdx"] = df["tIdx"]
-        rdst = np.random.RandomState(1234567890)  # all the same
-        shuffle_truth_colors(df, "tIdx", rdst)
+        # rdst = np.random.RandomState(1234567890)  # all the same
+        # shuffle_truth_colors(df, "tIdx", rdst)
 
         # hover_data = ["orig_tIdx", "idx"] + [k for k in hoverdict.keys()]
         # if nidx is not None:
