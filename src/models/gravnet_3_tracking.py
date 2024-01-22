@@ -38,7 +38,7 @@ class GravnetModel(nn.Module):
 
         super(GravnetModel, self).__init__()
         self.args = args
-        input_dim = 8
+        input_dim = 5
         assert activation in ["relu", "tanh", "sigmoid", "elu"]
         acts = {
             "relu": nn.ReLU(),

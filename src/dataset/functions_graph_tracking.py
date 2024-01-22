@@ -106,8 +106,8 @@ def create_graph_tracking(
         uvz = convert_to_conformal_coordinates(features_hits[:, 0:3])
         polar = convert_to_polar_coordinates(uvz)
         hit_features_graph = torch.cat(
-            (features_hits[:, 0:3], uvz, polar), dim=1
-        )  # dim =8
+            (uvz, polar), dim=1
+        )  # dim =8 #features_hits[:, 0:3],
         #! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["hit_type"] = hit_type_one_hot
@@ -127,6 +127,7 @@ def create_graph_tracking(
 
 
 def convert_to_conformal_coordinates(xyz):
+    # https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/transforms/polar.html
     x = xyz[:, 0]
     y = xyz[:, 1]
     u = x / (torch.square(x) + torch.square(y))
