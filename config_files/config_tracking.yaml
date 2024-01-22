@@ -70,6 +70,7 @@ inputs:
          - [part_m, null] #4
          - [part_pid, null]  #15
          - [part_id, null]  #6
+         - [part_p, null]  #6
    pf_vectoronly:
       length: 25000
       pad_mode: wrap
