@@ -146,7 +146,7 @@ def remove_loopers(
             mask1 = hit_particle_link == p
             mask = mask1 + mask
     else:
-        mask = np.full((len(hit_particle_link)), False, dtype=bool)
+        mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
     list_p = unique_p_numbers
     if len(list_remove) > 0:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
@@ -154,7 +154,7 @@ def remove_loopers(
             mask_particles1 = list_p == p
             mask_particles = mask_particles1 + mask_particles
     else:
-        mask_particles = np.full((len(list_p)), False, dtype=bool)
+        mask_particles = torch.tensor(np.full((len(list_p)), False, dtype=bool))
     return ~mask.to(bool), ~mask_particles.to(bool)
 
 
