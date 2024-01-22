@@ -97,7 +97,6 @@ def create_graph_tracking(
     cluster_id = cluster_id[mask_not_loopers]
     hit_particle_link = hit_particle_link[mask_not_loopers]
     features_hits = features_hits[mask_not_loopers]
-    print("mask_particles", mask_particles)
     y_data_graph = y_data_graph[mask_particles]
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     if hit_type_one_hot.shape[0] > 0:
@@ -143,7 +142,6 @@ def remove_loopers(
     list_remove = unique_p_numbers[mask_p.view(-1)]
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
-        print(mask.shape)
         for p in list_remove:
             mask1 = hit_particle_link == p
             mask = mask1 + mask
