@@ -92,7 +92,14 @@ def create_graph_tracking(
         hit_particle_link,
         features_hits,
     ) = create_inputs_from_table(output)
-
+    mask_not_loopers, mask_particles = remove_loopers(hit_particle_link, y_data_graph)
+    hit_type_one_hot = hit_type_one_hot[mask_not_loopers]
+    cluster_id = cluster_id[mask_not_loopers]
+    hit_particle_link = hit_particle_link[mask_not_loopers]
+    features_hits = features_hits[mask_not_loopers]
+    print("mask_particles", mask_particles)
+    y_data_graph = y_data_graph[mask_particles]
+    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     if hit_type_one_hot.shape[0] > 0:
         graph_empty = False
 
@@ -114,6 +121,7 @@ def create_graph_tracking(
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
         g.ndata["pos_hits_xyz"] = features_hits[:, 0:3]
+        g.ndata["e_dep"] = features_hits[:, 3]
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
@@ -124,6 +132,32 @@ def create_graph_tracking(
         graph_empty = True
 
     return [g, y_data_graph], graph_empty
+
+
+def remove_loopers(
+    hit_particle_link,
+    y,
+):
+    unique_p_numbers = torch.unique(hit_particle_link)
+    mask_p = y[:, 5] < 1
+    list_remove = unique_p_numbers[mask_p.view(-1)]
+    if len(list_remove) > 0:
+        mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
+        print(mask.shape)
+        for p in list_remove:
+            mask1 = hit_particle_link == p
+            mask = mask1 + mask
+    else:
+        mask = np.full((len(hit_particle_link)), False, dtype=bool)
+    list_p = unique_p_numbers
+    if len(list_remove) > 0:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+        for p in list_remove:
+            mask_particles1 = list_p == p
+            mask_particles = mask_particles1 + mask_particles
+    else:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+    return ~mask.to(bool), ~mask_particles.to(bool)
 
 
 def convert_to_conformal_coordinates(xyz):
