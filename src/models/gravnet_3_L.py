@@ -145,8 +145,8 @@ class GravnetModel(L.LightningModule):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        if step_count % 100:
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+        # if step_count % 100:
+        #     PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
@@ -178,7 +178,7 @@ class GravnetModel(L.LightningModule):
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if step_count % 100:
+        if step_count % 100 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -191,10 +191,10 @@ class GravnetModel(L.LightningModule):
 
         return x, pred_energy_corr, loss_ll
 
-    def on_after_backward(self):
-        for name, p in self.named_parameters():
-            if p.grad is None:
-                print(name)
+    # def on_after_backward(self):
+    #     for name, p in self.named_parameters():
+    #         if p.grad is None:
+    #             print(name)
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -225,7 +225,7 @@ class GravnetModel(L.LightningModule):
 
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
-            self.log("train_loss", loss)
+
         self.loss_final = loss
         return loss
 
@@ -406,10 +406,10 @@ class GravNetBlock(nn.Module):
             g, x, original_coords, batch
         )
         g.ndata["gncoords"] = gncoords
-        if step_count % 50:
-            PlotCoordinates(
-                g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
-            )
+        # if step_count % 50:
+        #     PlotCoordinates(
+        #         g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
+        #     )
         # gncoords = gncoords.detach()
         x = torch.cat((xgn, gncoords, x_input), dim=1)
         x = self.post_gravnet(x)
