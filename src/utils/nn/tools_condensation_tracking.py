@@ -127,27 +127,27 @@ def train_regression(
                 loss = loss  # add energy loss
                 if args.loss_regularization:
                     loss = loss + loss_regularizing_neig + loss_ll
-                betas = (
-                    torch.sigmoid(
-                        torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
-                    )
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
-                # wandb log betas hist
-                if logwandb and local_rank == 0:
-                    wandb.log(
-                        {
-                            "betas": wandb.Histogram(
-                                torch.nan_to_num(torch.tensor(betas), 0.0)
-                            ),
-                            "qs": wandb.Histogram(
-                                np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2
-                                + args.qmin
-                            ),
-                        }
-                    )  # , step=step_count)
+                # betas = (
+                #     torch.sigmoid(
+                #         torch.reshape(preds[:, args.clustering_space_dim], [-1, 1])
+                #     )
+                #     .detach()
+                #     .cpu()
+                #     .numpy()
+                # )
+                # # wandb log betas hist
+                # if logwandb and local_rank == 0:
+                #     wandb.log(
+                #         {
+                #             "betas": wandb.Histogram(
+                #                 torch.nan_to_num(torch.tensor(betas), 0.0)
+                #             ),
+                #             "qs": wandb.Histogram(
+                #                 np.arctanh(betas.clip(0.0, 1 - 1e-4) / 1.002) ** 2
+                #                 + args.qmin
+                #             ),
+                #         }
+                #     )  # , step=step_count)
             if grad_scaler is None:
                 loss.backward()
                 opt.step()
