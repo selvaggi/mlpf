@@ -58,10 +58,10 @@ class GravNetConv(MessagePassing):
         self.out_channels = out_channels
         self.k = k
         self.num_workers = num_workers
-        if weird_batchnom:
-            self.batchnorm_gravconv = WeirdBatchNorm(out_channels)
-        else:
-            self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
+        # if weird_batchnom:
+        #     self.batchnorm_gravconv = WeirdBatchNorm(out_channels)
+        # else:
+        #     self.batchnorm_gravconv = nn.BatchNorm1d(out_channels)
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
         # self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
         # torch.nn.init.xavier_uniform_(self.lin_s.weight, gain=0.001)
