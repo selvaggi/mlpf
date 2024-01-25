@@ -148,17 +148,17 @@ def generate_showers_data_frame(
         torch.ones_like(labels).view(-1),
         labels.long(),
     )
-    print("e_pred_showers", e_pred_showers)
+    # print("e_pred_showers", e_pred_showers)
     e_reco_showers = scatter_add(
         torch.ones_like(labels).view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
-    print("e_reco_showers0", e_reco_showers)
+    # print("e_reco_showers0", e_reco_showers)
     e_reco_showers = e_reco_showers[1:]
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
-    print("row_ind", row_ind)
-    print("col_ind", col_ind)
+    # print("row_ind", row_ind)
+    # print("col_ind", col_ind)
     pred_showers = shower_p_unique
 
     index_matches = col_ind + 1
@@ -193,7 +193,7 @@ def generate_showers_data_frame(
         ),
         dim=0,
     )
-    print(e_reco.shape, e_pred.shape, e_pred_t.shape)
+    # print(e_reco.shape, e_pred.shape, e_pred_t.shape)
     d = {
         "reco_showers_E": e_reco.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),

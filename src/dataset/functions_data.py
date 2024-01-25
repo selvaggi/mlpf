@@ -218,8 +218,7 @@ def get_hit_features(output, number_hits, prediction):
 
     return (
         pos_xyz_hits,
-        p_hits
-        / 2,  #! this is a fix for CLD since the B was set wrong for data generation (wrong only for tracks)
+        p_hits,
         e_hits,
         hit_type_one_hot,
         hit_particle_link,

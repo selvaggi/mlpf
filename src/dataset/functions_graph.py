@@ -74,6 +74,12 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             result[i] = result[i][hit_mask]
+    else:
+        # if we want the tracks keep only 1 track hit per charged particle.
+        hit_mask = hit_type == 0
+        hit_mask = ~hit_mask
+        for i in range(1, len(result)):
+            result[i] = result[i][hit_mask]
 
     return result
 
@@ -134,9 +140,9 @@ def create_graph(
         # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type_one_hot
         # g.ndata["p_hits"] = p_hits
-        g.ndata["e_hits"] = (
-            e_hits + p_hits
-        )  # if no tracks this is e and if there are tracks this fills the tracks e values with p
+        g.ndata[
+            "e_hits"
+        ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
         # g.ndata["theta_hits"] = theta_hits

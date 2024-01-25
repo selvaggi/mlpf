@@ -120,6 +120,7 @@ def _main(args):
             model_path = args.model_pretrained
             _logger.info("Loading model %s for training from there on" % model_path)
             model.load_state_dict(torch.load(model_path, map_location=dev))
+
         print("MODEL DEVICE", next(model.parameters()).is_cuda)
 
         # DistributedDataParallel
@@ -129,7 +130,7 @@ def _main(args):
                 model,
                 device_ids=gpus,
                 output_device=local_rank,
-                find_unused_parameters=True,
+                # find_unused_parameters=True,
             )
 
         # optimizer & learning rate
@@ -154,10 +155,14 @@ def _main(args):
             add_energy_loss = True
             if args.energy_loss_delay > 0:
                 add_energy_loss = False
+
+        freeze_batchnorm = False  # TODO Turn off after test
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
                 if epoch <= args.load_epoch:
                     continue
+            if epoch > 3:
+                freeze_batchnorm = True
             _logger.info("-" * 50)
             _logger.info("Epoch #%d training" % epoch)
             if args.clustering_and_energy_loss and epoch > args.energy_loss_delay:
@@ -181,6 +186,7 @@ def _main(args):
                 args=args,
                 args_model=data_config,
                 alternate_steps=args.alternate_steps_beta_clustering,
+                freeze_batchnorm=freeze_batchnorm,
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):

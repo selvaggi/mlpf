@@ -31,6 +31,21 @@ def lst_nonzero(x):
     return x[x != 0.0]
 
 
+def turn_grads_off(model):
+    list_grads_to_turn_off = [
+        "mod.ScaledGooeyBatchNorm2_1.weight",
+        "mod.ScaledGooeyBatchNorm2_1.bias",
+        "mod.ScaledGooeyBatchNorm2.weight",
+        "mod.ScaledGooeyBatchNorm2.bias",
+    ]
+
+    for name, param in model.named_parameters():
+        for i in list_grads_to_turn_off:
+            if name == i:
+                param.requires_grad = False
+    return model
+
+
 def clip_list(l, clip_val=4.0):
     result = []
     for item in l:
@@ -64,6 +79,7 @@ def train_regression(
     args=None,
     args_model=None,
     alternate_steps=None,  # alternate_steps: after how many steps to switch between beta and clustering loss
+    freeze_batchnorm=False,
 ):
     model.train()
     # print("starting to train")
@@ -84,9 +100,8 @@ def train_regression(
     start_time = time.time()
     prev_time = time.time()
     loss_epoch_total, losses_epoch_total = [], []
-    if alternate_steps is not None:
-        if not hasattr(model.mod, "current_state_alternate_steps"):
-            model.mod.current_state_alternate_steps = 0
+    if freeze_batchnorm:
+        model = turn_grads_off(model)
     with tqdm.tqdm(train_loader) as tq:
         for batch_g, y in tq:
             load_end_time = time.time()
