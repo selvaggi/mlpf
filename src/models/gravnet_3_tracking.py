@@ -406,7 +406,7 @@ class GravNetBlock(nn.Module):
             nn.Linear(self.d_shape, self.d_shape),  #! Dense 2
             nn.ELU(),
         )
-        self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
+        # self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
 
         # init_weights(self.output)
         # init_weights(self.post_gravnet)

@@ -130,7 +130,7 @@ def _main(args):
                 model,
                 device_ids=gpus,
                 output_device=local_rank,
-                find_unused_parameters=True,
+                # find_unused_parameters=True,
             )
 
         # optimizer & learning rate
