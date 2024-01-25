@@ -91,22 +91,22 @@ class GravnetModel(nn.Module):
         self.postgn_dense = nn.Sequential(*postgn_dense_modules)
 
         # Output block
-        self.output = nn.Sequential(
-            nn.Linear(64, 64),
-            self.act,
-            nn.Linear(64, 64),
-            self.act,
-            nn.Linear(64, 64),
-        )
+        # self.output = nn.Sequential(
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        # )
 
-        self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
-            nn.Linear(22, 64),
-            self.act,
-            nn.Linear(64, 64),
-            self.act,
-            nn.Linear(64, 22),
-            nn.Softmax(dim=-1),
-        )
+        # self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
+        #     nn.Linear(22, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 22),
+        #     nn.Softmax(dim=-1),
+        # )
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
