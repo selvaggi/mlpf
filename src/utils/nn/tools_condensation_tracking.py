@@ -32,17 +32,21 @@ def lst_nonzero(x):
 
 
 def turn_grads_off(model):
-    list_grads_to_turn_off = [
-        "mod.ScaledGooeyBatchNorm2_1.weight",
-        "mod.ScaledGooeyBatchNorm2_1.bias",
-        "mod.ScaledGooeyBatchNorm2.weight",
-        "mod.ScaledGooeyBatchNorm2.bias",
-    ]
+    # list_grads_to_turn_off = [
+    #     "mod.ScaledGooeyBatchNorm2_1.weight",
+    #     "mod.ScaledGooeyBatchNorm2_1.bias",
+    #     "mod.ScaledGooeyBatchNorm2.weight",
+    #     "mod.ScaledGooeyBatchNorm2.bias",
+    # ]
 
-    for name, param in model.named_parameters():
-        for i in list_grads_to_turn_off:
-            if name == i:
-                param.requires_grad = False
+    # for name, param in model.named_parameters():
+    #     for i in list_grads_to_turn_off:
+    #         if name == i:
+    #             param.requires_grad = False
+    # print("turning mom off")
+    model.mod.ScaledGooeyBatchNorm2_1.momentum = 0
+    model.mod.ScaledGooeyBatchNorm2_2.momentum = 0
+    # print(model.mod.ScaledGooeyBatchNorm2_2.running_mean)
     return model
 
 
@@ -114,6 +118,7 @@ def train_regression(
             with torch.cuda.amp.autocast(enabled=grad_scaler is not None):
                 batch_g = batch_g.to(dev)
                 calc_e_frac_loss = (num_batches % 250) == 0
+                # print("running mean", model.mod.ScaledGooeyBatchNorm2_2.running_mean)
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
@@ -327,6 +332,9 @@ def evaluate_regression(
                 label = y
                 num_examples = label.shape[0]
                 label = label.to(dev)
+                # print(
+                # #     "running mean val", model.mod.ScaledGooeyBatchNorm2_2.running_mean
+                # # )
                 if args.loss_regularization:
                     model_output, loss_regularizing_neig, loss_ll = model(batch_g)
                 else:
