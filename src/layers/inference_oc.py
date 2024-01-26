@@ -99,12 +99,12 @@ def create_and_store_graph_output(
                 tracks=tracks,
             )
 
-        # if len(shower_p_unique) < len(particle_ids) - 3:
+        # if len(shower_p_unique_hdb) < len(particle_ids):
         # print("storing  event", local_rank, step, i)
         # torch.save(
         #     dic,
         #     path_save
-        #     + "/graphs_all/"
+        #     + "/graphs_all_debug/"
         #     + str(local_rank)
         #     + "_"
         #     + str(step)

@@ -291,14 +291,14 @@ class GravnetModel(L.LightningModule):
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
 
-                df_showers = pd.concat(df_showers)
-                df_showers_pandora = pd.concat(df_showers_pandora)
-                df_showes_db = pd.concat(df_showes_db)
+                self.df_showers = pd.concat(self.df_showers)
+                self.df_showers_pandora = pd.concat(self.df_showers_pandora)
+                self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
                     path_save=self.args.model_prefix + "showers_df_evaluation",
-                    df_batch=df_showers,
-                    df_batch_pandora=df_showers_pandora,
-                    df_batch1=df_showes_db,
+                    df_batch=self.df_showers,
+                    df_batch_pandora=self.df_showers_pandora,
+                    df_batch1=self.df_showes_db,
                     step=0,
                     predict=True,
                 )

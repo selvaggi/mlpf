@@ -33,6 +33,7 @@ from src.utils.import_tools import import_module
 import wandb
 from src.utils.logger_wandb import log_wandb_init
 from lightning.pytorch.callbacks import TQDMProgressBar, ModelCheckpoint
+from lightning.pytorch.profilers import AdvancedProfiler
 
 
 def get_samples_steps_per_epoch(args):
@@ -106,13 +107,12 @@ def main():
 
     model = model_setup(args, data_config)
 
+    wandb_logger = WandbLogger(project=args.wandb_projectname, entity=args.wandb_entity)
     if training_mode:
 
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
-        wandb_logger = WandbLogger(
-            project=args.wandb_projectname, entity=args.wandb_entity
-        )
+
         if args.load_model_weights is not None:
             model = model.load_from_checkpoint(args.load_model_weights)
         accelerator, devices = get_gpu_dev(args)
@@ -126,13 +126,19 @@ def main():
             save_top_k=-1,  # <--- this is important!
         )
         # if accelerator != 0:
+
+        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
         trainer = L.Trainer(
-            callbacks=[TQDMProgressBar(refresh_rate=1), checkpoint_callback],
+            callbacks=[TQDMProgressBar(refresh_rate=10), checkpoint_callback],
             accelerator=accelerator,
-            devices=devices,
+            devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
+            # profiler=profiler,
+            max_epochs=100,
+            accumulate_grad_batches=2,
         )
+
         trainer.fit(
             model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
         )
@@ -140,14 +146,21 @@ def main():
         # TODO save checkpoints and hyperparameters
         # TODO use accumulate_grad_batches=7
 
-    # if test:
-    #     test_loader =
-    #     # initialize the Trainer
-    #     trainer = Trainer()
-    #     model =
-    #     model.eval()
-    #     # test the model
-    #     trainer.test(model, dataloaders=test_loader)
+    if args.data_test:
+        trainer = L.Trainer(
+            callbacks=[TQDMProgressBar(refresh_rate=1)],
+            accelerator="gpu",
+            devices=[0],
+            default_root_dir=args.model_prefix,
+            logger=wandb_logger,
+        )
+        for name, get_test_loader in test_loaders.items():
+            test_loader = get_test_loader()
+            trainer.validate(
+                model=model,
+                ckpt_path=args.load_model_weights,
+                dataloaders=test_loader,
+            )
 
 
 if __name__ == "__main__":
