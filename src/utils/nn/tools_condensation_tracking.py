@@ -43,9 +43,8 @@ def turn_grads_off(model):
     #     for i in list_grads_to_turn_off:
     #         if name == i:
     #             param.requires_grad = False
-    # print("turning mom off")
-    model.mod.ScaledGooeyBatchNorm2_1.momentum = 0
-    model.mod.ScaledGooeyBatchNorm2_2.momentum = 0
+    model.module.mod.ScaledGooeyBatchNorm2_1.momentum = 0
+    model.module.mod.ScaledGooeyBatchNorm2_2.momentum = 0
     # print(model.mod.ScaledGooeyBatchNorm2_2.running_mean)
     return model
 
