@@ -174,7 +174,7 @@ def create_and_store_graph_output(
             local_rank,
             step,
             epoch,
-            predict=False,
+            predict=True,
         )
     if predict:
         return df_batch, df_batch_pandora, df_batch1
@@ -549,7 +549,7 @@ def match_showers(
                 image_path = path_save + "/example_1_clustering_pandora.png"
             else:
                 image_path = path_save + "/example_1_clustering.png"
-            plot_iou_matrix(iou_matrix, image_path, hdbscan)
+            # plot_iou_matrix(iou_matrix, image_path, hdbscan)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
     return shower_p_unique, row_ind, col_ind, i_m_w
 

@@ -268,7 +268,7 @@ class GravnetModel(L.LightningModule):
                 batch_idx,
                 0,
                 path_save=self.args.model_prefix + "showers_df_evaluation",
-                store=False,
+                store=True,
                 predict=True,
                 tracks=self.args.tracks,
             )
@@ -277,9 +277,12 @@ class GravnetModel(L.LightningModule):
             self.df_showes_db.append(df_batch1)
 
     def on_train_epoch_end(self):
-        self.make_mom_zero()
+
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
+
+    def on_train_epoch_start(self):
+        self.make_mom_zero()
 
     def on_validation_epoch_start(self):
         self.make_mom_zero()
