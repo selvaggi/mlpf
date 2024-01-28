@@ -221,7 +221,7 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        loss = loss  #+ 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
 
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
@@ -254,7 +254,7 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        loss = loss #+ 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, val=True)
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
