@@ -298,7 +298,7 @@ def evaluate_regression(
                         step,
                         epoch,
                         path_save=args.model_prefix + "showers_df_evaluation",
-                        store=False,
+                        store=True,
                         predict=True,
                         tracks=args.tracks,
                     )

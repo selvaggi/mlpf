@@ -170,7 +170,7 @@ def create_and_store_graph_output(
             path_save,
             df_batch,
             df_batch1,
-            df_list_pandora,
+            df_batch_pandora,
             local_rank,
             step,
             epoch,
