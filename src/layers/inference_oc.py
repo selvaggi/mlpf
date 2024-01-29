@@ -174,7 +174,7 @@ def create_and_store_graph_output(
             local_rank,
             step,
             epoch,
-            predict=True,
+            predict=predict,
         )
     if predict:
         return df_batch, df_batch_pandora, df_batch1
