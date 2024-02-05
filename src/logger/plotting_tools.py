@@ -12,7 +12,7 @@ def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
         outdir = outdir + "/figures"
     name = path
     graphs = dgl.unbatch(g)
-    for i in range(0, 2):
+    for i in range(0, 1):
         graph_i = graphs[i]
         if path == "input_coords":
             coords = graph_i.ndata["original_coords"]

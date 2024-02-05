@@ -24,7 +24,7 @@ def plot_for_jan(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
             dict_1["variance_om"],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
+            label="HDBSCAN",
             s=70,
         )
     if dic2:
@@ -67,35 +67,37 @@ def plot_for_jan(neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list)
         )
 
 
-def plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_eff(ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start):
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_eff"],
-            dict_1["eff"],
+            dict_1["energy_eff"][idx_start:],
+            dict_1["eff"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            marker="o",
+            label="HDBSCAN",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_eff"],
-            dict_2["eff"],
+            dict_2["energy_eff"][idx_start:],
+            dict_2["eff"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_eff"],
-            dict_3["eff"],
+            dict_3["energy_eff"][idx_start:],
+            dict_3["eff"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
             s=70,
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        # ax[i, j].axvline(x=0.5, color="b")
     if log_scale:
         ax[i, j].set_xlabel("Log True Energy [GeV]")
         ax[i, j].set_xscale("log")
@@ -107,35 +109,40 @@ def plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_fakes(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
+
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_fakes"],
-            dict_1["fake_rate"],
+            dict_1["energy_fakes"][idx_start:],
+            dict_1["fake_rate"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            label="HDBSCAN",
+            marker="o",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_fakes"],
-            dict_2["fake_rate"],
+            dict_2["energy_fakes"][idx_start:],
+            dict_2["fake_rate"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_fakes"],
-            dict_3["fake_rate"],
+            dict_3["energy_fakes"][idx_start:],
+            dict_3["fake_rate"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
             s=70,
             marker="^",
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
     if log_scale:
         ax[i, j].set_xlabel("Log Reconstructed Energy [GeV]")
         ax[i, j].set_xscale("log")
@@ -148,29 +155,33 @@ def plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_response(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     # Energy resolution is parametrized
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_resolutions_reco"],
-            dict_1["mean_true_rec"],
+            dict_1["energy_resolutions_reco"][idx_start:],
+            dict_1["mean_true_rec"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            marker="o",
+            label="HDBSCAN",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_resolutions_reco"],
-            dict_2["mean_true_rec"],
+            dict_2["energy_resolutions_reco"][idx_start:],
+            dict_2["mean_true_rec"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_resolutions_reco"],
-            dict_3["mean_true_rec"],
+            dict_3["energy_resolutions_reco"][idx_start:],
+            dict_3["mean_true_rec"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
@@ -189,14 +200,14 @@ def plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
 
 
 def plot_fit_energy_resolution(
-    ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j, reco=False
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, reco=False
 ):
     if reco:
-        energies = np.array(dict_2["energy_resolutions_reco"])
-        errors = np.array(dict_2["variance_om_true_rec"])
+        energies = np.array(dict_1["energy_resolutions_reco"])
+        errors = np.array(dict_1["variance_om_true_rec"])
     else:
-        energies = np.array(dict_2["energy_resolutions"])
-        errors = np.array(dict_2["variance_om"])
+        energies = np.array(dict_1["energy_resolutions"])
+        errors = np.array(dict_1["variance_om"])
     mask = (energies > 1.0) * (errors < 0.38)
     energies = energies[mask]
     errors = errors[mask]
@@ -236,35 +247,39 @@ def resolution(E, a, b, c):
     return (a**2 / E + c**2 + b**2 / E**2) ** 0.5
 
 
-def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_resolution(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_resolutions_reco"],
-            dict_1["variance_om_true_rec"],
+            dict_1["energy_resolutions_reco"][idx_start:],
+            dict_1["variance_om_true_rec"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            label="HDBSCAN",
+            marker="o",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_resolutions_reco"],
-            dict_2["variance_om_true_rec"],
+            dict_2["energy_resolutions_reco"][idx_start:],
+            dict_2["variance_om_true_rec"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_resolutions_reco"],
-            dict_3["variance_om_true_rec"],
+            dict_3["energy_resolutions_reco"][idx_start:],
+            dict_3["variance_om_true_rec"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
             s=70,
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
     if log_scale:
         ax[i, j].set_xlabel("Log Reco Energy [GeV]")
         ax[i, j].set_xscale("log")
@@ -278,35 +293,39 @@ def plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_response_trueE(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_resolutions"],
-            dict_1["mean"],
+            dict_1["energy_resolutions"][idx_start:],
+            dict_1["mean"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            label="HDBSCAN",
+            marker="o",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_resolutions"],
-            dict_2["mean"],
+            dict_2["energy_resolutions"][idx_start:],
+            dict_2["mean"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_resolutions"],
-            dict_3["mean"],
+            dict_3["energy_resolutions"][idx_start:],
+            dict_3["mean"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
             s=70,
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
     if log_scale:
         ax[i, j].set_xlabel("Log True Energy [GeV]")
         ax[i, j].set_xscale("log")
@@ -320,35 +339,39 @@ def plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j)
     return ax
 
 
-def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_resolution_trueE(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     if dic1:
         ax[i, j].scatter(
-            dict_1["energy_resolutions"],
-            dict_1["variance_om"],
+            dict_1["energy_resolutions"][idx_start:],
+            dict_1["variance_om"][idx_start:],
             facecolors=colors_list[0],
             edgecolors=colors_list[0],
-            label="Hgcal",
-            s=70,
+            label="HDBSCAN",
+            marker="o",
+            s=80,
         )
     if dic2:
         ax[i, j].scatter(
-            dict_2["energy_resolutions"],
-            dict_2["variance_om"],
+            dict_2["energy_resolutions"][idx_start:],
+            dict_2["variance_om"][idx_start:],
             facecolors=colors_list[1],
             edgecolors=colors_list[1],
             label="GNN",
             s=70,
         )
+    if dic3:
         ax[i, j].scatter(
-            dict_3["energy_resolutions"],
-            dict_3["variance_om"],
+            dict_3["energy_resolutions"][idx_start:],
+            dict_3["variance_om"][idx_start:],
             facecolors=colors_list[2],
             edgecolors=colors_list[2],
             label="Pandora",
             marker="^",
             s=70,
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
     if log_scale:
         ax[i, j].set_xlabel("Log True Energy [GeV]")
         ax[i, j].set_xscale("log")
@@ -362,12 +385,14 @@ def plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, 
     return ax
 
 
-def plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_containment(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     if dic1:
         ax[i, j].errorbar(
-            np.array(dict_1["energy_ms"]),
-            np.array(dict_1["fce_energy"]),
-            np.array(dict_1["fce_var_energy"]),
+            np.array(dict_1["energy_ms"])[idx_start:],
+            np.array(dict_1["fce_energy"])[idx_start:],
+            np.array(dict_1["fce_var_energy"])[idx_start:],
             marker="o",
             mec=colors_list[0],
             mfc=colors_list[0],
@@ -378,9 +403,9 @@ def plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
         )
     if dic2:
         ax[i, j].errorbar(
-            np.array(dict_2["energy_ms"]),
-            np.array(dict_2["fce_energy"]),
-            np.array(dict_2["fce_var_energy"]),
+            np.array(dict_2["energy_ms"])[idx_start:],
+            np.array(dict_2["fce_energy"])[idx_start:],
+            np.array(dict_2["fce_var_energy"])[idx_start:],
             marker=".",
             mfc=colors_list[1],
             mec=colors_list[1],
@@ -389,11 +414,12 @@ def plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
             mew=4,
             linestyle="",
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if dic3:
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
         ax[i, j].errorbar(
-            np.array(dict_3["energy_ms"]),
-            np.array(dict_3["fce_energy"]),
-            np.array(dict_3["fce_var_energy"]),
+            np.array(dict_3["energy_ms"])[idx_start:],
+            np.array(dict_3["fce_energy"])[idx_start:],
+            np.array(dict_3["fce_var_energy"])[idx_start:],
             marker="^",
             mfc=colors_list[2],
             mec=colors_list[2],
@@ -413,13 +439,15 @@ def plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
     return ax
 
 
-def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
+def plot_purity(
+    ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, i, j, idx_start
+):
     if dic1:
         ax[i, j].errorbar(
-            np.array(dict_1["energy_ms"]),
-            np.array(dict_1["purity_energy"]),
-            np.array(dict_1["purity_var_energy"]),
-            marker=".",
+            np.array(dict_1["energy_ms"])[idx_start:],
+            np.array(dict_1["purity_energy"])[idx_start:],
+            np.array(dict_1["purity_var_energy"])[idx_start:],
+            marker="o",
             mec=colors_list[0],
             mfc=colors_list[0],
             ecolor=colors_list[0],
@@ -429,9 +457,9 @@ def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
         )
     if dic2:
         ax[i, j].errorbar(
-            np.array(dict_2["energy_ms"]),
-            np.array(dict_2["purity_energy"]),
-            np.array(dict_2["purity_var_energy"]),
+            np.array(dict_2["energy_ms"])[idx_start:],
+            np.array(dict_2["purity_energy"])[idx_start:],
+            np.array(dict_2["purity_var_energy"])[idx_start:],
             marker=".",
             mec=colors_list[1],
             mfc=colors_list[1],
@@ -440,11 +468,12 @@ def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
             mew=4,
             linestyle="",
         )
-        ax[i, j].axvline(x=0.5, color="b", label="axvline")
+    if dic3:
+        # ax[i, j].axvline(x=0.5, color="b", label="axvline")
         ax[i, j].errorbar(
-            np.array(dict_3["energy_ms"]),
-            np.array(dict_3["purity_energy"]),
-            np.array(dict_3["purity_var_energy"]),
+            np.array(dict_3["energy_ms"])[idx_start:],
+            np.array(dict_3["purity_energy"])[idx_start:],
+            np.array(dict_3["purity_var_energy"])[idx_start:],
             marker="^",
             mec=colors_list[2],
             mfc=colors_list[2],
@@ -467,61 +496,96 @@ def plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, i, j):
 
 
 def plot_metrics(
-    neutrals_only, dic1, dic2, dict_1, dict_2, dict_3, colors_list, PATH_store
+    neutrals_only,
+    dic1,
+    dic2,
+    dic3,
+    dict_1,
+    dict_2,
+    dict_3,
+    colors_list,
+    PATH_store,
+    log_scale,
 ):
     marker_size = 15
-    log_scale = True
+    idx_start = 5
     fig, ax = plt.subplots(4, 4, figsize=(9 * 4, 8 * 4))
     # efficiency plot
-    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 0, 0)
-    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 0, 2)
+    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 0, 0, idx_start)
+    ax = plot_eff(ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 0, 2, idx_start)
 
     # fake rates
-    ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 0, 1)
-    ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 0, 3)
+    ax = plot_fakes(ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 0, 1, idx_start)
+    ax = plot_fakes(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 0, 3, idx_start
+    )
 
     # response
-    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 0)
-    ax = plot_response(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 2)
+    ax = plot_response(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 1, 0, idx_start
+    )
+    ax = plot_response(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 1, 2, idx_start
+    )
 
     # resolution
-    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 1, 1)
-    ax = plot_resolution(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 1, 3)
-    ax = plot_fit_energy_resolution(
-        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 1, 1, reco=True
+    ax = plot_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 1, 1, idx_start
     )
-    ax = plot_fit_energy_resolution(
-        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 1, 3, reco=True
+    ax = plot_resolution(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 1, 3, idx_start
     )
+    # ax = plot_fit_energy_resolution(
+    #     ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, 1, 1, reco=True
+    # )
+    # ax = plot_fit_energy_resolution(
+    #     ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, 1, 3, reco=True
+    # )
 
     # response true_e
-    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 0)
-    ax = plot_response_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 2)
+    ax = plot_response_trueE(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 2, 0, idx_start
+    )
+    ax = plot_response_trueE(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 2, 2, idx_start
+    )
 
     # resolution true_e
-    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 2, 1)
-    ax = plot_resolution_trueE(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 2, 3)
-    ax = plot_fit_energy_resolution(
-        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 2, 1, reco=False
+    ax = plot_resolution_trueE(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 2, 1, idx_start
     )
-    ax = plot_fit_energy_resolution(
-        ax, dic1, dict_1, dic2, dict_2, dict_3, log_scale, 2, 3, reco=False
+    ax = plot_resolution_trueE(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 2, 3, idx_start
+    )
+    # ax = plot_fit_energy_resolution(
+    #     ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, 2, 1, reco=False
+    # )
+    # ax = plot_fit_energy_resolution(
+    #     ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, log_scale, 2, 3, reco=False
+    # )
+    # containment
+    ax = plot_containment(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 3, 0, idx_start
+    )
+    ax = plot_containment(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 3, 2, idx_start
     )
     # containment
-    ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 3, 0)
-    ax = plot_containment(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 3, 2)
-    # containment
-    ax = plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, True, 3, 1)
-    ax = plot_purity(ax, dic1, dict_1, dic2, dict_2, dict_3, False, 3, 3)
+    ax = plot_purity(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, True, 3, 1, idx_start
+    )
+    ax = plot_purity(
+        ax, dic1, dict_1, dic2, dict_2, dic3, dict_3, False, 3, 3, idx_start
+    )
 
     if neutrals_only:
         fig.savefig(
-            PATH_store + "testeq_rec_comp_MVP_68_calibrated_neutrals.png",
+            PATH_store + "testeq_rec_comp_MVP_68_calibrated_neutrals_compare_to_V8.png",
             bbox_inches="tight",
         )
     else:
         fig.savefig(
-            PATH_store + "testeq_rec_comp_MVP_68_calibrated.png",
+            PATH_store + "testeq_rec_comp_MVP_68_calibrated_compare_to_V8.png",
             bbox_inches="tight",
         )
 
@@ -529,8 +593,10 @@ def plot_metrics(
 def plot_histograms_energy(
     dic1, dic2, dict_1, dict_2, dict_3, neutrals_only=False, PATH_store=None
 ):
+    dict_2 = dict_1
     bins_plot_histogram = [5, 6, 10, 20]
     bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    bins = np.arange(0, 51, 2)
     fig, ax = plt.subplots(4, 2, figsize=(18, 25))
 
     for i in range(0, 4):

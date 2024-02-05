@@ -51,7 +51,7 @@ event_number, n_hit, n_part, dic, t = initialize(t)
 event_number[0] = 0
 for i, event in enumerate(reader.get("events")):
     if debug:
-        if i > 100:
+        if i > 2:
             break
     number_of_hist_with_no_genlinks = 0
 
@@ -87,7 +87,14 @@ for i, event in enumerate(reader.get("events")):
 
     n_hit[0] = 0
     n_hit, dic, number_of_hist_with_no_genlinks = store_tracks(
-        event, debug, dic, genpart_indexes, n_hit, number_of_hist_with_no_genlinks, CLIC
+        event,
+        debug,
+        dic,
+        genpart_indexes,
+        n_hit,
+        number_of_hist_with_no_genlinks,
+        store_pandora_hits,
+        CLIC,
     )
 
     (

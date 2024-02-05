@@ -168,13 +168,13 @@ class GravnetModel(nn.Module):
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if step_count % 100 == 0:
-            PlotCoordinates(
-                g,
-                path="final_clustering",
-                outdir=self.args.model_prefix,
-                predict=self.args.predict,
-            )
+        # if step_count % 100 == 0:
+        #     PlotCoordinates(
+        #         g,
+        #         path="final_clustering",
+        #         outdir=self.args.model_prefix,
+        #         predict=self.args.predict,
+        #     )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
         assert x.device == device

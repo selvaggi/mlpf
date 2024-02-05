@@ -20,15 +20,24 @@ from src.layers.object_cond import (
     get_clustering,
     calc_LV_Lbeta_inference,
 )
+from src.layers.GravNetConv3 import knn_per_graph
 from src.layers.obj_cond_inf import calc_energy_loss
+from src.logger.plotting_tools import PlotCoordinates
 
 
 class GraphTransformerNet(nn.Module):
-    def __init__(self, dev):
+    def __init__(
+        self,
+        args,
+        dev,
+        output_dim=4,
+        input_dim=9,
+        n_postgn_dense_blocks=0,
+        clust_space_norm="none",
+    ):
         super().__init__()
 
         in_dim_node = 9  # node_dim (feat is an integer)
-        self.clust_space_norm = "twonorm"
         hidden_dim = 80  # before 80
         out_dim = 80
         n_classes = 4
@@ -48,9 +57,10 @@ class GraphTransformerNet(nn.Module):
         max_wl_role_index = 100
         self.readout = "sum"
         self.output_dim = n_classes
-
+        self.args = args
+        self.batchnorm1 = nn.BatchNorm1d(in_dim_node, momentum=0.01)
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
-        self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
+        # self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
 
         self.layers = nn.ModuleList(
@@ -78,8 +88,9 @@ class GraphTransformerNet(nn.Module):
                 self.residual,
             )
         )
-        self.MLP_layer = MLPReadout(out_dim, 4)
-
+        self.MLP_layer = MLPReadout(out_dim, 64)
+        self.clustering = nn.Linear(64, 4 - 1, bias=False)
+        self.beta = nn.Linear(64, 1)
         self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
             nn.Linear(22, 64),
             nn.ReLU(),
@@ -89,145 +100,36 @@ class GraphTransformerNet(nn.Module):
             nn.Softmax(dim=-1),
         )
 
-    def forward(self, g_batch):
+    def forward(self, g_batch, step_count):
         g = g_batch
-
+        original_coords = g.ndata["h"][:, 0:3]
+        g.ndata["original_coords"] = original_coords
+        if step_count % 100:
+            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
         ############################## Embeddings #############################################
         h = g.ndata["h"]
         # input embedding
+        h = self.batchnorm1(h)
         h = self.embedding_h(h)
         h = self.in_feat_dropout(h)
 
         # GraphTransformer Layers
+        gu = knn_per_graph(g, original_coords, 8)
+        gu.ndata["h"] = h
         for conv in self.layers:
-            h = conv(g, h)
-
-        return self.MLP_layer(h)
-
-    def object_condensation_loss2(
-        self,
-        batch,
-        pred,
-        y,
-        return_resolution=False,
-        clust_loss_only=False,
-        add_energy_loss=False,
-        calc_e_frac_loss=False,
-        q_min=0.1,
-        frac_clustering_loss=0.1,
-        attr_weight=1.0,
-        repul_weight=1.0,
-        fill_loss_weight=1.0,
-    ):
-        """
-
-        :param batch:
-        :param pred:
-        :param y:
-        :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
-        :param clust_loss_only: If True, it will only add the clustering terms to the loss
-        :return:
-        """
-        _, S = pred.shape
-        if clust_loss_only:
-            clust_space_dim = self.output_dim - 1
-        else:
-            clust_space_dim = self.output_dim - 28
-
-        # xj = torch.nn.functional.normalize(
-        #     pred[:, 0:clust_space_dim], dim=1
-        # )  # 0, 1, 2: cluster space coords
-
-        bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-
-        xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
-        if self.clust_space_norm == "twonorm":
-            xj = torch.nn.functional.normalize(
-                xj, dim=1
-            )  # 0, 1, 2: cluster space coords
-        elif self.clust_space_norm == "tanh":
-            xj = torch.tanh(xj)
-        elif self.clust_space_norm == "none":
-            pass
-        else:
-            raise NotImplementedError
-        if clust_loss_only:
-            distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
-            energy_correction = torch.zeros_like(bj)
-            momentum = torch.zeros_like(bj)
-            pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
-                momentum.device
+            h = conv(gu, h)
+        x = self.MLP_layer(h)
+        x_cluster_coord = self.clustering(x)
+        beta = self.beta(x)
+        g.ndata["final_cluster"] = x_cluster_coord
+        g.ndata["beta"] = beta.view(-1)
+        if step_count % 100:
+            PlotCoordinates(
+                g,
+                path="final_clustering",
+                outdir=self.args.model_prefix,
+                predict=self.args.predict,
             )
-        else:
-            distance_threshold = torch.reshape(
-                pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
-            )  # 4, 5, 6: distance thresholds
-            energy_correction = torch.nn.functional.relu(
-                torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
-            )  # 7: energy correction factor
-            momentum = torch.nn.functional.relu(
-                torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
-            )
-            pid_predicted = pred[
-                :, 5 + clust_space_dim : 27 + clust_space_dim
-            ]  # 8:30: predicted particle one-hot encoding
-        dev = batch.device
-        clustering_index_l = batch.ndata["particle_number"]
-
-        len_batch = len(batch.batch_num_nodes())
-        batch_numbers = torch.repeat_interleave(
-            torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
-        ).to(dev)
-
-        a = calc_LV_Lbeta(
-            original_coords,
-            batch,
-            y,
-            distance_threshold,
-            energy_correction,
-            momentum=momentum,
-            predicted_pid=pid_predicted,
-            beta=bj.view(-1),
-            cluster_space_coords=xj,  # Predicted by model
-            cluster_index_per_event=clustering_index_l.view(
-                -1
-            ).long(),  # Truth hit->cluster index
-            batch=batch_numbers.long(),
-            qmin=q_min,
-            return_regression_resolution=return_resolution,
-            post_pid_pool_module=self.post_pid_pool_module,
-            clust_space_dim=clust_space_dim,
-            frac_combinations=frac_clustering_loss,
-            attr_weight=attr_weight,
-            repul_weight=repul_weight,
-            fill_loss_weight=fill_loss_weight,
-        )
-        if return_resolution:
-            return a
-        if clust_loss_only:
-            loss = a[0] + a[1]
-            if calc_e_frac_loss:
-                loss_E_frac, loss_E_frac_true = calc_energy_loss(
-                    batch, xj, bj.view(-1), qmin=q_min
-                )
-            if add_energy_loss:
-                loss += a[2]  # TODO add weight as argument
-
-        else:
-            loss = (
-                a[0]
-                + a[1]
-                + 20 * a[2]
-                + 0.001 * a[3]
-                + 0.001 * a[4]
-                + 0.001
-                * a[
-                    5
-                ]  # TODO: the last term is the PID classification loss, explore this yet
-            )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
-        if clust_loss_only:
-            if calc_e_frac_loss:
-                return loss, a, loss_E_frac, loss_E_frac_true
-            else:
-                return loss, a, 0, 0
-        return loss, a, 0, 0
+        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
+        pred_energy_corr = torch.ones_like(x[:, 0].view(-1, 1))
+        return x, pred_energy_corr, torch.Tensor([0]).to(x.device)

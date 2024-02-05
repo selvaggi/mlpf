@@ -369,6 +369,17 @@ def evaluate_regression(
 
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
+                evaluate_efficiency_tracks(
+                    batch_g,
+                    model_output,
+                    y,
+                    local_rank,
+                    step,
+                    epoch,
+                    path_save=args.model_prefix + "showers_df_evaluation",
+                    store=True,
+                    predict=False,
+                )
                 # if args.predict:
                 #     df_batch, df_batch_pandora = create_and_store_graph_output(
                 #         batch_g,

@@ -15,15 +15,15 @@ mchp = 0.139570
 
 def omega_to_pt(omega, isclic):
     if isclic:
-        Bz =Bz_clic
+        Bz = Bz_clic
     else:
         Bz = Bz_cld
     a = c_light * 1e3 * 1e-15
     return a * Bz / abs(omega)
 
 
-def track_momentum(trackstate,isclic=True):
-    pt = omega_to_pt(trackstate.omega,isclic)
+def track_momentum(trackstate, isclic=True):
+    pt = omega_to_pt(trackstate.omega, isclic)
     phi = trackstate.phi
     pz = trackstate.tanLambda * pt
     px = pt * math.cos(phi)
@@ -72,16 +72,21 @@ def find_pandora_cluster_of_hit(hit_index, hit_collection, cluster_collection):
     return pandora_cluster_index, cluster_energy_found
 
 
-def check_pandora_pfos(pfo_collection):
-    for index, pfo in enumerate(pfo_collection):
-        print(dir(pfo))
-        clusters = pfo.getClusters()
-        for cluster in clusters:
-            print("clusters", dir(cluster))
-            print("id", cluster.getObjectID().index)
-            cluster_energy = cluster.getEnergy()
-            print("cluster energy", cluster_energy)
-        break
+# def check_pandora_pfos(event):
+#     pandora_pfo = "PandoraPFOs"
+#     pandora_pfos_event = event.get(pandora_pfo)
+#     for index, pfo in enumerate(pandora_pfos_event):
+#         clusters_pfo = pfo.getClusters()
+#         for index_c, cluster in enumerate(clusters_pfo):
+#             cluster_hits = cluster.getHits()
+#             for index_h, hit in enumerate(cluster_hits):
+#         # clusters = pfo.getClusters()
+#         # for cluster in clusters:
+#         #     print("clusters", dir(cluster))
+#         #     print("id", cluster.getObjectID().index)
+#         #     cluster_energy = cluster.getEnergy()
+#         #     print("cluster energy", cluster_energy)
+#         break
 
 
 def find_pandora_pfo_and_cluster_of_hit(
@@ -118,13 +123,15 @@ def find_pandora_pfo_and_cluster_of_hit(
                 break
         if pandora_cluster_index >= 0:
             break
+    # print("PFO", pfo_index, pfo_energy_found)
     return pandora_cluster_index, cluster_energy_found, pfo_energy_found, pfo_index
 
 
 def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
     pandora_cluster_index = -1
+    pandora_pfo_index = -1
+    pfo_energy_found = 0
     for index_pfo, pfo in enumerate(pfo_collection):
-        # print("index pfo ", index_pfo)
         tracks_pfo = pfo.getTracks()
         pfo_energy = pfo.getEnergy()
         for index_t, track in enumerate(tracks_pfo):
@@ -139,9 +146,10 @@ def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
             else:
                 pandora_pfo_index = -1
                 pfo_energy_found = 0
-        if pandora_cluster_index >= 0:
+        if pandora_pfo_index >= 0:
             break
-    return pandora_cluster_index, pfo_energy_found
+    # print(pandora_cluster_index, pfo_energy_found, pandora_pfo_index)
+    return pandora_cluster_index, pfo_energy_found, pandora_pfo_index
 
 
 def get_genparticle_parents(i, mcparts):
@@ -367,14 +375,15 @@ def gen_particles_find(event, debug):
     for j, part in enumerate(gen_part_coll):
         momentum = part.getMomentum()
         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
-        if j < 11 and j > 1:
-            e_pp[j] = p
-            total_e = total_e + p
+        if debug:
+            if j < 11 and j > 1:
+                e_pp[j] = p
+                total_e = total_e + p
         theta = math.acos(momentum.z / p)
         phi = math.atan2(momentum.y, momentum.x)
         if debug:
             print(
-                "all genparts: N: {}, PID: {}, Q: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, status: {}, parents: {}, daughters: {}".format(
+                "all genparts: N: {}, PID: {}, Q: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, status: {}, parents: {}, daughters: {}, decayed_traacker: {}".format(
                     j,
                     part.getPDG(),
                     part.getCharge(),
@@ -396,6 +405,7 @@ def gen_particles_find(event, debug):
                         j,
                         gen_part_coll,
                     ),
+                    part.isDecayedInTracker() * 1,
                 )
             )
 
@@ -482,7 +492,6 @@ def store_gen_particles(
         #    continue
         momentum = part.getMomentum()
         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
-
         theta = math.acos(momentum.z / p)
         phi = math.atan2(momentum.y, momentum.x)
         # print(dic["part_p"])
@@ -586,8 +595,13 @@ def store_tracks(
             # gen_track_link_weight,
             genpart_indexes,
         )
+        # print("store_pandora_hits", store_pandora_hits)
         if store_pandora_hits == "True":
-            pandora_index, pandora_pfo_energy = find_pandora_pfo_track(
+            (
+                pandora_index,
+                pandora_pfo_energy,
+                pandora_index_pfo,
+            ) = find_pandora_pfo_track(
                 track.getObjectID().index,
                 track.getObjectID().collectionID,
                 pandora_pfos_event,
@@ -616,11 +630,15 @@ def store_tracks(
 
         if len(gen_indices) > 0:
             dic["hit_genlink0"].push_back(gen_indices[0])
-        if len(gen_indices) > 1:
-            dic["hit_genlink1"].push_back(gen_indices[1])
+
+        if store_pandora_hits == "True":
+            dic["hit_genlink1"].push_back(pandora_index_pfo)
+        else:
+            if len(gen_indices) > 1:
+                dic["hit_genlink1"].push_back(gen_indices[1])
         if store_pandora_hits == "True":
             # print("storing calo hit")
-            dic["hit_genlink2"].push_back(pandora_index)
+            dic["hit_genlink2"].push_back(pandora_index_pfo)
 
         else:
             if len(gen_indices) > 2:
@@ -657,7 +675,7 @@ def store_tracks(
         dic["hit_z"].push_back(z)
         dic["hit_t"].push_back(trackstate.time)
 
-        track_mom = track_momentum(trackstate)
+        track_mom = track_momentum(trackstate, isclic=isclic)
 
         dic["hit_p"].push_back(track_mom[0])
         dic["hit_theta"].push_back(track_mom[1])
@@ -905,29 +923,29 @@ def store_calo_hits(
 
             # find_pandora_cluster_of_hit(j, hit_collection, pandora_clusters_event)
 
-            if debug:
-                total_calohit_e = total_calohit_e + calohit.getEnergy()
-                if list(link_vector)[0] < 11 and list(link_vector)[0] > 1:
-                    total_calohit_[list(link_vector)[0]] = (
-                        total_calohit_[list(link_vector)[0]] + calohit.getEnergy()
-                    )
-                total_calohit_pandora[pandora_cluster] = (
-                    total_calohit_pandora[pandora_cluster] + calohit.getEnergy()
-                )
+            # if debug:
+            #     total_calohit_e = total_calohit_e + calohit.getEnergy()
+            #     if list(link_vector)[0] < 11 and list(link_vector)[0] > 1:
+            #         total_calohit_[list(link_vector)[0]] = (
+            #             total_calohit_[list(link_vector)[0]] + calohit.getEnergy()
+            #         )
+            #     total_calohit_pandora[pandora_cluster] = (
+            #         total_calohit_pandora[pandora_cluster] + calohit.getEnergy()
+            #     )
 
-                # print(
-                #     "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-                #         htype,
-                #         n_hit[0],
-                #         calohit.energy,
-                #         x * 1e-03,
-                #         y * 1e-03,
-                #         R * 1e-03,
-                #         z * 1e-03,
-                #         r * 1e-03,
-                #         list(link_vector),
-                #     )
-                # )
+            # print(
+            #     "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+            #         htype,
+            #         n_hit[0],
+            #         calohit.energy,
+            #         x * 1e-03,
+            #         y * 1e-03,
+            #         R * 1e-03,
+            #         z * 1e-03,
+            #         r * 1e-03,
+            #         list(link_vector),
+            #     )
+            # )
 
             n_hit[0] += 1
 
@@ -938,5 +956,3 @@ def store_calo_hits(
         number_of_hist_with_no_genlinks,
         total_calohit_pandora,
     )
-
-

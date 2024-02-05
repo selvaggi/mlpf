@@ -33,7 +33,7 @@ class GravnetModel(nn.Module):
         clust_space_norm: str = "twonorm",
         k_gravnet: int = 7,
         activation: str = "elu",
-        weird_batchnom=True,
+        weird_batchnom=False,
     ):
 
         super(GravnetModel, self).__init__()

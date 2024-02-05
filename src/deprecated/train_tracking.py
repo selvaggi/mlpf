@@ -156,7 +156,7 @@ def _main(args):
             if args.energy_loss_delay > 0:
                 add_energy_loss = False
 
-        freeze_batchnorm = False  # TODO Turn off after test
+        freeze_batchnorm = True  # TODO Turn off after test
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
                 if epoch <= args.load_epoch:

@@ -32,7 +32,11 @@ from src.utils.train_utils import (
 from src.utils.import_tools import import_module
 import wandb
 from src.utils.logger_wandb import log_wandb_init
-from lightning.pytorch.callbacks import TQDMProgressBar, ModelCheckpoint
+from lightning.pytorch.callbacks import (
+    TQDMProgressBar,
+    ModelCheckpoint,
+    LearningRateMonitor,
+)
 from lightning.pytorch.profilers import AdvancedProfiler
 
 
@@ -128,8 +132,13 @@ def main():
         # if accelerator != 0:
 
         # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+        lr_monitor = LearningRateMonitor(logging_interval="epoch")
         trainer = L.Trainer(
-            callbacks=[TQDMProgressBar(refresh_rate=10), checkpoint_callback],
+            callbacks=[
+                TQDMProgressBar(refresh_rate=10),
+                checkpoint_callback,
+                lr_monitor,
+            ],
             accelerator=accelerator,
             devices=[0],
             default_root_dir=args.model_prefix,

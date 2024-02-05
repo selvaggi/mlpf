@@ -1,7 +1,10 @@
 import torch
 
 # from src.models.gravnet_3_tracking import GravnetModel
-from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
+# 0from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
+from src.models.point_transformer.point_transformer import (
+    PointTransformerOC as GravnetModel,
+)
 
 
 class GraphTransformerNetWrapper(torch.nn.Module):

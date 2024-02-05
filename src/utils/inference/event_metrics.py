@@ -64,10 +64,14 @@ def calculate_energy_per_event(
     while number_of_showers > counter_total + 20:
         sum_by = np.argmax(sd_pandora["number_batch"].values != counter_i)
         temp_sd = sd_pandora[0:sum_by]
+        mask = (temp_sd["pred_showers_E"] > 0.6) * (
+            np.isnan(temp_sd["true_showers_E"])
+        ) + (~np.isnan(temp_sd["true_showers_E"]))
+        temp_sd = temp_sd[mask]
         counter_total = counter_total + sum_by
         total_e_event = np.nansum(temp_sd["true_showers_E"].values)
         total_e_reco = np.nansum(temp_sd["reco_showers_E"].values)
-        total_e_ML_cali = np.nansum(temp_sd["pandora_calibrated_E"].values)
+        total_e_ML_cali = np.nansum(temp_sd["pandora_calibrated_pfo"].values)
         total_e_reco_ML = np.nansum(temp_sd["pred_showers_E"].values)
         calibrated_list_pandora.append(total_e_ML_cali / total_e_event)
         reco_list_pandora.append(total_e_reco_ML / total_e_reco)
@@ -82,36 +86,50 @@ def calculate_energy_per_event(
 def plot_per_event_energy_distribution(
     calibrated_list, calibrated_list_pandora, reco_list, reco_list_pandora, PATH_store
 ):
-    fig = plt.figure(figsize=(4, 4))
-    sns.histplot(data=calibrated_list, stat="percent", binwidth=0.01, label="MLPF")
+    fig = plt.figure(figsize=(8, 8))
+    sns.histplot(
+        data=np.array(calibrated_list) + 1 - np.mean(calibrated_list),
+        stat="percent",
+        binwidth=0.1,
+        label="MLPF",
+        element="step",
+        fill=False,
+        color="red",
+        linewidth=2,
+    )
     sns.histplot(
         data=calibrated_list_pandora,
         stat="percent",
-        color="orange",
-        binwidth=0.01,
+        color="blue",
+        binwidth=0.1,
         label="Pandora",
+        element="step",
+        fill=False,
+        linewidth=2,
     )
     plt.ylabel("Percent of events")
     plt.xlabel("$E_{corrected}/E_{total}$")
+    plt.yscale("log")
     plt.legend()
     plt.xlim([0, 2])
     fig.savefig(
         PATH_store + "per_event_E.png",
         bbox_inches="tight",
     )
-    fig = plt.figure(figsize=(4, 4))
-    sns.histplot(data=reco_list, stat="percent", binwidth=0.01, label="MLPF")
+    fig = plt.figure(figsize=(8, 8))
+    sns.histplot(data=reco_list, stat="percent", binwidth=0.05, label="MLPF")
     sns.histplot(
         data=reco_list_pandora,
         stat="percent",
         color="orange",
-        binwidth=0.01,
+        binwidth=0.05,
         label="Pandora",
     )
     plt.ylabel("Percent of events")
     plt.xlabel("$E_{recoML}/E_{reco}$")
     plt.legend()
     plt.xlim([0.5, 1.5])
+    plt.yscale("log")
     fig.savefig(
         PATH_store + "per_event_E_reco.png",
         bbox_inches="tight",

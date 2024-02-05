@@ -8,7 +8,7 @@ def calculate_eff(sd, log_scale=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins = np.arange(0, 51, 2)
+        bins = np.arange(0, 51, 5)
     eff = []
     energy_eff = []
     for i in range(len(bins) - 1):
@@ -76,7 +76,6 @@ def calculate_response(matched, pandora, log_scale=False):
     energy_resolutions = []
     energy_resolutions_reco = []
     dic_histograms = {}
-    print("total number of bins", len(bins))
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
@@ -97,7 +96,6 @@ def calculate_response(matched, pandora, log_scale=False):
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_rec = pred_e / true_rec
             if i in bins_plot_histogram:
-                print("storing bin index", i, bin_i)
                 dic_histograms[str(i) + "reco"] = e_over_rec
                 dic_histograms[str(i) + "reco_baseline"] = true_rec
                 dic_histograms[str(i) + "pred_corr_e"] = pred_e_corrected
@@ -113,7 +111,7 @@ def calculate_response(matched, pandora, log_scale=False):
             energy_resolutions_reco.append((bin_i1 + bin_i) / 2)
     # TODO change the pred_showers_E to the pandora calibrated E and the calibrated E for the model pandora_calibrated_E
     if pandora:
-        bins_per_binned_E = np.arange(0, 3, 0.05)
+        bins_per_binned_E = np.arange(0, 3, 0.005)
     else:
         bins_per_binned_E = np.arange(0, 3, 0.005)
     for i in range(len(bins) - 1):
@@ -133,7 +131,6 @@ def calculate_response(matched, pandora, log_scale=False):
             e_over_true = pred_e / true_e
             e_rec_over_true = true_rec / true_e
             if i in bins_plot_histogram:
-                print("storing bin index true", i, bin_i)
                 dic_histograms[str(i) + "true"] = e_over_true
                 dic_histograms[str(i) + "reco_showers"] = e_rec_over_true
             mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
@@ -142,7 +139,14 @@ def calculate_response(matched, pandora, log_scale=False):
 
             # mean_predtotrue = np.mean(e_over_true)
             # var_predtotrue = np.var(e_over_true) / mean_predtotrue
-
+            print(
+                "bin i ",
+                bins[i],
+                mean_predtotrue,
+                var_predtotrue,
+                np.mean(e_over_true),
+                np.var(e_over_true) / np.mean(e_over_true),
+            )
             mean.append(mean_predtotrue)
             variance_om.append(var_predtotrue)
             energy_resolutions.append((bin_i1 + bin_i) / 2)
