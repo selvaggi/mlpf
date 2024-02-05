@@ -205,6 +205,7 @@ class GravnetModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        print("running a validation step")
         self.validation_step_outputs = []
         y = batch[1]
 
@@ -270,7 +271,7 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_1.momentum = 0
             self.ScaledGooeyBatchNorm2_2.momentum = 0
             for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-                gravnet_block.batchnorm_gravnet1.momentum = 0
+                # gravnet_block.batchnorm_gravnet1.momentum = 0
                 gravnet_block.batchnorm_gravnet2.momentum = 0
                 gravnet_block.batchnorm_gravnet3.momentum = 0
 
@@ -292,23 +293,24 @@ class GravnetModel(L.LightningModule):
                     predict=True,
                 )
             else:
-                model_output = self.validation_step_outputs[0][0]
-                e_corr = self.validation_step_outputs[0][1]
-                batch_g = self.validation_step_outputs[0][2]
-                y = self.validation_step_outputs[0][3]
-                model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                create_and_store_graph_output(
-                    batch_g,
-                    model_output1,
-                    y,
-                    0,
-                    0,
-                    0,
-                    path_save=self.args.model_prefix + "showers_df_evaluation",
-                    store=True,
-                    predict=False,
-                    tracks=self.args.tracks,
-                )
+                if len(self.validation_step_outputs) > 0:
+                    model_output = self.validation_step_outputs[0][0]
+                    e_corr = self.validation_step_outputs[0][1]
+                    batch_g = self.validation_step_outputs[0][2]
+                    y = self.validation_step_outputs[0][3]
+                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                    create_and_store_graph_output(
+                        batch_g,
+                        model_output1,
+                        y,
+                        0,
+                        0,
+                        0,
+                        path_save=self.args.model_prefix + "showers_df_evaluation",
+                        store=True,
+                        predict=False,
+                        tracks=self.args.tracks,
+                    )
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -348,7 +350,7 @@ class GravNetBlock(nn.Module):
             propagate_dimensions,
             k,
             weird_batchnom,
-        ).jittable()
+        )
 
         self.post_gravnet = nn.Sequential(
             nn.Linear(out_channels, self.d_shape),

@@ -63,7 +63,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pandora_cluster_energy[~mask_hits],
         pfo_energy[~mask_hits],
         pandora_pfo_link[~mask_hits],
-        hit_type_feature[~mask_hits][hit_mask]
+        hit_type_feature[~mask_hits],
     ]
     hit_type = result[1].argmax(dim=1)
 
