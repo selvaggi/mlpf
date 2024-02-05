@@ -14,13 +14,11 @@ from src.layers.object_cond import (
     calc_LV_Lbeta_inference,
 )
 from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_model import (
-    scatter_count,
-    obtain_batch_numbers,
-    global_exchange,
-)
 from src.layers.inference_oc import create_and_store_graph_output
-from src.models.gravnet_calibration import object_condensation_loss2
+from src.models.gravnet_calibration import (
+    object_condensation_loss2,
+    obtain_batch_numbers,
+)
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -31,7 +29,7 @@ class GravnetModel(L.LightningModule):
         self,
         args,
         dev,
-        input_dim: int = 9,
+        input_dim: int = 8,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
@@ -145,8 +143,8 @@ class GravnetModel(L.LightningModule):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        # if step_count % 100:
-        #     PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+        if self.trainer.is_global_zero and (step_count % 100 == 0):
+            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
@@ -170,15 +168,16 @@ class GravnetModel(L.LightningModule):
                 x = torch.concatenate(allfeat, dim=1)
 
         x = torch.cat(allfeat, dim=-1)
-        assert x.device == device
-
         x = self.postgn_dense(x)
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
+        if self.args.tracks:
+            mask = g.ndata["hit_type"] == 1
+            beta = beta + 10 * mask
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if step_count % 100 == 0:
+        if self.trainer.is_global_zero and (step_count % 100 == 0):
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -187,7 +186,6 @@ class GravnetModel(L.LightningModule):
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
-        assert x.device == device
 
         return x, pred_energy_corr, loss_ll
 
@@ -221,7 +219,7 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss  #+ 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
 
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
@@ -254,7 +252,7 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss #+ 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, val=True)
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])

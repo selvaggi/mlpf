@@ -140,12 +140,12 @@ def main():
                 lr_monitor,
             ],
             accelerator=accelerator,
-            devices=[0],
+            devices=args.gpus,
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,
             max_epochs=100,
-            accumulate_grad_batches=2,
+            accumulate_grad_batches=4,
         )
 
         trainer.fit(

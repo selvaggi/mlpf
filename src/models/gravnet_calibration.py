@@ -14,11 +14,7 @@ from src.layers.object_cond import (
     calc_LV_Lbeta_inference,
 )
 from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_model import (
-    scatter_count,
-    obtain_batch_numbers,
-    global_exchange,
-)
+
 
 
 class GravnetModel(nn.Module):
@@ -507,3 +503,18 @@ def calc_energy_correction_factor_loss(
         return tf.concat([prediction_loss, matching_loss + uncertainty_loss], axis=-1)
     else:
         return prediction_loss, uncertainty_loss + matching_loss
+
+
+def obtain_batch_numbers(x, g):
+    dev = x.device
+    graphs_eval = dgl.unbatch(g)
+    number_graphs = len(graphs_eval)
+    batch_numbers = []
+    for index in range(0, number_graphs):
+        gj = graphs_eval[index]
+        num_nodes = gj.number_of_nodes()
+        batch_numbers.append(index * torch.ones(num_nodes).to(dev))
+        # num_nodes = gj.number_of_nodes()
+
+    batch = torch.cat(batch_numbers, dim=0)
+    return batch

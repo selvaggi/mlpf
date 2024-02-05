@@ -202,7 +202,6 @@ def get_hit_features(output, number_hits, prediction):
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
-    hit_type_one_hot = torch.nn.functional.one_hot(hit_type_feature, num_classes=4)
 
     # position, e, p
     pos_xyz_hits = torch.permute(
@@ -220,7 +219,6 @@ def get_hit_features(output, number_hits, prediction):
         pos_xyz_hits,
         p_hits,
         e_hits,
-        hit_type_one_hot,
         hit_particle_link,
         pandora_cluster,
         pandora_cluster_energy,

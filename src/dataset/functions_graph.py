@@ -31,7 +31,6 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pos_xyz_hits,
         p_hits,
         e_hits,
-        hit_type_one_hot,
         hit_particle_link,
         pandora_cluster,
         pandora_cluster_energy,
@@ -55,7 +54,6 @@ def create_inputs_from_table(output, hits_only, prediction=False):
 
     result = [
         y_data_graph[~mask_particles],
-        hit_type_one_hot[~mask_hits],
         p_hits[~mask_hits],
         e_hits[~mask_hits],
         cluster_id,
@@ -65,6 +63,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pandora_cluster_energy[~mask_hits],
         pfo_energy[~mask_hits],
         pandora_pfo_link[~mask_hits],
+        hit_type_feature[~mask_hits][hit_mask]
     ]
     hit_type = result[1].argmax(dim=1)
 
@@ -74,13 +73,21 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             result[i] = result[i][hit_mask]
+        hit_type_one_hot = torch.nn.functional.one_hot(
+            hit_type_feature[~mask_hits][hit_mask], num_classes=2
+        )
+
     else:
         # if we want the tracks keep only 1 track hit per charged particle.
         hit_mask = hit_type == 0
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             result[i] = result[i][hit_mask]
+        hit_type_one_hot = torch.nn.functional.one_hot(
+            hit_type_feature[~mask_hits][hit_mask], num_classes=3
+        )
 
+    result.append(hit_type_one_hot)
     return result
 
 
@@ -97,7 +104,6 @@ def create_graph(
     prediction = config.graph_config.get("prediction", False)
     (
         y_data_graph,
-        hit_type_one_hot,
         p_hits,
         e_hits,
         cluster_id,
@@ -107,6 +113,8 @@ def create_graph(
         pandora_cluster_energy,
         pandora_pfo_energy,
         pandora_pfo_link,
+        hit_type,
+        hit_type_one_hot,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
 
@@ -138,7 +146,7 @@ def create_graph(
         # g.ndata["pos_hits"] = coord_cart_hits
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
         # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
-        g.ndata["hit_type"] = hit_type_one_hot
+        g.ndata["hit_type"] = hit_type
         # g.ndata["p_hits"] = p_hits
         g.ndata[
             "e_hits"
