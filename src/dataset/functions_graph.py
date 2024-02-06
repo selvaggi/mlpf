@@ -96,6 +96,7 @@ def create_graph(
     config=None,
     n_noise=0,
 ):
+    print("creating graph i")
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
@@ -163,6 +164,7 @@ def create_graph(
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
+        print("graph_empty", graph_empty)
         graph_empty = True
         g = 0
         y_data_graph = 0
