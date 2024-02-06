@@ -201,7 +201,7 @@ class GraphT(L.LightningModule):
                 0,
                 path_save=self.args.model_prefix + "showers_df_evaluation",
                 store=True,
-                predict=True,
+                predict=False,
             )
 
     def on_train_epoch_end(self):

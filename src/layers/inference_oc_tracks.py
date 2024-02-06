@@ -98,9 +98,10 @@ def evaluate_efficiency_tracks(
                 number_in_batch=i,
             )
             df_list.append(df_event)
-
-    df_batch = pd.concat(df_list)
-
+    if len(df_list) > 0:
+        df_batch = pd.concat(df_list)
+    else:
+        df_batch = []
     if store:
         store_at_batch_end(path_save, df_batch, local_rank, step, epoch, predict=False)
     return df_batch
@@ -117,7 +118,7 @@ def store_at_batch_end(
     path_save_ = (
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
-    df_batch.to_pickle(path_save_)
+    # df_batch.to_pickle(path_save_)
 
     log_efficiency(df_batch)
 
