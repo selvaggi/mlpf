@@ -118,7 +118,7 @@ def create_graph(
         hit_type_one_hot,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
-
+    print("pos_xyz_hits", pos_xyz_hits.shape[0])
     if pos_xyz_hits.shape[0] > 0:
         graph_empty = False
         g = dgl.DGLGraph()
@@ -164,8 +164,8 @@ def create_graph(
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
-        print("graph_empty", graph_empty)
         graph_empty = True
+        print("graph_empty", graph_empty)
         g = 0
         y_data_graph = 0
     if pos_xyz_hits.shape[0] < 10:
