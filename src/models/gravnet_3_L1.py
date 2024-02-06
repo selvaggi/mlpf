@@ -116,7 +116,9 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
     def forward(self, g, step_count):
+        print("forward now")
         x = g.ndata["h"]
+        print("x", x.shape)
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
         device = x.device
