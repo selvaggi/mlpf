@@ -103,10 +103,7 @@ def main():
     args = get_samples_steps_per_epoch(args)
     args.local_rank = 0
     training_mode = not args.predict
-    # load data
-    print("loading data")
     if training_mode:
-        print("training mode data")
         train_loader, val_loader, data_config, train_input_names = train_load(args)
     else:
         test_loaders, data_config = test_load(args)
@@ -142,7 +139,7 @@ def main():
                 lr_monitor,
             ],
             accelerator="gpu",
-            devices=[0],
+            devices=args.gpus,
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,

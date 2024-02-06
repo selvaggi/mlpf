@@ -65,8 +65,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pandora_pfo_link[~mask_hits],
         hit_type_feature[~mask_hits],
     ]
-    hit_type = result[1].argmax(dim=1)
-
+    hit_type = hit_type_feature[~mask_hits]
     # if hits only remove tracks, otherwise leave tracks
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
@@ -74,7 +73,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         for i in range(1, len(result)):
             result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
-            hit_type_feature[~mask_hits][hit_mask], num_classes=2
+            hit_type_feature[~mask_hits][hit_mask] - 2, num_classes=2
         )
 
     else:
@@ -84,7 +83,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         for i in range(1, len(result)):
             result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
-            hit_type_feature[~mask_hits][hit_mask], num_classes=3
+            hit_type_feature[~mask_hits][hit_mask] - 1, num_classes=3
         )
 
     result.append(hit_type_one_hot)
@@ -96,7 +95,6 @@ def create_graph(
     config=None,
     n_noise=0,
 ):
-    print("creating graph i")
     hits_only = config.graph_config.get(
         "only_hits", False
     )  # Whether to only include hits in the graph
@@ -118,7 +116,6 @@ def create_graph(
         hit_type_one_hot,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
-    print("pos_xyz_hits", pos_xyz_hits.shape[0])
     if pos_xyz_hits.shape[0] > 0:
         graph_empty = False
         g = dgl.DGLGraph()
@@ -165,7 +162,6 @@ def create_graph(
             graph_empty = True
     else:
         graph_empty = True
-        print("graph_empty", graph_empty)
         g = 0
         y_data_graph = 0
     if pos_xyz_hits.shape[0] < 10:

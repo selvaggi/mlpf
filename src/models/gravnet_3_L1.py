@@ -84,11 +84,11 @@ class GravnetModel(L.LightningModule):
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
-        self.d_shape = 32
+        self.d_shape = 64
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (self.d_shape * i + 64),
+                    64,
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -101,7 +101,7 @@ class GravnetModel(L.LightningModule):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
+                    nn.Linear(64, 64),
                     self.act,  # ,
                 ]
             )
@@ -116,9 +116,7 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
     def forward(self, g, step_count):
-        print("forward now")
         x = g.ndata["h"]
-        print("x", x.shape)
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
         device = x.device
@@ -153,7 +151,7 @@ class GravnetModel(L.LightningModule):
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
-            beta = beta + 10 * mask
+            beta = beta + 10 * mask.view(-1, 1)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and (step_count % 100 == 0):
@@ -207,7 +205,6 @@ class GravnetModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        print("running a validation step")
         self.validation_step_outputs = []
         y = batch[1]
 
@@ -309,7 +306,7 @@ class GravnetModel(L.LightningModule):
                         0,
                         0,
                         path_save=self.args.model_prefix + "showers_df_evaluation",
-                        store=True,
+                        store=False,
                         predict=False,
                         tracks=self.args.tracks,
                     )
@@ -341,7 +338,7 @@ class GravNetBlock(nn.Module):
         weird_batchnom=False,
     ):
         super(GravNetBlock, self).__init__()
-        self.d_shape = 32
+        self.d_shape = 64
         out_channels = self.d_shape
 
         propagate_dimensions = self.d_shape
@@ -424,10 +421,10 @@ class GravNetConv(nn.Module):
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
         edge_weight = torch.sqrt(edge_weight + 1e-6)
         edge_weight = torch.exp(-torch.square(edge_weight))
-        graph.edata["edge_weight"] = edge_weight
+        graph.edata["edge_weight"] = edge_weight.view(-1, 1)
         graph.ndata["h"] = h_l
-        g.update_all(self.message_func, self.reduce_func)
-        out = g.ndata["h"]
+        graph.update_all(self.message_func, self.reduce_func)
+        out = graph.ndata["h"]
 
         out = self.lin(out)
 
@@ -438,7 +435,7 @@ class GravNetConv(nn.Module):
         return {"e": e_ij}
 
     def reduce_func(self, nodes):
-        mean_ = torch.mean(nodes.mailbox["e"], dim=1)
-        max_ = torch.max(nodes.mailbox["e"], dim=1)
+        mean_ = torch.mean(nodes.mailbox["e"], dim=-2)
+        max_ = torch.max(nodes.mailbox["e"], dim=-2)[0]
         h = torch.cat((mean_, max_), dim=-1)
         return {"h": h}
