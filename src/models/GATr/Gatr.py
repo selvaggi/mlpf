@@ -4,16 +4,30 @@ import sys
 # sys.path.append(
 #     path.abspath("/afs/cern.ch/work/m/mgarciam/private/geometric-algebra-transformer/")
 # )
-sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
+# sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar
+from gatr.interface import embed_point, extract_scalar, extract_point
 import torch
 import torch.nn as nn
 from src.logger.plotting_tools import PlotCoordinates
+import numpy as np
+from typing import Tuple, Union, List
+import dgl
+from src.logger.plotting_tools import PlotCoordinates
+from src.layers.obj_cond_inf import calc_energy_loss
+from src.models.gravnet_calibration import (
+    obtain_batch_numbers,
+)
+from src.layers.inference_oc import create_and_store_graph_output
+import lightning as L
+from src.utils.nn.tools import log_losses_wandb_tracking
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from src.layers.inference_oc_tracks import evaluate_efficiency_tracks
+from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 
 
-class ExampleWrapper(torch.nn.Module):
+class ExampleWrapper(L.LightningModule):
     """Example wrapper around a GATr model.
 
     Expects input data that consists of a point cloud: one 3D point for each item in the data.
@@ -30,9 +44,25 @@ class ExampleWrapper(torch.nn.Module):
     """
 
     def __init__(
-        self, args, dev, blocks=20, hidden_mv_channels=16, hidden_s_channels=32
+        self,
+        args,
+        dev,
+        input_dim: int = 5,
+        output_dim: int = 4,
+        n_postgn_dense_blocks: int = 3,
+        n_gravnet_blocks: int = 4,
+        clust_space_norm: str = "twonorm",
+        k_gravnet: int = 7,
+        activation: str = "elu",
+        weird_batchnom=False,
+        blocks=20,
+        hidden_mv_channels=16,
+        hidden_s_channels=32,
     ):
         super().__init__()
+        self.input_dim = 3
+        self.output_dim = 4
+        self.args = args
         self.gatr = GATr(
             in_mv_channels=1,
             out_mv_channels=1,
@@ -44,9 +74,9 @@ class ExampleWrapper(torch.nn.Module):
             attention=SelfAttentionConfig(),  # Use default parameters for attention
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
-        self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.5)
-        self.clustering = nn.Linear(16, self.output_dim - 1, bias=False)
-        self.beta = nn.Linear(16, 1)
+        self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+        self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
+        self.beta = nn.Linear(1, 1)
 
     def forward(self, g, step_count):
         """Forward pass.
@@ -62,6 +92,15 @@ class ExampleWrapper(torch.nn.Module):
             Model prediction: a single scalar for the whole point cloud.
         """
         inputs = g.ndata["pos_hits_xyz"]
+        if self.trainer.is_global_zero and step_count % 100 == 0:
+            g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
+            PlotCoordinates(
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                features_type="ones",
+                epoch=str(self.current_epoch),
+            )
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         inputs = inputs.unsqueeze(0)
         # Embed point cloud in PGA
@@ -71,21 +110,142 @@ class ExampleWrapper(torch.nn.Module):
         embedded_outputs, _ = self.gatr(
             embedded_inputs, scalars=None
         )  # (..., num_points, 1, 16)
+        assert embedded_outputs.shape[2:] == (1, 16)
+
+        # Extract position
+        points = extract_point(embedded_outputs[:, :, 0, :])
+
+        # Extract non-point components and compute regularization
+        # other = extract_point_embedding_reg(embedded_outputs[:, :, 0, :])
+        # reg = torch.sum(other**2, dim=[1, 2])
 
         # Extract scalar and aggregate outputs from point cloud
-        # nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        # # outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
-        embedded_outputs = embedded_outputs.view(-1, 16)
-        x_cluster_coord = self.clustering(x)
-        beta = self.beta(x)
-        g.ndata["final_cluster"] = x_cluster_coord
-        g.ndata["beta"] = beta.view(-1)
-        if step_count % 5:
+        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
+        # # # outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
+        # embedded_outputs = nodewise_outputs.view(-1, 1)
+        x_point = points
+        x_scalar = nodewise_outputs
+
+        x_cluster_coord = self.clustering(x_point)
+        beta = self.beta(x_scalar)
+        g.ndata["final_cluster"] = x_cluster_coord[0]
+        g.ndata["beta"] = beta[0].view(-1)
+        if self.trainer.is_global_zero and step_count % 100 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch),
             )
-        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
+        x = torch.cat((x_cluster_coord[0], beta[0].view(-1, 1)), dim=1)
         return x
+
+    def training_step(self, batch, batch_idx):
+        y = batch[1]
+
+        batch_g = batch[0]
+        if self.trainer.is_global_zero:
+            model_output = self(batch_g, batch_idx)
+        else:
+            model_output = self(batch_g, 1)
+
+        (loss, losses) = object_condensation_loss_tracking(
+            batch_g,
+            model_output,
+            y,
+            clust_loss_only=True,
+            add_energy_loss=False,
+            calc_e_frac_loss=False,
+            q_min=self.args.qmin,
+            frac_clustering_loss=self.args.frac_cluster_loss,
+            attr_weight=self.args.L_attractive_weight,
+            repul_weight=self.args.L_repulsive_weight,
+            fill_loss_weight=self.args.fill_loss_weight,
+            use_average_cc_pos=self.args.use_average_cc_pos,
+            hgcalloss=self.args.hgcalloss,
+            tracking=True,
+        )
+        loss = loss
+
+        if self.trainer.is_global_zero:
+            log_losses_wandb_tracking(True, batch_idx, 0, losses, loss)
+
+        self.loss_final = loss
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        self.validation_step_outputs = []
+        y = batch[1]
+
+        batch_g = batch[0]
+
+        model_output = self(batch_g, 1)
+        preds = model_output.squeeze()
+
+        (loss, losses) = object_condensation_loss_tracking(
+            batch_g,
+            model_output,
+            y,
+            q_min=self.args.qmin,
+            frac_clustering_loss=0,
+            clust_loss_only=self.args.clustering_loss_only,
+            use_average_cc_pos=self.args.use_average_cc_pos,
+            hgcalloss=self.args.hgcalloss,
+            tracking=True,
+        )
+        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        if self.trainer.is_global_zero:
+            log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
+        self.validation_step_outputs.append([model_output, batch_g, y])
+        if self.trainer.is_global_zero:
+            evaluate_efficiency_tracks(
+                batch_g,
+                model_output,
+                y,
+                0,
+                batch_idx,
+                0,
+                path_save=self.args.model_prefix + "showers_df_evaluation",
+                store=True,
+                predict=True,
+            )
+
+    def on_train_epoch_end(self):
+
+        # log epoch metric
+        self.log("train_loss_epoch", self.loss_final)
+
+    def on_train_epoch_start(self):
+        self.make_mom_zero()
+
+    def on_validation_epoch_start(self):
+        self.make_mom_zero()
+        self.df_showers = []
+        self.df_showers_pandora = []
+        self.df_showes_db = []
+
+    def make_mom_zero(self):
+        if self.current_epoch > 2 or self.args.predict:
+            self.ScaledGooeyBatchNorm2_1.momentum = 0
+            # self.ScaledGooeyBatchNorm2_2.momentum = 0
+            # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
+            #     gravnet_block.batchnorm_gravnet1.momentum = 0
+            #     gravnet_block.batchnorm_gravnet2.momentum = 0
+
+    # def on_validation_epoch_end(self):
+    #     if self.trainer.is_global_zero:
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": ReduceLROnPlateau(optimizer),
+                "interval": "epoch",
+                "monitor": "train_loss_epoch",
+                "frequency": 1
+                # If "monitor" references validation metrics, then "frequency" should be set to a
+                # multiple of "trainer.check_val_every_n_epoch".
+            },
+        }

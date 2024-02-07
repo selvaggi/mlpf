@@ -5,7 +5,16 @@ import pandas as pd
 import numpy as np
 
 
-def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
+def PlotCoordinates(
+    g,
+    path,
+    outdir,
+    num_layer=0,
+    predict=False,
+    egnn=False,
+    features_type="ones",
+    epoch="",
+):
     if predict:
         outdir = outdir + "/figures_evaluation"
     else:
@@ -18,8 +27,11 @@ def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
             coords = graph_i.ndata["original_coords"]
             if egnn:
                 features = graph_i.ndata["h"][:, 4]
+            elif features_type == "ones":
+                features = torch.ones_like(coords[:, 0]).view(-1, 1)
             else:
                 features = graph_i.ndata["h"][:, -2]  # consider energy for size
+
         if path == "gravnet_coord":
             coords = graph_i.ndata["gncoords"]
             if egnn:
@@ -72,10 +84,10 @@ def PlotCoordinates(g, path, outdir, num_layer=0, predict=False, egnn=False):
         fig.update_traces(marker=dict(line=dict(width=0)))
         if path == "gravnet_coord":
             fig.write_html(
-                outdir + "/" + name + "_" + num_layer + "_" + str(i) + ".html"
+                outdir + "/" + name + "_" + num_layer + "_" + str(i) + epoch + ".html"
             )
         else:
-            fig.write_html(outdir + "/" + name + "_" + str(i) + ".html")
+            fig.write_html(outdir + "/" + name + "_" + str(i) + epoch + ".html")
 
 
 def shuffle_truth_colors(df, qualifier="truthHitAssignementIdx", rdst=None):

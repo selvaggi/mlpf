@@ -125,11 +125,12 @@ def store_at_batch_end(
 
 def log_efficiency(df):
     # take the true showers non nan
-    mask = ~np.isnan(df["reco_showers_E"])
-    eff = np.sum(~np.isnan(df["pred_showers_E"][mask].values)) / len(
-        df["pred_showers_E"][mask].values
-    )
-    wandb.log({"efficiency validation": eff})
+    if len(df) > 0:
+        mask = ~np.isnan(df["reco_showers_E"])
+        eff = np.sum(~np.isnan(df["pred_showers_E"][mask].values)) / len(
+            df["pred_showers_E"][mask].values
+        )
+        wandb.log({"efficiency validation": eff})
 
 
 def generate_showers_data_frame(

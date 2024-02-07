@@ -248,9 +248,9 @@ class GravnetModel(L.LightningModule):
         if self.current_epoch > 2 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
             self.ScaledGooeyBatchNorm2_2.momentum = 0
-            for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-                gravnet_block.batchnorm_gravnet1.momentum = 0
-                gravnet_block.batchnorm_gravnet2.momentum = 0
+            # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
+            #     gravnet_block.batchnorm_gravnet1.momentum = 0
+            #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
     # def on_validation_epoch_end(self):
     #     if self.trainer.is_global_zero:
