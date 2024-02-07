@@ -116,8 +116,8 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
 
-        # if args.load_model_weights is not None:
-        #     model = model.load_from_checkpoint(args.load_model_weights)
+        if args.load_model_weights is not None:
+            model = model.load_from_checkpoint(args.load_model_weights)
         accelerator, devices = get_gpu_dev(args)
 
         val_every_n_epochs = 1
@@ -145,7 +145,7 @@ def main():
             # profiler=profiler,
             max_epochs=100,
             accumulate_grad_batches=4,
-            resume_from_checkpoint=args.load_model_weights,
+            # resume_from_checkpoint=args.load_model_weights,
         )
 
         trainer.fit(
