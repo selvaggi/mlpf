@@ -116,8 +116,8 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
 
-        if args.load_model_weights is not None:
-            model = model.load_from_checkpoint(args.load_model_weights)
+        # if args.load_model_weights is not None:
+        #     model = model.load_from_checkpoint(args.load_model_weights)
         accelerator, devices = get_gpu_dev(args)
 
         val_every_n_epochs = 1
@@ -145,6 +145,7 @@ def main():
             # profiler=profiler,
             max_epochs=100,
             accumulate_grad_batches=4,
+            resume_from_checkpoint=args.load_model_weights,
         )
 
         trainer.fit(
@@ -157,8 +158,8 @@ def main():
     if args.data_test:
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
-            accelerator="cpu",
-            # devices=[0],
+            accelerator="gpu",
+            devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )

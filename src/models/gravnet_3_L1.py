@@ -151,7 +151,7 @@ class GravnetModel(L.LightningModule):
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
-            beta = beta + 10 * mask.view(-1, 1)
+            beta[mask] = 10
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and (step_count % 100 == 0):
@@ -211,7 +211,6 @@ class GravnetModel(L.LightningModule):
         batch_g = batch[0]
 
         model_output, e_cor, loss_ll = self(batch_g, 1)
-        preds = model_output.squeeze()
 
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -306,7 +305,7 @@ class GravnetModel(L.LightningModule):
                         0,
                         0,
                         path_save=self.args.model_prefix + "showers_df_evaluation",
-                        store=False,
+                        store=True,
                         predict=False,
                         tracks=self.args.tracks,
                     )
