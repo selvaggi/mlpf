@@ -157,8 +157,8 @@ def main():
     if args.data_test:
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
-            accelerator="gpu",
-            devices=[0],
+            accelerator="cpu",
+            # devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )
