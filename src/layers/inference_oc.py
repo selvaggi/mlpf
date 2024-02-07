@@ -164,6 +164,8 @@ def create_and_store_graph_output(
     df_batch1 = pd.concat(df_list1)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
+    else:
+        df_batch_pandora = []
     #
     if store:
         store_at_batch_end(
