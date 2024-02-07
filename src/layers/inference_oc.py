@@ -101,17 +101,17 @@ def create_and_store_graph_output(
 
         # if len(shower_p_unique_hdb) < len(particle_ids):
         # print("storing  event", local_rank, step, i)
-        torch.save(
-            dic,
-            path_save
-            + "/graphs_all_debug/"
-            + str(local_rank)
-            + "_"
-            + str(step)
-            + "_"
-            + str(i)
-            + ".pt",
-        )
+        # torch.save(
+        #     dic,
+        #     path_save
+        #     + "/graphs_all_debug/"
+        #     + str(local_rank)
+        #     + "_"
+        #     + str(step)
+        #     + "_"
+        #     + str(i)
+        #     + ".pt",
+        # )
         if len(shower_p_unique) > 1:
             df_event, number_of_showers_total = generate_showers_data_frame(
                 labels,
