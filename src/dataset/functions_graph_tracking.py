@@ -109,12 +109,12 @@ def create_graph_tracking(
         #     (features_hits[:, 4:-1], hit_type_one_hot), dim=1
         # )  # dims = 7
         hit_features_graph = features_hits[:, 4:-1]
-        uvz = convert_to_conformal_coordinates(features_hits[:, 0:3])
-        polar = convert_to_polar_coordinates(uvz)
-        hit_features_graph = torch.cat(
-            (uvz, polar), dim=1
-        )  # dim =8 #features_hits[:, 0:3],
-        #! currently we are not doing the pid or mass regression
+        # uvz = convert_to_conformal_coordinates(features_hits[:, 0:3])
+        # polar = convert_to_polar_coordinates(uvz)
+        # hit_features_graph = torch.cat(
+        #     (uvz, polar), dim=1
+        # )  # dim =8 #features_hits[:, 0:3],
+        # ! currently we are not doing the pid or mass regression
         g.ndata["h"] = hit_features_graph
         g.ndata["hit_type"] = hit_type_one_hot
         g.ndata["particle_number"] = cluster_id
