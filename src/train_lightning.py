@@ -147,7 +147,8 @@ def main():
             accumulate_grad_batches=4,
             # resume_from_checkpoint=args.load_model_weights,
         )
-
+        args.local_rank = trainer.global_rank 
+        train_loader, val_loader, data_config, train_input_names = train_load(args)
         trainer.fit(
             model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
         )
