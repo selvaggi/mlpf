@@ -69,7 +69,6 @@ class GravnetModel(L.LightningModule):
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
-        print("clust_space_norm", clust_space_norm)
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
@@ -116,12 +115,12 @@ class GravnetModel(L.LightningModule):
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-        init_weights_ = True
-        if init_weights_:
-            # init_weights(self.clustering)
-            init_weights(self.beta)
-            init_weights(self.postgn_dense)
-            # init_weights(self.output)
+        # init_weights_ = True
+        # if init_weights_:
+        #     # init_weights(self.clustering)
+        #     init_weights(self.beta)
+        #     init_weights(self.postgn_dense)
+        #     # init_weights(self.output)
 
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
@@ -174,7 +173,7 @@ class GravnetModel(L.LightningModule):
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
-            beta = beta + 10 * mask
+            beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and (step_count % 100 == 0):
@@ -187,7 +186,7 @@ class GravnetModel(L.LightningModule):
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
-        return x, pred_energy_corr, loss_ll
+        return x, pred_energy_corr, 0
 
     # def on_after_backward(self):
     #     for name, p in self.named_parameters():
@@ -275,7 +274,6 @@ class GravnetModel(L.LightningModule):
             self.df_showes_db.append(df_batch1)
 
     def on_train_epoch_end(self):
-
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
@@ -337,7 +335,7 @@ class GravnetModel(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer),
+                "scheduler": ReduceLROnPlateau(optimizer, patience=3),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
