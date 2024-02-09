@@ -205,7 +205,6 @@ class GraphT(L.LightningModule):
             )
 
     def on_train_epoch_end(self):
-
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
