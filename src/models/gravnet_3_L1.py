@@ -315,7 +315,7 @@ class GravnetModel(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer),
+                "scheduler": ReduceLROnPlateau(optimizer, patience=3),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
