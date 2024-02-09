@@ -584,7 +584,7 @@ def calc_LV_Lbeta(
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = (
-            torch.mean(1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)) / 4
+            torch.mean(1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)) 
         )
         # this is also per object so not dividing by batch size
 
