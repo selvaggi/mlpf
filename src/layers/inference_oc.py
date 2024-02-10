@@ -141,8 +141,9 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            df_list.append(df_event)
-            df_list1.append(df_event1)
+            if df_event != 0:
+                df_list.append(df_event)
+                df_list1.append(df_event1)
             if predict:
                 df_event_pandora = generate_showers_data_frame(
                     labels_pandora,
@@ -158,7 +159,8 @@ def create_and_store_graph_output(
                     number_in_batch=i,
                     tracks=tracks,
                 )
-                df_list_pandora.append(df_event_pandora)
+                if df_event_pandora != 0:
+                    df_list_pandora.append(df_event_pandora)
 
     df_batch = pd.concat(df_list)
     df_batch1 = pd.concat(df_list1)
@@ -313,92 +315,103 @@ def generate_showers_data_frame(
             number_of_showers_total = number_of_showers_total + number_of_showers
 
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
-    ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
-    intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
+    if len(col_ind) > 0:
+        ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
+        intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
 
-    pred_showers[index_matches] = -1
-    pred_showers[
-        0
-    ] = (
-        -1
-    )  # this takes into account that the class 0 for pandora and for dbscan is noise
-    mask = pred_showers != -1
-    fake_showers_e = e_pred_showers[mask]
-    if e_corr is None or pandora:
-        fake_showers_e_cali = e_pred_showers_cali[mask]
-    else:
-        fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
-    if not pandora:
-        if e_corr is None:
-            fake_showers_e_cali_factor = corrections_per_shower[mask]
+        pred_showers[index_matches] = -1
+        pred_showers[
+            0
+        ] = (
+            -1
+        )  # this takes into account that the class 0 for pandora and for dbscan is noise
+        mask = pred_showers != -1
+        fake_showers_e = e_pred_showers[mask]
+        if e_corr is None or pandora:
+            fake_showers_e_cali = e_pred_showers_cali[mask]
         else:
-            fake_showers_e_cali_factor = fake_showers_e_cali
-    fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
-    fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
-
-    energy_t = torch.cat(
-        (energy_t, fake_showers_showers_e_truw),
-        dim=0,
-    )
-    pid_t = torch.cat(
-        (pid_t, fake_showers_showers_e_truw),
-        dim=0,
-    )
-    e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
-    e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
-
-    e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
-    if pandora:
-        e_pred_cali_pfo = torch.cat((matched_es_cali_pfo, fake_showers_e_cali), dim=0)
-    if not pandora:
-        calibration_factor = torch.cat(
-            (calibration_per_shower, fake_showers_e_cali_factor), dim=0
+            fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
+        if not pandora:
+            if e_corr is None:
+                fake_showers_e_cali_factor = corrections_per_shower[mask]
+            else:
+                fake_showers_e_cali_factor = fake_showers_e_cali
+        fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (
+            torch.nan
+        )
+        fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
+            e_pred_showers.device
         )
 
-    e_pred_t = torch.cat(
-        (
-            intersection_E,
-            torch.zeros_like(fake_showers_e) * (torch.nan),
-        ),
-        dim=0,
-    )
-    # e_pred_t_pandora = torch.cat(
-    #     (
-    #         intersection_E,
-    #         torch.zeros_like(fake_showers_e) * (-200),
-    #         torch.zeros_like(fake_showers_e_pandora) * (-100),
-    #     ),
-    #     dim=0,
-    # )
-    if pandora:
-        d = {
-            "true_showers_E": energy_t.detach().cpu(),
-            "reco_showers_E": e_reco.detach().cpu(),
-            "pred_showers_E": e_pred.detach().cpu(),
-            "e_pred_and_truth": e_pred_t.detach().cpu(),
-            "pandora_calibrated_E": e_pred_cali.detach().cpu(),
-            "pandora_calibrated_pfo": e_pred_cali_pfo.detach().cpu(),
-            "pid": pid_t.detach().cpu(),
-            "step": torch.ones_like(energy_t.detach().cpu()) * step,
-            "number_batch": torch.ones_like(energy_t.detach().cpu()) * number_in_batch,
-        }
+        energy_t = torch.cat(
+            (energy_t, fake_showers_showers_e_truw),
+            dim=0,
+        )
+        pid_t = torch.cat(
+            (pid_t, fake_showers_showers_e_truw),
+            dim=0,
+        )
+        e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
+        e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
+
+        e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
+        if pandora:
+            e_pred_cali_pfo = torch.cat(
+                (matched_es_cali_pfo, fake_showers_e_cali), dim=0
+            )
+        if not pandora:
+            calibration_factor = torch.cat(
+                (calibration_per_shower, fake_showers_e_cali_factor), dim=0
+            )
+
+        e_pred_t = torch.cat(
+            (
+                intersection_E,
+                torch.zeros_like(fake_showers_e) * (torch.nan),
+            ),
+            dim=0,
+        )
+        # e_pred_t_pandora = torch.cat(
+        #     (
+        #         intersection_E,
+        #         torch.zeros_like(fake_showers_e) * (-200),
+        #         torch.zeros_like(fake_showers_e_pandora) * (-100),
+        #     ),
+        #     dim=0,
+        # )
+        if pandora:
+            d = {
+                "true_showers_E": energy_t.detach().cpu(),
+                "reco_showers_E": e_reco.detach().cpu(),
+                "pred_showers_E": e_pred.detach().cpu(),
+                "e_pred_and_truth": e_pred_t.detach().cpu(),
+                "pandora_calibrated_E": e_pred_cali.detach().cpu(),
+                "pandora_calibrated_pfo": e_pred_cali_pfo.detach().cpu(),
+                "pid": pid_t.detach().cpu(),
+                "step": torch.ones_like(energy_t.detach().cpu()) * step,
+                "number_batch": torch.ones_like(energy_t.detach().cpu())
+                * number_in_batch,
+            }
+        else:
+            d = {
+                "true_showers_E": energy_t.detach().cpu(),
+                "reco_showers_E": e_reco.detach().cpu(),
+                "pred_showers_E": e_pred.detach().cpu(),
+                "e_pred_and_truth": e_pred_t.detach().cpu(),
+                "pid": pid_t.detach().cpu(),
+                "calibration_factor": calibration_factor.detach().cpu(),
+                "calibrated_E": e_pred_cali.detach().cpu(),
+                "step": torch.ones_like(energy_t.detach().cpu()) * step,
+                "number_batch": torch.ones_like(energy_t.detach().cpu())
+                * number_in_batch,
+            }
+        df = pd.DataFrame(data=d)
+        if number_of_showers_total is None:
+            return df
+        else:
+            return df, number_of_showers_total
     else:
-        d = {
-            "true_showers_E": energy_t.detach().cpu(),
-            "reco_showers_E": e_reco.detach().cpu(),
-            "pred_showers_E": e_pred.detach().cpu(),
-            "e_pred_and_truth": e_pred_t.detach().cpu(),
-            "pid": pid_t.detach().cpu(),
-            "calibration_factor": calibration_factor.detach().cpu(),
-            "calibrated_E": e_pred_cali.detach().cpu(),
-            "step": torch.ones_like(energy_t.detach().cpu()) * step,
-            "number_batch": torch.ones_like(energy_t.detach().cpu()) * number_in_batch,
-        }
-    df = pd.DataFrame(data=d)
-    if number_of_showers_total is None:
-        return df
-    else:
-        return df, number_of_showers_total
+        return 0, 0
 
 
 def get_correction_per_shower(labels, dic):
@@ -486,7 +499,10 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
         )
-    return torch.cat(list_intersection_E, dim=0)
+    if len(list_intersection_E) > 0:
+        return torch.cat(list_intersection_E, dim=0)
+    else:
+        return 0
 
 
 def plot_iou_matrix(iou_matrix, image_path, hdbscan=False):
