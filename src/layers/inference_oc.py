@@ -141,8 +141,9 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            if df_event != 0:
+            if len(df_event) > 1:
                 df_list.append(df_event)
+            if len(df_event1) > 1:
                 df_list1.append(df_event1)
             if predict:
                 df_event_pandora = generate_showers_data_frame(
@@ -159,7 +160,7 @@ def create_and_store_graph_output(
                     number_in_batch=i,
                     tracks=tracks,
                 )
-                if df_event_pandora != 0:
+                if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
 
     df_batch = pd.concat(df_list)
@@ -411,7 +412,7 @@ def generate_showers_data_frame(
         else:
             return df, number_of_showers_total
     else:
-        return 0, 0
+        return [0], 0
 
 
 def get_correction_per_shower(labels, dic):
