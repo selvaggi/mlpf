@@ -330,6 +330,7 @@ class GravnetModel(L.LightningModule):
                     predict=False,
                     tracks=self.args.tracks,
                 )
+        self.validation_step_outputs = []
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
