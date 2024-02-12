@@ -13,7 +13,7 @@ import torch
 import wandb
 import warnings
 
-warnings.filterwarnings("ignore")
+# warnings.filterwarnings("ignore")
 
 from torch import nn
 import torch.nn.functional as F
@@ -127,6 +127,7 @@ def main():
             filename="_{epoch}",
             every_n_epochs=val_every_n_epochs,
             save_top_k=-1,  # <--- this is important!
+            save_weights_only=True,
         )
         # if accelerator != 0:
 
@@ -139,7 +140,7 @@ def main():
                 lr_monitor,
             ],
             accelerator="gpu",
-            devices=args.gpus,
+            devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,
