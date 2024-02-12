@@ -53,7 +53,7 @@ def to_filelist(args, mode="train"):
                 np.random.shuffle(new_files)
                 new_file_dict[name] = new_files
             file_dict = new_file_dict
-            # print(file_dict)
+            print(args.local_rank, len(file_dict["_"]))
 
     if args.copy_inputs:
         import tempfile
