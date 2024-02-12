@@ -135,6 +135,7 @@ class GraphT(L.LightningModule):
     #             print(name)
 
     def training_step(self, batch, batch_idx):
+
         y = batch[1]
 
         batch_g = batch[0]
@@ -160,7 +161,7 @@ class GraphT(L.LightningModule):
             tracking=True,
         )
         loss = loss
-
+        print("training step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss)
 
@@ -168,6 +169,7 @@ class GraphT(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+
         self.validation_step_outputs = []
         y = batch[1]
 
@@ -187,11 +189,12 @@ class GraphT(L.LightningModule):
             hgcalloss=self.args.hgcalloss,
             tracking=True,
         )
+        print("val step", batch_idx, loss)
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
         self.validation_step_outputs.append([model_output, batch_g, y])
-        if self.trainer.is_global_zero:
+        if self.trainer.is_global_zero and self.current_epoch > 1:
             evaluate_efficiency_tracks(
                 batch_g,
                 model_output,
@@ -203,10 +206,11 @@ class GraphT(L.LightningModule):
                 store=True,
                 predict=False,
             )
+        print("finished step")
 
     def on_train_epoch_end(self):
         # log epoch metric
-        self.log("train_loss_epoch", self.loss_final)
+        self.log("train_loss_epoch", self.loss_final, sync_dist=True)
 
     def on_train_epoch_start(self):
         self.make_mom_zero()
@@ -219,14 +223,14 @@ class GraphT(L.LightningModule):
 
     def make_mom_zero(self):
         if self.current_epoch > 2 or self.args.predict:
-            self.ScaledGooeyBatchNorm2_1.momentum = 0
-            self.ScaledGooeyBatchNorm2_2.momentum = 0
+            self.batchnorm1.momentum = 0
+            # self.ScaledGooeyBatchNorm2_2.momentum = 0
             # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #     gravnet_block.batchnorm_gravnet1.momentum = 0
             #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
-    # def on_validation_epoch_end(self):
-    #     if self.trainer.is_global_zero:
+    def on_validation_epoch_end(self):
+        print("DONE WITH VALIDATION EPOCH", self.trainer.global_rank)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
