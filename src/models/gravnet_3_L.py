@@ -55,7 +55,7 @@ class GravnetModel(L.LightningModule):
         }
         self.act = acts[activation]
 
-        N_NEIGHBOURS = [16, 128, 16, 256]
+        N_NEIGHBOURS = [16, 128, 16, 128]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim
