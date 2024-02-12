@@ -227,6 +227,7 @@ class GravnetModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        print("starting validation step", batch_idx)
         self.validation_step_outputs = []
         y = batch[1]
 
