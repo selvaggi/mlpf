@@ -227,7 +227,6 @@ class GravnetModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        print("starting validation step", batch_idx)
         self.validation_step_outputs = []
         y = batch[1]
 
@@ -253,6 +252,7 @@ class GravnetModel(L.LightningModule):
             hgcalloss=self.args.hgcalloss,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, val=True)
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
