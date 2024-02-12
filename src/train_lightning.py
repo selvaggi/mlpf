@@ -147,7 +147,7 @@ def main():
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            precision=16
+            # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
         args.local_rank = trainer.global_rank
