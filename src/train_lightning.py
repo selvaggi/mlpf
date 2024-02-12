@@ -145,7 +145,9 @@ def main():
             logger=wandb_logger,
             # profiler=profiler,
             max_epochs=100,
-            accumulate_grad_batches=1,
+            # accumulate_grad_batches=1,
+            strategy="ddp",
+            precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
         args.local_rank = trainer.global_rank
