@@ -25,6 +25,7 @@ from src.utils.nn.tools import log_losses_wandb_tracking
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from src.layers.inference_oc_tracks import evaluate_efficiency_tracks
 from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
+from xformers.ops.fmha import BlockDiagonalMask
 
 
 class ExampleWrapper(L.LightningModule):
@@ -55,9 +56,9 @@ class ExampleWrapper(L.LightningModule):
         k_gravnet: int = 7,
         activation: str = "elu",
         weird_batchnom=False,
-        blocks=20,
+        blocks=10,
         hidden_mv_channels=16,
-        hidden_s_channels=32,
+        hidden_s_channels=64,
     ):
         super().__init__()
         self.input_dim = 3
@@ -74,7 +75,7 @@ class ExampleWrapper(L.LightningModule):
             attention=SelfAttentionConfig(),  # Use default parameters for attention
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
-        self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+        self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(1, 1)
 
@@ -102,22 +103,19 @@ class ExampleWrapper(L.LightningModule):
                 epoch=str(self.current_epoch),
             )
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
-        inputs = inputs.unsqueeze(0)
-        # Embed point cloud in PGA
-        embedded_inputs = embed_point(inputs).unsqueeze(-2)  # (..., num_points, 1, 16)
-
+        # inputs = inputs.unsqueeze(0)
+        embedded_inputs = embed_point(inputs).unsqueeze(
+            -2
+        )  # (batch_size*num_points, 1, 16)
+        mask = self.build_attention_mask(g)
+        scalars = torch.zeros((inputs.shape[0], 1))
         # Pass data through GATr
         embedded_outputs, _ = self.gatr(
-            embedded_inputs, scalars=None
+            embedded_inputs, scalars=scalars, attention_mask=mask
         )  # (..., num_points, 1, 16)
-        assert embedded_outputs.shape[2:] == (1, 16)
+        # assert embedded_outputs.shape[2:] == (1, 16)
 
-        # Extract position
-        points = extract_point(embedded_outputs[:, :, 0, :])
-
-        # Extract non-point components and compute regularization
-        # other = extract_point_embedding_reg(embedded_outputs[:, :, 0, :])
-        # reg = torch.sum(other**2, dim=[1, 2])
+        points = extract_point(embedded_outputs[:, 0, :])
 
         # Extract scalar and aggregate outputs from point cloud
         nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
@@ -128,8 +126,8 @@ class ExampleWrapper(L.LightningModule):
 
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
-        g.ndata["final_cluster"] = x_cluster_coord[0]
-        g.ndata["beta"] = beta[0].view(-1)
+        g.ndata["final_cluster"] = x_cluster_coord
+        g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and step_count % 100 == 0:
             PlotCoordinates(
                 g,
@@ -138,8 +136,27 @@ class ExampleWrapper(L.LightningModule):
                 predict=self.args.predict,
                 epoch=str(self.current_epoch),
             )
-        x = torch.cat((x_cluster_coord[0], beta[0].view(-1, 1)), dim=1)
+        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         return x
+
+    def build_attention_mask(self, g):
+        """Construct attention mask from pytorch geometric batch.
+
+        Parameters
+        ----------
+        inputs : torch_geometric.data.Batch
+            Data batch.
+
+        Returns
+        -------
+        attention_mask : xformers.ops.fmha.BlockDiagonalMask
+            Block-diagonal attention mask: within each sample, each token can attend to each other
+            token.
+        """
+        batch_numbers = obtain_batch_numbers(g)
+        return BlockDiagonalMask.from_seqlens(
+            torch.bincount(batch_numbers.long()).tolist()
+        )
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -167,7 +184,7 @@ class ExampleWrapper(L.LightningModule):
             tracking=True,
         )
         loss = loss
-
+        print("training step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss)
 
@@ -195,9 +212,10 @@ class ExampleWrapper(L.LightningModule):
             tracking=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        print("validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
-        self.validation_step_outputs.append([model_output, batch_g, y])
+        # self.validation_step_outputs.append([model_output, batch_g, y])
         if self.trainer.is_global_zero:
             evaluate_efficiency_tracks(
                 batch_g,
@@ -233,8 +251,9 @@ class ExampleWrapper(L.LightningModule):
             #     gravnet_block.batchnorm_gravnet1.momentum = 0
             #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
-    # def on_validation_epoch_end(self):
-    #     if self.trainer.is_global_zero:
+    def on_validation_epoch_end(self):
+        print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
+        # if self.trainer.is_global_zero:
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -249,3 +268,17 @@ class ExampleWrapper(L.LightningModule):
                 # multiple of "trainer.check_val_every_n_epoch".
             },
         }
+
+
+def obtain_batch_numbers(g):
+    graphs_eval = dgl.unbatch(g)
+    number_graphs = len(graphs_eval)
+    batch_numbers = []
+    for index in range(0, number_graphs):
+        gj = graphs_eval[index]
+        num_nodes = gj.number_of_nodes()
+        batch_numbers.append(index * torch.ones(num_nodes))
+        num_nodes = gj.number_of_nodes()
+
+    batch = torch.cat(batch_numbers, dim=0)
+    return batch
