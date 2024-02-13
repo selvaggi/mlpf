@@ -278,11 +278,11 @@ class GravnetModel(L.LightningModule):
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
-    def on_train_epoch_start(self):
-        self.make_mom_zero()
+    # def on_train_epoch_start(self):
+    #     # self.make_mom_zero()
 
     def on_validation_epoch_start(self):
-        self.make_mom_zero()
+        # self.make_mom_zero()
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
