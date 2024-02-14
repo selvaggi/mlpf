@@ -77,7 +77,9 @@ class GravnetModel(L.LightningModule):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(
+                self.input_dim
+            )  # , momentum=0.01)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
@@ -267,11 +269,11 @@ class GravnetModel(L.LightningModule):
     def make_mom_zero(self):
         if self.current_epoch > 2 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
-            self.ScaledGooeyBatchNorm2_2.momentum = 0
-            for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-                # gravnet_block.batchnorm_gravnet1.momentum = 0
-                gravnet_block.batchnorm_gravnet2.momentum = 0
-                gravnet_block.batchnorm_gravnet3.momentum = 0
+            # self.ScaledGooeyBatchNorm2_2.momentum = 0
+            # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
+            #     # gravnet_block.batchnorm_gravnet1.momentum = 0
+            #     gravnet_block.batchnorm_gravnet2.momentum = 0
+            #     gravnet_block.batchnorm_gravnet3.momentum = 0
 
     def on_validation_epoch_end(self):
         if self.trainer.is_global_zero:
@@ -356,8 +358,8 @@ class GravNetBlock(nn.Module):
             nn.Linear(self.d_shape, self.d_shape),  #! Dense 4
         )
 
-        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
-        self.batchnorm_gravnet3 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
+        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
+        self.batchnorm_gravnet3 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
 
     def forward(
         self,
