@@ -65,7 +65,7 @@ class GravnetModel(L.LightningModule):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
@@ -125,7 +125,7 @@ class GravnetModel(L.LightningModule):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
         else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
+            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
@@ -278,22 +278,22 @@ class GravnetModel(L.LightningModule):
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
-    # def on_train_epoch_start(self):
-    #     # self.make_mom_zero()
+    def on_train_epoch_start(self):
+        self.make_mom_zero()
 
     def on_validation_epoch_start(self):
-        # self.make_mom_zero()
+        self.make_mom_zero()
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
 
     def make_mom_zero(self):
-        if self.current_epoch > 2 or self.args.predict:
+        if self.current_epoch > 1 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
-            self.ScaledGooeyBatchNorm2_2.momentum = 0
-            for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-                gravnet_block.batchnorm_gravnet1.momentum = 0
-                gravnet_block.batchnorm_gravnet2.momentum = 0
+            # self.ScaledGooeyBatchNorm2_2.momentum = 0
+            # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
+            #     gravnet_block.batchnorm_gravnet1.momentum = 0
+            #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
     def on_validation_epoch_end(self):
         if self.trainer.is_global_zero:
