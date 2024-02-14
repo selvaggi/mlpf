@@ -112,10 +112,10 @@ class GravnetModel(L.LightningModule):
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-        if weird_batchnom:
-            self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
-        else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
+        # if weird_batchnom:
+        #     self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
+        # else:
+        #     self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
@@ -148,7 +148,7 @@ class GravnetModel(L.LightningModule):
             )
 
         x = self.postgn_dense(x)
-        x = self.ScaledGooeyBatchNorm2_2(x)
+        # x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         if self.args.tracks:
