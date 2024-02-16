@@ -354,7 +354,7 @@ def object_condensation_loss_tracking(
         clust_space_dim = output_dim - 28
 
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-    original_coords = batch.ndata["h"][:, 0:clust_space_dim]
+    original_coords = batch.ndata["pos_hits_xyz"]  # [:, 0:clust_space_dim]
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
 
     dev = batch.device
