@@ -111,7 +111,7 @@ class GraphT(L.LightningModule):
                 step_count=step_count,
             )
         ############################## Embeddings #############################################
-        h = torch.cat((g.ndata["pos_hits_xyz"], g.ndata["hit_type"].view(-1, 1)), dim=0)
+        h = torch.cat((g.ndata["pos_hits_xyz"], g.ndata["hit_type"].view(-1, 1)), dim=1)
         # input embedding
         h = self.batchnorm1(h)
         h = self.embedding_h(h)
