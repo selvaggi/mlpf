@@ -7,7 +7,7 @@ import sys
 # sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar, extract_point
+from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
 import torch
 import torch.nn as nn
 from src.logger.plotting_tools import PlotCoordinates
@@ -23,7 +23,10 @@ from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from src.layers.inference_oc_tracks import evaluate_efficiency_tracks
+from src.layers.inference_oc_tracks import (
+    evaluate_efficiency_tracks,
+    store_at_batch_end,
+)
 from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 
@@ -79,7 +82,7 @@ class ExampleWrapper(L.LightningModule):
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(1, 1)
 
-    def forward(self, g, step_count):
+    def forward(self, g, step_count, eval=""):
         """Forward pass.
 
         Parameters
@@ -100,11 +103,15 @@ class ExampleWrapper(L.LightningModule):
                 path="input_coords",
                 outdir=self.args.model_prefix,
                 features_type="ones",
-                epoch=str(self.current_epoch),
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
+        inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
-        embedded_inputs = embed_point(inputs).unsqueeze(
+        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
+        embedded_inputs = embedded_inputs.unsqueeze(
             -2
         )  # (batch_size*num_points, 1, 16)
         mask = self.build_attention_mask(g)
@@ -134,7 +141,8 @@ class ExampleWrapper(L.LightningModule):
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
-                epoch=str(self.current_epoch),
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         return x
@@ -197,7 +205,7 @@ class ExampleWrapper(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output = self(batch_g, 1)
+        model_output = self(batch_g, batch_idx, eval="_val")
         preds = model_output.squeeze()
 
         (loss, losses) = object_condensation_loss_tracking(
@@ -217,7 +225,7 @@ class ExampleWrapper(L.LightningModule):
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
         # self.validation_step_outputs.append([model_output, batch_g, y])
         if self.trainer.is_global_zero:
-            evaluate_efficiency_tracks(
+            df_batch = evaluate_efficiency_tracks(
                 batch_g,
                 model_output,
                 y,
@@ -226,8 +234,10 @@ class ExampleWrapper(L.LightningModule):
                 0,
                 path_save=self.args.model_prefix + "showers_df_evaluation",
                 store=True,
-                predict=True,
+                predict=False,
             )
+            if self.args.predict:
+                self.df_showers.append(df_batch)
 
     def on_train_epoch_end(self):
 
@@ -253,6 +263,15 @@ class ExampleWrapper(L.LightningModule):
 
     def on_validation_epoch_end(self):
         print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
+        if self.args.predict:
+            store_at_batch_end(
+                self.args.model_prefix + "showers_df_evaluation",
+                self.df_showers,
+                0,
+                0,
+                0,
+                True,
+            )
         # if self.trainer.is_global_zero:
 
     def configure_optimizers(self):

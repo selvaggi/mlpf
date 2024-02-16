@@ -20,7 +20,10 @@ from src.data.preprocess import (
     WeightMaker,
 )
 from src.dataset.functions_graph import create_graph
-from src.dataset.functions_graph_tracking import create_graph_tracking
+from src.dataset.functions_graph_tracking import (
+    create_graph_tracking,
+    create_graph_tracking_global,
+)
 
 
 def _finalize_inputs(table, data_config):
@@ -288,9 +291,17 @@ class _SimpleIter(object):
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
         if not self.synthetic:
             if self._data_config.graph_config.get("tracking", False):
-                [g, features_partnn], graph_empty = create_graph_tracking(
-                    X,
-                )
+                if self._data_config.graph_config.get("global", False):
+                    get_vtx = self._data_config.graph_config.get("VTX", False)
+
+                    [g, features_partnn], graph_empty = create_graph_tracking_global(
+                        X, get_vtx
+                    )
+                else:
+                    [g, features_partnn], graph_empty = create_graph_tracking(
+                        X,
+                    )
+
             else:
                 [g, features_partnn], graph_empty = create_graph(
                     X, self._data_config, n_noise=self.n_noise

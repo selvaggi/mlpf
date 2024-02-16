@@ -10,6 +10,8 @@ from scipy.optimize import linear_sum_assignment
 import pandas as pd
 import wandb
 
+from src.layers.inference_oc import hfdb_obtain_labels
+
 
 def evaluate_efficiency_tracks(
     batch_g,
@@ -40,28 +42,11 @@ def evaluate_efficiency_tracks(
         if clustering_mode == "clustering_normal":
             clustering = get_clustering(betas, X)
         elif clustering_mode == "dbscan":
-            distance_scale = (
-                (
-                    torch.min(
-                        torch.abs(torch.min(X, dim=0)[0] - torch.max(X, dim=0)[0])
-                    )
-                    / 30
-                )
-                .view(-1)
-                .detach()
-                .cpu()
-                .numpy()[0]
-            )
-
-            db = DBSCAN(eps=distance_scale, min_samples=15).fit(X.detach().cpu())
-            # DBSCAN has clustering labels -1,0,.., our cluster 0 is noise so we add 1
-            labels = db.labels_ + 1
-            labels = np.reshape(labels, (-1))
-            labels = torch.Tensor(labels).long().to(model_output.device)
+            labels = hfdb_obtain_labels(X, betas.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
-        shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
+        shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix = match_showers(
             labels,
             dic,
             particle_ids,
@@ -103,7 +88,9 @@ def evaluate_efficiency_tracks(
     else:
         df_batch = []
     if store:
-        store_at_batch_end(path_save, df_batch, local_rank, step, epoch, predict=False)
+        store_at_batch_end(
+            path_save, df_batch, local_rank, step, epoch, predict=predict
+        )
     return df_batch
 
 
@@ -118,7 +105,9 @@ def store_at_batch_end(
     path_save_ = (
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
-    # df_batch.to_pickle(path_save_)
+    if predict:
+        df_batch = pd.concat(df_batch)
+        df_batch.to_pickle(path_save_)
 
     log_efficiency(df_batch)
 
@@ -307,8 +296,8 @@ def match_showers(
     if torch.sum(labels == 0) == 0:
         shower_p_unique = torch.cat(
             (
-                shower_p_unique.view(-1),
                 torch.Tensor([0]).to(shower_p_unique.device).view(-1),
+                shower_p_unique.view(-1),
             ),
             dim=0,
         )
@@ -336,4 +325,4 @@ def match_showers(
             image_path = path_save + "/example_1_clustering.png"
             plot_iou_matrix(iou_matrix, image_path)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
-    return shower_p_unique, row_ind, col_ind, i_m_w
+    return shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix

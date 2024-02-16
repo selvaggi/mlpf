@@ -25,7 +25,7 @@ class GravnetModel(L.LightningModule):
         self,
         args,
         dev,
-        input_dim: int = 5,
+        input_dim: int = 4,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
@@ -97,8 +97,8 @@ class GravnetModel(L.LightningModule):
         else:
             self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
 
-    def forward(self, g, step_count):
-        x = g.ndata["h"]
+    def forward(self, g, step_count, eval=""):
+        x = torch.cat((g.ndata["pos_hits_xyz"], g.ndata["hit_type"].view(-1, 1)), dim=1)
         original_coords = g.ndata["pos_hits_xyz"]
         g.ndata["original_coords"] = original_coords
         device = x.device
@@ -112,8 +112,16 @@ class GravnetModel(L.LightningModule):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        # if step_count % 100:
-        #     PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+        if self.trainer.is_global_zero and step_count % 100 == 0:
+            PlotCoordinates(
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                features_type="ones",
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
                 g,
@@ -142,23 +150,19 @@ class GravnetModel(L.LightningModule):
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if step_count % 100 == 0:
+        if self.trainer.is_global_zero and step_count % 100 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
-        pred_energy_corr = torch.ones_like(beta.view(-1, 1))
         assert x.device == device
 
         return x
-
-    # def on_after_backward(self):
-    #     for name, p in self.named_parameters():
-    #         if p.grad is None:
-    #             print(name)
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -199,7 +203,7 @@ class GravnetModel(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output = self(batch_g, 1)
+        model_output = self(batch_g, batch_idx, eval="_val")
         preds = model_output.squeeze()
 
         (loss, losses) = object_condensation_loss_tracking(
@@ -214,6 +218,7 @@ class GravnetModel(L.LightningModule):
             tracking=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        print("validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
         self.validation_step_outputs.append([model_output, batch_g, y])
@@ -231,15 +236,15 @@ class GravnetModel(L.LightningModule):
             )
 
     def on_train_epoch_end(self):
-
-        # log epoch metric
+        # log epoch     metric
         self.log("train_loss_epoch", self.loss_final)
 
     def on_train_epoch_start(self):
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
-        self.make_mom_zero()
+
+        # self.make_mom_zero()
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
@@ -247,7 +252,7 @@ class GravnetModel(L.LightningModule):
     def make_mom_zero(self):
         if self.current_epoch > 2 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
-            self.ScaledGooeyBatchNorm2_2.momentum = 0
+            # self.ScaledGooeyBatchNorm2_2.momentum = 0
             # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #     gravnet_block.batchnorm_gravnet1.momentum = 0
             #     gravnet_block.batchnorm_gravnet2.momentum = 0
@@ -368,7 +373,7 @@ def object_condensation_loss_tracking(
         clust_space_dim = output_dim - 28
 
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
-    original_coords = batch.ndata["h"][:, 0:clust_space_dim]
+    original_coords = batch.ndata["pos_hits_xyz"]  # [:, 0:clust_space_dim]
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
 
     dev = batch.device

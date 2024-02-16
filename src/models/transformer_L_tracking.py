@@ -28,7 +28,7 @@ class GraphT(L.LightningModule):
         self,
         args,
         dev,
-        input_dim: int = 5,
+        input_dim: int = 4,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
@@ -64,7 +64,7 @@ class GraphT(L.LightningModule):
         max_wl_role_index = 100
         self.readout = "sum"
         self.output_dim = n_classes
-        self.batchnorm1 = nn.BatchNorm1d(in_dim_node, momentum=0.01)
+        self.batchnorm1 = nn.BatchNorm1d(in_dim_node)
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
         # self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
@@ -97,11 +97,19 @@ class GraphT(L.LightningModule):
         self.clustering = nn.Linear(64, 4 - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-    def forward(self, g, step_count):
+    def forward(self, g, step_count, eval=""):
         original_coords = g.ndata["pos_hits_xyz"]
-        g.ndata["original_coords"] = original_coords
-        if step_count % 100 == 0:
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+        if self.trainer.is_global_zero and step_count % 100 == 0:
+            g.ndata["original_coords"] = original_coords
+            PlotCoordinates(
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                features_type="ones",
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         ############################## Embeddings #############################################
         h = g.ndata["h"]
         # input embedding
@@ -110,7 +118,7 @@ class GraphT(L.LightningModule):
         h = self.in_feat_dropout(h)
 
         # GraphTransformer Layers
-        gu = knn_per_graph(g, original_coords, 16)
+        gu = knn_per_graph(g, original_coords, 7)
         gu.ndata["h"] = h
         for conv in self.layers:
             h = conv(gu, h)
@@ -119,12 +127,14 @@ class GraphT(L.LightningModule):
         beta = self.beta(x)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if step_count % 100 == 0:
+        if self.trainer.is_global_zero and step_count % 100 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         return x
@@ -175,7 +185,7 @@ class GraphT(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output = self(batch_g, 1)
+        model_output = self(batch_g, batch_idx, eval="_val")
         preds = model_output.squeeze()
 
         (loss, losses) = object_condensation_loss_tracking(
@@ -206,7 +216,6 @@ class GraphT(L.LightningModule):
                 store=True,
                 predict=False,
             )
-        print("finished step")
 
     def on_train_epoch_end(self):
         # log epoch metric
