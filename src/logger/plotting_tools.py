@@ -14,6 +14,7 @@ def PlotCoordinates(
     egnn=False,
     features_type="ones",
     epoch="",
+    step_count=0,
 ):
     if predict:
         outdir = outdir + "/figures_evaluation"
@@ -87,7 +88,12 @@ def PlotCoordinates(
                 outdir + "/" + name + "_" + num_layer + "_" + str(i) + epoch + ".html"
             )
         else:
-            fig.write_html(outdir + "/" + name + "_" + str(i) + epoch + ".html")
+            print(
+                outdir + "/" + name + "_" + str(i) + epoch + str(step_count) + ".html"
+            )
+            fig.write_html(
+                outdir + "/" + name + "_" + str(i) + epoch + str(step_count) + ".html"
+            )
 
 
 def shuffle_truth_colors(df, qualifier="truthHitAssignementIdx", rdst=None):
