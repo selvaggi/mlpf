@@ -45,7 +45,7 @@ class GraphT(L.LightningModule):
         self.df_showes_db = []
         self.args = args
         self.validation_step_outputs = []
-        in_dim_node = 5  # node_dim (feat is an integer)
+        in_dim_node = 4  # node_dim (feat is an integer)
         hidden_dim = 80  # before 80
         out_dim = 80
         n_classes = 4
@@ -111,7 +111,7 @@ class GraphT(L.LightningModule):
                 step_count=step_count,
             )
         ############################## Embeddings #############################################
-        h = g.ndata["h"]
+        h = torch.cat((g.ndata["pos_hits_xyz"], g.ndata["hit_type"].view(-1, 1)), dim=0)
         # input embedding
         h = self.batchnorm1(h)
         h = self.embedding_h(h)
