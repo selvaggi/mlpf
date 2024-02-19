@@ -67,7 +67,8 @@ class GravnetModel(L.LightningModule):
         }
         self.act = acts[activation]
 
-        N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
+        # N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
+        N_NEIGHBOURS = [16, 32, 16, 32, 16, 32, 16]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim
@@ -90,7 +91,7 @@ class GravnetModel(L.LightningModule):
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64,
+                    64 if i == 0 else (self.d_shape * i + 64),
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -103,7 +104,7 @@ class GravnetModel(L.LightningModule):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(64, 64),
+                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
                     self.act,  # ,
                 ]
             )
@@ -128,7 +129,7 @@ class GravnetModel(L.LightningModule):
         assert x.device == device
 
         allfeat = []  # To store intermediate outputs
-
+        allfeat.append(x)
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
@@ -146,7 +147,10 @@ class GravnetModel(L.LightningModule):
                 self.args.model_prefix,
                 num_layer,
             )
-
+            allfeat.append(x)
+            if len(allfeat) > 1:
+                x = torch.concatenate(allfeat, dim=1)
+        x = torch.cat(allfeat, dim=-1)
         x = self.postgn_dense(x)
         # x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
