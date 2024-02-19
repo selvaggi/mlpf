@@ -56,7 +56,6 @@ def evaluate_efficiency_tracks(
             path_save,
         )
 
-        # if len(shower_p_unique) < len(particle_ids) - 3:
         # print("storing  event", local_rank, step, i)
         # torch.save(
         #     dic,
@@ -146,6 +145,7 @@ def generate_showers_data_frame(
     )
     # print("e_reco_showers0", e_reco_showers)
     e_reco_showers = e_reco_showers[1:]
+    e_true_showers = dic["part_true"][:, 5]
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     # print("row_ind", row_ind)
@@ -175,6 +175,8 @@ def generate_showers_data_frame(
     fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
     fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(e_pred_showers.device)
     e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
+
+    e_true = torch.cat((e_true_showers, fake_showers_showers_e_truw), dim=0)
     e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
 
     e_pred_t = torch.cat(
@@ -187,6 +189,7 @@ def generate_showers_data_frame(
     # print(e_reco.shape, e_pred.shape, e_pred_t.shape)
     d = {
         "reco_showers_E": e_reco.detach().cpu(),
+        "true_showers_E": e_true.detach().cpu(),
         "pred_showers_E": e_pred.detach().cpu(),
         "e_pred_and_truth": e_pred_t.detach().cpu(),
     }
