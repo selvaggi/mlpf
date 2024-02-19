@@ -200,7 +200,8 @@ def store_at_batch_end(
     path_save_ = (
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
-    df_batch.to_pickle(path_save_)
+    if predict:
+        df_batch.to_pickle(path_save_)
     path_save_ = (
         path_save
         + "/"
@@ -211,7 +212,8 @@ def store_at_batch_end(
         + str(epoch)
         + "_hdbscan.pt"
     )
-    df_batch1.to_pickle(path_save_)
+    if predict:
+        df_batch1.to_pickle(path_save_)
     if predict:
         path_save_pandora = (
             path_save
