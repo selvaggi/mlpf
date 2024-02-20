@@ -147,6 +147,8 @@ def main():
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
+            limit_train_batches=6000,
+            limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
@@ -166,6 +168,7 @@ def main():
             devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
+            limit_val_batches=19,
         )
         for name, get_test_loader in test_loaders.items():
             test_loader = get_test_loader()

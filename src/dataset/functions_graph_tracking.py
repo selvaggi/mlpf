@@ -192,13 +192,17 @@ def create_graph_tracking_global(output, get_vtx=False):
             )
             pos_xyz = torch.cat((left_post, right_post), dim=0)
             hit_type_all = torch.cat((hit_type, hit_type), dim=0)
+
         g.ndata["hit_type"] = hit_type_all
         g.ndata["particle_number"] = particle_number
         g.ndata["particle_number_nomap"] = particle_number_nomap
         g.ndata["pos_hits_xyz"] = pos_xyz
         # uvz = convert_to_conformal_coordinates(pos_xyz)
         # g.ndata["conformal"] = uvz
-        if len(y_data_graph) < 4:
+        if len(y_data_graph) < 2:
+            # print(y_data_graph)
+            # print("hit_type", hit_type)
+            # print("GRAPH IS EMPTY", len(y_data_graph))
             graph_empty = True
     else:
         graph_empty = True
@@ -212,6 +216,7 @@ def create_graph_tracking_global(output, get_vtx=False):
 
 def remove_loopers(hit_particle_link, y, coord, cluster_id):
     unique_p_numbers = torch.unique(hit_particle_link)
+    cluster_id_unique = torch.unique(cluster_id)
     # mask_p = y[:, 5] < 0.1
 
     min_x = scatter_min(coord[:, 0], cluster_id.long() - 1)[0]
@@ -229,6 +234,8 @@ def remove_loopers(hit_particle_link, y, coord, cluster_id):
 
     mask_all = mask_hits.view(-1) + mask_p.view(-1)
     list_remove = unique_p_numbers[mask_all.view(-1)]
+    # print("number_of_hits", number_of_hits)
+    # print("list_remove", cluster_id_unique[mask_all.view(-1)])
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:

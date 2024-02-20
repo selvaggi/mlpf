@@ -192,7 +192,7 @@ class ExampleWrapper(L.LightningModule):
             tracking=True,
         )
         loss = loss
-        print("training step", batch_idx, loss)
+        # print("training step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss)
 
@@ -220,7 +220,7 @@ class ExampleWrapper(L.LightningModule):
             tracking=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
-        print("validation step", batch_idx, loss)
+        # print("validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
         # self.validation_step_outputs.append([model_output, batch_g, y])
@@ -262,7 +262,7 @@ class ExampleWrapper(L.LightningModule):
             #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
     def on_validation_epoch_end(self):
-        print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
+        # print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
         if self.args.predict:
             store_at_batch_end(
                 self.args.model_prefix + "showers_df_evaluation",
