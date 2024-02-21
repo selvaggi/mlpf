@@ -24,6 +24,7 @@ from src.dataset.functions_graph_tracking import (
     create_graph_tracking,
     create_graph_tracking_global,
 )
+from src.dataset.functions_graph_tracking_CLD import create_graph_tracking_CLD
 
 
 def _finalize_inputs(table, data_config):
@@ -33,8 +34,8 @@ def _finalize_inputs(table, data_config):
     for k, params in data_config.preprocess_params.items():
         if data_config._auto_standardization and params["center"] == "auto":
             raise ValueError("No valid standardization params for %s" % k)
-        # if params['center'] is not None:
-        #    table[k] = (table[k] - params['center']) * params['scale']
+        # if params["center"] is not None:
+        #     table[k] = (table[k] - params["center"]) * params["scale"]
         if params["length"] is not None:
             # if k == "hit_genlink":
             #    pad_fn = partial(_pad_vector, value=-1)
@@ -301,11 +302,16 @@ class _SimpleIter(object):
                     [g, features_partnn], graph_empty = create_graph_tracking(
                         X,
                     )
+            elif self._data_config.graph_config.get("tracking_CLD", False):
+                [g, features_partnn], graph_empty = create_graph_tracking_CLD(
+                    X,
+                )
 
             else:
                 [g, features_partnn], graph_empty = create_graph(
                     X, self._data_config, n_noise=self.n_noise
                 )
+
         else:
             npart_min, npart_max = self.synthetic_npart_min, self.synthetic_npart_max
             [g, features_partnn], graph_empty = create_graph_synthetic(

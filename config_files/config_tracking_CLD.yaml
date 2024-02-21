@@ -1,8 +1,6 @@
 graph_config:
-   only_hits: true
-   k: 40
-   tracking: true
-   global: false
+   tracking_CLD: true
+
 
 
 custom_model_kwargs:
@@ -24,12 +22,8 @@ test_time_selection:
    #(recojet_e<5)
 
 new_variables:
-   ### [format] name: formula
-   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
-   #pfcand_mask: awkward.JaggedArray.ones_like(pfcand_etarel)
-   #sv_mask: awkward.JaggedArray.ones_like(sv_etarel)
-   #pfcand_mask: awkward.JaggedArray.ones_like(pfcand_e)
-   hit_mask: ak.ones_like(hit_EDep)
+   hit_xx: hit_x
+   hit_mask: ak.ones_like(hit_xx)
    part_mask: ak.ones_like(part_p)
 
 preprocess:
@@ -42,47 +36,40 @@ preprocess:
 inputs:
    pf_points:
       pad_mode: wrap
-      length: 25000
+      length: 2000
       vars:
          - [hit_x, null]
          - [hit_y, null]
          - [hit_z, null]
    pf_features:
       pad_mode: wrap
-      length: 25000
+      length: 2000
       vars:
          - [hit_x, null] #VX
          - [hit_y, null] #VX
          - [hit_z, null] #VX
-         - [hit_EDep, null] # VX DC
-         - [superLayer, null] # DC
-         - [layer, null] # DC
-         - [phi, null] #  DC
-         - [distance_to_wire, null] # DC
-         - [z_position_along_wire, null] # DC
-         - [hit_type, null] # VX DC
-         #- [cluster_count, null] # DC
+         - [calohit_col, null] # VX DC
 
    pf_vectors:
-      length: 25000
+      length: 2000
       pad_mode: wrap
       vars:
          - [part_theta, null]  #2
          - [part_phi, null] #3
          - [part_m, null] #4
          - [part_pid, null]  #15
-         - [part_id, null]  #6
          - [part_p, null]  #6
    pf_vectoronly:
-      length: 25000
+      length: 2000
       pad_mode: wrap
       vars:
-      - [hit_genlink0, null] #2
+      - [hit_genlink, null] #2
+      - [hit_genlink, null] #2
 
 
 
    pf_mask:
-      length: 25000
+      length: 2000
       pad_mode: constant
       vars:
          - [hit_mask, null]
