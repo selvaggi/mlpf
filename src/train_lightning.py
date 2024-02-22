@@ -118,7 +118,7 @@ def main():
 
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
-
+        print("args.load_model_weights", args.load_model_weights)
         if args.load_model_weights is not None:
             print("LOADING MODEL WEIGHTS")
             from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
