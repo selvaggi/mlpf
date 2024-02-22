@@ -120,6 +120,7 @@ def main():
         # wandb.run.name = args.wandb_displayname
 
         if args.load_model_weights is not None:
+            print("LOADING MODEL WEIGHTS")
             from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
