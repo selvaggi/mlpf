@@ -89,10 +89,28 @@ def PlotCoordinates(
             )
         else:
             print(
-                outdir + "/" + name + "_" + str(i) + epoch + str(step_count) + ".html"
+                outdir
+                + "/"
+                + name
+                + "_"
+                + epoch
+                + "_"
+                + str(step_count)
+                + "_"
+                + str(i)
+                + ".html"
             )
             fig.write_html(
-                outdir + "/" + name + "_" + str(i) + epoch + str(step_count) + ".html"
+                outdir
+                + "/"
+                + name
+                + "_"
+                + epoch
+                + "_"
+                + str(step_count)
+                + "_"
+                + str(i)
+                + ".html"
             )
 
 

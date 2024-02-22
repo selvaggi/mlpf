@@ -22,7 +22,7 @@ from src.models.gravnet_calibration import (
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
 from src.layers.inference_oc_tracks import (
     evaluate_efficiency_tracks,
     store_at_batch_end,
@@ -279,7 +279,7 @@ class ExampleWrapper(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer),
+                "scheduler": StepLR(optimizer, step_size=2, gamma=0.1), #ReduceLROnPlateau(optimizer),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
