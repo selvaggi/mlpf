@@ -39,6 +39,9 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.profilers import AdvancedProfiler
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
+
 
 def get_samples_steps_per_epoch(args):
     if args.samples_per_epoch is not None:
@@ -117,7 +120,11 @@ def main():
         # wandb.run.name = args.wandb_displayname
 
         if args.load_model_weights is not None:
-            model = model.load_from_checkpoint(args.load_model_weights)
+            from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
+
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0
+            )
         accelerator, devices = get_gpu_dev(args)
 
         val_every_n_epochs = 1
@@ -140,14 +147,14 @@ def main():
                 lr_monitor,
             ],
             accelerator="gpu",
-            devices=[0, 1, 2, 3],
+            devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=6000,
+            limit_train_batches=600,
             limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
