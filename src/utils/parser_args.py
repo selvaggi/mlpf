@@ -520,3 +520,9 @@ parser.add_argument(
     default=False,
     help="Are we using track information",
 )
+parser.add_argument(
+    "--correction",
+    action="store_true",
+    default=False,
+    help="Train correction only",
+)

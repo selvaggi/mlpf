@@ -12,19 +12,14 @@ import time
 from scipy.optimize import curve_fit
 
 
-def plot_efficiency_all(sd_hgb, PATH_store):
-    all_particles = create_eff_dic(sd_hgb)
-    plot_eff(
-        "efficiency",
-        all_particles,
-        "Photons",
-        PATH_store,
-    )
+def plot_efficiency_all(sd_hgb, PATH_store, log):
+    all_particles = create_eff_dic(sd_hgb, log)
+    plot_eff("efficiency", all_particles, "Photons", PATH_store, log)
 
 
-def create_eff_dic(matched_):
+def create_eff_dic(matched_, log):
     df_id = matched_
-    eff, energy_eff = calculate_eff(df_id, False)
+    eff, energy_eff = calculate_eff(df_id, log)
     photons_dic = {}
     photons_dic["eff"] = eff
     photons_dic["energy_eff"] = energy_eff
@@ -32,7 +27,10 @@ def create_eff_dic(matched_):
 
 
 def calculate_eff(sd, log_scale=False):
-    bins = np.arange(0, 51, 2)
+    if log_scale:
+        bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+    else:
+        bins = np.arange(0, 51, 2)
     eff = []
     energy_eff = []
     for i in range(len(bins) - 1):
@@ -54,7 +52,7 @@ def calculate_eff(sd, log_scale=False):
     return eff, energy_eff
 
 
-def plot_eff(title, photons_dic, label1, PATH_store):
+def plot_eff(title, photons_dic, label1, PATH_store, log):
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
     fig = plt.figure()
     j = 0
@@ -69,7 +67,7 @@ def plot_eff(title, photons_dic, label1, PATH_store):
         facecolors=colors_list[1],
         edgecolors=colors_list[1],
         label="ML",
-        marker="x",
+        marker="o",
         s=50,
     )
 
@@ -77,8 +75,13 @@ def plot_eff(title, photons_dic, label1, PATH_store):
     # if title == "Electromagnetic Shower Reconstruction Efficiency":
     #     plt.ylim([0.7, 1.1])
     # else:
+    if log:
+        log_ = "log"
+        # plt.xscale("log")
+    else:
+        log_ = ""
     plt.ylim([0.5, 1.1])
     fig.savefig(
-        PATH_store + title + ".png",
+        PATH_store + title + log_ + ".png",
         bbox_inches="tight",
     )

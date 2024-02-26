@@ -6,26 +6,25 @@ NEV=${3}
 SEED=${4}
 OUTPUTDIR=${5}
 
-DIR="/eos/experiment/fcc/ee/datasets/mlpf/condor/train/10_15_05_50_dr01/"
+DIR="/eos/experiment/fcc/ee/datasets/mlpf/condor/train/210224_1/"
 mkdir ${DIR}
 mkdir ${DIR}${SEED}
 cd ${DIR}${SEED}
 
 
-# cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
-# cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
-cp -r ${HOMEDIR}/gun/gun.cpp .
-cp -r ${HOMEDIR}/gun/compile_gun.x .
+cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
+cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
+# cp -r ${HOMEDIR}/gun/gun.cpp .
+# cp -r ${HOMEDIR}/gun/compile_gun.x .
 cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
 cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
 mkdir ${DIR}${SEED}/PandoraSettingsCLD
 cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
 cp -r ${HOMEDIR}/condor/make_pftree_clic_bindings.py .
 cp -r ${HOMEDIR}/condor/tree_tools.py .
-
 cp -r ${HOMEDIR}/gun/${GUNCARD} .
 echo ${HOMEDIR}/gun/${GUNCARD}
-echo ${INPUTFILE}
+# echo ${INPUTFILE}
 
 #first recompile gun locally 
 echo "  "
@@ -36,8 +35,8 @@ echo "  "
 echo " ===============================================================================  "
 echo "  "
 
-# source compile_gun_RA.x
-source compile_gun.x
+source compile_gun_RA.x
+# source compile_gun.x
 
 #produce hepmc event file 
 
@@ -50,8 +49,7 @@ echo "running gun"
 echo "  "
 echo " ===============================================================================  "
 echo "  "
-
-./gun ${GUNCARD}
+./gun ${GUNCARD} 
 
 echo "  "
 echo " ================================================================================ "
@@ -60,11 +58,13 @@ echo "gun complete ..."
 echo "  "
 echo " ================================================================================ "
 echo "  "
-# 
 
+wrapperfunction() {
+    source /cvmfs/sw.hsf.org/key4hep/setup.sh
+}
+wrapperfunction
 # #When you want to revert the changes:
 
-source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
 
 echo "  "
 echo " ================================================================================ "

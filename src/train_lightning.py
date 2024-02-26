@@ -176,7 +176,7 @@ def main():
             devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            limit_val_batches=19,
+            # limit_val_batches=19,
         )
         for name, get_test_loader in test_loaders.items():
             test_loader = get_test_loader()

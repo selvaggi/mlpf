@@ -38,6 +38,7 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
 )
 from lightning.pytorch.profilers import AdvancedProfiler
+from src.models.gravnet_3_L import FreezeClustering
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["TORCH_USE_CUDA_DSA"] = "1"
@@ -118,9 +119,12 @@ def main():
 
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
-
         if args.load_model_weights is not None:
-            model = model.load_from_checkpoint(args.load_model_weights)
+            from src.models.gravnet_3_L import GravnetModel
+
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0
+            )
         accelerator, devices = get_gpu_dev(args)
 
         val_every_n_epochs = 1
@@ -132,16 +136,18 @@ def main():
             save_top_k=-1,  # <--- this is important!
             save_weights_only=True,
         )
-        # if accelerator != 0:
-
-        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
         lr_monitor = LearningRateMonitor(logging_interval="epoch")
+        callbacks = [
+            TQDMProgressBar(refresh_rate=10),
+            checkpoint_callback,
+            lr_monitor,
+        ]
+        if args.correction:
+            callbacks.append(FreezeClustering())
+        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+
         trainer = L.Trainer(
-            callbacks=[
-                TQDMProgressBar(refresh_rate=10),
-                checkpoint_callback,
-                lr_monitor,
-            ],
+            callbacks=callbacks,
             accelerator="gpu",
             devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
@@ -150,15 +156,19 @@ def main():
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=2000,
-            limit_val_batches=20,
+            limit_train_batches=100,
+            limit_val_batches=2,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
+
         trainer.fit(
-            model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
+            model=model,
+            train_dataloaders=train_loader,
+            val_dataloaders=val_loader,
+            # ckpt_path=args.load_model_weights,
         )
 
         # TODO save checkpoints and hyperparameters

@@ -68,7 +68,7 @@ def evaluate_efficiency_tracks(
         #     + str(i)
         #     + ".pt",
         # )
-        if len(shower_p_unique) > 1:
+        if len(row_ind) > 1:
             df_event, number_of_showers_total = generate_showers_data_frame(
                 labels,
                 dic,
@@ -105,6 +105,7 @@ def store_at_batch_end(
         path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
     )
     if predict:
+        print("STORING")
         df_batch = pd.concat(df_batch)
         df_batch.to_pickle(path_save_)
 
@@ -138,18 +139,14 @@ def generate_showers_data_frame(
         torch.ones_like(labels).view(-1),
         labels.long(),
     )
-    # print("e_pred_showers", e_pred_showers)
     e_reco_showers = scatter_add(
         torch.ones_like(labels).view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
-    # print("e_reco_showers0", e_reco_showers)
     e_reco_showers = e_reco_showers[1:]
     e_true_showers = dic["part_true"][:, 5]
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
-    # print("row_ind", row_ind)
-    # print("col_ind", col_ind)
     pred_showers = shower_p_unique
 
     index_matches = col_ind + 1
@@ -158,7 +155,6 @@ def generate_showers_data_frame(
     matched_es = matched_es.to(e_pred_showers.device)
 
     matched_es[row_ind] = e_pred_showers[index_matches]
-
     intersection_E = torch.zeros_like(e_reco_showers) * (torch.nan)
     ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
     intersection_E[row_ind] = ie_e.to(e_pred_showers.device)

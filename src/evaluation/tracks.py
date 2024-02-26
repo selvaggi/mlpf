@@ -22,7 +22,7 @@ colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
 
 log_scale = False
 
-PATH_store = "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/160124_global/showers_df_evaluation/"
+PATH_store = "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/200124_global_1/showers_df_evaluation/"
 path_hgcal = PATH_store + "0_0_0.pt"
 
 
@@ -31,7 +31,7 @@ def main():
     sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, False)
     dict_1 = obtain_metrics(matched_hgb)
 
-    plot_efficiency_all(sd_hgb, PATH_store)
+    plot_efficiency_all(sd_hgb, PATH_store, log=True)
 
     plot_metrics(
         dict_1,

@@ -22,6 +22,11 @@ from src.models.gravnet_calibration import (
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from src.models.GattedGCN_correction import GraphTransformerNet, GCNNet
+from src.layers.inference_oc import hfdb_obtain_labels
+import torch_cmspepr
+from src.layers.inference_oc import match_showers
+from lightning.pytorch.callbacks import BaseFinetuning
 
 
 class GravnetModel(L.LightningModule):
@@ -40,8 +45,9 @@ class GravnetModel(L.LightningModule):
     ):
 
         super(GravnetModel, self).__init__()
+        self.dev = dev
         self.loss_final = 100
-        self.df_showers = []
+        # self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
         self.args = args
@@ -126,8 +132,11 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
         else:
             self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
+        if self.args.correction:
+            self.strict_loading = False
+            self.GatedGCNNet = GraphTransformerNet(self.dev)
 
-    def forward(self, g, step_count):
+    def forward(self, g, y, step_count):
         x = g.ndata["h"]
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
@@ -184,9 +193,17 @@ class GravnetModel(L.LightningModule):
                 predict=self.args.predict,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
-        pred_energy_corr = torch.ones_like(beta.view(-1, 1))
+        if self.args.correction:
+            graphs_new, true_new, sum_e = obtain_clustering_for_matched_showers(
+                g, x, y, self.trainer.global_rank
+            )
+            graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
+            pred_energy_corr = self.GatedGCNNet(graphs_new)
+            return x, pred_energy_corr, true_new, sum_e
+        else:
+            pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
-        return x, pred_energy_corr, 0
+            return x, pred_energy_corr, 0
 
     # def on_after_backward(self):
     #     for name, p in self.named_parameters():
@@ -198,10 +215,21 @@ class GravnetModel(L.LightningModule):
 
         batch_g = batch[0]
         if self.trainer.is_global_zero:
-            model_output, e_cor, loss_ll = self(batch_g, batch_idx)
+            if self.args.correction:
+                model_output, e_cor1, true_e, sum_e = self(batch_g, y, batch_idx)
+                e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+                loss_ll = 0
+            else:
+                model_output, e_cor, loss_ll = self(batch_g, y, batch_idx)
         else:
-            model_output, e_cor, loss_ll = self(batch_g, 1)
-
+            if self.args.correction:
+                model_output, e_cor1, true_e, sum_e = self(batch_g, y, 1)
+                e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+                loss_ll = 0
+            else:
+                model_output, e_cor, loss_ll = self(batch_g, y, 1)
+                e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        print(model_output.shape, e_cor.shape, e_cor1.shape)
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -218,7 +246,10 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        if self.args.correction:
+            loss, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
+        else:
+            loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
 
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
@@ -232,7 +263,12 @@ class GravnetModel(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output, e_cor, loss_ll = self(batch_g, 1)
+        if self.args.correction:
+            model_output, e_cor1, true_e, sum_e = self(batch_g, y, 1)
+            loss_ll = 0
+            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        else:
+            model_output, e_cor, loss_ll = self(batch_g, y, 1)
         preds = model_output.squeeze()
 
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -251,14 +287,22 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
-        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        if self.args.correction:
+            loss, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
+        else:
+            loss = loss
+
         print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, val=True)
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
-            (df_batch, df_batch_pandora, df_batch1,) = create_and_store_graph_output(
+            if self.args.correction:
+                e_corr = e_cor1
+            else:
+                e_corr = None
+            (df_batch_pandora, df_batch1,) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -268,9 +312,10 @@ class GravnetModel(L.LightningModule):
                 path_save=self.args.model_prefix + "showers_df_evaluation",
                 store=True,
                 predict=True,
+                e_corr=e_corr,
                 tracks=self.args.tracks,
             )
-            self.df_showers.append(df_batch)
+            # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
 
@@ -279,11 +324,13 @@ class GravnetModel(L.LightningModule):
         self.log("train_loss_epoch", self.loss_final)
 
     def on_train_epoch_start(self):
+        # if self.args.correction:
+        #     self.turn_grads_off()
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
         self.make_mom_zero()
-        self.df_showers = []
+        # self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
 
@@ -301,12 +348,12 @@ class GravnetModel(L.LightningModule):
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
 
-                self.df_showers = pd.concat(self.df_showers)
+                # self.df_showers = pd.concat(self.df_showers)
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
                     path_save=self.args.model_prefix + "showers_df_evaluation",
-                    df_batch=self.df_showers,
+                    # df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
                     step=0,
@@ -333,7 +380,9 @@ class GravnetModel(L.LightningModule):
         self.validation_step_outputs = []
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=1e-3
+        )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -345,6 +394,44 @@ class GravnetModel(L.LightningModule):
                 # multiple of "trainer.check_val_every_n_epoch".
             },
         }
+
+    # def turn_grads_off(self):
+    #     for name, param in self.named_parameters():
+    #         print("name", name)
+    #         if name.split(".")[2] == "GatedGCNNet":
+    #             param.requires_grad = True
+    #         else:
+    #             param.requires_grad = False
+
+
+class FreezeClustering(BaseFinetuning):
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        # self._unfreeze_at_epoch = unfreeze_at_epoch
+
+    def freeze_before_training(self, pl_module):
+        # freeze any module you want
+        # Here, we are freezing `feature_extractor`
+        print("CLUSTERING HAS BEEN FROOOZEN")
+        self.freeze(pl_module.ScaledGooeyBatchNorm2_1)
+        self.freeze(pl_module.Dense_1)
+        self.freeze(pl_module.gravnet_blocks)
+        self.freeze(pl_module.postgn_dense)
+        self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
+        self.freeze(pl_module.clustering)
+        self.freeze(pl_module.beta)
+
+    def finetune_function(self, pl_module, current_epoch, optimizer):
+        print("Not finetunning")
+        # # When `current_epoch` is 10, feature_extractor will start training.
+        # if current_epoch == self._unfreeze_at_epoch:
+        #     self.unfreeze_and_add_param_group(
+        #         modules=pl_module.feature_extractor,
+        #         optimizer=optimizer,
+        #         train_bn=True,
+        #     )
 
 
 class GravNetBlock(nn.Module):
@@ -434,3 +521,81 @@ def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.00)
+
+
+def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
+    graphs_showers_matched = []
+    true_energy_showers = []
+    reco_energy_showers = []
+    batch_g.ndata["coords"] = model_output[:, 0:3]
+    batch_g.ndata["beta"] = model_output[:, 3]
+    graphs = dgl.unbatch(batch_g)
+    batch_id = y[:, -1].view(-1)
+    for i in range(0, len(graphs)):
+        mask = batch_id == i
+        dic = {}
+        dic["graph"] = graphs[i]
+        dic["part_true"] = y[mask]
+        betas = torch.sigmoid(dic["graph"].ndata["beta"])
+        X = dic["graph"].ndata["coords"]
+        clustering_mode = "dbscan"
+        if clustering_mode == "clustering_normal":
+            clustering = get_clustering(betas, X)
+        elif clustering_mode == "dbscan":
+            labels = hfdb_obtain_labels(X, model_output.device)
+
+            particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
+            shower_p_unique = torch.unique(labels)
+            shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
+                labels, dic, particle_ids, model_output, local_rank, i, None
+            )
+            row_ind = torch.Tensor(row_ind).to(model_output.device).long()
+            col_ind = torch.Tensor(col_ind).to(model_output.device).long()
+            index_matches = col_ind + 1
+            index_matches = index_matches.to(model_output.device).long()
+            for unique_showers_label in shower_p_unique:
+                if torch.sum(unique_showers_label == index_matches) == 1:
+                    index_in_matched = torch.argmax(
+                        (unique_showers_label == index_matches) * 1
+                    )
+                    mask = labels == unique_showers_label
+                    # non_graph = torch.sum(mask)
+                    sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
+                    k = 7
+                    edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+                    g = dgl.graph(
+                        (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+                    )
+                    g = dgl.remove_self_loop(g)
+                    # g = dgl.DGLGraph().to(graphs[i].device)
+                    # g.add_nodes(non_graph.detach().cpu())
+                    g.ndata["h"] = torch.cat(
+                        (
+                            graphs[i].ndata["h"][mask],
+                            graphs[i].ndata["beta"][mask].view(-1, 1),
+                        ),
+                        dim=1,
+                    )
+                    energy_t = dic["part_true"][:, 3].to(model_output.device)
+                    true_energy_shower = energy_t[row_ind[index_in_matched]]
+                    reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
+                    graphs_showers_matched.append(g)
+                    true_energy_showers.append(true_energy_shower.view(-1))
+                    reco_energy_showers.append(reco_energy_shower.view(-1))
+    graphs_showers_matched = dgl.batch(graphs_showers_matched)
+    true_energy_showers = torch.cat(true_energy_showers, dim=0)
+    reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
+    return graphs_showers_matched, true_energy_showers, reco_energy_showers
+
+
+def loss_reco_true(e_cor, true_e, sum_e):
+    # m = nn.ELU()
+    # e_cor = m(e_cor)
+    print("corection", e_cor[0:5])
+    print("sum_e", sum_e[0:5])
+    print("true_e", true_e[0:5])
+    loss = torch.square((e_cor * sum_e - true_e) / true_e)
+    loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
+    loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
+    loss = torch.mean(loss)
+    return loss, loss_abs, loss_abs_nocali

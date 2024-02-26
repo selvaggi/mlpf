@@ -101,6 +101,7 @@ def log_losses_wandb(
             }
         )
 
+
 def log_losses_wandb_tracking(
     logwandb, num_batches, local_rank, losses, loss, val=False
 ):
@@ -114,6 +115,8 @@ def log_losses_wandb_tracking(
                 "loss" + val_ + " regression": loss,
                 "loss" + val_ + " lv": losses[0],
                 "loss" + val_ + " beta": losses[1],
+                "loss" + val_ + " beta sig": losses[4],
+                "loss" + val_ + " beta noise": losses[5],
                 "loss" + val_ + " attractive": losses[2],
                 "loss" + val_ + " repulsive": losses[3],
             }

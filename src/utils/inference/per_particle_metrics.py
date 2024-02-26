@@ -277,9 +277,13 @@ def resolution(E, a, b, c):
 def plot_per_energy_resolution2(
     sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
 ):
+    if tracks:
+        tracks_label = "tracks"
+    else:
+        tracks_label = ""
     plot_response = True
     if plot_response:
-        list_plots = ["", "_reco"]  # "","_reco"
+        list_plots = [""]  # "","_reco"
         for el in list_plots:
             photons_dic = get_response_for_id_i(
                 [22], matched_pandora, matched_, tracks=tracks
@@ -294,6 +298,7 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Photons",
                 el,
+                tracks=tracks_label,
             )
             plot_one_label(
                 "Electromagnetic Response",
@@ -302,6 +307,7 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Photons",
                 el,
+                tracks=tracks_label,
             )
             plot_one_label(
                 "Electromagnetic Response",
@@ -310,6 +316,7 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Electrons",
                 el,
+                tracks=tracks_label,
             )
             plot_one_label(
                 "Electromagnetic Resolution",
@@ -318,6 +325,7 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Electrons",
                 el,
+                tracks=tracks_label,
             )
             hadrons_dic = get_response_for_id_i(
                 [130, 2112, 211], matched_pandora, matched_, tracks=tracks
@@ -329,6 +337,7 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Hadrons",
                 el,
+                tracks=tracks_label,
             )
             plot_one_label(
                 "Hadronic Response",
@@ -337,11 +346,12 @@ def plot_per_energy_resolution2(
                 PATH_store,
                 "Hadrons",
                 el,
+                tracks=tracks_label,
             )
 
 
 def plot_per_energy_resolution(
-    sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store
+    sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
 ):
     plot_response = True
     if plot_response:
@@ -538,14 +548,14 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
     energy_resolutions = []
     energy_resolutions_reco = []
 
-    tic = time.time()
-    vector = range(len(bins) - 1)
-    output_results = parallel_process(vector, bins, matched, pandora, bins_per_binned_E)
-    mean_true_rec = [r[0] for ind, r in enumerate(output_results)]
-    variance_om_true_rec = [r[1] for ind, r in enumerate(output_results)]
-    energy_resolutions_reco = [r[2] for ind, r in enumerate(output_results)]
-    toc = time.time()
-    print("time with paralel version", toc - tic)
+    # tic = time.time()
+    # vector = range(len(bins) - 1)
+    # output_results = parallel_process(vector, bins, matched, pandora, bins_per_binned_E)
+    # mean_true_rec = [r[0] for ind, r in enumerate(output_results)]
+    # variance_om_true_rec = [r[1] for ind, r in enumerate(output_results)]
+    # energy_resolutions_reco = [r[2] for ind, r in enumerate(output_results)]
+    # toc = time.time()
+    # print("time with paralel version", toc - tic)
 
     binning = 1e-3
     if pandora:
@@ -639,14 +649,7 @@ def parallel_process(
     return results1
 
 
-def plot_one_label(
-    title,
-    photons_dic,
-    y_axis,
-    PATH_store,
-    label1,
-    reco,
-):
+def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=""):
     if reco == "":
         label_add = " raw"
         label_add_pandora = " corrected"
@@ -749,4 +752,6 @@ def plot_one_label(
     plt.legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
     label = label1
 
-    fig.savefig(PATH_store + title + reco + label + "_v1.pdf", bbox_inches="tight")
+    fig.savefig(
+        PATH_store + title + reco + label + tracks + "_v1.pdf", bbox_inches="tight"
+    )

@@ -32,6 +32,7 @@ def create_and_store_graph_output(
     if not tracking:
         if e_corr is None:
             batch_g.ndata["correction"] = model_output[:, 4]
+
     graphs = dgl.unbatch(batch_g)
     batch_id = y[:, -1].view(-1)
 
@@ -44,32 +45,25 @@ def create_and_store_graph_output(
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
 
-        # betas = torch.sigmoid(dic["graph"].ndata["beta"])
-        if not tracking:
-            if e_corr is None:
-                correction_e = dic["graph"].ndata["correction"].view(-1)
         X = dic["graph"].ndata["coords"]
-        # clustering_mode = "dbscan"
-        # if clustering_mode == "clustering_normal":
-        #     clustering = get_clustering(betas, X)
-        # elif clustering_mode == "dbscan":
-        labels = dbscan_obtain_labels(X, model_output.device)
+
+        # labels = dbscan_obtain_labels(X, model_output.device)
         labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        shower_p_unique = torch.unique(labels)
-        shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
-            labels,
-            dic,
-            particle_ids,
-            model_output,
-            local_rank,
-            i,
-            path_save,
-            tracks=tracks,
-        )
+        # shower_p_unique = torch.unique(labels)
+        # shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
+        #     labels,
+        #     dic,
+        #     particle_ids,
+        #     model_output,
+        #     local_rank,
+        #     i,
+        #     path_save,
+        #     tracks=tracks,
+        # )
         shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb = match_showers(
             labels_hdb,
             dic,
@@ -112,21 +106,21 @@ def create_and_store_graph_output(
         #     + str(i)
         #     + ".pt",
         # )
-        if len(shower_p_unique) > 1:
-            df_event, number_of_showers_total = generate_showers_data_frame(
-                labels,
-                dic,
-                shower_p_unique,
-                particle_ids,
-                row_ind,
-                col_ind,
-                i_m_w,
-                e_corr=e_corr,
-                number_of_showers_total=number_of_showers_total,
-                step=step,
-                number_in_batch=i,
-                tracks=tracks,
-            )
+        if len(shower_p_unique_hdb) > 1:
+            # df_event, number_of_showers_total = generate_showers_data_frame(
+            #     labels,
+            #     dic,
+            #     shower_p_unique,
+            #     particle_ids,
+            #     row_ind,
+            #     col_ind,
+            #     i_m_w,
+            #     e_corr=e_corr,
+            #     number_of_showers_total=number_of_showers_total,
+            #     step=step,
+            #     number_in_batch=i,
+            #     tracks=tracks,
+            # )
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -141,8 +135,8 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            if len(df_event) > 1:
-                df_list.append(df_event)
+            # if len(df_event) > 1:
+            #     df_list.append(df_event)
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
             if predict:
@@ -162,8 +156,8 @@ def create_and_store_graph_output(
                 )
                 if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
-
-    df_batch = pd.concat(df_list)
+        number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
+    # df_batch = pd.concat(df_list)
     df_batch1 = pd.concat(df_list1)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
@@ -173,7 +167,7 @@ def create_and_store_graph_output(
     if store:
         store_at_batch_end(
             path_save,
-            df_batch,
+            # df_batch,
             df_batch1,
             df_batch_pandora,
             local_rank,
@@ -182,14 +176,13 @@ def create_and_store_graph_output(
             predict=predict,
         )
     if predict:
-        return df_batch, df_batch_pandora, df_batch1
+        return df_batch_pandora, df_batch1
     else:
-        return df_batch
+        return df_batch1
 
 
 def store_at_batch_end(
     path_save,
-    df_batch,
     df_batch1,
     df_batch_pandora,
     local_rank=0,
@@ -197,11 +190,11 @@ def store_at_batch_end(
     epoch=None,
     predict=False,
 ):
-    path_save_ = (
-        path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
-    )
-    if predict:
-        df_batch.to_pickle(path_save_)
+    # path_save_ = (
+    #     path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
+    # )
+    # if predict:
+    #     df_batch.to_pickle(path_save_)
     path_save_ = (
         path_save
         + "/"
@@ -226,7 +219,7 @@ def store_at_batch_end(
             + "_pandora.pt"
         )
         df_batch_pandora.to_pickle(path_save_pandora)
-    log_efficiency(df_batch)
+    log_efficiency(df_batch1)
     if predict:
         log_efficiency(df_batch_pandora, pandora=True)
 
@@ -310,6 +303,14 @@ def generate_showers_data_frame(
                     + number_of_showers
                 ]
                 * e_pred_showers[index_matches]
+            )
+            print(
+                "corrections per shower",
+                corrections_per_shower[
+                    number_of_showers_total : number_of_showers_total
+                    + number_of_showers
+                ].shape,
+                e_pred_showers[index_matches].shape,
             )
             calibration_per_shower = matched_es.clone()
             calibration_per_shower[row_ind] = corrections_per_shower[

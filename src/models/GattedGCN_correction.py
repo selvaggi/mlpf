@@ -22,7 +22,7 @@ class GraphTransformerNet(nn.Module):
     def __init__(self, dev):
         super().__init__()
 
-        in_dim_node = 10  # node_dim (feat is an integer)
+        in_dim_node = 9  # node_dim (feat is an integer)
         self.clust_space_norm = "twonorm"
         hidden_dim = 80  # before 80
         out_dim = 80
