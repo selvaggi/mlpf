@@ -152,7 +152,7 @@ def main():
                 lr_monitor,
             ],
             accelerator="gpu",
-            devices=[0],
+            devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,
@@ -177,7 +177,7 @@ def main():
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
-            devices=[0],
+            devices=[1],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # limit_val_batches=19,
