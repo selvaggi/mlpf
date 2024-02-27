@@ -67,14 +67,16 @@ class GravnetModel(L.LightningModule):
         }
         self.act = acts[activation]
 
-        # N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
-        N_NEIGHBOURS = [16, 128, 16, 128]
+        N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
+        # N_NEIGHBOURS = [16, 32, 16, 32, 16, 32, 16]
+
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.n_gravnet_blocks = TOTAL_ITERATIONS
         self.n_postgn_dense_blocks = n_postgn_dense_blocks
+        self.inner_dim = 64
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
@@ -82,17 +84,16 @@ class GravnetModel(L.LightningModule):
                 self.input_dim
             )  # , momentum=0.01)
 
-        self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
-        # self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
+        self.Dense_1 = nn.Linear(input_dim, self.inner_dim, bias=False)
+        self.Dense_1.weight.data.copy_(torch.eye(self.inner_dim, input_dim))
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
-        self.d_shape = 64
+        self.d_shape = self.inner_dim
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (i * 64 + 64),
-                    64,
+                    self.inner_dim,
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -105,9 +106,7 @@ class GravnetModel(L.LightningModule):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(
-                        len(N_NEIGHBOURS) * self.d_shape + 64 if i == 0 else 64, 64
-                    ),
+                    nn.Linear(64, 64),
                     self.act,  # ,
                 ]
             )
@@ -132,7 +131,7 @@ class GravnetModel(L.LightningModule):
         assert x.device == device
 
         allfeat = []  # To store intermediate outputs
-        allfeat.append(x)
+        # allfeat.append(x)
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
@@ -150,10 +149,10 @@ class GravnetModel(L.LightningModule):
                 self.args.model_prefix,
                 num_layer,
             )
-            allfeat.append(x)
-            if len(allfeat) > 1:
-                x = torch.concatenate(allfeat, dim=1)
-        x = torch.cat(allfeat, dim=-1)
+            # allfeat.append(x)
+            # if len(allfeat) > 1:
+            #     x = torch.concatenate(allfeat, dim=1)
+        # x = torch.cat(x, dim=-1)
         x = self.postgn_dense(x)
         # x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
@@ -243,7 +242,7 @@ class GravnetModel(L.LightningModule):
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
-            (df_batch, df_batch_pandora, df_batch1) = create_and_store_graph_output(
+            (df_batch, df_batch_pandora, df_batch1,) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -346,14 +345,15 @@ class GravNetBlock(nn.Module):
         weird_batchnom=False,
     ):
         super(GravNetBlock, self).__init__()
-        self.d_shape = 64
+        self.d_shape = in_channels
+        out_channels = self.d_shape
 
         propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
-            in_channels,
+            self.d_shape,
             out_channels,
             space_dimensions,
-            self.d_shape,
+            propagate_dimensions,
             k,
             weird_batchnom,
         )
@@ -361,11 +361,11 @@ class GravNetBlock(nn.Module):
         self.post_gravnet = nn.Sequential(
             nn.Linear(out_channels, self.d_shape),
             nn.ELU(),
-            nn.Linear(self.d_shape, out_channels),  #! Dense 4
+            nn.Linear(self.d_shape, self.d_shape),  #! Dense 4
         )
 
-        self.batchnorm_gravnet2 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
-        self.batchnorm_gravnet3 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
+        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
+        self.batchnorm_gravnet3 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
 
     def forward(
         self,
@@ -377,14 +377,14 @@ class GravNetBlock(nn.Module):
         outdir,
         num_layer,
     ) -> Tensor:
-        # x_input = x
+        x_input = x
         xgn, gncoords = self.gravnet_layer(g, x, original_coords, batch)
         g.ndata["gncoords"] = gncoords
-        # x = xgn + x_input  # inchannels == outchannels
-        x = self.batchnorm_gravnet2(xgn)
-        # x_in2 = x
+        x = xgn + x_input
+        x = self.batchnorm_gravnet2(x)
+        x_in2 = x
         x = self.post_gravnet(x)
-        # x = x_in2 + x
+        x = x_in2 + x
         x = self.batchnorm_gravnet3(x)  #! batchnorm 2
         return x
 
@@ -407,12 +407,14 @@ class GravNetConv(nn.Module):
     ):
         super().__init__()
         self.in_channels = in_channels
+        self.out_channels = in_channels
+        self.in_channels = in_channels
         self.out_channels = out_channels
         self.k = k
         self.num_workers = num_workers
         self.lin_s = Linear(in_channels, space_dimensions, bias=False)
         self.lin_h = Linear(in_channels, propagate_dimensions)
-        self.lin = Linear(2 * propagate_dimensions, out_channels)
+        self.lin = Linear(2 * propagate_dimensions + self.in_channels, out_channels)
 
     def forward(self, g, x, original_coords, batch):
         h_l: Tensor = self.lin_h(x)  #! input_feature_transform
@@ -431,7 +433,7 @@ class GravNetConv(nn.Module):
         graph.update_all(self.message_func, self.reduce_func)
         out = graph.ndata["h"]
 
-        out = self.lin(out)
+        out = self.lin(torch.cat((out, x), dim=1))
 
         return (out, s_l)
 

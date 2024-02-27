@@ -34,14 +34,16 @@ import dgl.function as fn
 import numpy as np
 from dgl.nn import EdgeWeightNorm
 from torch_geometric.typing import OptTensor, PairTensor, PairOptTensor
+from src.layers.graph_transformer_layer import GraphTransformerLayer
+from src.layers.mlp_readout_layer import MLPReadout
 
 
-class GravnetModel(L.LightningModule):
+class GraphT(L.LightningModule):
     def __init__(
         self,
         args,
         dev,
-        input_dim: int = 8,
+        input_dim: int = 4,
         output_dim: int = 4,
         n_postgn_dense_blocks: int = 3,
         n_gravnet_blocks: int = 4,
@@ -51,128 +53,110 @@ class GravnetModel(L.LightningModule):
         weird_batchnom=False,
     ):
 
-        super(GravnetModel, self).__init__()
+        super(GraphT, self).__init__()
         self.loss_final = 100
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
         self.args = args
         self.validation_step_outputs = []
-        assert activation in ["relu", "tanh", "sigmoid", "elu"]
-        acts = {
-            "relu": nn.ReLU(),
-            "tanh": nn.Tanh(),
-            "sigmoid": nn.Sigmoid(),
-            "elu": nn.ELU(),
-        }
-        self.act = acts[activation]
-
-        # N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
-        N_NEIGHBOURS = [16, 128, 16, 128]
-        TOTAL_ITERATIONS = len(N_NEIGHBOURS)
-        self.return_graphs = False
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.n_gravnet_blocks = TOTAL_ITERATIONS
-        self.n_postgn_dense_blocks = n_postgn_dense_blocks
-        if weird_batchnom:
-            self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
-        else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(
-                self.input_dim
-            )  # , momentum=0.01)
-
-        self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
-        # self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
-        assert clust_space_norm in ["twonorm", "tanh", "none"]
-        self.clust_space_norm = clust_space_norm
-
-        self.d_shape = 64
-        self.gravnet_blocks = nn.ModuleList(
+        in_dim_node = 8  # node_dim (feat is an integer)
+        hidden_dim = 80  # before 80
+        out_dim = 80
+        n_classes = 4
+        num_heads = 8
+        in_feat_dropout = 0.0
+        dropout = 0.0
+        n_layers = 10
+        self.n_layers = n_layers
+        self.layer_norm = False
+        self.batch_norm = False
+        self.residual = True
+        self.dropout = dropout
+        self.n_classes = n_classes
+        self.lap_pos_enc = False
+        self.wl_pos_enc = False
+        max_wl_role_index = 100
+        self.readout = "sum"
+        self.output_dim = n_classes
+        self.batchnorm1 = nn.BatchNorm1d(in_dim_node)
+        self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
+        # self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
+        self.in_feat_dropout = nn.Dropout(in_feat_dropout)
+        self.layers = nn.ModuleList(
             [
-                GravNetBlock(
-                    64 if i == 0 else (i * 64 + 64),
-                    64,
-                    k=N_NEIGHBOURS[i],
-                    weird_batchnom=weird_batchnom,
+                GraphTransformerLayer(
+                    hidden_dim,
+                    hidden_dim,
+                    num_heads,
+                    dropout,
+                    self.layer_norm,
+                    self.batch_norm,
+                    self.residual,
                 )
-                for i in range(self.n_gravnet_blocks)
+                for _ in range(n_layers - 1)
             ]
         )
-
-        # Post-GravNet dense layers
-        postgn_dense_modules = nn.ModuleList()
-        for i in range(self.n_postgn_dense_blocks):
-            postgn_dense_modules.extend(
-                [
-                    nn.Linear(
-                        len(N_NEIGHBOURS) * self.d_shape + 64 if i == 0 else 64, 64
-                    ),
-                    self.act,  # ,
-                ]
+        self.layers.append(
+            GraphTransformerLayer(
+                hidden_dim,
+                out_dim,
+                num_heads,
+                dropout,
+                self.layer_norm,
+                self.batch_norm,
+                self.residual,
             )
-        self.postgn_dense = nn.Sequential(*postgn_dense_modules)
-
-        self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
+        )
+        self.MLP_layer = MLPReadout(out_dim, 64)
+        self.clustering = nn.Linear(64, 4 - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-        # if weird_batchnom:
-        #     self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
-        # else:
-        #     self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
-
-    def forward(self, g, step_count):
-        x = g.ndata["h"]
-        original_coords = x[:, 0:3]
-        g.ndata["original_coords"] = original_coords
-        device = x.device
-        batch = obtain_batch_numbers(x, g)
-        x = self.ScaledGooeyBatchNorm2_1(x)
-        x = self.Dense_1(x)
-        assert x.device == device
-
-        allfeat = []  # To store intermediate outputs
-        allfeat.append(x)
-        graphs = []
-        loss_regularizing_neig = 0.0
-        loss_ll = 0
-        if self.trainer.is_global_zero and (step_count % 100 == 0):
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
-        for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-            #! first time dim x is 64
-            #! second time is 64+d
-            x = gravnet_block(
+    def forward(self, g, step_count, eval=""):
+        original_coords = g.ndata["pos_hits_xyz"]
+        if self.trainer.is_global_zero and step_count % 100 == 0:
+            g.ndata["original_coords"] = original_coords
+            PlotCoordinates(
                 g,
-                x,
-                batch,
-                original_coords,
-                step_count,
-                self.args.model_prefix,
-                num_layer,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                features_type="ones",
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
-            allfeat.append(x)
-            if len(allfeat) > 1:
-                x = torch.concatenate(allfeat, dim=1)
-        x = torch.cat(allfeat, dim=-1)
-        x = self.postgn_dense(x)
-        # x = self.ScaledGooeyBatchNorm2_2(x)
+        ############################## Embeddings #############################################
+        # h = torch.cat((g.ndata["pos_hits_xyz"], g.ndata["hit_type"].view(-1, 1)), dim=1)
+        h = g.ndata["h"]
+        # input embedding
+        h = self.batchnorm1(h)
+        h = self.embedding_h(h)
+        h = self.in_feat_dropout(h)
+
+        # GraphTransformer Layers
+        gu = knn_per_graph(g, original_coords, 7)
+        gu.ndata["h"] = h
+        for conv in self.layers:
+            h = conv(gu, h)
+        x = self.MLP_layer(h)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
-            beta[mask] = 10
+            beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and (step_count % 100 == 0):
+        if self.trainer.is_global_zero and step_count % 100 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
-
         return x, pred_energy_corr, 0
 
     # def on_after_backward(self):
@@ -243,7 +227,7 @@ class GravnetModel(L.LightningModule):
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
-            (df_batch, df_batch_pandora, df_batch1) = create_and_store_graph_output(
+            (df_batch, df_batch_pandora, df_batch1,) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -347,13 +331,14 @@ class GravNetBlock(nn.Module):
     ):
         super(GravNetBlock, self).__init__()
         self.d_shape = 64
+        out_channels = self.d_shape
 
         propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
-            in_channels,
+            self.d_shape,
             out_channels,
             space_dimensions,
-            self.d_shape,
+            propagate_dimensions,
             k,
             weird_batchnom,
         )
@@ -361,11 +346,11 @@ class GravNetBlock(nn.Module):
         self.post_gravnet = nn.Sequential(
             nn.Linear(out_channels, self.d_shape),
             nn.ELU(),
-            nn.Linear(self.d_shape, out_channels),  #! Dense 4
+            nn.Linear(self.d_shape, self.d_shape),  #! Dense 4
         )
 
-        self.batchnorm_gravnet2 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
-        self.batchnorm_gravnet3 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
+        self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
+        self.batchnorm_gravnet3 = nn.BatchNorm1d(self.d_shape)  # , momentum=0.01)
 
     def forward(
         self,
@@ -377,14 +362,14 @@ class GravNetBlock(nn.Module):
         outdir,
         num_layer,
     ) -> Tensor:
-        # x_input = x
+        x_input = x
         xgn, gncoords = self.gravnet_layer(g, x, original_coords, batch)
         g.ndata["gncoords"] = gncoords
-        # x = xgn + x_input  # inchannels == outchannels
-        x = self.batchnorm_gravnet2(xgn)
-        # x_in2 = x
+        x = xgn + x_input
+        x = self.batchnorm_gravnet2(x)
+        x_in2 = x
         x = self.post_gravnet(x)
-        # x = x_in2 + x
+        x = x_in2 + x
         x = self.batchnorm_gravnet3(x)  #! batchnorm 2
         return x
 
@@ -406,6 +391,8 @@ class GravNetConv(nn.Module):
         **kwargs
     ):
         super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = in_channels
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.k = k
