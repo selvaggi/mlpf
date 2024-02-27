@@ -512,10 +512,6 @@ def calc_LV_Lbeta(
             per_shower_weight = weight[label]
             soft_m = torch.nn.Softmax(dim=0)
             per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
-            print("getting shapes!!!")
-            print(
-                V_attractive.shape, per_shower_weight.shape, label.shape, weight.shape
-            )
             L_V_attractive = torch.mean(V_attractive * per_shower_weight)
         else:
             L_V_attractive = torch.mean(V_attractive)
