@@ -497,20 +497,25 @@ def calc_LV_Lbeta(
         #     L_V_attractive = torch.mean(V_attractive * per_shower_weight)
         # else:
         # weight classes by bin
-        label = 1 * (e_true_particle > 4)
-        V = label.size(0)
-        n_classes = 2
-        label_count = torch.bincount(label)
-        label_count = label_count[label_count.nonzero()].squeeze()
-        cluster_sizes = torch.zeros(n_classes).long().to(label_count.device)
-        cluster_sizes[torch.unique(label)] = label_count
-        weight = (V - cluster_sizes).float() / V
-        weight *= (cluster_sizes > 0).float()
-        per_shower_weight = weight[label]
-        soft_m = torch.nn.Softmax(dim=0)
-        per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
-        L_V_attractive = torch.mean(V_attractive * per_shower_weight)
-        # L_V_attractive = torch.mean(V_attractive)
+        if tracking:
+            e_true = y[:, 5].clone()
+            e_true = e_true.to(e_particles_pred_per_object.device)
+            e_true_particle = e_true[object_index]
+            label = 1 * (e_true_particle > 4)
+            V = label.size(0)
+            n_classes = 2
+            label_count = torch.bincount(label)
+            label_count = label_count[label_count.nonzero()].squeeze()
+            cluster_sizes = torch.zeros(n_classes).long().to(label_count.device)
+            cluster_sizes[torch.unique(label)] = label_count
+            weight = (V - cluster_sizes).float() / V
+            weight *= (cluster_sizes > 0).float()
+            per_shower_weight = weight[label]
+            soft_m = torch.nn.Softmax(dim=0)
+            per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
+            L_V_attractive = torch.mean(V_attractive * per_shower_weight)
+        else:
+            L_V_attractive = torch.mean(V_attractive)
     else:
         #! in comparison this works per hit
         V_attractive = (
@@ -555,8 +560,10 @@ def calc_LV_Lbeta(
         #     per_shower_weight = soft_m(per_shower_weight) * len(L_V_repulsive)
         #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
         # else:
-        L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
-        # L_V_repulsive = torch.mean(L_V_repulsive)
+        if tracking:
+            L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
+        else:
+            L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
