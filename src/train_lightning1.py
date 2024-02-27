@@ -114,7 +114,11 @@ def main():
 
     model = model_setup(args, data_config)
 
-    wandb_logger = WandbLogger(project=args.wandb_projectname, entity=args.wandb_entity)
+    wandb_logger = WandbLogger(
+        project=args.wandb_projectname,
+        entity=args.wandb_entity,
+        name=args.wandb_displayname,
+    )
     if training_mode:
 
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
