@@ -499,8 +499,8 @@ def calc_LV_Lbeta(
         # weight classes by bin
         if tracking:
             e_true = y[:, 5].clone()
-            e_true_particle = e_true[object_index]
-            label = 1 * (e_true_particle > 4)
+            # e_true_particle = e_true[object_index]
+            label = 1 * (e_true > 4)
             V = label.size(0)
             n_classes = 2
             label_count = torch.bincount(label)
