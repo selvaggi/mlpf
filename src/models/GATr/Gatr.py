@@ -96,7 +96,7 @@ class ExampleWrapper(L.LightningModule):
             Model prediction: a single scalar for the whole point cloud.
         """
         inputs = g.ndata["pos_hits_xyz"]
-        if self.trainer.is_global_zero and step_count % 100 == 0:
+        if self.trainer.is_global_zero and step_count % 400 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -135,7 +135,7 @@ class ExampleWrapper(L.LightningModule):
         beta = self.beta(x_scalar)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 100 == 0:
+        if self.trainer.is_global_zero and step_count % 400 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -263,6 +263,7 @@ class ExampleWrapper(L.LightningModule):
 
     def on_validation_epoch_end(self):
         # print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
+        print("end of val predictiong")
         if self.args.predict:
             store_at_batch_end(
                 self.args.model_prefix + "showers_df_evaluation",
@@ -270,7 +271,7 @@ class ExampleWrapper(L.LightningModule):
                 0,
                 0,
                 0,
-                True,
+                predict=True,
             )
         # if self.trainer.is_global_zero:
 
@@ -279,7 +280,9 @@ class ExampleWrapper(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": StepLR(optimizer, step_size=2, gamma=0.1), #ReduceLROnPlateau(optimizer),
+                "scheduler": StepLR(
+                    optimizer, step_size=4, gamma=0.1
+                ),  # ReduceLROnPlateau(optimizer),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1

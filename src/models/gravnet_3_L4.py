@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch_scatter import scatter_min, scatter_max, scatter_mean, scatter_add
 from torch.nn import Parameter
-from src.layers.GravNetConv3 import WeirdBatchNorm, knn_per_graph
+from src.layers.GravNetConv3 import GravNetConv, WeirdBatchNorm
 import numpy as np
 from typing import Tuple, Union, List
 import dgl
@@ -13,27 +13,15 @@ from src.layers.object_cond import (
     get_clustering,
     calc_LV_Lbeta_inference,
 )
-from typing import Optional, Union
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.layers.inference_oc import create_and_store_graph_output
 from src.models.gravnet_calibration import (
     object_condensation_loss2,
     obtain_batch_numbers,
 )
-from torch_geometric.nn.conv import MessagePassing
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch import Tensor
-from torch.nn import Linear
-from torch_scatter import scatter
-from torch_geometric.nn.conv import MessagePassing
-import torch.nn as nn
-import dgl
-import dgl.function as fn
-import numpy as np
-from dgl.nn import EdgeWeightNorm
-from torch_geometric.typing import OptTensor, PairTensor, PairOptTensor
 
 
 class GravnetModel(L.LightningModule):
@@ -67,7 +55,6 @@ class GravnetModel(L.LightningModule):
         }
         self.act = acts[activation]
 
-        # N_NEIGHBOURS = [16, 32, 64, 128, 16, 32, 64]
         N_NEIGHBOURS = [16, 128, 16, 128]
         TOTAL_ITERATIONS = len(N_NEIGHBOURS)
         self.return_graphs = False
@@ -78,12 +65,10 @@ class GravnetModel(L.LightningModule):
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
-            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(
-                self.input_dim
-            )  # , momentum=0.01)
+            self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
 
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
-        # self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
+        self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
 
@@ -91,8 +76,7 @@ class GravnetModel(L.LightningModule):
         self.gravnet_blocks = nn.ModuleList(
             [
                 GravNetBlock(
-                    64 if i == 0 else (i * 64 + 64),
-                    64,
+                    64 if i == 0 else (self.d_shape * i + 64),
                     k=N_NEIGHBOURS[i],
                     weird_batchnom=weird_batchnom,
                 )
@@ -105,21 +89,43 @@ class GravnetModel(L.LightningModule):
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(
-                        len(N_NEIGHBOURS) * self.d_shape + 64 if i == 0 else 64, 64
-                    ),
+                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
                     self.act,  # ,
                 ]
             )
         self.postgn_dense = nn.Sequential(*postgn_dense_modules)
 
+        # Output block
+        # self.output = nn.Sequential(
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        # )
+
+        # self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
+        #     nn.Linear(22, 64),
+        #     self.act,
+        #     nn.Linear(64, 64),
+        #     self.act,
+        #     nn.Linear(64, 22),
+        #     nn.Softmax(dim=-1),
+        # )
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-        # if weird_batchnom:
-        #     self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
-        # else:
-        #     self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.01)
+        # init_weights_ = True
+        # if init_weights_:
+        #     # init_weights(self.clustering)
+        #     init_weights(self.beta)
+        #     init_weights(self.postgn_dense)
+        #     # init_weights(self.output)
+
+        if weird_batchnom:
+            self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
+        else:
+            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
@@ -141,7 +147,7 @@ class GravnetModel(L.LightningModule):
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
-            x = gravnet_block(
+            x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
                 g,
                 x,
                 batch,
@@ -150,17 +156,24 @@ class GravnetModel(L.LightningModule):
                 self.args.model_prefix,
                 num_layer,
             )
+
             allfeat.append(x)
+            graphs.append(graph)
+            loss_regularizing_neig = (
+                loss_regularizing_neig_block + loss_regularizing_neig
+            )
+            loss_ll = loss_ll_ + loss_ll
             if len(allfeat) > 1:
                 x = torch.concatenate(allfeat, dim=1)
+
         x = torch.cat(allfeat, dim=-1)
         x = self.postgn_dense(x)
-        # x = self.ScaledGooeyBatchNorm2_2(x)
+        x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
-            beta[mask] = 10
+            beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and (step_count % 100 == 0):
@@ -220,6 +233,7 @@ class GravnetModel(L.LightningModule):
         batch_g = batch[0]
 
         model_output, e_cor, loss_ll = self(batch_g, 1)
+        preds = model_output.squeeze()
 
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -238,12 +252,13 @@ class GravnetModel(L.LightningModule):
             hgcalloss=self.args.hgcalloss,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, val=True)
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
-            (df_batch, df_batch_pandora, df_batch1) = create_and_store_graph_output(
+            (df_batch, df_batch_pandora, df_batch1,) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -260,7 +275,6 @@ class GravnetModel(L.LightningModule):
             self.df_showes_db.append(df_batch1)
 
     def on_train_epoch_end(self):
-
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
@@ -274,13 +288,12 @@ class GravnetModel(L.LightningModule):
         self.df_showes_db = []
 
     def make_mom_zero(self):
-        if self.current_epoch > 2 or self.args.predict:
+        if self.current_epoch > 1 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
             # self.ScaledGooeyBatchNorm2_2.momentum = 0
             # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-            #     # gravnet_block.batchnorm_gravnet1.momentum = 0
+            #     gravnet_block.batchnorm_gravnet1.momentum = 0
             #     gravnet_block.batchnorm_gravnet2.momentum = 0
-            #     gravnet_block.batchnorm_gravnet3.momentum = 0
 
     def on_validation_epoch_end(self):
         if self.trainer.is_global_zero:
@@ -300,24 +313,24 @@ class GravnetModel(L.LightningModule):
                     predict=True,
                 )
             else:
-                if len(self.validation_step_outputs) > 0:
-                    model_output = self.validation_step_outputs[0][0]
-                    e_corr = self.validation_step_outputs[0][1]
-                    batch_g = self.validation_step_outputs[0][2]
-                    y = self.validation_step_outputs[0][3]
-                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                    create_and_store_graph_output(
-                        batch_g,
-                        model_output1,
-                        y,
-                        0,
-                        0,
-                        0,
-                        path_save=self.args.model_prefix + "showers_df_evaluation",
-                        store=True,
-                        predict=False,
-                        tracks=self.args.tracks,
-                    )
+                model_output = self.validation_step_outputs[0][0]
+                e_corr = self.validation_step_outputs[0][1]
+                batch_g = self.validation_step_outputs[0][2]
+                y = self.validation_step_outputs[0][3]
+                model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                create_and_store_graph_output(
+                    batch_g,
+                    model_output1,
+                    y,
+                    0,
+                    0,
+                    0,
+                    path_save=self.args.model_prefix + "showers_df_evaluation",
+                    store=True,
+                    predict=False,
+                    tracks=self.args.tracks,
+                )
+        self.validation_step_outputs = []
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -347,25 +360,45 @@ class GravNetBlock(nn.Module):
     ):
         super(GravNetBlock, self).__init__()
         self.d_shape = 64
-
+        out_channels = self.d_shape
+        if weird_batchnom:
+            self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
+        else:
+            self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
         propagate_dimensions = self.d_shape
         self.gravnet_layer = GravNetConv(
-            in_channels,
+            self.d_shape,
             out_channels,
             space_dimensions,
-            self.d_shape,
+            propagate_dimensions,
             k,
             weird_batchnom,
-        )
+        ).jittable()
 
         self.post_gravnet = nn.Sequential(
-            nn.Linear(out_channels, self.d_shape),
+            nn.Linear(
+                out_channels + space_dimensions + self.d_shape, self.d_shape
+            ),  #! Dense 3
             nn.ELU(),
-            nn.Linear(self.d_shape, out_channels),  #! Dense 4
+            nn.Linear(self.d_shape, self.d_shape),  #! Dense 4
+            nn.ELU(),
         )
+        self.pre_gravnet = nn.Sequential(
+            nn.Linear(in_channels, self.d_shape),  #! Dense 1
+            nn.ELU(),
+            nn.Linear(self.d_shape, self.d_shape),  #! Dense 2
+            nn.ELU(),
+        )
+        # self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
 
-        self.batchnorm_gravnet2 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
-        self.batchnorm_gravnet3 = nn.BatchNorm1d(out_channels)  # , momentum=0.01)
+        # init_weights(self.output)
+        init_weights(self.post_gravnet)
+        init_weights(self.pre_gravnet)
+
+        if weird_batchnom:
+            self.batchnorm_gravnet2 = WeirdBatchNorm(self.d_shape)
+        else:
+            self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
 
     def forward(
         self,
@@ -377,70 +410,27 @@ class GravNetBlock(nn.Module):
         outdir,
         num_layer,
     ) -> Tensor:
-        # x_input = x
-        xgn, gncoords = self.gravnet_layer(g, x, original_coords, batch)
+        x = self.pre_gravnet(x)
+        x = self.batchnorm_gravnet1(x)
+        x_input = x
+        xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
+            g, x, original_coords, batch
+        )
         g.ndata["gncoords"] = gncoords
-        # x = xgn + x_input  # inchannels == outchannels
-        x = self.batchnorm_gravnet2(xgn)
-        # x_in2 = x
+        # if step_count % 50:
+        #     PlotCoordinates(
+        #         g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
+        #     )
+        # gncoords = gncoords.detach()
+        x = torch.cat((xgn, gncoords, x_input), dim=1)
         x = self.post_gravnet(x)
-        # x = x_in2 + x
-        x = self.batchnorm_gravnet3(x)  #! batchnorm 2
-        return x
+        x = self.batchnorm_gravnet2(x)  #! batchnorm 2
+        # x = global_exchange(x, batch)
+        # x = self.output(x)
+        return x, graph, loss_regularizing_neig, ll_r
 
 
-class GravNetConv(nn.Module):
-    """
-    Param: [in_dim, out_dim]
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        space_dimensions: int,
-        propagate_dimensions: int,
-        k: int,
-        num_workers: int = 1,
-        weird_batchnom=False,
-        **kwargs
-    ):
-        super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.k = k
-        self.num_workers = num_workers
-        self.lin_s = Linear(in_channels, space_dimensions, bias=False)
-        self.lin_h = Linear(in_channels, propagate_dimensions)
-        self.lin = Linear(2 * propagate_dimensions, out_channels)
-
-    def forward(self, g, x, original_coords, batch):
-        h_l: Tensor = self.lin_h(x)  #! input_feature_transform
-        s_l: Tensor = self.lin_s(x)
-        graph = knn_per_graph(g, s_l, self.k)
-        graph.ndata["s_l"] = s_l
-        row = graph.edges()[0]
-        col = graph.edges()[1]
-        edge_index = torch.stack([row, col], dim=0)
-
-        edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
-        edge_weight = torch.sqrt(edge_weight + 1e-6)
-        edge_weight = torch.exp(-torch.square(edge_weight))
-        graph.edata["edge_weight"] = edge_weight.view(-1, 1)
-        graph.ndata["h"] = h_l
-        graph.update_all(self.message_func, self.reduce_func)
-        out = graph.ndata["h"]
-
-        out = self.lin(out)
-
-        return (out, s_l)
-
-    def message_func(self, edges):
-        e_ij = edges.data["edge_weight"] * edges.src["h"]
-        return {"e": e_ij}
-
-    def reduce_func(self, nodes):
-        mean_ = torch.mean(nodes.mailbox["e"], dim=-2)
-        max_ = torch.max(nodes.mailbox["e"], dim=-2)[0]
-        h = torch.cat((mean_, max_), dim=-1)
-        return {"h": h}
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform(m.weight)
+        m.bias.data.fill_(0.00)

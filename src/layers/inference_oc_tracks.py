@@ -290,7 +290,7 @@ def match_showers(
     i,
     path_save,
 ):
-    iou_threshold = 0.01
+    iou_threshold = 0.1
     shower_p_unique = torch.unique(labels)
     if torch.sum(labels == 0) == 0:
         shower_p_unique = torch.cat(

@@ -496,6 +496,24 @@ def calc_LV_Lbeta(
         #     per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
         #     L_V_attractive = torch.mean(V_attractive * per_shower_weight)
         # else:
+        # weight classes by bin
+        # if tracking:
+        #     e_true = y[:, 5].clone()
+        #     # e_true_particle = e_true[object_index]
+        #     label = 1 * (e_true > 4)
+        #     V = label.size(0)
+        #     n_classes = 2
+        #     label_count = torch.bincount(label)
+        #     label_count = label_count[label_count.nonzero()].squeeze()
+        #     cluster_sizes = torch.zeros(n_classes).long().to(label_count.device)
+        #     cluster_sizes[torch.unique(label)] = label_count
+        #     weight = (V - cluster_sizes).float() / V
+        #     weight *= (cluster_sizes > 0).float()
+        #     per_shower_weight = weight[label]
+        #     soft_m = torch.nn.Softmax(dim=0)
+        #     per_shower_weight = soft_m(per_shower_weight) * len(V_attractive)
+        #     L_V_attractive = torch.mean(V_attractive * per_shower_weight)
+        # else:
         L_V_attractive = torch.mean(V_attractive)
     else:
         #! in comparison this works per hit
@@ -541,6 +559,9 @@ def calc_LV_Lbeta(
         #     per_shower_weight = soft_m(per_shower_weight) * len(L_V_repulsive)
         #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
         # else:
+        # if tracking:
+        #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
+        # else:
         L_V_repulsive = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
@@ -583,8 +604,8 @@ def calc_LV_Lbeta(
         # version one:
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
-        L_beta_sig = (
-            torch.mean(1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)) 
+        L_beta_sig = torch.mean(
+            1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
         )
         # this is also per object so not dividing by batch size
 
@@ -596,6 +617,7 @@ def calc_LV_Lbeta(
         # beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
         # L_beta_sig = beta_pen.sum() / len(beta_pen)
         # L_beta_sig = L_beta_sig / 4
+        L_beta_noise = L_beta_noise / batch_size
         # ? note: the training that worked quite well was dividing this by the batch size (1/4)
 
     elif beta_term_option == "paper":
@@ -729,6 +751,8 @@ def calc_LV_Lbeta(
                 L_beta,
                 L_V_attractive,
                 L_V_repulsive,
+                L_beta_sig,
+                L_beta_noise,
             )
     else:
         if not tracking:

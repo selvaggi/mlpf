@@ -30,6 +30,21 @@ def scatter_count(input: torch.Tensor):
     return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
 
 
+def fix_splitted_tracks(hit_particle_link, y):
+    parents = y[:, -1]
+    particle_ids = y[:, 4]
+    change_pairs = []
+    for indx, i in enumerate(parents):
+        if torch.sum(particle_ids == i) > 0:
+            change_pairs.append([parents[indx], particle_ids[indx]])
+    print("change_pairs", change_pairs)
+    for pair in change_pairs:
+        mask_change = hit_particle_link == pair[1]
+        hit_particle_link[mask_change] = pair[0]
+
+    return hit_particle_link
+
+
 def create_inputs_from_table(output, get_vtx):
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     # print("number_hits", number_hits)
@@ -53,8 +68,15 @@ def create_inputs_from_table(output, get_vtx):
         hit_particle_link = hit_particle_link[mask_DC]
         hit_type = hit_type[mask_DC]
 
+    unique_list_particles = list(np.unique(hit_particle_link))
+    unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
+    features_particles = torch.permute(
+        torch.tensor(output["pf_vectors"][:, list(unique_list_particles)]),
+        (1, 0),
+    )
+    y_data_graph = features_particles
+    hit_particle_link = fix_splitted_tracks(hit_particle_link, y_data_graph)
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-
     # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
 
@@ -210,7 +232,6 @@ def create_graph_tracking_global(output, get_vtx=False):
         y_data_graph = 0
     if features_hits.shape[0] < 10:
         graph_empty = True
-
     return [g, y_data_graph], graph_empty
 
 
@@ -221,13 +242,17 @@ def remove_loopers(hit_particle_link, y, coord, cluster_id):
 
     min_x = scatter_min(coord[:, 0], cluster_id.long() - 1)[0]
     min_z = scatter_min(coord[:, 2], cluster_id.long() - 1)[0]
+    min_y = scatter_min(coord[:, 1], cluster_id.long() - 1)[0]
     max_x = scatter_max(coord[:, 0], cluster_id.long() - 1)[0]
     max_z = scatter_max(coord[:, 2], cluster_id.long() - 1)[0]
+    max_y = scatter_max(coord[:, 1], cluster_id.long() - 1)[0]
     diff_x = torch.abs(max_x - min_x)
     diff_z = torch.abs(max_z - min_z)
+    diff_y = torch.abs(max_y - min_y)
     mask_x = diff_x > 1600
     mask_z = diff_z > 2800
-    mask_p = mask_x + mask_z
+    mask_y = diff_y > 2800
+    mask_p = mask_x + mask_z + mask_y
     # remove particles with a couple hits
     number_of_hits = get_number_hits(cluster_id)
     mask_hits = number_of_hits < 20

@@ -54,10 +54,6 @@ inputs:
          - [hit_x, null] #VX
          - [hit_y, null] #VX
          - [hit_z, null] #VX
-         # - [hit_EDep, null] # VX DC
-         # - [superLayer, null] # DC
-         # - [layer, null] # DC
-         # - [phi, null] #  DC
          - [leftPosition_x, null] # DC
          - [leftPosition_y, null] # DC
          - [leftPosition_z, null] # DC
@@ -65,23 +61,24 @@ inputs:
          - [rightPosition_y, null] # DC
          - [rightPosition_z, null] # DC
          - [hit_type, null] # VX DC
-         #- [cluster_count, null] # DC
+        
 
    pf_vectors:
       length: 25000
       pad_mode: wrap
       vars:
-         - [part_theta, null]  #2
-         - [part_phi, null] #3
-         - [part_m, null] #4
-         - [part_pid, null]  #15
-         - [part_id, null]  #6
-         - [part_p, null]  #6
+         - [part_theta, null] 
+         - [part_phi, null]
+         - [part_m, null]
+         - [part_pid, null] 
+         - [part_id, null] 
+         - [part_p, null] 
+         - [part_parent, null] 
    pf_vectoronly:
       length: 25000
       pad_mode: wrap
       vars:
-      - [hit_genlink0, null] #2
+      - [hit_genlink0, null] 
 
 
 
