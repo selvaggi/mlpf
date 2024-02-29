@@ -74,7 +74,7 @@ def getEffSigma(data_for_hist, percentage=0.683, bins=1000):
 
 
 def log_losses_wandb(
-    logwandb, num_batches, local_rank, losses, loss, loss_ll, val=False
+    logwandb, num_batches, local_rank, losses, loss, loss_ll, loss_ec=0., val=False
 ):
     if val:
         val_ = " val"
@@ -98,6 +98,7 @@ def log_losses_wandb(
                 "loss" + val_ + " alpha coord": losses[14],
                 "loss" + val_ + " beta zeros": losses[15],
                 "loss regularization gravnet" + val_: loss_ll,
+                "loss energy correction": loss_ec,
             }
         )
 
