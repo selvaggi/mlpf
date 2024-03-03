@@ -59,9 +59,11 @@ def turn_grads_off(model):
 def loss_reco_true(e_cor, true_e, sum_e):
     # m = nn.ELU()
     # e_cor = m(e_cor)
-    print("corection", e_cor[0:5])
+    print("correction", e_cor[0:5])
     print("sum_e", sum_e[0:5])
     print("true_e", true_e[0:5])
+    print(true_e.shape) # SE * (1+c) = TE // C =
+    print("True correction", (true_e[0:5] / sum_e[0:5]) - 1)
     loss = torch.square((e_cor * sum_e - true_e) / true_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
     loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)

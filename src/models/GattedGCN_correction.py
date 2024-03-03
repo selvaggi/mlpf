@@ -19,7 +19,7 @@ from src.layers.gcn_layer import GCNLayer
 
 
 class GraphTransformerNet(nn.Module):
-    def __init__(self, dev):
+    def __init__(self, dev, activation='elu'):
         super().__init__()
 
         in_dim_node = 9  # node_dim (feat is an integer)
@@ -48,6 +48,8 @@ class GraphTransformerNet(nn.Module):
         self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
         self.batchnorm1 = nn.BatchNorm1d(in_dim_node)
+        #self.batchnorm1 = nn.Identity()  #!!!!! #For experiments with and without batch norm
+        #print("No batch norm!!")
         self.layers = nn.ModuleList(
             [
                 GraphTransformerLayer(
@@ -74,7 +76,11 @@ class GraphTransformerNet(nn.Module):
             )
         )
         self.MLP_layer = MLPReadout(out_dim, 1)
-        self.elu = nn.ELU()
+        if activation=='elu':
+            self.act = nn.ELU()
+        else:
+            print("Using identity activation for E corr. factor calibration!")
+            self.act = nn.Identity()
 
     def forward(self, g_batch):
         g = g_batch
@@ -92,7 +98,7 @@ class GraphTransformerNet(nn.Module):
         g.ndata["h1"] = h
         hg = dgl.mean_nodes(g, "h1")
         hg = self.MLP_layer(hg)
-        hg = self.elu(hg)
+        hg = self.act(hg)
         return hg
 
 

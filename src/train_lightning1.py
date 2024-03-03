@@ -113,7 +113,11 @@ def main():
         test_loaders, data_config = test_load(args)
 
     model = model_setup(args, data_config)
-
+    if args.gpus:
+        gpus = [int(i) for i in args.gpus.split(",")]
+    else:
+        print("No GPUs flag provided - Setting GPUs to [0]")
+        gpus = [0]
     wandb_logger = WandbLogger(
         project=args.wandb_projectname,
         entity=args.wandb_entity,

@@ -3,7 +3,8 @@ import dgl
 import torch
 import pandas as pd
 import numpy as np
-
+import os
+import wandb
 
 def PlotCoordinates(
     g,
@@ -20,6 +21,9 @@ def PlotCoordinates(
         outdir = outdir + "/figures_evaluation"
     else:
         outdir = outdir + "/figures"
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+
     name = path
     graphs = dgl.unbatch(g)
     for i in range(0, 1):
