@@ -37,7 +37,7 @@ def fix_splitted_tracks(hit_particle_link, y):
     for indx, i in enumerate(parents):
         if torch.sum(particle_ids == i) > 0:
             change_pairs.append([parents[indx], particle_ids[indx]])
-    print("change_pairs", change_pairs)
+    # print("change_pairs", change_pairs)
     for pair in change_pairs:
         mask_change = hit_particle_link == pair[1]
         hit_particle_link[mask_change] = pair[0]
@@ -55,7 +55,7 @@ def create_inputs_from_table(output, get_vtx):
     features_hits = torch.permute(
         torch.tensor(output["pf_features"][:, 0:number_hits]), (1, 0)
     )
-    hit_type = features_hits[:, -1].clone()
+    hit_type = features_hits[:, -2].clone()
     hit_type_one_hot = torch.nn.functional.one_hot(hit_type.long(), num_classes=2)
     if get_vtx:
         hit_type_one_hot = hit_type_one_hot
@@ -76,8 +76,9 @@ def create_inputs_from_table(output, get_vtx):
     )
     y_data_graph = features_particles
     hit_particle_link = fix_splitted_tracks(hit_particle_link, y_data_graph)
+
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-    # features particles
+    # # features particles
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
 
     features_particles = torch.permute(
@@ -152,7 +153,7 @@ def create_graph_tracking(
         y_data_graph = 0
     if features_hits.shape[0] < 10:
         graph_empty = True
-
+    # print("graph_empty", graph_empty)
     return [g, y_data_graph], graph_empty
 
 
@@ -185,7 +186,7 @@ def create_graph_tracking_global(output, get_vtx=False):
         g = dgl.DGLGraph()
         g.add_nodes(number_of_vtx + number_of_dc * 2)
 
-        left_right_pos = features_hits[:, 3:-1][mask_dc]
+        left_right_pos = features_hits[:, 3:9][mask_dc]
         left_post = left_right_pos[:, 0:3]
         right_post = left_right_pos[:, 3:]
 
@@ -207,6 +208,18 @@ def create_graph_tracking_global(output, get_vtx=False):
             hit_type_all = torch.cat(
                 (hit_type[mask_vtx], hit_type[mask_dc], hit_type[mask_dc]), dim=0
             )
+            cellid = torch.cat(
+                (
+                    features_hits[:, -1][mask_vtx].view(-1, 1),
+                    features_hits[:, -1][mask_dc].view(-1, 1),
+                    features_hits[:, -1][mask_dc].view(-1, 1),
+                ),
+                dim=0,
+            )
+            # print(
+            #     features_hits[:, -1][mask_vtx].view(-1, 1).shape,
+            #     features_hits[:, -1][mask_dc].view(-1, 1).shape,
+            # )
         else:
             particle_number = torch.cat((cluster_id, cluster_id), dim=0)
             particle_number_nomap = torch.cat(
@@ -219,6 +232,7 @@ def create_graph_tracking_global(output, get_vtx=False):
         g.ndata["particle_number"] = particle_number
         g.ndata["particle_number_nomap"] = particle_number_nomap
         g.ndata["pos_hits_xyz"] = pos_xyz
+        g.ndata["cellid"] = cellid
         # uvz = convert_to_conformal_coordinates(pos_xyz)
         # g.ndata["conformal"] = uvz
         if len(y_data_graph) < 2:
@@ -232,6 +246,7 @@ def create_graph_tracking_global(output, get_vtx=False):
         y_data_graph = 0
     if features_hits.shape[0] < 10:
         graph_empty = True
+    # print("graph_empty", graph_empty)
     return [g, y_data_graph], graph_empty
 
 
@@ -255,7 +270,7 @@ def remove_loopers(hit_particle_link, y, coord, cluster_id):
     mask_p = mask_x + mask_z + mask_y
     # remove particles with a couple hits
     number_of_hits = get_number_hits(cluster_id)
-    mask_hits = number_of_hits < 20
+    mask_hits = number_of_hits < 5
 
     mask_all = mask_hits.view(-1) + mask_p.view(-1)
     list_remove = unique_p_numbers[mask_all.view(-1)]
