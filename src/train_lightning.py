@@ -177,7 +177,7 @@ def main():
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
-            devices=[1],
+            devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # limit_val_batches=19,
