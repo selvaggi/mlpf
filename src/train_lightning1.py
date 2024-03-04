@@ -160,7 +160,7 @@ def main():
             devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            profiler=profiler,
+            # profiler=profiler,
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
