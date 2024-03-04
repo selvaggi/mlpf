@@ -152,7 +152,7 @@ def main():
         ]
         if args.correction:
             callbacks.append(FreezeClustering())
-        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+        profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
 
         trainer = L.Trainer(
             callbacks=callbacks,
@@ -160,12 +160,12 @@ def main():
             devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            # profiler=profiler,
+            profiler=profiler,
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            # limit_train_batches=100,
-            limit_val_batches=10,
+            limit_train_batches=4,
+            limit_val_batches=2,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
