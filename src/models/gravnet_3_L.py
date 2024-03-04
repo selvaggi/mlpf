@@ -74,8 +74,9 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
             self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
-
+        # TODO maybe mom should be higher to start with (0.4? and then bring it down to zero epoch by epoch?)
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
+        # TODO maybe this layer is not needed
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
@@ -154,7 +155,13 @@ class GravnetModel(L.LightningModule):
         loss_regularizing_neig = 0.0
         loss_ll = 0
         if self.trainer.is_global_zero and (step_count % 100 == 0):
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+            PlotCoordinates(
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                epoch=str(self.current_epoch),
+                step_count=step_count,
+            )
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
@@ -193,6 +200,8 @@ class GravnetModel(L.LightningModule):
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch),
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         if self.args.correction:
