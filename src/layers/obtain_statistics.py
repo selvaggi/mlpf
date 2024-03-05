@@ -2,7 +2,6 @@ import torch
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
 import dgl
-import torchist
 import matplotlib.pyplot as plt
 
 
