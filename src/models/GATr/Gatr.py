@@ -29,6 +29,14 @@ from src.layers.inference_oc_tracks import (
 )
 from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
+import os
+import wandb
+from src.layers.obtain_statistics import (
+    obtain_statistics_graph,
+    create_stats_dict,
+    save_stat_dict,
+    plot_distributions,
+)
 
 
 class ExampleWrapper(L.LightningModule):
@@ -82,7 +90,7 @@ class ExampleWrapper(L.LightningModule):
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(1, 1)
 
-    def forward(self, g, step_count, eval=""):
+    def forward(self, g, y, step_count, eval=""):
         """Forward pass.
 
         Parameters
@@ -96,6 +104,7 @@ class ExampleWrapper(L.LightningModule):
             Model prediction: a single scalar for the whole point cloud.
         """
         inputs = g.ndata["pos_hits_xyz"]
+
         if self.trainer.is_global_zero and step_count % 400 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
@@ -170,10 +179,14 @@ class ExampleWrapper(L.LightningModule):
         y = batch[1]
 
         batch_g = batch[0]
+        if self.trainer.is_global_zero and self.current_epoch == 0:
+            self.stat_dict = obtain_statistics_graph(
+                self.stat_dict, y, batch_g, pf=False
+            )
         if self.trainer.is_global_zero:
-            model_output = self(batch_g, batch_idx)
+            model_output = self(batch_g, y, batch_idx)
         else:
-            model_output = self(batch_g, 1)
+            model_output = self(batch_g, y, 1)
 
         (loss, losses) = object_condensation_loss_tracking(
             batch_g,
@@ -205,7 +218,7 @@ class ExampleWrapper(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output = self(batch_g, batch_idx, eval="_val")
+        model_output = self(batch_g, y, batch_idx, eval="_val")
         preds = model_output.squeeze()
 
         (loss, losses) = object_condensation_loss_tracking(
@@ -240,11 +253,24 @@ class ExampleWrapper(L.LightningModule):
                 self.df_showers.append(df_batch)
 
     def on_train_epoch_end(self):
-
+        if self.current_epoch == 0 and self.trainer.is_global_zero:
+            save_stat_dict(
+                self.stat_dict,
+                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+            )
+            plot_distributions(
+                self.stat_dict,
+                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+                pf=True,
+            )
+            self.stat_dict = {}
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
     def on_train_epoch_start(self):
+        if self.current_epoch == 0 and self.trainer.is_global_zero:
+            stats_dict = create_stats_dict(self.beta.weight.device)
+            self.stat_dict = stats_dict
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
