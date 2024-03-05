@@ -32,6 +32,12 @@ from src.layers.inference_oc import match_showers
 from lightning.pytorch.callbacks import BaseFinetuning
 import os
 import wandb
+from src.layers.obtain_statistics import (
+    obtain_statistics_graph,
+    create_stats_dict,
+    save_stat_dict,
+    plot_distributions,
+)
 
 
 class GravnetModel(L.LightningModule):
@@ -266,6 +272,8 @@ class GravnetModel(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
+        if self.trainer.is_global_zero and self.current_epoch == 0:
+            self.stat_dict = obtain_statistics_graph(self.stat_dict, y, batch_g)
         if self.trainer.is_global_zero:
             if self.args.correction:
                 model_output, e_cor1, true_e, sum_e, new_graphs, batch_idx, graph_level_features = self(batch_g, y, batch_idx)
@@ -463,12 +471,23 @@ class GravnetModel(L.LightningModule):
             self.df_showes_db.append(df_batch1)
 
     def on_train_epoch_end(self):
-        # log epoch metric
+        if self.current_epoch == 0 and self.trainer.is_global_zero:
+            save_stat_dict(
+                self.stat_dict,
+                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+            )
+            plot_distributions(
+                self.stat_dict,
+                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+                pf=True,
+            )
+            self.stat_dict = {}
         self.log("train_loss_epoch", self.loss_final)
 
     def on_train_epoch_start(self):
-        # if self.args.correction:
-        #     self.turn_grads_off()
+        if self.current_epoch == 0 and self.trainer.is_global_zero:
+            stats_dict = create_stats_dict(self.beta.weight.device)
+            self.stat_dict = stats_dict
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
@@ -543,14 +562,6 @@ class GravnetModel(L.LightningModule):
                 # multiple of "trainer.check_val_every_n_epoch".
             },
         }
-
-    # def turn_grads_off(self):
-    #     for name, param in self.named_parameters():
-    #         print("name", name)
-    #         if name.split(".")[2] == "GatedGCNNet":
-    #             param.requires_grad = True
-    #         else:
-    #             param.requires_grad = False
 
 
 class FreezeClustering(BaseFinetuning):
