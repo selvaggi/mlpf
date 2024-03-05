@@ -39,8 +39,8 @@ from lightning.pytorch.callbacks import (
 )
 from lightning.pytorch.profilers import AdvancedProfiler
 
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-os.environ["TORCH_USE_CUDA_DSA"] = "1"
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+# os.environ["TORCH_USE_CUDA_DSA"] = "1"
 
 
 def get_samples_steps_per_epoch(args):
@@ -159,7 +159,7 @@ def main():
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=3000,
+            limit_train_batches=1400,
             limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
