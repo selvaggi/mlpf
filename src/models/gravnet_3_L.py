@@ -228,7 +228,7 @@ class GravnetModel(L.LightningModule):
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         if self.args.correction:
             graphs_new, true_new, sum_e = obtain_clustering_for_matched_showers(
-                g, x, y, self.trainer.global_rank
+                g, x, y, self.trainer.global_rank, use_gt_clusters=self.args.use_gt_clusters
             )
             batch_num_nodes = graphs_new.batch_num_nodes()
             batch_idx = []
@@ -237,7 +237,7 @@ class GravnetModel(L.LightningModule):
             batch_idx = torch.tensor(batch_idx).to(device)
             graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
             # TODO: add global features to each node here
-            print("Add global features?")
+            # print("Add global features?")
             if self.args.global_features:
                 print("Using global features of the graphs as well")
                 # graphs_num_nodes = graphs_new.batch_num_nodes
@@ -705,7 +705,11 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
         if clustering_mode == "clustering_normal":
             clustering = get_clustering(betas, X)
         elif clustering_mode == "dbscan":
-            labels = hfdb_obtain_labels(X, model_output.device)
+            if use_gt_clusters:
+                print("Using GT clusters")
+                labels = dic["graph"].ndata["particle_number"].type(torch.int64)
+            else:
+                labels = hfdb_obtain_labels(X, model_output.device)
 
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
@@ -716,6 +720,7 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
             index_matches = col_ind + 1
             index_matches = index_matches.to(model_output.device).long()
+
             for unique_showers_label in shower_p_unique:
                 if torch.sum(unique_showers_label == index_matches) == 1:
                     index_in_matched = torch.argmax(
@@ -763,7 +768,6 @@ def loss_reco_true(e_cor, true_e, sum_e):
     loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
     loss = torch.mean(loss)
     return loss, loss_abs, loss_abs_nocali
-
 
 def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     # implementation of a loss that regresses the sum of the hits instead of the corr. factor ( just for debugging )

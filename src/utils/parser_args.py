@@ -538,5 +538,14 @@ parser.add_argument(
     "--graph-level-features",
     default=False,
     action="store_true",
-    help="if toggled, considers the 'high-level' features for energy corr."
+    help="if toggled, considers the 'high-level' features for energy corr. (energy of the hits, number of the hits etc.)"
 )
+
+
+parser.add_argument(
+    "--use-gt-clusters",
+    default=False,
+    action="store_true",
+    help="If toggled, uses ground-truth clusters instead of the predicted ones by the model. We can use this to simulate 'ideal' clustering."
+)
+
