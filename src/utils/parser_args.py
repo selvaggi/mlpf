@@ -526,3 +526,17 @@ parser.add_argument(
     default=False,
     help="Train correction only",
 )
+
+parser.add_argument(
+    "--global-features",
+    default=False,
+    action="store_true",
+    help="if toggled, also adds global features to the graphs for energy correction"
+)
+
+parser.add_argument(
+    "--graph-level-features",
+    default=False,
+    action="store_true",
+    help="if toggled, considers the 'high-level' features for energy corr."
+)
