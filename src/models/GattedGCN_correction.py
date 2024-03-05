@@ -19,12 +19,11 @@ from src.layers.gcn_layer import GCNLayer
 
 
 class GraphTransformerNet(nn.Module):
-    def __init__(self, dev, activation='elu'):
+    def __init__(self, dev, activation='elu', in_dim_node = 9):
         super().__init__()
-
-        in_dim_node = 9  # node_dim (feat is an integer)
+        # in_dim_node = 9  # node_dim (feat is an integer)
         self.clust_space_norm = "twonorm"
-        hidden_dim = 80  # before 80
+        hidden_dim = 80
         out_dim = 80
         n_classes = 4
         num_heads = 4
@@ -43,7 +42,6 @@ class GraphTransformerNet(nn.Module):
         max_wl_role_index = 100
         self.readout = "mean"
         self.output_dim = n_classes
-
         self.embedding_h = nn.Linear(in_dim_node, hidden_dim)  # node feat is an integer
         self.embedding_h.weight.data.copy_(torch.eye(hidden_dim, in_dim_node))
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
@@ -84,14 +82,12 @@ class GraphTransformerNet(nn.Module):
 
     def forward(self, g_batch):
         g = g_batch
-
         ############################## Embeddings #############################################
         h = g.ndata["h"]
         # input embedding
         h = self.batchnorm1(h)
         h = self.embedding_h(h)
         h = self.in_feat_dropout(h)
-
         # GraphTransformer Layers
         for conv in self.layers:
             h = conv(g, h)
@@ -101,24 +97,23 @@ class GraphTransformerNet(nn.Module):
         hg = self.act(hg)
         return hg
 
-
 class GCNNet(nn.Module):
-    def __init__(self, dev):
+    # A very simple GCN for debugging/testing
+    def __init__(self, dev, activation='elu', in_dim_node = 9):
         super().__init__()
-        num_atom_type = 10
 
-        hidden_dim = 80
-        out_dim = 80
+        hidden_dim = 30
+        out_dim = 30
         in_feat_dropout = 0.0
         dropout = 0.0
-        n_layers = 10
-        self.readout = "max"
-        self.batch_norm = True
+        n_layers = 2
+        self.readout = "mean"
+        self.batch_norm = False
         self.residual = True
 
         self.in_feat_dropout = nn.Dropout(in_feat_dropout)
-        self.batchnorm1 = nn.BatchNorm1d(num_atom_type)
-        self.embedding_h = nn.Linear(num_atom_type, hidden_dim)
+        self.batchnorm1 = nn.BatchNorm1d(in_dim_node)
+        self.embedding_h = nn.Linear(in_dim_node, hidden_dim)
 
         self.layers = nn.ModuleList(
             [
@@ -139,7 +134,10 @@ class GCNNet(nn.Module):
             )
         )
         self.MLP_layer = MLPReadout(out_dim, 1)  # 1 out dim since regression problem
-        self.elu = nn.ELU()
+        if activation == "elu":
+            self.act = nn.ELU()
+        else:
+            self.act = nn.Identity()
 
     def forward(self, g):
         h = g.ndata["h"]
@@ -149,8 +147,8 @@ class GCNNet(nn.Module):
 
         for conv in self.layers:
             h = conv(g, h)
-        g.ndata["h"] = h
 
+        g.ndata["h"] = h
         if self.readout == "sum":
             hg = dgl.sum_nodes(g, "h")
         elif self.readout == "max":
@@ -160,5 +158,21 @@ class GCNNet(nn.Module):
         else:
             hg = dgl.mean_nodes(g, "h")  # default readout is mean nodes
         hg = self.MLP_layer(hg)
-        hg = self.elu(hg)
+        hg = self.act(hg)
         return hg
+
+
+class LinearGNNLayer(nn.Module):
+    # A very simple linear transformation for debugging
+    def __init__(self, dev, activation='elu', in_dim_node = 9):
+        super().__init__()
+        self.proj = nn.Linear(in_dim_node, 50)
+        self.proj1 = nn.Linear(50, 50)
+        self.proj2 = nn.Linear(50, 1)
+        self.act = nn.LeakyReLU()
+
+    def forward(self, g):
+        hg = dgl.mean_nodes(g, "h") # a quick neural network to test the pipeline
+        return self.act(self.proj2(self.act(self.proj1(self.act(self.proj(hg))))))
+
+
