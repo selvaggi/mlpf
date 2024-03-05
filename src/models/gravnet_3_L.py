@@ -33,6 +33,7 @@ from lightning.pytorch.callbacks import BaseFinetuning
 import os
 import wandb
 
+
 class GravnetModel(L.LightningModule):
     def __init__(
         self,
@@ -77,8 +78,9 @@ class GravnetModel(L.LightningModule):
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
             self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
-
+        # TODO maybe mom should be higher to start with (0.4? and then bring it down to zero epoch by epoch?)
         self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
+        # TODO maybe this layer is not needed
         self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
         assert clust_space_norm in ["twonorm", "tanh", "none"]
         self.clust_space_norm = clust_space_norm
@@ -170,7 +172,13 @@ class GravnetModel(L.LightningModule):
         loss_regularizing_neig = 0.0
         loss_ll = 0
         if self.trainer.is_global_zero and (step_count % 100 == 0):
-            PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
+            PlotCoordinates(
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                epoch=str(self.current_epoch),
+                step_count=step_count,
+            )
         for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
             #! first time dim x is 64
             #! second time is 64+d
@@ -208,6 +216,8 @@ class GravnetModel(L.LightningModule):
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
+                epoch=str(self.current_epoch),
+                step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         if self.args.correction:
@@ -271,6 +281,9 @@ class GravnetModel(L.LightningModule):
             else:
                 model_output, e_cor, loss_ll = self(batch_g, y, 1)
                 e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        if self.args.correction:
+            print(model_output.shape, e_cor.shape, e_cor1.shape)
+            e_cor1 += 1.0  # We regress the number around zero!!! # TODO: uncomment this if needed
         '''energies_sums_features = new_graphs.ndata["h"][:, 15]
         energies_sums = [sum_e[i] for i in batch_idx]
         energies_sums = torch.tensor(energies_sums).to(energies_sums_features.device).flatten()
@@ -297,6 +310,7 @@ class GravnetModel(L.LightningModule):
         )
         if self.args.correction:
             debug_regress_e_sum = False
+
             def corr(array):
                 return torch.clamp(array, min=0.000001)
             if debug_regress_e_sum:
@@ -306,12 +320,52 @@ class GravnetModel(L.LightningModule):
                 table = wandb.Table(data=data, columns=["sum E (GT)", "sum E (regressed)"])
                 wandb.log({"energy_corr": wandb.plot.scatter(table, "sum E (GT)", "sum E (regressed)",
                                                              title="energy correction correlation")})
+                print("debug_regress_e_sum == True !")
+                loss, loss_abs, loss_abs_nocali = loss_reco_sum_absolute(
+                    torch.log10(corr(e_cor1)),
+                    torch.log10(corr(true_e)),
+                    torch.log10(corr(sum_e)),
+                )
+
+                data = [
+                    [x, y]
+                    for (x, y) in zip(
+                        torch.log10(corr(sum_e)), torch.log10(corr(e_cor1))
+                    )
+                ]
+                table = wandb.Table(
+                    data=data, columns=["log10 sum E (GT)", "log10 sum E (regressed)"]
+                )
+                wandb.log(
+                    {
+                        "energy_corr": wandb.plot.scatter(
+                            table,
+                            "log10 sum E (GT)",
+                            "log10 sum E (regressed)",
+                            title="energy correction correlation",
+                        )
+                    }
+                )
                 print("Logged!")
             else:
                 loss, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
                 true_e_corr = (true_e / sum_e) - 1
                 model_e_corr = e_cor1
                 data = [[x, y] for (x, y) in zip(true_e_corr, model_e_corr)]
+
+                table = wandb.Table(
+                    data=data, columns=["true E corr factor", "regressed E corr factor"]
+                )
+                wandb.log(
+                    {
+                        "energy_corr": wandb.plot.scatter(
+                            table,
+                            "true E corr factor",
+                            "regressed E corr factor",
+                            title="energy correction correlation",
+                        )
+                    }
+                )
                 table = wandb.Table(data=data, columns=["true E corr factor", "regressed E corr factor"])
                 wandb.log({"energy_corr": wandb.plot.scatter(table, "true E corr factor", "regressed E corr factor",
                                                                    title="energy correction correlation")})
@@ -338,8 +392,10 @@ class GravnetModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        show_df_eval_path = os.path.join(self.args.model_prefix, "showers_df_evaluation")
         cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
+        show_df_eval_path = os.path.join(
+            self.args.model_prefix, "showers_df_evaluation"
+        )
         if not os.path.exists(show_df_eval_path):
             os.makedirs(show_df_eval_path)
         if not os.path.exists(cluster_features_path):
@@ -439,7 +495,9 @@ class GravnetModel(L.LightningModule):
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
-                    path_save=os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+                    path_save=os.path.join(
+                        self.args.model_prefix, "showers_df_evaluation"
+                    ),
                     # df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
@@ -459,7 +517,9 @@ class GravnetModel(L.LightningModule):
                     0,
                     0,
                     0,
-                    path_save=os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+                    path_save=os.path.join(
+                        self.args.model_prefix, "showers_df_evaluation"
+                    ),
                     store=True,
                     predict=False,
                     tracks=self.args.tracks,
@@ -687,11 +747,12 @@ def loss_reco_true(e_cor, true_e, sum_e):
     print("sum_e", sum_e[0:5])
     print("true_e", true_e[0:5])
     # true_e = -1 * sum_e  # Temporarily, to debug - so the model would have to learn corr. factor of -1 for each particle...
-    loss = torch.square(((e_cor ) * sum_e - true_e) / true_e)
+    loss = torch.square(((e_cor) * sum_e - true_e) / true_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
     loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
     loss = torch.mean(loss)
     return loss, loss_abs, loss_abs_nocali
+
 
 def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     # implementation of a loss that regresses the sum of the hits instead of the corr. factor ( just for debugging )
@@ -706,5 +767,3 @@ def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
     loss = torch.mean(loss)
     return loss, loss_abs, loss_abs_nocali
-
-

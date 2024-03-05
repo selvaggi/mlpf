@@ -82,7 +82,6 @@ def model_setup(args, data_config):
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]  # ?
         dev = torch.device(gpus[0])
-        print("using GPUs:", gpus)
     else:
         gpus = None
         local_rank = 0
@@ -123,9 +122,9 @@ def main():
         project=args.wandb_projectname,
         entity=args.wandb_entity,
         name=args.wandb_displayname,
-        log_model="all"
     )
     if training_mode:
+
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None:
@@ -135,7 +134,9 @@ def main():
                 args.load_model_weights, args=args, dev=0
             )
         accelerator, devices = get_gpu_dev(args)
+
         val_every_n_epochs = 1
+
         checkpoint_callback = ModelCheckpoint(
             dirpath=args.model_prefix,  # checkpoints_path, # <--- specify this on the trainer itself for version control
             filename="_{epoch}",
@@ -151,20 +152,20 @@ def main():
         ]
         if args.correction:
             callbacks.append(FreezeClustering())
-        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+        profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
 
         trainer = L.Trainer(
             callbacks=callbacks,
             accelerator="gpu",
-            devices=gpus,
+            devices=[0, 1, 2, 3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            # profiler=profiler,
-            max_epochs=100,
+            profiler=profiler,
+            max_epochs=1,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            # limit_train_batches=100,
-            limit_val_batches=10,
+            limit_train_batches=20,
+            limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
