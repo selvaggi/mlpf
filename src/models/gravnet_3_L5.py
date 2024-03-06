@@ -70,10 +70,10 @@ class GravnetModel(L.LightningModule):
         self.batch_norm = True
         self.residual = True
         dropout = 0.05
-        self.number_of_layers = 5
+        self.number_of_layers = 3
         self.num_classes = 13
         num_neigh = [16, 16, 16, 16, 16]
-        n_layers = [2, 4, 9, 4, 4]
+        n_layers = [2, 4, 4]
         # self.embedding_h = nn.Linear(in_dim_node, hidden_dim)
         self.embedding_h = nn.Sequential(
             nn.Linear(in_dim_node, hidden_dim, bias=False),
@@ -141,7 +141,7 @@ class GravnetModel(L.LightningModule):
         ij_pairs = []
         latest_depth_rep = []
         for l, swin3 in enumerate(self.layers):
-            features, up_points, g, i, j, s_l = swin3(g, h, c)
+            features, up_points, g, i, j, s_l, loss_ud = swin3(g, h, c)
             if l == 0:
                 full_res_features.append(features)
             c = s_l
@@ -153,7 +153,7 @@ class GravnetModel(L.LightningModule):
             h = features[up_points]
             c = c[up_points]
             depth_label = depth_label + 1
-            # losses = losses + loss_ud
+            losses = losses + loss_ud
             features_down = features
             for it in range(0, depth_label):
                 h_up_down = self.push_info_down(features_down, i, j)
@@ -190,7 +190,7 @@ class GravnetModel(L.LightningModule):
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
-        return x, pred_energy_corr, 0
+        return x, pred_energy_corr, losses
 
     def push_info_down(self, features, i, j):
         # feed information back down averaging the information of the upcoming uppoints
@@ -376,13 +376,15 @@ class GravnetModel(L.LightningModule):
                 #     print("!!!temporarily saving features in an external file!!!!")
                 # print("Logged!")
         else:
-            loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+            loss1 = (
+                loss + loss_ll
+            )  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
         self.loss_final = loss + self.loss_final
         self.number_b = self.number_b + 1
-        return loss
+        return loss1
 
     def validation_step(self, batch, batch_idx):
         cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
@@ -590,8 +592,8 @@ class Swin3D(nn.Module):
         self.batch_norm = batch_norm
         self.residual = residual
 
-        # self.send_scores = SendScoresMessage()
-        # self.find_up = FindUpPoints()
+        self.send_scores = SendScoresMessage()
+        self.find_up = FindUpPoints()
         self.sigmoid_scores = nn.Sigmoid()
         self.funky_coordinate_space = True
         if self.funky_coordinate_space:
@@ -599,7 +601,9 @@ class Swin3D(nn.Module):
                 in_dim_node, 3
             )  # node feat is an integer
         self.M = M  # number of points up to connect to
-        self.embedding_h = nn.Linear(in_dim_node, hidden_dim)
+        self.embedding_h = nn.Linear(in_dim_node, hidden_dim - 3)
+
+        self.score_ = nn.Linear(hidden_dim, 1)
         self.SWIN3D_Blocks = SWIN3D_Blocks(
             n_layers,
             hidden_dim,
@@ -621,30 +625,85 @@ class Swin3D(nn.Module):
         else:
             s_l = c
         h = self.embedding_h(h)
-        scores = torch.rand(h.shape[0]).to(h.device)
+        # scores = torch.rand(h.shape[0]).to(h.device)
 
         # 2) Do knn down graph
         g.ndata["s_l"] = s_l
-        g = knn_per_graph(
-            g, s_l, 7
-        )  #! if these are learnt then they should be added to the gradients, they are not at the moment
-        g.ndata["h"] = h
+        g = knn_per_graph(g, s_l, 7)
+        g.ndata["h"] = torch.cat((h, s_l), dim=1)
 
         # 3) Message passing on the down graph SWIN3D_Blocks
         h = self.SWIN3D_Blocks(g)
-
+        scores = torch.sigmoid(self.score_(h))
         g.ndata["scores"] = scores
         g.ndata["particle_number"] = object
         g.ndata["s_l"] = s_l
         g.ndata["h"] = h
 
         # calculate loss of score
-        # g.update_all(self.send_scores, self.find_up)
-        # loss_ud = self.find_up.loss_ud
+        g.update_all(self.send_scores, self.find_up)
+        loss_ud = self.find_up.loss_ud
 
         # 4) Downsample:
         features, up_points, new_graphs_up, i, j = self.Downsample(g)
-        return features, up_points, new_graphs_up, i, j, s_l
+        return features, up_points, new_graphs_up, i, j, s_l, loss_ud
+
+
+class SendScoresMessage(nn.Module):
+    """
+    Compute the input feature from neighbors
+    """
+
+    def __init__(self):
+        super(SendScoresMessage, self).__init__()
+
+    def forward(self, edges):
+        score_neigh = edges.src["scores"]
+        same_object = edges.dst["object"] == edges.src["object"]
+        return {"score_neigh": score_neigh.view(-1), "same_object": same_object}
+
+
+class FindUpPoints(nn.Module):
+    """
+    Feature aggregation in a DGL graph
+    """
+
+    def __init__(self):
+        super(FindUpPoints, self).__init__()
+        self.loss_ud = 0
+
+    def forward(self, nodes):
+        same_object = nodes.mailbox["same_object"]
+        scores_neigh = nodes.mailbox["score_neigh"]
+        # loss per neighbourhood of same object as src node
+        values_max, index = torch.max(scores_neigh * same_object, dim=1)
+        number_points_same_object = torch.sum(same_object, dim=1)
+        # print("number_points_same_object", number_points_same_object)
+        # print("values_max", values_max)
+        loss_u = 1 - values_max
+        # loss_d = (
+        #     1 / number_points_same_object * torch.sum(scores_neigh * same_object, dim=1)
+        # )
+        sum_same_object = torch.sum(scores_neigh * same_object, dim=1) - values_max
+        # print("sum_same_object", sum_same_object)
+        mask_ = number_points_same_object > 0
+        if torch.sum(mask_) > 0:
+            loss_d = 1 / number_points_same_object[mask_] * sum_same_object[mask_]
+            # per neigh measure
+            # print("loss_u", loss_u)
+            # print("loss_d", torch.mean(loss_d))
+            loss_total = loss_u.clone()
+            # this takes into account some points not having neigh of the same class
+            loss_total[mask_] = loss_u[mask_] + loss_d
+            total_loss_ud = torch.mean(loss_total)
+            # print("loss ud normal", total_loss_ud)
+        else:
+            total_loss_ud = torch.mean(loss_u)
+            # print("loss ud no neigh", total_loss_ud)
+        # print("total_loss_ud", total_loss_ud)
+        self.loss_ud = total_loss_ud
+        fake_feature = torch.sum(scores_neigh, dim=1)
+        return {"new_feat": fake_feature}
 
 
 class SWIN3D_Blocks(nn.Module):
@@ -700,7 +759,7 @@ class Downsample_maxpull(nn.Module):
     def __init__(self, hidden_dim, M):
         super().__init__()
         self.M = M
-        self.embedding_features_to_att = nn.Linear(hidden_dim + 3, hidden_dim)
+        self.embedding_features_to_att = nn.Linear(hidden_dim + 4, hidden_dim)
         self.MLP_difs = MLP_difs_maxpool(hidden_dim, hidden_dim)
 
     def forward(self, g):
@@ -770,7 +829,7 @@ class Downsample_maxpull(nn.Module):
         i, j = graphs_UD.edges()
         graphs_U = dgl.batch(graphs_U)
         # naive way of giving the coordinates gradients
-        features = torch.cat((features, s_l), dim=1)
+        features = torch.cat((features, s_l, g.ndata["scores"].view(-1, 1)), dim=1)
         features = self.embedding_features_to_att(features)
 
         # do attention in g connected to up, this features have only been updated for points that have neighbourgs pointing to them: up-points
