@@ -179,10 +179,10 @@ class ExampleWrapper(L.LightningModule):
         y = batch[1]
 
         batch_g = batch[0]
-        if self.trainer.is_global_zero and self.current_epoch == 0:
-            self.stat_dict = obtain_statistics_graph(
-                self.stat_dict, y, batch_g, pf=False
-            )
+        # if self.trainer.is_global_zero and self.current_epoch == 0:
+        #     self.stat_dict = obtain_statistics_graph(
+        #         self.stat_dict, y, batch_g, pf=False
+        #     )
         if self.trainer.is_global_zero:
             model_output = self(batch_g, y, batch_idx)
         else:
@@ -253,24 +253,24 @@ class ExampleWrapper(L.LightningModule):
                 self.df_showers.append(df_batch)
 
     def on_train_epoch_end(self):
-        if self.current_epoch == 0 and self.trainer.is_global_zero:
-            save_stat_dict(
-                self.stat_dict,
-                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-            )
-            plot_distributions(
-                self.stat_dict,
-                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-                pf=True,
-            )
-            self.stat_dict = {}
+        # if self.current_epoch == 0 and self.trainer.is_global_zero:
+        #     save_stat_dict(
+        #         self.stat_dict,
+        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+        #     )
+        #     plot_distributions(
+        #         self.stat_dict,
+        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+        #         pf=True,
+        #     )
+        # self.stat_dict = {}
         # log epoch metric
         self.log("train_loss_epoch", self.loss_final)
 
     def on_train_epoch_start(self):
-        if self.current_epoch == 0 and self.trainer.is_global_zero:
-            stats_dict = create_stats_dict(self.beta.weight.device)
-            self.stat_dict = stats_dict
+        # if self.current_epoch == 0 and self.trainer.is_global_zero:
+        #     stats_dict = create_stats_dict(self.beta.weight.device)
+        #     self.stat_dict = stats_dict
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
