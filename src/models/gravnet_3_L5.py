@@ -738,7 +738,7 @@ class Downsample_maxpull(nn.Module):
             )
             g_i.ndata["h"] = graph_i.ndata["h"]
             g_i.ndata["s_l"] = graph_i.ndata["s_l"]
-            g_i.ndata["object"] = graph_i.ndata["object"]
+            g_i.ndata["particle_number"] = graph_i.ndata["particle_number"]
             # find index in original numbering
             graphs_UD.append(g_i)
             # use this way if no message passing between nodes
@@ -748,7 +748,9 @@ class Downsample_maxpull(nn.Module):
             # ).to(device)
             graph_up = dgl.DGLGraph().to(device)
             graph_up.add_nodes(len(nodes_up))
-            graph_up.ndata["object"] = g_i.ndata["object"][up_points_i]
+            graph_up.ndata["particle_number"] = g_i.ndata["particle_number"][
+                up_points_i
+            ]
             graph_up.ndata["s_l"] = g_i.ndata["s_l"][up_points_i]
             graphs_U.append(graph_up)
 
