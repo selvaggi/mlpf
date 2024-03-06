@@ -48,6 +48,7 @@ class GravnetModel(L.LightningModule):
         super(GravnetModel, self).__init__()
         self.loss_final = 100
         self.input_dim = 8
+        self.output_dim = output_dim
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
