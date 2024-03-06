@@ -105,7 +105,7 @@ class ExampleWrapper(L.LightningModule):
         """
         inputs = g.ndata["pos_hits_xyz"]
 
-        if self.trainer.is_global_zero and step_count % 400 == 0:
+        if self.trainer.is_global_zero and step_count % 800 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -144,7 +144,7 @@ class ExampleWrapper(L.LightningModule):
         beta = self.beta(x_scalar)
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 400 == 0:
+        if self.trainer.is_global_zero and step_count % 800 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
