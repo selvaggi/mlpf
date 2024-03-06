@@ -66,7 +66,7 @@ def obtain_statistics_graph(stat_dict, y_all, g_all, pf=True):
 
 def create_stats_dict(device):
 
-    bins_number_of_particles_event = torch.arange(0, 20, 1).to(device)
+    bins_number_of_particles_event = torch.arange(0, 200, 1).to(device)
     freq_count_particles = torch.zeros_like(bins_number_of_particles_event)
     # the reason to not do log is that the histc only takes min, max, numbins and the other hist with bins is not supported in cuda
     energy_event = torch.arange(0.001, 50, 0.1).to(
