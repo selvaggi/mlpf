@@ -62,7 +62,7 @@ class GravnetModel(L.LightningModule):
             "elu": nn.ELU(),
         }
         self.act = acts[activation]
-        in_dim_node = 6
+        in_dim_node = 8
         num_heads = 8
         hidden_dim = 128
         self.layer_norm = False
