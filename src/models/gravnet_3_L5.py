@@ -22,6 +22,7 @@ from src.models.gravnet_calibration import (
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import torch_cmspepr
 
 
 class GravnetModel(L.LightningModule):
@@ -46,7 +47,7 @@ class GravnetModel(L.LightningModule):
         self.df_showes_db = []
         self.args = args
         self.validation_step_outputs = []
-        assert activation in ["relu", "tanh", "sigmoid", "elu"]
+        activation = "elu"
         acts = {
             "relu": nn.ReLU(),
             "tanh": nn.Tanh(),
@@ -54,131 +55,127 @@ class GravnetModel(L.LightningModule):
             "elu": nn.ELU(),
         }
         self.act = acts[activation]
-
-        N_NEIGHBOURS = [16, 128, 16, 128]
-        TOTAL_ITERATIONS = len(N_NEIGHBOURS)
-        self.return_graphs = False
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.n_gravnet_blocks = TOTAL_ITERATIONS
-        self.n_postgn_dense_blocks = n_postgn_dense_blocks
+        in_dim_node = 6
+        num_heads = 8
+        hidden_dim = 128
+        self.layer_norm = False
+        self.batch_norm = True
+        self.residual = True
+        dropout = 0.05
+        self.number_of_layers = 5
+        self.num_classes = 13
+        num_neigh = [16, 16, 16, 16, 16]
+        n_layers = [2, 4, 9, 4, 4]
+        # self.embedding_h = nn.Linear(in_dim_node, hidden_dim)
+        self.embedding_h = nn.Sequential(
+            nn.Linear(in_dim_node, hidden_dim, bias=False),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True),
+        )
         if weird_batchnom:
             self.ScaledGooeyBatchNorm2_1 = WeirdBatchNorm(self.input_dim)
         else:
             self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim)
-
-        self.Dense_1 = nn.Linear(input_dim, 64, bias=False)
-        self.Dense_1.weight.data.copy_(torch.eye(64, input_dim))
-        assert clust_space_norm in ["twonorm", "tanh", "none"]
-        self.clust_space_norm = clust_space_norm
-
-        self.d_shape = 32
-        self.gravnet_blocks = nn.ModuleList(
+        self.layers = nn.ModuleList(
             [
-                GravNetBlock(
-                    64 if i == 0 else (self.d_shape * i + 64),
-                    k=N_NEIGHBOURS[i],
-                    weird_batchnom=weird_batchnom,
+                Swin3D(
+                    in_dim_node=hidden_dim,
+                    hidden_dim=hidden_dim,
+                    num_heads=num_heads,
+                    layer_norm=self.layer_norm,
+                    batch_norm=self.batch_norm,
+                    residual=self.residual,
+                    dropout=dropout,
+                    M=0.5,
+                    k_in=num_neigh[ii],
+                    n_layers=n_layers[ii],
                 )
-                for i in range(self.n_gravnet_blocks)
+                for ii in range(self.number_of_layers)
             ]
         )
-
-        # Post-GravNet dense layers
+        # self.batch_norm1 = nn.BatchNorm1d(in_dim_node, momentum=0.01)
+        hidden_dim = hidden_dim
+        out_dim = hidden_dim * (self.number_of_layers + 1)
+        self.n_postgn_dense_blocks = 3
         postgn_dense_modules = nn.ModuleList()
         for i in range(self.n_postgn_dense_blocks):
             postgn_dense_modules.extend(
                 [
-                    nn.Linear(4 * self.d_shape + 64 if i == 0 else 64, 64),
+                    nn.Linear(out_dim if i == 0 else 64, 64),
                     self.act,  # ,
                 ]
             )
         self.postgn_dense = nn.Sequential(*postgn_dense_modules)
-
-        # Output block
-        # self.output = nn.Sequential(
-        #     nn.Linear(64, 64),
-        #     self.act,
-        #     nn.Linear(64, 64),
-        #     self.act,
-        #     nn.Linear(64, 64),
-        # )
-
-        # self.post_pid_pool_module = nn.Sequential(  # to project pooled "particle type" embeddings to a common space
-        #     nn.Linear(22, 64),
-        #     self.act,
-        #     nn.Linear(64, 64),
-        #     self.act,
-        #     nn.Linear(64, 22),
-        #     nn.Softmax(dim=-1),
-        # )
+        self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64, momentum=0.1)
+        self.step_count = 0
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
-
-        # init_weights_ = True
-        # if init_weights_:
-        #     # init_weights(self.clustering)
-        #     init_weights(self.beta)
-        #     init_weights(self.postgn_dense)
-        #     # init_weights(self.output)
-
-        if weird_batchnom:
-            self.ScaledGooeyBatchNorm2_2 = WeirdBatchNorm(64)
-        else:
-            self.ScaledGooeyBatchNorm2_2 = nn.BatchNorm1d(64)  # , momentum=0.01)
 
     def forward(self, g, step_count):
         x = g.ndata["h"]
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
-        device = x.device
-        batch = obtain_batch_numbers(x, g)
+        g.ndata["c"] = original_coords
+        #! this is to have the GT for the loss
+        g.ndata["object"] = object
+        x = g.ndata["h"]
+        c = g.ndata["c"]
         x = self.ScaledGooeyBatchNorm2_1(x)
-        x = self.Dense_1(x)
-        assert x.device == device
+        h = self.embedding_h(h)
 
-        allfeat = []  # To store intermediate outputs
-        allfeat.append(x)
-        graphs = []
-        loss_regularizing_neig = 0.0
-        loss_ll = 0
+        g1 = g
+
         if self.trainer.is_global_zero and (step_count % 100 == 0):
             PlotCoordinates(g, path="input_coords", outdir=self.args.model_prefix)
-        for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-            #! first time dim x is 64
-            #! second time is 64+d
-            x, graph, loss_regularizing_neig_block, loss_ll_ = gravnet_block(
-                g,
-                x,
-                batch,
-                original_coords,
-                step_count,
-                self.args.model_prefix,
-                num_layer,
-            )
+        full_res_features = []
+        losses = 0
+        depth_label = 0
+        full_up_points = []
+        ij_pairs = []
+        latest_depth_rep = []
+        for l, swin3 in enumerate(self.layers):
+            features, up_points, g, i, j, s_l = swin3(g, h, c)
+            if l == 0:
+                full_res_features.append(features)
+            c = s_l
+            up_points = up_points.view(-1)
+            if l == 0:
+                g1.ndata["up_points"] = up_points + 1
+            ij_pairs.append([i, j])
+            full_up_points.append(up_points)
+            h = features[up_points]
+            c = c[up_points]
+            depth_label = depth_label + 1
+            # losses = losses + loss_ud
+            features_down = features
+            for it in range(0, depth_label):
+                h_up_down = self.push_info_down(features_down, i, j)
+                try:
+                    latest_depth_rep[l - it] = h_up_down
+                except:
+                    latest_depth_rep.append(h_up_down)
+                if depth_label > 1 and (l - it - 1) >= 0:
+                    # print(l, it)
+                    h_up_down_previous = latest_depth_rep[l - it - 1]
+                    up_points_down = full_up_points[l - it - 1]
+                    h_up_down_previous[up_points_down] = h_up_down
+                    features_down = h_up_down_previous
+                    i, j = ij_pairs[l - it - 1]
+            full_res_features.append(h_up_down)
 
-            allfeat.append(x)
-            graphs.append(graph)
-            loss_regularizing_neig = (
-                loss_regularizing_neig_block + loss_regularizing_neig
-            )
-            loss_ll = loss_ll_ + loss_ll
-            if len(allfeat) > 1:
-                x = torch.concatenate(allfeat, dim=1)
-
-        x = torch.cat(allfeat, dim=-1)
-        x = self.postgn_dense(x)
+        all_resolutions = torch.concat(full_res_features, dim=1)
+        x = self.postgn_dense(all_resolutions)
         x = self.ScaledGooeyBatchNorm2_2(x)
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
             beta[mask] = 9
-        g.ndata["final_cluster"] = x_cluster_coord
-        g.ndata["beta"] = beta.view(-1)
+        g1.ndata["final_cluster"] = x_cluster_coord
+        g1.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and (step_count % 100 == 0):
             PlotCoordinates(
-                g,
+                g1,
                 path="final_clustering",
                 outdir=self.args.model_prefix,
                 predict=self.args.predict,
@@ -187,11 +184,6 @@ class GravnetModel(L.LightningModule):
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
         return x, pred_energy_corr, 0
-
-    # def on_after_backward(self):
-    #     for name, p in self.named_parameters():
-    #         if p.grad is None:
-    #             print(name)
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -347,90 +339,318 @@ class GravnetModel(L.LightningModule):
         }
 
 
-class GravNetBlock(nn.Module):
+class Swin3D(nn.Module):
+    """MAIN block
+    1) Find coordinates and score for the graph
+    2) Do knn down graph
+    3) Message passing on the down graph SWIN3D_Blocks
+    4) Downsample:
+            - find up points
+            - find neigh of from down to up
+    """
+
     def __init__(
         self,
-        in_channels: int,
-        out_channels: int = 96,
-        space_dimensions: int = 3,
-        propagate_dimensions: int = 22,
-        k: int = 40,
-        # batchnorm: bool = True
-        weird_batchnom=False,
+        in_dim_node,
+        hidden_dim,
+        num_heads,
+        layer_norm,
+        batch_norm,
+        residual,
+        dropout,
+        M,
+        k_in,
+        n_layers,
     ):
-        super(GravNetBlock, self).__init__()
-        self.d_shape = 32
-        out_channels = self.d_shape
-        if weird_batchnom:
-            self.batchnorm_gravnet1 = WeirdBatchNorm(self.d_shape)
-        else:
-            self.batchnorm_gravnet1 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
-        propagate_dimensions = self.d_shape
-        self.gravnet_layer = GravNetConv(
-            self.d_shape,
-            out_channels,
-            space_dimensions,
-            propagate_dimensions,
-            k,
-            weird_batchnom,
-        ).jittable()
+        super().__init__()
+        self.k = k_in
+        self.layer_norm = layer_norm
+        self.batch_norm = batch_norm
+        self.residual = residual
 
-        self.post_gravnet = nn.Sequential(
-            nn.Linear(
-                out_channels + space_dimensions + self.d_shape, self.d_shape
-            ),  #! Dense 3
-            nn.ELU(),
-            nn.Linear(self.d_shape, self.d_shape),  #! Dense 4
-            nn.ELU(),
+        # self.send_scores = SendScoresMessage()
+        # self.find_up = FindUpPoints()
+        self.sigmoid_scores = nn.Sigmoid()
+        self.funky_coordinate_space = True
+        if self.funky_coordinate_space:
+            self.embedding_coordinates = nn.Linear(
+                in_dim_node, 3
+            )  # node feat is an integer
+        self.M = M  # number of points up to connect to
+        self.embedding_h = nn.Linear(in_dim_node, hidden_dim)
+        self.SWIN3D_Blocks = SWIN3D_Blocks(
+            n_layers,
+            hidden_dim,
+            num_heads,
+            dropout,
+            self.layer_norm,
+            self.batch_norm,
+            self.residual,
+            possible_empty=True,
         )
-        self.pre_gravnet = nn.Sequential(
-            nn.Linear(in_channels, self.d_shape),  #! Dense 1
-            nn.ELU(),
-            nn.Linear(self.d_shape, self.d_shape),  #! Dense 2
-            nn.ELU(),
-        )
-        # self.output = nn.Sequential(nn.Linear(self.d_shape, self.d_shape), nn.ELU())
+        self.Downsample = Downsample_maxpull(hidden_dim, M)
 
-        # init_weights(self.output)
-        init_weights(self.post_gravnet)
-        init_weights(self.pre_gravnet)
-
-        if weird_batchnom:
-            self.batchnorm_gravnet2 = WeirdBatchNorm(self.d_shape)
+    def forward(self, g, h, c):
+        object = g.ndata["object"]
+        # 1) Find coordinates and score for the graph
+        # embedding to calculate the coordinates in the embedding space #! this could also be kept to the original coordinates
+        if self.funky_coordinate_space:
+            s_l = self.embedding_coordinates(h)
         else:
-            self.batchnorm_gravnet2 = nn.BatchNorm1d(self.d_shape, momentum=0.01)
+            s_l = c
+        h = self.embedding_h(h)
+        scores = torch.rand(h.shape[0]).to(h.device)
 
-    def forward(
+        # 2) Do knn down graph
+        g.ndata["s_l"] = s_l
+        g = knn_per_graph(
+            g, s_l, 7
+        )  #! if these are learnt then they should be added to the gradients, they are not at the moment
+        g.ndata["h"] = h
+
+        # 3) Message passing on the down graph SWIN3D_Blocks
+        h = self.SWIN3D_Blocks(g)
+
+        g.ndata["scores"] = scores
+        g.ndata["object"] = object
+        g.ndata["s_l"] = s_l
+        g.ndata["h"] = h
+
+        # calculate loss of score
+        # g.update_all(self.send_scores, self.find_up)
+        # loss_ud = self.find_up.loss_ud
+
+        # 4) Downsample:
+        features, up_points, new_graphs_up, i, j = self.Downsample(g)
+        return features, up_points, new_graphs_up, i, j, s_l
+
+
+class SWIN3D_Blocks(nn.Module):
+    """Point 3)
+    Just multiple blocks of sparse attention over the down graph
+    """
+
+    def __init__(
         self,
-        g,
-        x: Tensor,
-        batch: Tensor,
-        original_coords: Tensor,
-        step_count,
-        outdir,
-        num_layer,
-    ) -> Tensor:
-        x = self.pre_gravnet(x)
-        x = self.batchnorm_gravnet1(x)
-        x_input = x
-        xgn, graph, gncoords, loss_regularizing_neig, ll_r = self.gravnet_layer(
-            g, x, original_coords, batch
+        n_layers,
+        hidden_dim,
+        num_heads,
+        layer_norm,
+        batch_norm,
+        residual,
+        dropout,
+        possible_empty=True,
+    ):
+        super().__init__()
+        self.layer_norm = layer_norm
+        self.batch_norm = batch_norm
+        self.residual = residual
+        self.layers_message_passing = nn.ModuleList(
+            [
+                GraphTransformerLayer(
+                    hidden_dim,
+                    hidden_dim,
+                    num_heads,
+                    dropout,
+                    self.layer_norm,
+                    self.batch_norm,
+                    self.residual,
+                    possible_empty=True,
+                )
+                for zz in range(n_layers)
+            ]
         )
-        g.ndata["gncoords"] = gncoords
-        # if step_count % 50:
-        #     PlotCoordinates(
-        #         g, path="gravnet_coord", outdir=outdir, num_layer=str(num_layer)
-        #     )
-        # gncoords = gncoords.detach()
-        x = torch.cat((xgn, gncoords, x_input), dim=1)
-        x = self.post_gravnet(x)
-        x = self.batchnorm_gravnet2(x)  #! batchnorm 2
-        # x = global_exchange(x, batch)
-        # x = self.output(x)
-        return x, graph, loss_regularizing_neig, ll_r
+
+    def forward(self, g):
+        h = g.ndata["h"]
+        for ii, conv in enumerate(self.layers_message_passing):
+            h = conv(g, h)
+
+        return h
 
 
-def init_weights(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform(m.weight)
-        m.bias.data.fill_(0.00)
+class Downsample_maxpull(nn.Module):
+    """Point 4)
+    - find up points
+    - find neigh of from down to up
+    """
+
+    def __init__(self, hidden_dim, M):
+        super().__init__()
+        self.M = M
+        self.embedding_features_to_att = nn.Linear(hidden_dim + 3, hidden_dim)
+        self.MLP_difs = MLP_difs_maxpool(hidden_dim, hidden_dim)
+
+    def forward(self, g):
+        features = g.ndata["h"]
+        list_graphs = dgl.unbatch(g)
+        s_l = g.ndata["s_l"]
+        graphs_UD = []
+        graphs_U = []
+        up_points = []
+        for i in range(0, len(list_graphs)):
+            graph_i = list_graphs[i]
+            number_nodes_graph = graph_i.number_of_nodes()
+
+            # find up nodes
+            s_l_i = graph_i.ndata["s_l"]
+            scores_i = graph_i.ndata["scores"].view(-1)
+            device = scores_i.device
+            number_up = np.floor(number_nodes_graph * 0.25).astype(int)
+            up_points_i_index = torch.flip(torch.sort(scores_i, dim=0)[1], [0])[
+                0:number_up
+            ]
+            up_points_i = torch.zeros_like(scores_i)
+            up_points_i[up_points_i_index.long()] = 1
+            up_points_i = up_points_i.bool()
+
+            up_points.append(up_points_i)
+
+            # connect down to up
+            number_up_points_i = torch.sum(up_points_i)
+            if number_up_points_i > 5:
+                M_i = 5
+            else:
+                M_i = number_up_points_i
+            nodes = torch.range(start=0, end=number_nodes_graph - 1, step=1).to(device)
+            nodes_up = nodes[up_points_i]
+            nodes_down = nodes[~up_points_i]
+
+            neigh_indices, neigh_dist_sq = torch_cmspepr.select_knn_directional(
+                s_l_i[~up_points_i], s_l_i[up_points_i], M_i
+            )
+            j = nodes_up[neigh_indices]
+            j = j.view(-1)
+            i = torch.tile(nodes_down.view(-1, 1), (1, M_i)).reshape(-1)
+
+            g_i = dgl.graph((i.long(), j.long()), num_nodes=number_nodes_graph).to(
+                device
+            )
+            g_i.ndata["h"] = graph_i.ndata["h"]
+            g_i.ndata["s_l"] = graph_i.ndata["s_l"]
+            g_i.ndata["object"] = graph_i.ndata["object"]
+            # find index in original numbering
+            graphs_UD.append(g_i)
+            # use this way if no message passing between nodes
+            # edge_index = torch_cmspepr.knn_graph(s_l_i[up_points_i], k=7)
+            # graph_up = dgl.graph(
+            #     (edge_index[0], edge_index[1]), num_nodes=len(nodes_up)
+            # ).to(device)
+            graph_up = dgl.DGLGraph().to(device)
+            graph_up.add_nodes(len(nodes_up))
+            graph_up.ndata["object"] = g_i.ndata["object"][up_points_i]
+            graph_up.ndata["s_l"] = g_i.ndata["s_l"][up_points_i]
+            graphs_U.append(graph_up)
+
+        graphs_UD = dgl.batch(graphs_UD)
+        i, j = graphs_UD.edges()
+        graphs_U = dgl.batch(graphs_U)
+        # naive way of giving the coordinates gradients
+        features = torch.cat((features, s_l), dim=1)
+        features = self.embedding_features_to_att(features)
+
+        # do attention in g connected to up, this features have only been updated for points that have neighbourgs pointing to them: up-points
+        features = self.MLP_difs(graphs_UD, features)
+
+        up_points = torch.concat(up_points, dim=0).view(-1)
+
+        return features, up_points, graphs_U, i, j
+
+
+class MLP_difs_maxpool(nn.Module):
+    """
+    Param:
+    """
+
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+    ):
+        super().__init__()
+
+        self.in_channels = in_dim
+        self.out_channels = out_dim
+        self.edgedistancespassing = EdgePassing(self.in_channels, self.out_channels)
+        self.meanmaxaggregation = Max_aggregation(self.out_channels)
+        # self.batch_norm = nn.BatchNorm1d(out_dim)
+        # self.FFN_layer1 = nn.Linear(out_dim, out_dim * 2)
+        # self.FFN_layer2 = nn.Linear(out_dim * 2, out_dim)
+        # self.batch_norm2 = nn.BatchNorm1d(out_dim)
+
+    def forward(self, g, h):
+        h_in = h
+        g.ndata["features"] = h
+        g.update_all(self.edgedistancespassing, self.meanmaxaggregation)
+        h = g.ndata["h_updated"]
+        # h = h_in + h
+        # h = self.batch_norm(h)
+        # h_in2 = h
+        # h = self.FFN_layer1(h)
+        # h = F.relu(h)
+        # h = self.FFN_layer2(h)
+        # h = h_in2 + h  # residual connection
+        # h = self.batch_norm2(h)
+        return h
+
+
+class EdgePassing(nn.Module):
+    """
+    Compute the input feature from neighbors
+    """
+
+    def __init__(self, in_dim, out_dim):
+        super(EdgePassing, self).__init__()
+        # self.MLP = nn.Sequential(
+        #     nn.Linear(in_dim, out_dim),  #! Dense 3
+        #     nn.ReLU(),
+        #     nn.Linear(out_dim, 1),  #! Dense 4
+        #     nn.ReLU(),
+        # )
+
+    def forward(self, edges):
+        dif = edges.src["features"]
+        # att_weight = self.MLP(dif)
+        # att_weight = torch.sigmoid(att_weight)  #! try sigmoid
+        # feature = att_weight * edges.src["features"]
+        return {"feature_n": dif}
+
+
+class Max_aggregation(nn.Module):
+    """
+    Feature aggregation in a DGL graph
+    """
+
+    def __init__(self, out_dim):
+        super(Max_aggregation, self).__init__()
+
+    def forward(self, nodes):
+        max_agg = torch.max(nodes.mailbox["feature_n"], dim=1)[0]
+
+        return {"h_updated": max_agg}
+
+
+def knn_per_graph(g, sl, k):
+    """Build knn for each graph in the batch
+
+    Args:
+        g (_type_): original batch of dgl graphs
+        sl (_type_): coordinates
+        k (_type_): number of neighbours
+
+    Returns:
+        _type_: updates batch of dgl graphs with edges
+    """
+    graphs_list = dgl.unbatch(g)
+    node_counter = 0
+    new_graphs = []
+    for graph in graphs_list:
+        non = graph.number_of_nodes()
+        sls_graph = sl[node_counter : node_counter + non]
+        edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+        new_graph = dgl.graph(
+            (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+        )
+        new_graphs.append(new_graph)
+        node_counter = node_counter + non
+    return dgl.batch(new_graphs)
