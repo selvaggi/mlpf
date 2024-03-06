@@ -175,7 +175,7 @@ class GravnetModel(L.LightningModule):
         x_cluster_coord = self.clustering(x)
         beta = self.beta(x)
         if self.args.tracks:
-            mask = g.ndata["hit_type"] == 1
+            mask = g1.ndata["hit_type"] == 1
             beta[mask] = 9
         g1.ndata["final_cluster"] = x_cluster_coord
         g1.ndata["beta"] = beta.view(-1)
