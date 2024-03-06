@@ -659,7 +659,7 @@ class SendScoresMessage(nn.Module):
 
     def forward(self, edges):
         score_neigh = edges.src["scores"]
-        same_object = edges.dst["object"] == edges.src["object"]
+        same_object = edges.dst["particle_number"] == edges.src["particle_number"]
         return {"score_neigh": score_neigh.view(-1), "same_object": same_object}
 
 
