@@ -118,7 +118,7 @@ class GravnetModel(L.LightningModule):
         self.clustering = nn.Linear(64, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(64, 1)
 
-    def forward(self, g, step_count):
+    def forward(self, g, y, step_count):
         x = g.ndata["h"]
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
