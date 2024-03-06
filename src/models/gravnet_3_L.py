@@ -477,7 +477,7 @@ class GravnetModel(L.LightningModule):
         else:
             loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
-            log_losses_wandb(True, len(batch_idx), 0, losses, loss, loss_ll)
+            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
         self.loss_final = loss + self.loss_final
         self.number_b = self.number_b + 1
