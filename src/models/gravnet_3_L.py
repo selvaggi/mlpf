@@ -60,7 +60,7 @@ class GravnetModel(L.LightningModule):
         self.dev = dev
         self.loss_final = 0
         self.number_b = 0
-        # self.df_showers = []
+        self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
         self.args = args
