@@ -963,9 +963,7 @@ class GraphTransformerLayer(nn.Module):
         h_in1 = h  # for first residual connection
         # print("h in attention", h)
         # multi-head attention out
-        print("h inputs att", h_in1.shape)
         attn_out = self.attention(g, h)
-        print("h inputs att", attn_out.shape)
         h = attn_out.view(-1, self.out_channels)
         # print("h attention", h)
         h = F.dropout(h, self.dropout, training=self.training)
