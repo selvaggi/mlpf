@@ -127,7 +127,7 @@ class GravnetModel(L.LightningModule):
         x = g.ndata["h"]
         c = g.ndata["c"]
         x = self.ScaledGooeyBatchNorm2_1(x)
-        h = self.embedding_h(h)
+        h = self.embedding_h(x)
 
         g1 = g
 
