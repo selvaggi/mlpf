@@ -124,7 +124,6 @@ class GravnetModel(L.LightningModule):
         g.ndata["original_coords"] = original_coords
         g.ndata["c"] = original_coords
         #! this is to have the GT for the loss
-        g.ndata["object"] = object
         x = g.ndata["h"]
         c = g.ndata["c"]
         x = self.ScaledGooeyBatchNorm2_1(x)
@@ -602,7 +601,7 @@ class Swin3D(nn.Module):
         self.Downsample = Downsample_maxpull(hidden_dim, M)
 
     def forward(self, g, h, c):
-        object = g.ndata["object"]
+        object = g.ndata["particle_number"]
         # 1) Find coordinates and score for the graph
         # embedding to calculate the coordinates in the embedding space #! this could also be kept to the original coordinates
         if self.funky_coordinate_space:
@@ -623,7 +622,7 @@ class Swin3D(nn.Module):
         h = self.SWIN3D_Blocks(g)
 
         g.ndata["scores"] = scores
-        g.ndata["object"] = object
+        g.ndata["particle_number"] = object
         g.ndata["s_l"] = s_l
         g.ndata["h"] = h
 
