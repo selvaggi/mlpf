@@ -65,7 +65,7 @@ class GravnetModel(L.LightningModule):
         self.act = acts[activation]
         in_dim_node = 8
         num_heads = 8
-        hidden_dim = 128
+        hidden_dim = 32
         self.layer_norm = False
         self.batch_norm = True
         self.residual = True
