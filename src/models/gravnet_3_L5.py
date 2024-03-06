@@ -191,6 +191,17 @@ class GravnetModel(L.LightningModule):
 
         return x, pred_energy_corr, 0
 
+    def push_info_down(self, features, i, j):
+        # feed information back down averaging the information of the upcoming uppoints
+        g_connected_down = dgl.graph((j, i), num_nodes=features.shape[0])
+        g_connected_down.ndata["features"] = features
+        g_connected_down.update_all(
+            fn.copy_u("features", "m"), fn.max("m", "h")
+        )  #! full resolution graph
+        h_up_down = g_connected_down.ndata["h"]
+        # g connected down is the highest resolution graph with mean features of the up nodes
+        return h_up_down
+
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
