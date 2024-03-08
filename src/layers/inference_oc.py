@@ -24,6 +24,7 @@ def create_and_store_graph_output(
     tracking=False,
     e_corr=None,
     tracks=False,
+    store_epoch=False,
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -47,24 +48,26 @@ def create_and_store_graph_output(
 
         X = dic["graph"].ndata["coords"]
 
-        # labels = dbscan_obtain_labels(X, model_output.device)
+        labels_clustering = clustering_obtain_labels(
+            X, dic["graph"].ndata["beta"].view(-1), model_output.device
+        )
         labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        # shower_p_unique = torch.unique(labels)
-        # shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
-        #     labels,
-        #     dic,
-        #     particle_ids,
-        #     model_output,
-        #     local_rank,
-        #     i,
-        #     path_save,
-        #     tracks=tracks,
-        # )
-        shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb = match_showers(
+        shower_p_unique = torch.unique(labels_clustering)
+        shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
+            labels_clustering,
+            dic,
+            particle_ids,
+            model_output,
+            local_rank,
+            i,
+            path_save,
+            tracks=tracks,
+        )
+        shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb, iou_m = match_showers(
             labels_hdb,
             dic,
             particle_ids,
@@ -81,6 +84,7 @@ def create_and_store_graph_output(
                 row_ind_pandora,
                 col_ind_pandora,
                 i_m_w_pandora,
+                iou_m_pandora,
             ) = match_showers(
                 labels_pandora,
                 dic,
@@ -93,34 +97,34 @@ def create_and_store_graph_output(
                 tracks=tracks,
             )
 
-        # if len(shower_p_unique_hdb) < len(particle_ids):
-        # print("storing  event", local_rank, step, i)
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs_all_debug/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        # )
+        if len(row_ind_hdb) < len(row_ind_pandora):
+            print("storing  event", local_rank, step, i)
+            torch.save(
+                dic,
+                path_save
+                + "/graphs_all_comparing/"
+                + str(local_rank)
+                + "_"
+                + str(step)
+                + "_"
+                + str(i)
+                + ".pt",
+            )
         if len(shower_p_unique_hdb) > 1:
-            # df_event, number_of_showers_total = generate_showers_data_frame(
-            #     labels,
-            #     dic,
-            #     shower_p_unique,
-            #     particle_ids,
-            #     row_ind,
-            #     col_ind,
-            #     i_m_w,
-            #     e_corr=e_corr,
-            #     number_of_showers_total=number_of_showers_total,
-            #     step=step,
-            #     number_in_batch=i,
-            #     tracks=tracks,
-            # )
+            df_event, number_of_showers_total = generate_showers_data_frame(
+                labels_clustering,
+                dic,
+                shower_p_unique,
+                particle_ids,
+                row_ind,
+                col_ind,
+                i_m_w,
+                e_corr=e_corr,
+                number_of_showers_total=number_of_showers_total,
+                step=step,
+                number_in_batch=i,
+                tracks=tracks,
+            )
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -135,8 +139,8 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            # if len(df_event) > 1:
-            #     df_list.append(df_event)
+            if len(df_event) > 1:
+                df_list.append(df_event)
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
             if predict:
@@ -157,7 +161,7 @@ def create_and_store_graph_output(
                 if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
         number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
-    # df_batch = pd.concat(df_list)
+    df_batch = pd.concat(df_list)
     df_batch1 = pd.concat(df_list1)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
@@ -167,34 +171,38 @@ def create_and_store_graph_output(
     if store:
         store_at_batch_end(
             path_save,
-            # df_batch,
+            df_batch,
             df_batch1,
             df_batch_pandora,
             local_rank,
             step,
             epoch,
             predict=predict,
+            store=store_epoch,
         )
     if predict:
-        return df_batch_pandora, df_batch1
+        return df_batch_pandora, df_batch1, df_batch
     else:
         return df_batch1
 
 
 def store_at_batch_end(
     path_save,
+    df_batch,
     df_batch1,
     df_batch_pandora,
     local_rank=0,
     step=0,
     epoch=None,
     predict=False,
+    store=False,
 ):
-    # path_save_ = (
-    #     path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
-    # )
-    # if predict:
-    #     df_batch.to_pickle(path_save_)
+    path_save_ = (
+        path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
+    )
+    if store and predict:
+        df_batch.to_pickle(path_save_)
+    log_efficiency(df_batch, clustering=True)
     path_save_ = (
         path_save
         + "/"
@@ -205,7 +213,7 @@ def store_at_batch_end(
         + str(epoch)
         + "_hdbscan.pt"
     )
-    if predict:
+    if store and predict:
         df_batch1.to_pickle(path_save_)
     if predict:
         path_save_pandora = (
@@ -218,19 +226,22 @@ def store_at_batch_end(
             + str(epoch)
             + "_pandora.pt"
         )
-        df_batch_pandora.to_pickle(path_save_pandora)
+        if store and predict:
+            df_batch_pandora.to_pickle(path_save_pandora)
     log_efficiency(df_batch1)
     if predict:
         log_efficiency(df_batch_pandora, pandora=True)
 
 
-def log_efficiency(df, pandora=False):
+def log_efficiency(df, pandora=False, clustering=False):
     mask = ~np.isnan(df["reco_showers_E"])
     eff = np.sum(~np.isnan(df["pred_showers_E"][mask].values)) / len(
         df["pred_showers_E"][mask].values
     )
     if pandora:
         wandb.log({"efficiency validation pandora": eff})
+    elif clustering:
+        wandb.log({"efficiency validation clustering": eff})
     else:
         wandb.log({"efficiency validation": eff})
 
@@ -469,7 +480,7 @@ def obtain_union_matrix(shower_p_unique, particle_ids, labels, dic):
     return union_matrix
 
 
-def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
+def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.7, td=0.2):
     """
     Returns a clustering of hits -> cluster_index, based on the GravNet model
     output (predicted betas and cluster space coordinates) and the clustering
@@ -485,14 +496,32 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=0.5):
     # Assign points to condensation points
     # Only assign previously unassigned points (no overwriting)
     # Points unassigned at the end are bkg (-1)
-    unassigned = torch.arange(n_points)
-    clustering = -1 * torch.ones(n_points, dtype=torch.long)
-    for index_condpoint in indices_condpoints:
+    unassigned = torch.arange(n_points).to(betas.device)
+    clustering = -1 * torch.ones(n_points, dtype=torch.long).to(betas.device)
+    while len(indices_condpoints) > 0 and len(unassigned) > 0:
+        index_condpoint = indices_condpoints[0]
+
         d = torch.norm(X[unassigned] - X[index_condpoint][0], dim=-1)
         assigned_to_this_condpoint = unassigned[d < td]
         clustering[assigned_to_this_condpoint] = index_condpoint[0]
         unassigned = unassigned[~(d < td)]
+        # calculate indices_codpoints again
+        indices_condpoints = find_condpoints(betas, unassigned, tbeta)
     return clustering
+
+
+def find_condpoints(betas, unassigned, tbeta):
+    n_points = betas.size(0)
+    select_condpoints = betas > tbeta
+    device = betas.device
+    mask_unassigned = torch.zeros(n_points).to(device)
+    mask_unassigned[unassigned] = True
+    select_condpoints = mask_unassigned.to(bool) * select_condpoints
+    # Get indices passing the threshold
+    indices_condpoints = select_condpoints.nonzero()
+    # Order them by decreasing beta value
+    indices_condpoints = indices_condpoints[(-betas[select_condpoints]).argsort()]
+    return indices_condpoints
 
 
 def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
@@ -537,7 +566,7 @@ def match_showers(
     tracks=False,
     hdbscan=False,
 ):
-    iou_threshold = 0.3
+    iou_threshold = 0.25
     shower_p_unique = torch.unique(labels)
     if torch.sum(labels == 0) == 0:
         shower_p_unique = torch.cat(
@@ -573,7 +602,20 @@ def match_showers(
                 image_path = path_save + "/example_1_clustering.png"
             # plot_iou_matrix(iou_matrix, image_path, hdbscan)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
-    return shower_p_unique, row_ind, col_ind, i_m_w
+    return shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix
+
+
+def clustering_obtain_labels(X, betas, device):
+    clustering = get_clustering(betas, X)
+    map_from = list(np.unique(clustering.detach().cpu()))
+    cluster_id = map(lambda x: map_from.index(x), clustering.detach().cpu())
+    clustering_ordered = torch.Tensor(list(cluster_id)).long()
+    if torch.unique(clustering)[0] != -1:
+        clustering = clustering_ordered + 1
+    else:
+        clustering = clustering_ordered
+    clustering = torch.Tensor(clustering.view(-1)).long().to(device)
+    return clustering
 
 
 def hfdb_obtain_labels(X, device):
