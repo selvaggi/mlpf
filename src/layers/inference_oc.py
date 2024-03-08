@@ -97,19 +97,19 @@ def create_and_store_graph_output(
                 tracks=tracks,
             )
 
-        if len(row_ind_hdb) < len(row_ind_pandora):
-            print("storing  event", local_rank, step, i)
-            torch.save(
-                dic,
-                path_save
-                + "/graphs_all_comparing/"
-                + str(local_rank)
-                + "_"
-                + str(step)
-                + "_"
-                + str(i)
-                + ".pt",
-            )
+        # if len(row_ind_hdb) < len(row_ind_pandora):
+        #     print("storing  event", local_rank, step, i)
+        #     torch.save(
+        #         dic,
+        #         path_save
+        #         + "/graphs_all_comparing/"
+        #         + str(local_rank)
+        #         + "_"
+        #         + str(step)
+        #         + "_"
+        #         + str(i)
+        #         + ".pt",
+        #     )
         if len(shower_p_unique_hdb) > 1:
             df_event, number_of_showers_total = generate_showers_data_frame(
                 labels_clustering,
