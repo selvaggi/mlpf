@@ -333,26 +333,26 @@ class ExampleWrapper(L.LightningModule):
                     predict=True,
                     store=True,
                 )
-            # else:
-            #     model_output = self.validation_step_outputs[0][0]
-            #     e_corr = self.validation_step_outputs[0][1]
-            #     batch_g = self.validation_step_outputs[0][2]
-            #     y = self.validation_step_outputs[0][3]
-            #     model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-            #     create_and_store_graph_output(
-            #         batch_g,
-            #         model_output1,
-            #         y,
-            #         0,
-            #         0,
-            #         0,
-            #         path_save=os.path.join(
-            #             self.args.model_prefix, "showers_df_evaluation"
-            #         ),
-            #         store=True,
-            #         predict=False,
-            #         tracks=self.args.tracks,
-            #     )
+            else:
+                model_output = self.validation_step_outputs[0][0]
+                e_corr = self.validation_step_outputs[0][1]
+                batch_g = self.validation_step_outputs[0][2]
+                y = self.validation_step_outputs[0][3]
+                model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                create_and_store_graph_output(
+                    batch_g,
+                    model_output1,
+                    y,
+                    0,
+                    0,
+                    0,
+                    path_save=os.path.join(
+                        self.args.model_prefix, "showers_df_evaluation"
+                    ),
+                    store=True,
+                    predict=False,
+                    tracks=self.args.tracks,
+                )
         self.validation_step_outputs = []
 
     def configure_optimizers(self):
