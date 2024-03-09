@@ -159,7 +159,7 @@ def main():
             max_epochs=100,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=6000,
+            limit_train_batches=12000,
             limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
@@ -177,7 +177,7 @@ def main():
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
-            devices=[0],
+            devices=[1],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # limit_val_batches=19,
