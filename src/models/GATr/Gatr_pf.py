@@ -17,6 +17,7 @@ import dgl
 from src.logger.plotting_tools import PlotCoordinates
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.models.gravnet_calibration import (
+    object_condensation_loss2,
     obtain_batch_numbers,
 )
 from src.layers.inference_oc import create_and_store_graph_output
@@ -37,6 +38,7 @@ from src.layers.obtain_statistics import (
     save_stat_dict,
     plot_distributions,
 )
+from src.utils.nn.tools import log_losses_wandb
 
 
 class ExampleWrapper(L.LightningModule):
@@ -74,6 +76,11 @@ class ExampleWrapper(L.LightningModule):
         super().__init__()
         self.input_dim = 3
         self.output_dim = 4
+        self.loss_final = 0
+        self.number_b = 0
+        self.df_showers = []
+        self.df_showers_pandora = []
+        self.df_showes_db = []
         self.args = args
         self.gatr = GATr(
             in_mv_channels=1,
@@ -103,9 +110,10 @@ class ExampleWrapper(L.LightningModule):
         outputs : torch.Tensor with shape (*batch_dimensions, 1)
             Model prediction: a single scalar for the whole point cloud.
         """
+
         inputs = g.ndata["pos_hits_xyz"]
 
-        if self.trainer.is_global_zero and step_count % 800 == 0:
+        if self.trainer.is_global_zero and step_count % 500 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -142,9 +150,12 @@ class ExampleWrapper(L.LightningModule):
 
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
+        if self.args.tracks:
+            mask = g.ndata["hit_type"] == 1
+            beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 800 == 0:
+        if self.trainer.is_global_zero and step_count % 500 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -154,7 +165,9 @@ class ExampleWrapper(L.LightningModule):
                 step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
-        return x
+        pred_energy_corr = torch.ones_like(beta.view(-1, 1))
+
+        return x, pred_energy_corr, 0
 
     def build_attention_mask(self, g):
         """Construct attention mask from pytorch geometric batch.
@@ -177,20 +190,18 @@ class ExampleWrapper(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
-
         batch_g = batch[0]
         # if self.trainer.is_global_zero and self.current_epoch == 0:
-        #     self.stat_dict = obtain_statistics_graph(
-        #         self.stat_dict, y, batch_g, pf=False
-        #     )
+        #     self.stat_dict = obtain_statistics_graph(self.stat_dict, y, batch_g)
         if self.trainer.is_global_zero:
-            model_output = self(batch_g, y, batch_idx)
+            model_output, e_cor, loss_ll = self(batch_g, y, batch_idx)
         else:
-            model_output = self(batch_g, y, 1)
-
-        (loss, losses) = object_condensation_loss_tracking(
+            model_output, e_cor, loss_ll = self(batch_g, y, 1)
+            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
+            e_cor,
             y,
             clust_loss_only=True,
             add_energy_loss=False,
@@ -202,75 +213,94 @@ class ExampleWrapper(L.LightningModule):
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
-            tracking=True,
         )
-        loss = loss
-        # print("training step", batch_idx, loss)
+        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
-            log_losses_wandb_tracking(True, batch_idx, 0, losses, loss)
+            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
-        self.loss_final = loss
+        self.loss_final = loss + self.loss_final
+        self.number_b = self.number_b + 1
         return loss
 
     def validation_step(self, batch, batch_idx):
+        cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
+        show_df_eval_path = os.path.join(
+            self.args.model_prefix, "showers_df_evaluation"
+        )
+        if not os.path.exists(show_df_eval_path):
+            os.makedirs(show_df_eval_path)
+        if not os.path.exists(cluster_features_path):
+            os.makedirs(cluster_features_path)
         self.validation_step_outputs = []
         y = batch[1]
-
         batch_g = batch[0]
-
-        model_output = self(batch_g, y, batch_idx, eval="_val")
+        if self.args.correction:
+            (
+                model_output,
+                e_cor1,
+                true_e,
+                sum_e,
+                new_graphs,
+                batch_id,
+                graph_level_features,
+            ) = self(batch_g, y, 1)
+            loss_ll = 0
+            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        else:
+            model_output, e_cor1, loss_ll = self(batch_g, y, 1)
+            loss_ll = 0
+            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
-
-        (loss, losses) = object_condensation_loss_tracking(
+        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
+            e_cor,
             y,
+            clust_loss_only=True,
+            add_energy_loss=False,
+            calc_e_frac_loss=False,
             q_min=self.args.qmin,
-            frac_clustering_loss=0,
-            clust_loss_only=self.args.clustering_loss_only,
+            frac_clustering_loss=self.args.frac_cluster_loss,
+            attr_weight=self.args.L_attractive_weight,
+            repul_weight=self.args.L_repulsive_weight,
+            fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
-            tracking=True,
         )
-        loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
-        # print("validation step", batch_idx, loss)
+        loss_ec = 0
+
+        print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
-            log_losses_wandb_tracking(True, batch_idx, 0, losses, loss, val=True)
-        # self.validation_step_outputs.append([model_output, batch_g, y])
-        if self.trainer.is_global_zero:
-            df_batch = evaluate_efficiency_tracks(
+            log_losses_wandb(
+                True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
+            )
+        self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
+        if self.args.predict:
+            model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
+            e_corr = None
+            (df_batch_pandora, df_batch1, df_batch) = create_and_store_graph_output(
                 batch_g,
-                model_output,
+                model_output1,
                 y,
                 0,
                 batch_idx,
                 0,
-                path_save=self.args.model_prefix + "showers_df_evaluation",
+                path_save=show_df_eval_path,
                 store=True,
-                predict=False,
+                predict=True,
+                e_corr=e_corr,
+                tracks=self.args.tracks,
             )
-            if self.args.predict:
-                self.df_showers.append(df_batch)
+            self.df_showers.append(df_batch)
+            self.df_showers_pandora.append(df_batch_pandora)
+            self.df_showes_db.append(df_batch1)
+        print("end of validation step ")
 
     def on_train_epoch_end(self):
-        # if self.current_epoch == 0 and self.trainer.is_global_zero:
-        #     save_stat_dict(
-        #         self.stat_dict,
-        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-        #     )
-        #     plot_distributions(
-        #         self.stat_dict,
-        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-        #         pf=True,
-        #     )
-        # self.stat_dict = {}
-        # log epoch metric
-        self.log("train_loss_epoch", self.loss_final)
+
+        self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
-        # if self.current_epoch == 0 and self.trainer.is_global_zero:
-        #     stats_dict = create_stats_dict(self.beta.weight.device)
-        #     self.stat_dict = stats_dict
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
@@ -280,35 +310,60 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def make_mom_zero(self):
-        if self.current_epoch > 2 or self.args.predict:
+        if self.current_epoch > 1 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
-            # self.ScaledGooeyBatchNorm2_2.momentum = 0
-            # for num_layer, gravnet_block in enumerate(self.gravnet_blocks):
-            #     gravnet_block.batchnorm_gravnet1.momentum = 0
-            #     gravnet_block.batchnorm_gravnet2.momentum = 0
 
     def on_validation_epoch_end(self):
-        # print("VALIDATION END NEXT EPOCH", self.trainer.global_rank)
-        print("end of val predictiong")
-        if self.args.predict:
-            store_at_batch_end(
-                self.args.model_prefix + "showers_df_evaluation",
-                self.df_showers,
-                0,
-                0,
-                0,
-                predict=True,
-            )
-        # if self.trainer.is_global_zero:
+        if self.trainer.is_global_zero:
+            if self.args.predict:
+                from src.layers.inference_oc import store_at_batch_end
+                import pandas as pd
+
+                self.df_showers = pd.concat(self.df_showers)
+                self.df_showers_pandora = pd.concat(self.df_showers_pandora)
+                self.df_showes_db = pd.concat(self.df_showes_db)
+                store_at_batch_end(
+                    path_save=os.path.join(
+                        self.args.model_prefix, "showers_df_evaluation"
+                    ),
+                    df_batch=self.df_showers,
+                    df_batch_pandora=self.df_showers_pandora,
+                    df_batch1=self.df_showes_db,
+                    step=0,
+                    predict=True,
+                    store=True,
+                )
+            else:
+                model_output = self.validation_step_outputs[0][0]
+                e_corr = self.validation_step_outputs[0][1]
+                batch_g = self.validation_step_outputs[0][2]
+                y = self.validation_step_outputs[0][3]
+                model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                create_and_store_graph_output(
+                    batch_g,
+                    model_output1,
+                    y,
+                    0,
+                    0,
+                    0,
+                    path_save=os.path.join(
+                        self.args.model_prefix, "showers_df_evaluation"
+                    ),
+                    store=True,
+                    predict=False,
+                    tracks=self.args.tracks,
+                )
+        self.validation_step_outputs = []
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.start_lr)
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=1e-3
+        )
+        print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": StepLR(
-                    optimizer, step_size=4, gamma=0.1
-                ),  # ReduceLROnPlateau(optimizer),
+                "scheduler": ReduceLROnPlateau(optimizer, patience=3),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1

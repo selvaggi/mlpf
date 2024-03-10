@@ -53,13 +53,14 @@ class GravnetModel(L.LightningModule):
         k_gravnet: int = 7,
         activation: str = "elu",
         weird_batchnom=False,
-        use_correction=False
+        use_correction=False,
     ):
 
         super(GravnetModel, self).__init__()
         self.dev = dev
-        self.loss_final = 100
-        # self.df_showers = []
+        self.loss_final = 0
+        self.number_b = 0
+        self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
         self.args = args
@@ -154,15 +155,26 @@ class GravnetModel(L.LightningModule):
                     self.GatedGCNNet = LinearGNNLayer(self.dev, activation="linear")
             else:
                 print("Initializing!")
-                self.GatedGCNNet = LinearGNNLayer(self.dev, activation="linear", in_dim_node=18)
-                print("Len of NN params", len([param for param in self.GatedGCNNet.parameters() if param.requires_grad]))
+                self.GatedGCNNet = LinearGNNLayer(
+                    self.dev, activation="linear", in_dim_node=18
+                )
+                print(
+                    "Len of NN params",
+                    len(
+                        [
+                            param
+                            for param in self.GatedGCNNet.parameters()
+                            if param.requires_grad
+                        ]
+                    ),
+                )
 
     def forward(self, g, y, step_count):
-        #print("Num. of trainable params", len([param for param in self.parameters() if param.requires_grad]))
-        #for p in self.parameters():
+        # print("Num. of trainable params", len([param for param in self.parameters() if param.requires_grad]))
+        # for p in self.parameters():
         #    if p.requires_grad:
         #        print("--> param name: ", p.name, " dir: ", dir(p))
-        #print("Num of trainable params in the sub NN" , len([param for param in self.GatedGCNNet.parameters() if param.requires_grad]))
+        # print("Num of trainable params in the sub NN" , len([param for param in self.GatedGCNNet.parameters() if param.requires_grad]))
         x = g.ndata["h"]
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
@@ -228,7 +240,11 @@ class GravnetModel(L.LightningModule):
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         if self.args.correction:
             graphs_new, true_new, sum_e = obtain_clustering_for_matched_showers(
-                g, x, y, self.trainer.global_rank, use_gt_clusters=self.args.use_gt_clusters
+                g,
+                x,
+                y,
+                self.trainer.global_rank,
+                use_gt_clusters=self.args.use_gt_clusters,
             )
             batch_num_nodes = graphs_new.batch_num_nodes()
             batch_idx = []
@@ -242,21 +258,38 @@ class GravnetModel(L.LightningModule):
                 print("Using global features of the graphs as well")
                 # graphs_num_nodes = graphs_new.batch_num_nodes
                 # add num_nodes for each node
-                graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
+                graphs_sum_features = scatter_add(
+                    graphs_new.ndata["h"], batch_idx, dim=0
+                )
                 # now multiply graphs_sum_features so the shapes match
                 graphs_sum_features = graphs_sum_features[batch_idx]
                 # append the new features to "h" (graphs_sum_features)
                 shape0 = graphs_new.ndata["h"].shape
-                graphs_new.ndata["h"] = torch.cat((graphs_new.ndata["h"], graphs_sum_features), dim=1)
+                graphs_new.ndata["h"] = torch.cat(
+                    (graphs_new.ndata["h"], graphs_sum_features), dim=1
+                )
                 assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             if self.args.graph_level_features:
-                #print("Also computing graph-level features")
-                graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e)
-                #print("Computed graph-level features")
-                #print("Shape", graphs_high_level_features)
+                # print("Also computing graph-level features")
+                graphs_high_level_features = get_post_clustering_features(
+                    graphs_new, sum_e
+                )
+                # print("Computed graph-level features")
+                # print("Shape", graphs_high_level_features)
                 pred_energy_corr = self.GatedGCNNet(graphs_high_level_features)
-                assert graphs_high_level_features.shape[0] == graphs_new.batch_num_nodes().shape[0]
-                return x, pred_energy_corr, true_new, sum_e, graphs_new, batch_idx, graphs_high_level_features
+                assert (
+                    graphs_high_level_features.shape[0]
+                    == graphs_new.batch_num_nodes().shape[0]
+                )
+                return (
+                    x,
+                    pred_energy_corr,
+                    true_new,
+                    sum_e,
+                    graphs_new,
+                    batch_idx,
+                    graphs_high_level_features,
+                )
             else:
                 pred_energy_corr = self.GatedGCNNet(graphs_new)
                 return x, pred_energy_corr, true_new, sum_e, graphs_new, batch_idx, None
@@ -272,18 +305,34 @@ class GravnetModel(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        if self.trainer.is_global_zero and self.current_epoch == 0:
-            self.stat_dict = obtain_statistics_graph(self.stat_dict, y, batch_g)
+        # if self.trainer.is_global_zero and self.current_epoch == 0:
+        #     self.stat_dict = obtain_statistics_graph(self.stat_dict, y, batch_g)
         if self.trainer.is_global_zero:
             if self.args.correction:
-                model_output, e_cor1, true_e, sum_e, new_graphs, batch_idx, graph_level_features = self(batch_g, y, batch_idx)
+                (
+                    model_output,
+                    e_cor1,
+                    true_e,
+                    sum_e,
+                    new_graphs,
+                    batch_idx,
+                    graph_level_features,
+                ) = self(batch_g, y, batch_idx)
                 e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
                 loss_ll = 0
             else:
                 model_output, e_cor, loss_ll = self(batch_g, y, batch_idx)
         else:
             if self.args.correction:
-                model_output, e_cor1, true_e, sum_e, new_graphs, batch_idx, graph_level_features = self(batch_g, y, 1)
+                (
+                    model_output,
+                    e_cor1,
+                    true_e,
+                    sum_e,
+                    new_graphs,
+                    batch_idx,
+                    graph_level_features,
+                ) = self(batch_g, y, 1)
                 e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
                 loss_ll = 0
             else:
@@ -292,12 +341,12 @@ class GravnetModel(L.LightningModule):
         if self.args.correction:
             print(model_output.shape, e_cor.shape, e_cor1.shape)
             e_cor1 += 1.0  # We regress the number around zero!!! # TODO: uncomment this if needed
-        '''energies_sums_features = new_graphs.ndata["h"][:, 15]
+        """energies_sums_features = new_graphs.ndata["h"][:, 15]
         energies_sums = [sum_e[i] for i in batch_idx]
         energies_sums = torch.tensor(energies_sums).to(energies_sums_features.device).flatten()
         print(energies_sums[energies_sums != energies_sums_features])
         print(energies_sums_features[energies_sums != energies_sums_features])
-        assert (torch.abs(energies_sums - energies_sums_features) < 0.001).all()'''
+        assert (torch.abs(energies_sums - energies_sums_features) < 0.001).all()"""
         # print(model_output.shape, e_cor.shape, e_cor1.shape)
         # e_cor1 += 1.  # We regress the number around zero!!! # TODO: uncomment this if needed
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -321,13 +370,26 @@ class GravnetModel(L.LightningModule):
 
             def corr(array):
                 return torch.clamp(array, min=0.000001)
+
             if debug_regress_e_sum:
                 # This section is just for debugging!
-                loss, loss_abs, loss_abs_nocali = loss_reco_sum_absolute(e_cor1, torch.log10(true_e), torch.log10(sum_e))
+                loss, loss_abs, loss_abs_nocali = loss_reco_sum_absolute(
+                    e_cor1, torch.log10(true_e), torch.log10(sum_e)
+                )
                 data = [[x, y] for (x, y) in zip(torch.log10(sum_e), e_cor1)]
-                table = wandb.Table(data=data, columns=["sum E (GT)", "sum E (regressed)"])
-                wandb.log({"energy_corr": wandb.plot.scatter(table, "sum E (GT)", "sum E (regressed)",
-                                                             title="energy correction correlation")})
+                table = wandb.Table(
+                    data=data, columns=["sum E (GT)", "sum E (regressed)"]
+                )
+                wandb.log(
+                    {
+                        "energy_corr": wandb.plot.scatter(
+                            table,
+                            "sum E (GT)",
+                            "sum E (regressed)",
+                            title="energy correction correlation",
+                        )
+                    }
+                )
                 print("debug_regress_e_sum == True !")
                 loss, loss_abs, loss_abs_nocali = loss_reco_sum_absolute(
                     torch.log10(corr(e_cor1)),
@@ -374,29 +436,51 @@ class GravnetModel(L.LightningModule):
                         )
                     }
                 )
-                table = wandb.Table(data=data, columns=["true E corr factor", "regressed E corr factor"])
-                wandb.log({"energy_corr": wandb.plot.scatter(table, "true E corr factor", "regressed E corr factor",
-                                                                   title="energy correction correlation")})
+                table = wandb.Table(
+                    data=data, columns=["true E corr factor", "regressed E corr factor"]
+                )
+                wandb.log(
+                    {
+                        "energy_corr": wandb.plot.scatter(
+                            table,
+                            "true E corr factor",
+                            "regressed E corr factor",
+                            title="energy correction correlation",
+                        )
+                    }
+                )
                 if self.args.graph_level_features:
                     # also plot graph level features correlations
                     data = [[x, y] for (x, y) in zip(true_e_corr, sum_e)]
-                    table = wandb.Table(data=data, columns=["true E corr factor", "sum of E of hits"])
-                    #wandb.log({"energy_corr_vs_E_hits": wandb.plot.scatter(table, "true E corr factor", "sum of E of hits",
+                    table = wandb.Table(
+                        data=data, columns=["true E corr factor", "sum of E of hits"]
+                    )
+                    # wandb.log({"energy_corr_vs_E_hits": wandb.plot.scatter(table, "true E corr factor", "sum of E of hits",
                     #                                                       title="energy correction vs. sum of E hits")})
                     #  save graph-level features temporarily, to view later...
-                    cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
+                    cluster_features_path = os.path.join(
+                        self.args.model_prefix, "cluster_features"
+                    )
                     if not os.path.exists(cluster_features_path):
                         os.makedirs(cluster_features_path)
-                    save_features(cluster_features_path, {"x": graph_level_features.detach().cpu(), "e_true": true_e.detach().cpu(),
-                                                  "e_reco": model_e_corr.detach().cpu(), "true_e_corr": true_e_corr.detach().cpu()})
+                    save_features(
+                        cluster_features_path,
+                        {
+                            "x": graph_level_features.detach().cpu(),
+                            "e_true": true_e.detach().cpu(),
+                            "e_reco": model_e_corr.detach().cpu(),
+                            "true_e_corr": true_e_corr.detach().cpu(),
+                        },
+                    )
                     print("!!!temporarily saving features in an external file!!!!")
                 print("Logged!")
         else:
             loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
-            log_losses_wandb(True, len(batch_idx), 0, losses, loss, loss_ll)
+            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
-        self.loss_final = loss
+        self.loss_final = loss + self.loss_final
+        self.number_b = self.number_b + 1
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -412,7 +496,15 @@ class GravnetModel(L.LightningModule):
         y = batch[1]
         batch_g = batch[0]
         if self.args.correction:
-            model_output, e_cor1, true_e, sum_e, new_graphs, batch_id, graph_level_features = self(batch_g, y, 1)
+            (
+                model_output,
+                e_cor1,
+                true_e,
+                sum_e,
+                new_graphs,
+                batch_id,
+                graph_level_features,
+            ) = self(batch_g, y, 1)
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
@@ -436,16 +528,19 @@ class GravnetModel(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
         )
+        loss_ec = 0
         if self.args.correction:
             loss, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
             loss_ec = 0
-        else:
-            print("Doing both correction and OC loss!!")
-            loss_ec, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
-            loss = loss + 0.05 * loss_ec
+        # else:
+        #     print("Doing both correction and OC loss!!")
+        #     loss_ec, loss_abs, loss_abs_nocali = loss_reco_true(e_cor1, true_e, sum_e)
+        #     loss = loss + 0.05 * loss_ec
         print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
-            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True)
+            log_losses_wandb(
+                True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
+            )
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
@@ -453,7 +548,7 @@ class GravnetModel(L.LightningModule):
                 e_corr = e_cor1
             else:
                 e_corr = None
-            (df_batch_pandora, df_batch1,) = create_and_store_graph_output(
+            (df_batch_pandora, df_batch1, df_batch) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -466,23 +561,23 @@ class GravnetModel(L.LightningModule):
                 e_corr=e_corr,
                 tracks=self.args.tracks,
             )
-            # self.df_showers.append(df_batch)
+            self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
 
     def on_train_epoch_end(self):
-        if self.current_epoch == 0 and self.trainer.is_global_zero:
-            save_stat_dict(
-                self.stat_dict,
-                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-            )
-            plot_distributions(
-                self.stat_dict,
-                os.path.join(self.args.model_prefix, "showers_df_evaluation"),
-                pf=True,
-            )
-            self.stat_dict = {}
-        self.log("train_loss_epoch", self.loss_final)
+        # if self.current_epoch == 0 and self.trainer.is_global_zero:
+        #     save_stat_dict(
+        #         self.stat_dict,
+        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+        #     )
+        #     plot_distributions(
+        #         self.stat_dict,
+        #         os.path.join(self.args.model_prefix, "showers_df_evaluation"),
+        #         pf=True,
+        #     )
+        #     self.stat_dict = {}
+        self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
         if self.current_epoch == 0 and self.trainer.is_global_zero:
@@ -492,7 +587,7 @@ class GravnetModel(L.LightningModule):
 
     def on_validation_epoch_start(self):
         self.make_mom_zero()
-        # self.df_showers = []
+        self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
 
@@ -510,18 +605,19 @@ class GravnetModel(L.LightningModule):
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
 
-                # self.df_showers = pd.concat(self.df_showers)
+                self.df_showers = pd.concat(self.df_showers)
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
                     ),
-                    # df_batch=self.df_showers,
+                    df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
                     step=0,
                     predict=True,
+                    store=True,
                 )
             else:
                 model_output = self.validation_step_outputs[0][0]
@@ -769,6 +865,7 @@ def loss_reco_true(e_cor, true_e, sum_e):
     loss_abs_nocali = torch.mean(torch.abs(sum_e - true_e) / true_e)
     loss = torch.mean(loss)
     return loss, loss_abs, loss_abs_nocali
+
 
 def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     # implementation of a loss that regresses the sum of the hits instead of the corr. factor ( just for debugging )
