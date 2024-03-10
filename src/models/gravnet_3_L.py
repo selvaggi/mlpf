@@ -686,7 +686,7 @@ def init_weights(m):
         m.bias.data.fill_(0.00)
 
 
-def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
+def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, use_gt_clusters=False):
     graphs_showers_matched = []
     true_energy_showers = []
     reco_energy_showers = []
@@ -753,6 +753,7 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank):
     graphs_showers_matched = dgl.batch(graphs_showers_matched)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
+
     return graphs_showers_matched, true_energy_showers, reco_energy_showers
 
 
