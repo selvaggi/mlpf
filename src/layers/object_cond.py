@@ -571,7 +571,7 @@ def calc_LV_Lbeta(
         ).sum()
     L_V = (
         attr_weight * L_V_attractive
-        + 1 / 10 * repul_weight * L_V_repulsive
+        + 1 / 100 * repul_weight * L_V_repulsive
         # + L_clusters
         # + fill_loss
     )
