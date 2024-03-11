@@ -532,7 +532,7 @@ def calc_LV_Lbeta(
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
     if hgcal_implementation:
-        norms_rep = torch.exp(-(norms) / 2) * M_inv
+        norms_rep = torch.exp(-(norms)* 4) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
@@ -571,7 +571,7 @@ def calc_LV_Lbeta(
         ).sum()
     L_V = (
         attr_weight * L_V_attractive
-        + 1 / 100 * repul_weight * L_V_repulsive
+        +   repul_weight * L_V_repulsive
         # + L_clusters
         # + fill_loss
     )
