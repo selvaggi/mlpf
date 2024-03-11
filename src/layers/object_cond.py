@@ -550,7 +550,8 @@ def calc_LV_Lbeta(
         number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
         L_V_repulsive = L_V_repulsive.view(
             -1
-        ) / number_of_repulsive_terms_per_object.view(-1)
+        )  # / number_of_repulsive_terms_per_object.view(-1)
+
         # if not tracking:
         #     #! add to terms function (divide by total number of showers per event)
         #     # L_V_repulsive = scatter_add(L_V_repulsive, object_index) / n_objects
@@ -570,7 +571,7 @@ def calc_LV_Lbeta(
         ).sum()
     L_V = (
         attr_weight * L_V_attractive
-        + repul_weight * L_V_repulsive
+        + 1 / 10 * repul_weight * L_V_repulsive
         # + L_clusters
         # + fill_loss
     )
