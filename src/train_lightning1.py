@@ -128,7 +128,14 @@ def main():
     if training_mode:
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
-        if args.load_model_weights is not None:
+        if args.load_model_weights is not None and args.correction:
+            from src.models.gravnet_3_L import GravnetModel
+
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0
+            )
+
+        elif args.load_model_weights is not None:
             from src.models.GATr.Gatr_pf import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
