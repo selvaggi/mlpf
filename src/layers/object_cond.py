@@ -532,12 +532,14 @@ def calc_LV_Lbeta(
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
     if hgcal_implementation:
-        norms_rep = torch.exp(-(norms)* 4) * M_inv
+        norms_rep = torch.exp(-(norms) / 2) * M_inv
+        norms_rep2 = torch.exp(-(norms) * 10) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
     # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
     V_repulsive = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep
+    V_repulsive2 = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep2
     # No need to apply a V = max(0, V); by construction V>=0
     assert V_repulsive.size() == (n_hits, n_objects)
 
@@ -550,7 +552,10 @@ def calc_LV_Lbeta(
         number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
         L_V_repulsive = L_V_repulsive.view(
             -1
-        )  # / number_of_repulsive_terms_per_object.view(-1)
+        ) / number_of_repulsive_terms_per_object.view(-1)
+        L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
+
+        L_V_repulsive2 = L_V_repulsive2.view(-1)
 
         # if not tracking:
         #     #! add to terms function (divide by total number of showers per event)
@@ -564,6 +569,7 @@ def calc_LV_Lbeta(
         #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
         # else:
         L_V_repulsive = torch.mean(L_V_repulsive)
+        L_V_repulsive2 = torch.mean(L_V_repulsive)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
@@ -571,7 +577,8 @@ def calc_LV_Lbeta(
         ).sum()
     L_V = (
         attr_weight * L_V_attractive
-        +   repul_weight * L_V_repulsive
+        + repul_weight * L_V_repulsive
+        + L_V_repulsive2
         # + L_clusters
         # + fill_loss
     )
@@ -745,6 +752,7 @@ def calc_LV_Lbeta(
                 L_exp,
                 norms_rep,  # 16
                 norms_att,  # 17
+                L_V_repulsive2,
             )
         else:
             return (
