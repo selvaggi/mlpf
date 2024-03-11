@@ -123,17 +123,25 @@ def main():
         project=args.wandb_projectname,
         entity=args.wandb_entity,
         name=args.wandb_displayname,
-        log_model="all"
+        log_model="all",
     )
     if training_mode:
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
-        if args.load_model_weights is not None:
+        if args.load_model_weights is not None and args.correction:
             from src.models.gravnet_3_L import GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0
             )
+
+        elif args.load_model_weights is not None:
+            from src.models.GATr.Gatr_pf import ExampleWrapper as GravnetModel
+
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0
+            )
+
         accelerator, devices = get_gpu_dev(args)
         val_every_n_epochs = 1
         checkpoint_callback = ModelCheckpoint(
@@ -185,10 +193,10 @@ def main():
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
-            devices=[0],
+            devices=[1],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            limit_val_batches=19,
+            # limit_val_batches=19,
         )
         for name, get_test_loader in test_loaders.items():
             test_loader = get_test_loader()
