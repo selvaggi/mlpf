@@ -63,7 +63,7 @@ class RelativePositionMessage(nn.Module):
         score = (edges.src["K_h"] * edges.dst["Q_h"]).sum(-1, keepdim=True)
         score_e = torch.exp((score / np.sqrt(self.out_dim)).clamp(-5, 5))
         print("checkling shapes", score_e.shape, distance.shape, edges.src["V_h"].shape)
-        weight = torch.mul(score_e, distance)
+        weight = torch.mul(score_e.view(-1, 1, 1), distance.view(-1, 1, 1))
         v_h = torch.mul(weight, edges.src["V_h"])
 
         return {"V1_h": v_h}
@@ -124,8 +124,8 @@ class MultiHeadAttentionLayer(nn.Module):
         mask_empty = gu.ndata["z"] > 0
         head_out = gu.ndata["wV"]
         head_out[mask_empty] = head_out[mask_empty] / (gu.ndata["z"][mask_empty])
-        g.ndata["z"] = g.ndata["z"][:, :, 0].view(
-            g.ndata["wV"].shape[0], self.num_heads, 1
+        gu.ndata["z"] = gu.ndata["z"][:, :, 0].view(
+            gu.ndata["wV"].shape[0], self.num_heads, 1
         )
 
         return head_out
