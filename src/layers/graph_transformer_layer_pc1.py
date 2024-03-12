@@ -17,17 +17,6 @@ from src.layers.GravNetConv3 import WeirdBatchNorm, knn_per_graph
 """
 
 
-def dist_calc(src_field, dst_field, out_field):
-    def func(edges):
-        return {
-            out_field: -torch.sqrt(
-                (edges.src[src_field] - edges.dst[dst_field]).pow(2).sum(-1) + 1e-6
-            )
-        }
-
-    return func
-
-
 def src_dot_dst(src_field, dst_field, out_field):
     def func(edges):
         return {
@@ -47,15 +36,6 @@ def scaled_exp(field, scale_constant):
     return func
 
 
-def score_times_dist(field):
-    def func(edges):
-        # clamp for softmax numerical stability
-        print("check shapes", edges.data["score"].view(-1).shape)
-        return {field: (edges.data["score"].view(-1) * edges.data["distance"].view(-1))}
-
-    return func
-
-
 def src_dot_dst2(src_field, dst_field, out_field):
     def func(edges):
         return {out_field: (edges.src[src_field] - edges.dst[dst_field])}
@@ -66,6 +46,26 @@ def src_dot_dst2(src_field, dst_field, out_field):
 """
     Single Attention Head
 """
+
+
+class RelativePositionMessage(nn.Module):
+    """
+    Compute the input feature from neighbors
+    """
+
+    def __init__(self, out_dim):
+        super(RelativePositionMessage, self).__init__()
+        self.out_dim = out_dim
+
+    def forward(self, edges):
+        dist = -torch.sqrt((edges.src["G_h"] - edges.dst["G_h"]).pow(2).sum(-1) + 1e-6)
+        distance = torch.exp((dist / np.sqrt(self.out_dim)).clamp(-5, 5))
+        score = (edges.src["K_h"] * edges.dst["Q_h"]).sum(-1, keepdim=True)
+        score_e = torch.exp((score / np.sqrt(self.out_dim)).clamp(-5, 5))
+
+        v_h = score_e * distance * edges.src["V_h"]
+
+        return {"V1_h": v_h}
 
 
 class MultiHeadAttentionLayer(nn.Module):
@@ -84,22 +84,21 @@ class MultiHeadAttentionLayer(nn.Module):
             self.K = nn.Linear(in_dim, out_dim * num_heads, bias=False)
             self.Q = nn.Linear(in_dim, out_dim * num_heads, bias=False)
             self.V = nn.Linear(in_dim, out_dim * num_heads, bias=False)
-            # self.M1 = nn.Linear(1, out_dim, bias=False)
-            # self.relu = nn.ReLU()
-            # self.M2 = nn.Linear(out_dim, out_dim, bias=False)
+        self.RelativePositionMessage = RelativePositionMessage(out_dim)
+        # self.M1 = nn.Linear(1, out_dim, bias=False)
+        # self.relu = nn.ReLU()
+        # self.M2 = nn.Linear(out_dim, out_dim, bias=False)
 
     def propagate_attention(self, g):
         # Compute attention score
-        g.apply_edges(dist_calc("G_h", "G_h", "distance"))
+        # g.apply_edges(dist_calc("G_h", "G_h", "distance"))
         g.apply_edges(src_dot_dst("K_h", "Q_h", "score"))
         g.apply_edges(scaled_exp("score", np.sqrt(self.out_dim)))
 
-        g.apply_edges(scaled_exp("distance", np.sqrt(self.out_dim)))
-        g.apply_edges(score_times_dist("score_dis"))
+        # g.apply_edges(scaled_exp("distance", np.sqrt(self.out_dim)))
+        # g.apply_edges(score_times_dist("score_dis"))
         eids = g.edges()
-        g.send_and_recv(
-            eids, fn.u_mul_e("V_h", "score_dis", "V_h"), fn.sum("V_h", "wV")
-        )
+        g.send_and_recv(eids, self.RelativePositionMessage, fn.sum("V1_h", "wV"))
         g.send_and_recv(eids, fn.copy_e("score", "score"), fn.sum("score", "z"))
 
     def forward(self, g, h):
