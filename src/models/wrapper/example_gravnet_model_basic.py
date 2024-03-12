@@ -1,5 +1,5 @@
 import torch
-from src.models.gravnet_3_L5 import GravnetModel
+from src.models.transformer_Lpc import GraphT as GravnetModel
 
 
 class GraphTransformerNetWrapper(torch.nn.Module):
