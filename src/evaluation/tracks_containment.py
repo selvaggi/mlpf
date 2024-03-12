@@ -4,16 +4,18 @@ import matplotlib
 matplotlib.rc("font", size=35)
 import pandas as pd
 import matplotlib.pyplot as plt
+import mplhep as hep
 
+hep.style.use("CMS")
 
-colors_list = ["#deebf7", "#9ecae1", "#3182bd"]
+colors_list = ["#c91023", "#9ecae1", "#3182bd"]
 
 
 def plot_metrics(
     dict_1,
     PATH_store,
 ):
-    marker_size = 10
+    marker_size = 2
     idx_start = 0
     fig, ax = plt.subplots(2, 1, figsize=(8, 16))
     # efficiency plot
@@ -28,7 +30,7 @@ def plot_metrics(
 
 
 def plot_containment(ax, dict_1, i, idx_start):
-    marker_size = 10
+    marker_size = 2
     ax[i].errorbar(
         np.array(dict_1["energy_ms"])[idx_start:],
         np.array(dict_1["fce_energy"])[idx_start:],
@@ -45,13 +47,16 @@ def plot_containment(ax, dict_1, i, idx_start):
     ax[i].set_xlabel("Energy [GeV]")
     ax[i].set_ylabel("Containment")
     ax[i].grid()
-    ax[i].set_ylim([0.5, 1.1])
+    ax[i].set_ylim([0.8, 1.1])
+    # ax[i].set_xticks(fontsize=25)
+    # ax[i].set_yticks(fontsize=25)
+    ax[i].set_yticks(ticks=[0.8, 0.9, 1, 1.1])
     # ax[3, 0].set_yscale("log")
     return ax
 
 
 def plot_purity(ax, dict_1, i, idx_start):
-    marker_size = 20
+    marker_size = 2
 
     ax[i].errorbar(
         np.array(dict_1["energy_ms"])[idx_start:],
@@ -69,7 +74,10 @@ def plot_purity(ax, dict_1, i, idx_start):
     ax[i].set_xlabel("Energy [GeV]")
     ax[i].set_ylabel("Purity")
     ax[i].grid()
-    ax[i].set_ylim([0.5, 1.1])
+    ax[i].set_ylim([0.8, 1.1])
+    # ax[i].set_xticks(fontsize=25)
+    # ax[i].set_yticks(fontsize=25)
+    ax[i].set_yticks([0.8, 0.9, 1, 1.1])
     return ax
 
 

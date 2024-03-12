@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import concurrent.futures
 import time
+import mplhep as hep
 
+hep.style.use("CMS")
 # TODO paralellize this script or make the data larger so that the binning needed is larger
 from scipy.optimize import curve_fit
 
@@ -28,7 +30,7 @@ def create_eff_dic(matched_, log):
 
 def calculate_eff(sd, log_scale=False):
     if log_scale:
-        bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
+        bins = np.exp(np.arange(np.log(0.001), np.log(80), 0.3))
     else:
         bins = np.arange(0, 51, 2)
     eff = []
@@ -48,7 +50,12 @@ def calculate_eff(sd, log_scale=False):
                 (total_showers - number_of_non_reconstructed_showers) / total_showers
             )
             energy_eff.append((bin_i1 + bin_i) / 2)
-
+        print(
+            "bin",
+            bin_i1,
+            bin_i,
+            (total_showers - number_of_non_reconstructed_showers) / total_showers,
+        )
     return eff, energy_eff
 
 
@@ -56,10 +63,10 @@ def plot_eff(title, photons_dic, label1, PATH_store, log):
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
     fig = plt.figure()
     j = 0
-    plt.xlabel("Energy [GeV]")
-    plt.ylabel("Efficiency [GeV]")
+    plt.xlabel("p_T [GeV]", fontsize=35)
+    plt.ylabel("Efficiency", fontsize=35)
     # ax[row_i, j].set_xscale("log")
-    plt.title(title)
+    # plt.title(title)
     plt.grid()
     plt.scatter(
         photons_dic["energy_eff"],
@@ -77,10 +84,13 @@ def plot_eff(title, photons_dic, label1, PATH_store, log):
     # else:
     if log:
         log_ = "log"
-        # plt.xscale("log")
+        plt.xscale("log")
     else:
         log_ = ""
-    plt.ylim([0.5, 1.1])
+    plt.ylim([0.7, 1.1])
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.yticks([0.7, 0.8, 0.9, 1, 1.1])
     fig.savefig(
         PATH_store + title + log_ + ".png",
         bbox_inches="tight",
