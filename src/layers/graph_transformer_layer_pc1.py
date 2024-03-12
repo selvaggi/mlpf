@@ -63,7 +63,7 @@ class RelativePositionMessage(nn.Module):
         score = (edges.src["K_h"] * edges.dst["Q_h"]).sum(-1, keepdim=True)
         score_e = torch.exp((score / np.sqrt(self.out_dim)).clamp(-5, 5))
         print("checkling shapes", score_e.shape, distance.shape, edges.src["V_h"].shape)
-        weight = torch.mul(score_e, distance)
+        weight = torch.mul(score_e.view(-1, 1, 1), distance.view(-1, 1, 1))
         v_h = torch.mul(weight, edges.src["V_h"])
 
         return {"V1_h": v_h}
