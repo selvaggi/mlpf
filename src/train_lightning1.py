@@ -168,7 +168,7 @@ def main():
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # profiler=profiler,
-            max_epochs=100,
+            max_epochs=200,
             # accumulate_grad_batches=1,
             strategy="ddp",
             # limit_train_batches=100,
