@@ -50,7 +50,8 @@ def scaled_exp(field, scale_constant):
 def score_times_dist(field):
     def func(edges):
         # clamp for softmax numerical stability
-        return {field: edges.data["score"] * edges.data["distance"]}
+        print("check shapes", edges.data["score"].view(-1).shape)
+        return {field: (edges.data["score"].view(-1) * edges.data["distance"].view(-1))}
 
     return func
 
