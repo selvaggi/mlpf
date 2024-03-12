@@ -57,7 +57,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
         filt1 = (
             (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
         )  # only keep these particles
-
+    number_of_tracks = scatter_add(1 * (hit_type_a == 1), hit_particle_link.long())[1:]
     for index, p in enumerate(list_p):
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
@@ -69,6 +69,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
                 or int(p) not in filt1
                 or (number_of_hits[index] < 1)
                 or (y[index, 8] == 1)
+                or number_of_tracks[index] == 2
             ):  # This is commented to disable filtering
                 list_remove.append(p)
                 # print(
@@ -85,6 +86,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
                 or (number_of_hits[index] < 1)
+                or number_of_tracks[index] == 2
             ):  # This is commented to disable filtering
                 list_remove.append(p)
                 # print(

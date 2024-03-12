@@ -166,7 +166,6 @@ def create_graph(
         y_data_graph = 0
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
-
     return [g, y_data_graph], graph_empty
 
 
