@@ -106,9 +106,10 @@ class MultiHeadAttentionLayer(nn.Module):
         K_h = self.K(h)
         V_h = self.V(h)
         Q_h = self.Q(h)
+        G_h = self.G(h)
         g.ndata["K_h"] = K_h.view(-1, self.num_heads, self.out_dim)
-        g.ndata["Q_h"] = K_h.view(-1, self.num_heads, self.out_dim)
-        g.ndata["G_h"] = K_h.view(-1, self.num_heads, 3)
+        g.ndata["Q_h"] = Q_h.view(-1, self.num_heads, self.out_dim)
+        g.ndata["G_h"] = G_h.view(-1, self.num_heads, 3)
         g.ndata["V_h"] = V_h.view(-1, self.num_heads, self.out_dim)
         s_l = g.ndata["G_h"]
         gu = knn_per_graph(g, s_l.view(-1, 3), self.n_neigh)
