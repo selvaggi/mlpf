@@ -50,7 +50,7 @@ def scaled_exp(field, scale_constant):
 def score_times_dist(field):
     def func(edges):
         # clamp for softmax numerical stability
-        return {field: edges.data["score"] * edges.data["gg"]}
+        return {field: edges.data["score"] * edges.data["distance"]}
 
     return func
 
@@ -93,7 +93,7 @@ class MultiHeadAttentionLayer(nn.Module):
         g.apply_edges(src_dot_dst("K_h", "Q_h", "score"))
         g.apply_edges(scaled_exp("score", np.sqrt(self.out_dim)))
 
-        g.apply_edges(scaled_exp("gg", np.sqrt(self.out_dim)))
+        g.apply_edges(scaled_exp("distance", np.sqrt(self.out_dim)))
         g.apply_edges(score_times_dist("score_dis"))
         eids = g.edges()
         g.send_and_recv(
