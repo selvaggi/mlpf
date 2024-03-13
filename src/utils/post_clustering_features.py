@@ -36,7 +36,7 @@ def get_post_clustering_features(graphs_new, sum_e):
     batch_idx_f = batch_idx[filter_hcal]
     for i in range(len(e_hits_f)):
         per_graph_e_hits_hcal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_hcal_mean[batch_idx_f[i]]) ** 2
-    track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)  # TODO: kick out tracks if there are two tracks etc.!!
+    track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)
     num_tracks = scatter_sum((graphs_new.ndata["h"][:, 7] > 0).type(torch.int), batch_idx)
     num_hits = graphs_new.batch_num_nodes()
     # print shapes of the below things

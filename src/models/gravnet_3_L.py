@@ -470,14 +470,16 @@ class GravnetModel(L.LightningModule):
                             "e_true": true_e.detach().cpu(),
                             "e_reco": model_e_corr.detach().cpu(),
                             "true_e_corr": true_e_corr.detach().cpu(),
+                            "node_features_avg": scatter_mean(batch_g.ndata["h"], batch_idx, dim=0), # graph-averaged node features
+                            "y_particles": y
                         },
                     )
-                    print("!!!temporarily saving features in an external file!!!!")
+                    print("!!! Temporarily saving features in an external file !!!!")
                 print("Logged!")
         else:
             loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
-            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
+            log_losses_wandb(True, len(batch_idx.unique()), 0, losses, loss, loss_ll)
 
         self.loss_final = loss + self.loss_final
         self.number_b = self.number_b + 1
@@ -838,7 +840,7 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, 
                             graphs[i].ndata["h"][mask],
                             graphs[i].ndata["beta"][mask].view(-1, 1),
                         ),
-                        dim=1,
+                        dim=1
                     )
                     energy_t = dic["part_true"][:, 3].to(model_output.device)
                     true_energy_shower = energy_t[row_ind[index_in_matched]]
@@ -846,9 +848,11 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, 
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
                     reco_energy_showers.append(reco_energy_shower.view(-1))
+
     graphs_showers_matched = dgl.batch(graphs_showers_matched)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
+
 
     return graphs_showers_matched, true_energy_showers, reco_energy_showers
 
