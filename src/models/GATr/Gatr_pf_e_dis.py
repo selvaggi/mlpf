@@ -273,6 +273,7 @@ class ExampleWrapper(L.LightningModule):
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
             hgcalloss=self.args.hgcalloss,
+            dis=True,
         )
         loss_ec = 0
 
