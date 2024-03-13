@@ -11,7 +11,7 @@ from src.logger.plotting_tools import PlotCoordinates
 from src.layers.object_cond import (
     calc_LV_Lbeta,
     get_clustering,
-    calc_LV_Lbeta_inference,
+    # calc_LV_Lbeta_inference,
 )
 from src.layers.obj_cond_inf import calc_energy_loss
 from src.layers.mlp_readout_layer import MLPReadout
@@ -470,8 +470,10 @@ class GravnetModel(L.LightningModule):
                             "e_true": true_e.detach().cpu(),
                             "e_reco": model_e_corr.detach().cpu(),
                             "true_e_corr": true_e_corr.detach().cpu(),
-                            "node_features_avg": scatter_mean(batch_g.ndata["h"], batch_idx, dim=0), # graph-averaged node features
-                            "y_particles": y
+                            "node_features_avg": scatter_mean(
+                                batch_g.ndata["h"], batch_idx, dim=0
+                            ),  # graph-averaged node features
+                            "y_particles": y,
                         },
                     )
                     print("!!! Temporarily saving features in an external file !!!!")
@@ -784,7 +786,9 @@ def init_weights(m):
         m.bias.data.fill_(0.00)
 
 
-def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, use_gt_clusters=False):
+def obtain_clustering_for_matched_showers(
+    batch_g, model_output, y, local_rank, use_gt_clusters=False
+):
     graphs_showers_matched = []
     true_energy_showers = []
     reco_energy_showers = []
@@ -840,7 +844,7 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, 
                             graphs[i].ndata["h"][mask],
                             graphs[i].ndata["beta"][mask].view(-1, 1),
                         ),
-                        dim=1
+                        dim=1,
                     )
                     energy_t = dic["part_true"][:, 3].to(model_output.device)
                     true_energy_shower = energy_t[row_ind[index_in_matched]]
@@ -852,7 +856,6 @@ def obtain_clustering_for_matched_showers(batch_g, model_output, y, local_rank, 
     graphs_showers_matched = dgl.batch(graphs_showers_matched)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
-
 
     return graphs_showers_matched, true_energy_showers, reco_energy_showers
 
