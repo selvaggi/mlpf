@@ -16,7 +16,6 @@ from src.layers.object_cond import (
 from src.layers.obj_cond_inf import calc_energy_loss
 
 
-
 class GravnetModel(nn.Module):
     def __init__(
         self,
@@ -206,6 +205,7 @@ def object_condensation_loss2(
     hgcalloss=False,
     output_dim=4,
     clust_space_norm="none",
+    dis=False,
 ):
     """
 
@@ -228,6 +228,8 @@ def object_condensation_loss2(
 
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
+    if dis:
+        distance_threshold = torch.reshape(pred[:, -1], [-1, 1])
     energy_correction = pred_2
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
     if clust_space_norm == "twonorm":
@@ -239,7 +241,7 @@ def object_condensation_loss2(
     else:
         raise NotImplementedError
     if clust_loss_only:
-        distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
+        # distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
         momentum = torch.zeros_like(bj)
         pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
             momentum.device
@@ -289,6 +291,7 @@ def object_condensation_loss2(
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
         hgcal_implementation=hgcalloss,
+        dis=dis,
     )
     if return_resolution:
         return a

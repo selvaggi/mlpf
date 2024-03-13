@@ -146,7 +146,7 @@ def main():
         val_every_n_epochs = 1
         checkpoint_callback = ModelCheckpoint(
             dirpath=args.model_prefix,  # checkpoints_path, # <--- specify this on the trainer itself for version control
-            filename="_{epoch}",
+            filename="_{epoch}_{step}",
             # every_n_epochs=val_every_n_epochs,
             every_n_train_steps=500,
             save_top_k=-1,  # <--- this is important!
