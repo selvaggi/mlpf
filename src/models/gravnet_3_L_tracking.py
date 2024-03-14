@@ -390,8 +390,8 @@ def object_condensation_loss_tracking(
         y,
         None,
         None,
-        momentum=None,
-        predicted_pid=None,
+        # momentum=None,
+        # predicted_pid=None,
         beta=bj.view(-1),
         cluster_space_coords=xj,  # Predicted by model
         cluster_index_per_event=clustering_index_l.view(
