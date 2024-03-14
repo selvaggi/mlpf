@@ -67,7 +67,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
             if (
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
-                or (number_of_hits[index] < 1)
+                or (number_of_hits[index] < 2)
                 or (y[index, 8] == 1)
                 or number_of_tracks[index] == 2
             ):  # This is commented to disable filtering
@@ -85,7 +85,7 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
             if (
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
-                or (number_of_hits[index] < 1)
+                or (number_of_hits[index] < 2)
                 or number_of_tracks[index] == 2
             ):  # This is commented to disable filtering
                 list_remove.append(p)
@@ -164,10 +164,10 @@ def get_particle_features(unique_list_particles, output, prediction):
         y_data_graph = torch.cat(
             (
                 particle_coord,
-                y_energy,
-                y_mom,
-                y_mass,
-                y_pid,  # particle ID (discrete)
+                y_energy,  # 3
+                y_mom,  # 4
+                y_mass,  # 5
+                y_pid,  # 6 particle ID (discrete)
                 features_particles[:, 5].view(-1).unsqueeze(1),  # decayed in calo
                 features_particles[:, 6].view(-1).unsqueeze(1),  # decayed in tracker
             ),
@@ -187,23 +187,56 @@ def get_particle_features(unique_list_particles, output, prediction):
     return y_data_graph
 
 
-def get_hit_features(output, number_hits, prediction):
+def modify_index_link_for_gamma_e(
+    hit_type_feature, hit_particle_link, daughters, output, number_part
+):
+    mask = hit_type_feature > 1
+    a = hit_particle_link[mask]
+    b = daughters[mask]
+    a_u = torch.unique(a)
+    number_of_p = torch.zeros_like(a_u)
+    for p, i in enumerate(a_u):
+        mask2 = a == i
+        number_of_p[p] = len(torch.unique(b[mask2]))
+    pid_particles = torch.tensor(output["pf_features"][6, 0:number_part])
+    electron_photon_mask = (pid_particles[a_u.long()] == 11) + (
+        pid_particles[a_u.long()] == 22
+    )
+    electron_photon_mask = electron_photon_mask * (number_of_p > 1)
+    index_change = a_u[electron_photon_mask]
+    # print("index change", index_change)
+    # if len(index_change) > 0:
+    #     for i in index_change:
+    #         print("daughters changed", daughters[hit_particle_link == i])
+
+    for i in index_change:
+        mask_n = mask * (hit_particle_link == i)
+        hit_particle_link[mask_n] = daughters[mask_n]
+    return hit_particle_link
+
+
+def get_hit_features(output, number_hits, prediction, number_part):
     # identification of particles, clusters, pfos
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
     pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
+    daughters = torch.tensor(output["pf_vectoronly"][3, 0:number_hits])
     if prediction:
         pandora_cluster_energy = torch.tensor(output["pf_features"][-2, 0:number_hits])
         pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
     else:
         pandora_cluster_energy = pandora_cluster * 0
         pfo_energy = pandora_cluster * 0
-    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-
     # hit type
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
+
+    hit_particle_link = modify_index_link_for_gamma_e(
+        hit_type_feature, hit_particle_link, daughters, output, number_part
+    )
+
+    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
 
     # position, e, p
     pos_xyz_hits = torch.permute(
@@ -229,6 +262,7 @@ def get_hit_features(output, number_hits, prediction):
         cluster_id,
         hit_type_feature,
         pandora_pfo_link,
+        daughters,
     )
 
 

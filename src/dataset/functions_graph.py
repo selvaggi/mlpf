@@ -39,7 +39,8 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         cluster_id,
         hit_type_feature,
         pandora_pfo_link,
-    ) = get_hit_features(output, number_hits, prediction)
+        daughters,
+    ) = get_hit_features(output, number_hits, prediction, number_part)
 
     # features particles
     y_data_graph = get_particle_features(unique_list_particles, output, prediction)

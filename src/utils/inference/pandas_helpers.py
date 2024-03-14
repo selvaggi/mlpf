@@ -33,7 +33,7 @@ def open_hgcal(path_hgcal, neutrals_only):
     return sd, ms
 
 
-def open_mlpf_dataframe(path_mlpf, neutrals_only):
+def open_mlpf_dataframe(path_mlpf, neutrals_only=False):
     data = pd.read_pickle(path_mlpf)
     if neutrals_only:
         sd = pd.concat(

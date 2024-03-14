@@ -230,6 +230,8 @@ def object_condensation_loss2(
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
     if dis:
         distance_threshold = torch.reshape(pred[:, -1], [-1, 1])
+    else:
+        distance_threshold = 0
     energy_correction = pred_2
     xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
     if clust_space_norm == "twonorm":
