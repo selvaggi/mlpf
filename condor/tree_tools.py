@@ -219,6 +219,7 @@ def find_gen_link(
             if calo:
                 mother = find_mother_particle(genpart_indexes[pos], gen_part_coll)
                 indices.append(mother)
+                indices.append(genpart_indexes[pos])
             else:
                 indices.append(genpart_indexes[pos])
 
@@ -708,17 +709,21 @@ def store_tracks(
         if store_pandora_hits == "True":
             dic["hit_pandora_cluster_energy"].push_back(0)
             dic["hit_pandora_pfo_energy"].push_back(pandora_pfo_energy)
+
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
 
         if len(gen_indices) > 0:
             dic["hit_genlink0"].push_back(gen_indices[0])
-        if len(gen_indices) > 1:
-            dic["hit_genlink1"].push_back(gen_indices[1])
+        if store_pandora_hits == "True":
+            dic["hit_genlink1"].push_back(pandora_index_pfo)
+        else:
+            if len(gen_indices) > 1:
+                dic["hit_genlink1"].push_back(gen_indices[1])
         if store_pandora_hits == "True":
             # print("storing calo hit")
-            dic["hit_genlink2"].push_back(pandora_index)
+            dic["hit_genlink2"].push_back(pandora_index_pfo)
         else:
             if len(gen_indices) > 2:
                 dic["hit_genlink2"].push_back(gen_indices[2])
@@ -898,15 +903,15 @@ def store_calo_hits(
                 dic["hit_genlink1"].push_back(pandora_cluster)
             else:
                 if len(gen_indices) > 1:
-                    dic["hit_genlink1"].push_back(gen_indices[1])
+                    dic["hit_genlink1"].push_back(0)
             if store_pandora_hits == "True":
                 # print("storing calo hit")
                 dic["hit_genlink2"].push_back(pandora_pfo_index)
             else:
                 if len(gen_indices) > 2:
-                    dic["hit_genlink2"].push_back(gen_indices[2])
+                    dic["hit_genlink2"].push_back(0)
             if len(gen_indices) > 3:
-                dic["hit_genlink3"].push_back(gen_indices[3])
+                dic["hit_genlink3"].push_back(gen_indices[1])
             if len(gen_indices) > 4:
                 dic["hit_genlink4"].push_back(gen_indices[4])
 
