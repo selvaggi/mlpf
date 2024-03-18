@@ -463,10 +463,18 @@ class GravnetModel(L.LightningModule):
                     )
                     if not os.path.exists(cluster_features_path):
                         os.makedirs(cluster_features_path)
+                    ''' covariances = []
+                    for b_i in batch_idx.unique():
+                        mask_b_i = batch_idx == b_i
+                        xyz = batch_g.ndata["h"][mask_b_i, 0:3]
+                        cov = torch.cov(xyz, rowvar=False)
+                        covariances.append(cov.flatten())
+                    covariances = torch.stack(covariances)'''
                     save_features(
                         cluster_features_path,
                         {
                             "x": graph_level_features.detach().cpu(),
+                           ''' "xyz_covariance_matrix": covariances.cpu(),'''
                             "e_true": true_e.detach().cpu(),
                             "e_reco": model_e_corr.detach().cpu(),
                             "true_e_corr": true_e_corr.detach().cpu(),
@@ -823,6 +831,33 @@ def obtain_clustering_for_matched_showers(
             index_matches = col_ind + 1
             index_matches = index_matches.to(model_output.device).long()
 
+            '''
+                        ### Plot shapes of some showers, to debug what's wrong with the energies
+                        debug_showers = False
+                        if debug_showers:
+                            energy_true_part = dic["part_true"][:, 3].detach().cpu()
+                            from torch_scatter import scatter_sum
+                            energy_sum_hits = scatter_sum(dic["graph"].ndata["e_hits"], dic["graph"].ndata["particle_number"].type(torch.int64), dim=0).flatten().detach().cpu()
+                            energy_noise = str(round(energy_sum_hits[0].item(), 2))
+                            n_hits_noise = torch.sum(dic["graph"].ndata["particle_number"] == 0).detach().cpu().item()
+                            #frac_energy_sum = energy_sum_hits / energy_true_part[1:]
+                            import matplotlib.pyplot as plt
+                            n_particles = len(particle_ids)
+            
+                            fig = plt.figure(figsize=(18, 4 * n_particles))
+                            for j in range(n_particles):
+                                mask = labels == j
+                                # make ax projection 3D
+                                #ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
+                                ax = fig.add_subplot(n_particles, 1, j+1, projection='3d')
+                                ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), X[mask, 2].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
+                                pnum = (particle_ids[j]-1).type(torch.int64).detach().cpu()
+                                part_xyz = dic["part_true"][pnum, [0,1,2]].detach().cpu()
+                                ax.scatter(part_xyz[0], part_xyz[1], part_xyz[2], c='r', s=100)
+                                ax.set_title(f"gr. {i}, E c.f. = {str(round(energy_true_part[pnum].item() / energy_sum_hits[1:][pnum].item() - 1, 2))}, Etrue = {round(energy_true_part[pnum].item(), 2)}, Esum_hits = {round(energy_sum_hits[1:][pnum].item(), 2)}, Nnoisehits = {n_hits_noise}, Enoise = {energy_noise}, eta={part_eta},phi={part_phi}")
+                            # log to wandb
+                            wandb.log({"showers": [wandb.Image(fig, caption="showers")]})
+            '''
             for unique_showers_label in shower_p_unique:
                 if torch.sum(unique_showers_label == index_matches) == 1:
                     index_in_matched = torch.argmax(
