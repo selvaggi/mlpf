@@ -424,10 +424,10 @@ def calc_LV_Lbeta(
             / (n_hits_per_event * nope)
         ).sum()
     if not tracking:
-        L_V = (
+        L_V = 4 * (
             attr_weight * L_V_attractive
-            # + repul_weight * L_V_repulsive
-            + L_V_repulsive2
+            + repul_weight * L_V_repulsive
+            # + L_V_repulsive2
             # + L_clusters
             # + fill_loss
         )
