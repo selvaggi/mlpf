@@ -5,34 +5,6 @@ from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.loss_fill_space_torch import LLFillSpace
 
 
-onehot_particles_arr = [
-    -2212.0,
-    -211.0,
-    -14.0,
-    -13.0,
-    -11.0,
-    11.0,
-    12.0,
-    13.0,
-    14.0,
-    22.0,
-    111.0,
-    130.0,
-    211.0,
-    2112.0,
-    2212.0,
-    1000010048.0,
-    1000020032.0,
-    1000040064.0,
-    1000050112.0,
-    1000060096.0,
-    1000080128.0,
-]
-onehot_particles_arr = [int(x) for x in onehot_particles_arr]
-pid_dict = {i + 1: onehot_particles_arr[i] for i in range(len(onehot_particles_arr))}
-pid_dict[0] = "other"
-
-
 def safe_index(arr, index):
     # One-hot index (or zero if it's not in the array)
     if index not in arr:
@@ -59,101 +31,18 @@ def debug(*args, **kwargs):
         print(*args, **kwargs)
 
 
-def calc_energy_pred(
-    batch,
-    g,
-    cluster_index_per_event,
-    is_sig,
-    q,
-    beta,
-    energy_correction,
-    pid_results,
-    hit_mom,
-):
-    td = 0.7
-    batch_number = torch.max(batch) + 1
-    energies = []
-    pid_outputs = []
-    momenta = []
-    for i in range(0, batch_number):
-        mask_batch = batch == i
-        X = g.ndata["pos_hits_xyz"][mask_batch]
-        cluster_index_i = cluster_index_per_event[mask_batch] - 1
-        is_sig_i = is_sig[mask_batch]
-
-        q_i = q[mask_batch]
-        betas = beta[mask_batch]
-        q_alpha_i, index_alpha_i = scatter_max(q_i[is_sig_i], cluster_index_i)
-        n_points = betas.size(0)
-        unassigned = torch.arange(n_points).to(betas.device)
-        clustering = -1 * torch.ones(n_points, dtype=torch.long)
-        counter = 0
-        # index_alpha_i -= 1
-        for index_condpoint in index_alpha_i:
-            d = torch.norm(X[unassigned] - X[index_condpoint], dim=-1)
-            assigned_to_this_condpoint = unassigned[d < td]
-            clustering[assigned_to_this_condpoint] = counter
-            unassigned = unassigned[~(d < td)]
-            counter = counter + 1
-        counter = 0
-        for index_condpoint in index_alpha_i:
-            clustering[index_condpoint] = counter
-            counter = counter + 1
-        if torch.sum(clustering == -1) > 0:
-            clustering_ = clustering + 1
-        else:
-            clustering_ = clustering
-        clus_values = np.unique(clustering)
-        e_c = g.ndata["e_hits"][mask_batch][is_sig_i].view(-1) * energy_correction[
-            mask_batch
-        ][is_sig_i].view(-1)
-        mom_c = hit_mom[mask_batch][is_sig_i].view(-1)
-        # pid_results_i = pid_results[mask_batch][is_sig_i][index_alpha_i]
-        pid_results_i = scatter_add(
-            pid_results[mask_batch][is_sig_i],
-            clustering_.long().to(pid_results.device),
-            dim=0,
-        )
-        #  aggregated "PID embeddings"
-        e_objects = scatter_add(e_c, clustering_.long().to(e_c.device))
-        mom_objects = scatter_add(mom_c, clustering_.long().to(mom_c.device))
-        e_objects = e_objects[clus_values != -1]
-        pid_results_i = pid_results_i[clus_values != -1]
-        mom_objects = mom_objects[clus_values != -1]
-        energies.append(e_objects)
-        pid_outputs.append(pid_results_i)
-        momenta.append(mom_objects)
-    return (
-        torch.cat(energies, dim=0),
-        torch.cat(pid_outputs, dim=0),
-        torch.cat(momenta, dim=0),
-    )
-
-
-def calc_pred_pid(batch, g, cluster_index_per_event, is_sig, q, beta, pred_pid):
-    outputs = []
-    batch_number = torch.max(batch) + 1
-    for i in range(0, batch_number):
-        mask_batch = batch == i
-        is_sig_i = is_sig[mask_batch]
-        pid = pred_pid[mask_batch][is_sig_i].view(-1)
-        outputs.append(pid)
-    return torch.cat(outputs, dim=0)
-
-
 def calc_LV_Lbeta(
     original_coords,
     g,
     y,
     distance_threshold,
     energy_correction,
-    momentum: torch.Tensor,
     beta: torch.Tensor,
     cluster_space_coords: torch.Tensor,  # Predicted by model
     cluster_index_per_event: torch.Tensor,  # Truth hit->cluster index
     batch: torch.Tensor,
-    predicted_pid: torch.Tensor,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
-    post_pid_pool_module: None,  # MLP to apply to the pooled embeddings to get the PID predictions torch.nn.Module
+    predicted_pid=None,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
+    post_pid_pool_module=None,  # MLP to apply to the pooled embeddings to get the PID predictions torch.nn.Module
     # From here on just parameters
     qmin: float = 0.1,
     s_B: float = 1.0,
@@ -172,6 +61,7 @@ def calc_LV_Lbeta(
     hgcal_implementation=False,
     hit_energies=None,
     tracking=False,
+    dis=False,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
     """
     Calculates the L_V and L_beta object condensation losses.
@@ -287,87 +177,33 @@ def calc_LV_Lbeta(
         div_fac = torch.nan_to_num(div_fac, nan=0)
         x_alpha_mean = torch.mul(x_alpha_sum, div_fac.view(-1, 1).repeat(1, 3))
         x_alpha = use_average_cc_pos * x_alpha_mean + (1 - use_average_cc_pos) * x_alpha
+    if dis:
+        phi_sum = scatter_add(
+            beta[is_sig].view(-1) * distance_threshold[is_sig].view(-1),
+            object_index,
+            dim=0,
+        )
+        phi_alpha_sum = scatter_add(beta[is_sig].view(-1), object_index) + 1e-9
+        phi_alpha = phi_sum / phi_alpha_sum
 
     beta_alpha = beta[is_sig][index_alpha]
     assert x_alpha.size() == (n_objects, cluster_space_dim)
     assert beta_alpha.size() == (n_objects,)
 
     if not tracking:
-        positions_particles_pred = g.ndata["pos_hits_xyz"][is_sig][index_alpha]
-        positions_particles_pred = (
-            positions_particles_pred + distance_threshold[is_sig][index_alpha]
-        )
-
-        # e_particles_pred = g.ndata["e_hits"][is_sig][index_alpha]
-        # e_particles_pred = e_particles_pred * energy_correction[is_sig][index_alpha]
-        # particles pred updated to follow end-to-end paper approach, sum the particles in the object and multiply by the correction factor of alpha (the cluster center)
-        # e_particles_pred = (scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)*energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
-        e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
-            batch,
-            g,
-            cluster_index_per_event,
-            is_sig,
-            q,
-            beta,
-            energy_correction,
-            predicted_pid,
-            momentum,
-        )
-
-    if fill_loss_weight > 0:
-        fill_loss = fill_loss_weight * LLFillSpace()(cluster_space_coords, batch)
-    else:
-        fill_loss = 0
-    # pid_particles_pred = post_pid_pool_module(
-    #     pid_particles_pred
-    # )  # Project the pooled PID embeddings to the final "one hot encoding" space
-    # pid_particles_pred = calc_pred_pid(
-    #    batch, g, cluster_index_per_event, is_sig, q, beta, predicted_pid
-    # )
-    if not tracking:
         x_particles = y[:, 0:3]
         e_particles = y[:, 3]
-        mom_particles_true = y[:, 4]
-        mass_particles_true = y[:, 5]
-        # particles_mask = y[:, 6]
-        mom_particles_true = mom_particles_true.to(device)
-        mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
-        mass_particles_true = mass_particles_true.to(device)
-        mass_particles_pred[mass_particles_pred < 0] = 0.0
-        mass_particles_pred = torch.sqrt(mass_particles_pred)
-        loss_mass = torch.nn.MSELoss()(
-            mass_particles_true, mass_particles_pred
-        )  # only logging this, not using it in the loss func
-        pid_id_particles = y[:, 6].unsqueeze(1).long()
-        pid_particles_true = torch.zeros((pid_id_particles.shape[0], 22))
-        part_idx_onehot = [
-            safe_index(onehot_particles_arr, i)
-            for i in pid_id_particles.flatten().tolist()
-        ]
-        pid_particles_true[
-            torch.arange(pid_id_particles.shape[0]), part_idx_onehot
-        ] = 1.0
-
-        # if return_regression_resolution:
-        #     e_particles_pred = e_particles_pred.detach().flatten()
-        #     e_particles = e_particles.detach().flatten()
-        #     positions_particles_pred = positions_particles_pred.detach().flatten()
-        #     x_particles = x_particles.detach().flatten()
-        #     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
-        #     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-        #     return (
-        #         {
-        #             "momentum_res": (
-        #                 (mom_particles_pred - mom_particles_true) / mom_particles_true
-        #             ).tolist(),
-        #             "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-        #             "pos_res": (
-        #                 (positions_particles_pred - x_particles) / x_particles
-        #             ).tolist(),
-        #         },
-        #         pid_particles_true,
-        #         pid_particles_pred,
-        #     )
+        # mom_particles_true = y[:, 4]
+        # mass_particles_true = y[:, 5]
+        # # particles_mask = y[:, 6]
+        # mom_particles_true = mom_particles_true.to(device)
+        # mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
+        # mass_particles_true = mass_particles_true.to(device)
+        # mass_particles_pred[mass_particles_pred < 0] = 0.0
+        # mass_particles_pred = torch.sqrt(mass_particles_pred)
+        # loss_mass = torch.nn.MSELoss()(
+        #     mass_particles_true, mass_particles_pred
+        # )  # only logging this, not using it in the loss func
 
         e_particles_pred_per_object = scatter_add(
             g.ndata["e_hits"][is_sig].view(-1), object_index
@@ -388,23 +224,16 @@ def calc_LV_Lbeta(
         #         / e_particles.to(device)
         #     )
         # )
-        loss_momentum = torch.mean(
-            torch.square(
-                (mom_particles_pred.to(device) - mom_particles_true.to(device))
-                / mom_particles_true.to(device)
-            )
-        )
+        # loss_momentum = torch.mean(
+        #     torch.square(
+        #         (mom_particles_pred.to(device) - mom_particles_true.to(device))
+        #         / mom_particles_true.to(device)
+        #     )
+        # )
         # loss_ce = torch.nn.BCELoss()
         loss_mse = torch.nn.MSELoss()
-        loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
-    # loss_x = 0. # TEMPORARILY, there is some issue with X loss and it goes to \infty
-    # loss_particle_ids = loss_ce(
-    #     pid_particles_pred.to(device), pid_particles_true.to(device)
-    # )
-    # pid_true = pid_particles_true.argmax(dim=1).detach().tolist()
-    # pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
-    # pid_true = [pid_dict[i.long().item()] for i in pid_true]
-    # pid_pred = [pid_dict[i.long().item()] for i in pid_pred]
+        # loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
+
     # Connectivity matrix from hit (row) -> cluster (column)
     # Index to matrix, e.g.:
     # [1, 3, 1, 0] --> [
@@ -445,17 +274,31 @@ def calc_LV_Lbeta(
     # First select all norms of all signal hits w.r.t. all objects, mask out later
 
     if hgcal_implementation:
-        N_k = torch.sum(M, dim=0)  # number of hits per object
-        norms = torch.sum(
-            torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
-            dim=-1,
-        )
-        norms_att = norms[is_sig]
-        #! att func as in line 159 of object condensation
-        norms_att = torch.log(
-            torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
-        )
-        # Power-scale the norms
+        if dis:
+            N_k = torch.sum(M, dim=0)  # number of hits per object
+            norms = torch.sum(
+                torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
+                dim=-1,
+            )
+            norms_att = norms[is_sig]
+            norms_att = norms_att / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
+            #! att func as in line 159 of object condensation
+            norms_att = torch.log(
+                torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att + 1
+            )
+        else:
+            N_k = torch.sum(M, dim=0)  # number of hits per object
+            norms = torch.sum(
+                torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
+                dim=-1,
+            )
+            norms_att = norms[is_sig]
+            #! att func as in line 159 of object condensation
+
+            norms_att = torch.log(
+                torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
+            )
+
     elif huberize_norm_for_V_attractive:
         norms_att = norms[is_sig]
         # Huberized version (linear but times 4)
@@ -532,8 +375,13 @@ def calc_LV_Lbeta(
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
     if hgcal_implementation:
-        norms_rep = torch.exp(-(norms) / 2) * M_inv
-        norms_rep2 = torch.exp(-(norms) * 10) * M_inv
+        if dis:
+            norms = norms / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
+            norms_rep = torch.exp(-(norms)) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
+        else:
+            norms_rep = torch.exp(-(norms) / 2) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
@@ -575,13 +423,22 @@ def calc_LV_Lbeta(
             scatter_add(V_repulsive.sum(dim=0), batch_object)
             / (n_hits_per_event * nope)
         ).sum()
-    L_V = (
-        attr_weight * L_V_attractive
-        # + repul_weight * L_V_repulsive
-        + L_V_repulsive2
-        # + L_clusters
-        # + fill_loss
-    )
+    if not tracking:
+        L_V = (
+            attr_weight * L_V_attractive
+            # + repul_weight * L_V_repulsive
+            + L_V_repulsive2
+            # + L_clusters
+            # + fill_loss
+        )
+    else:
+        L_V = (
+            attr_weight * L_V_attractive
+            + repul_weight * L_V_repulsive
+            # + L_V_repulsive2
+            # + L_clusters
+            # + fill_loss
+        )
     if L_clusters != 0:
         print(
             "L-clusters is",
@@ -709,22 +566,22 @@ def calc_LV_Lbeta(
         print(L_beta, batch_size)
         print("L_beta_noise", L_beta_noise)
         print("L_beta_sig", L_beta_sig)
-    if not tracking:
-        e_particles_pred = e_particles_pred.detach().to("cpu").flatten()
-        e_particles = e_particles.detach().to("cpu").flatten()
-        positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
-        x_particles = x_particles.detach().to("cpu").flatten()
-        mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
-        mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
-        resolutions = {
-            "momentum_res": (
-                (mom_particles_pred - mom_particles_true) / mom_particles_true
-            ),
-            "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
-            "pos_res": (
-                (positions_particles_pred - x_particles) / x_particles
-            ).tolist(),
-        }
+    # if not tracking:
+    #     e_particles_pred = e_particles_pred.detach().to("cpu").flatten()
+    #     e_particles = e_particles.detach().to("cpu").flatten()
+    #     positions_particles_pred = positions_particles_pred.detach().to("cpu").flatten()
+    #     x_particles = x_particles.detach().to("cpu").flatten()
+    #     mom_particles_pred = mom_particles_pred.detach().flatten().to("cpu")
+    #     mom_particles_true = mom_particles_true.detach().flatten().to("cpu")
+    #     resolutions = {
+    #         "momentum_res": (
+    #             (mom_particles_pred - mom_particles_true) / mom_particles_true
+    #         ),
+    #         "e_res": ((e_particles_pred - e_particles) / e_particles).tolist(),
+    #         "pos_res": (
+    #             (positions_particles_pred - x_particles) / x_particles
+    #         ).tolist(),
+    #     }
     # also return pid_true an<d pid_pred here to log the confusion matrix at each validation step
     # try:
     #    L_clusters = L_clusters.detach().cpu().item()  # if L_clusters is zero
@@ -737,15 +594,15 @@ def calc_LV_Lbeta(
                 L_V,  # 0
                 L_beta,
                 loss_E,
-                loss_x,
+                0,  # loss_x
                 None,  # loss_particle_ids0,  # 4
-                loss_momentum,
-                loss_mass,
+                0,  # loss_momentum
+                0,  # loss mass
                 None,  # pid_true,
                 None,  # pid_pred,
-                resolutions,
+                0,  # resolutions
                 L_clusters,  # 10
-                fill_loss,
+                0,  # fill_loss
                 L_V_attractive,
                 L_V_repulsive,
                 L_alpha_coordinates,
@@ -769,15 +626,15 @@ def calc_LV_Lbeta(
                 L_V / batch_size,  # 0
                 L_beta / batch_size,
                 loss_E,
-                loss_x,
+                0,  # loss_x
                 None,  # loss_particle_ids0,  # 4
                 loss_momentum,
-                loss_mass,
+                0,  # loss_mass
                 None,  # pid_true,
                 None,  # pid_pred,
                 resolutions,
                 L_clusters,  # 10
-                fill_loss,
+                0,  # fill loss
                 L_V_attractive / batch_size,
                 L_V_repulsive / batch_size,
                 L_alpha_coordinates,
@@ -785,166 +642,6 @@ def calc_LV_Lbeta(
                 norms_rep,  # 16
                 norms_att,  # 17
             )
-
-
-def calc_LV_Lbeta_inference(
-    g,
-    distance_threshold,
-    energy_correction,
-    momentum: torch.Tensor,
-    beta: torch.Tensor,
-    cluster_space_coords: torch.Tensor,  # Predicted by model
-    cluster_index_per_event: torch.Tensor,  # inferred cluster_index_per_event
-    batch: torch.Tensor,
-    predicted_pid: torch.Tensor,  # predicted PID embeddings - will be aggregated by summing up the clusters and applying the post_pid_pool_module MLP afterwards
-    post_pid_pool_module: torch.nn.Module,  # MLP to apply to the pooled embeddings to get the PID predictions
-    # From here on just parameters
-    qmin: float = 0.1,
-    s_B: float = 1.0,
-    beta_stabilizing="soft_q_scaling",
-    huberize_norm_for_V_attractive=False,
-    beta_term_option="paper",
-) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
-    """
-    Calculates the L_V and L_beta object condensation losses.
-    Concepts:
-    - A hit belongs to exactly one cluster (cluster_index_per_event is (n_hits,)),
-      and to exactly one event (batch is (n_hits,))
-    - A cluster index of `noise_cluster_index` means the cluster is a noise cluster.
-      There is typically one noise cluster per event. Any hit in a noise cluster
-      is a 'noise hit'. A hit in an object is called a 'signal hit' for lack of a
-      better term.
-    - An 'object' is a cluster that is *not* a noise cluster.
-    beta_stabilizing: Choices are ['paper', 'clip', 'soft_q_scaling']:
-        paper: beta is sigmoid(model_output), q = beta.arctanh()**2 + qmin
-        clip:  beta is clipped to 1-1e-4, q = beta.arctanh()**2 + qmin
-        soft_q_scaling: beta is sigmoid(model_output), q = (clip(beta)/1.002).arctanh()**2 + qmin
-    huberize_norm_for_V_attractive: Huberizes the norms when used in the attractive potential
-    beta_term_option: Choices are ['paper', 'short-range-potential']:
-        Choosing 'short-range-potential' introduces a short range potential around high
-        beta points, acting like V_attractive.
-    Note this function has modifications w.r.t. the implementation in 2002.03605:
-    - The norms for V_repulsive are now Gaussian (instead of linear hinge)
-    """
-    # remove dummy rows added for dataloader  # TODO think of better way to do this
-
-    device = beta.device
-    # alert the user if there are nans
-    if torch.isnan(beta).any():
-        print("There are nans in beta!", len(beta[torch.isnan(beta)]))
-
-    beta = torch.nan_to_num(beta, nan=0.0)
-    assert_no_nans(beta)
-    # ________________________________
-    # Calculate a bunch of needed counts and indices locally
-
-    # cluster_index: unique index over events
-    # E.g. cluster_index_per_event=[ 0, 0, 1, 2, 0, 0, 1], batch=[0, 0, 0, 0, 1, 1, 1]
-    #      -> cluster_index=[ 0, 0, 1, 2, 3, 3, 4 ]
-
-    cluster_index, n_clusters_per_event = batch_cluster_indices(
-        cluster_index_per_event, batch
-    )
-    n_clusters = n_clusters_per_event.sum()
-    n_hits, cluster_space_dim = cluster_space_coords.size()
-    batch_size = batch.max() + 1
-    n_hits_per_event = scatter_count(batch)
-
-    # Index of cluster -> event (n_clusters,)
-    # batch_cluster = scatter_counts_to_indices(n_clusters_per_event)
-
-    # Per-hit boolean, indicating whether hit is sig or noise
-    # is_noise = cluster_index_per_event == noise_cluster_index
-    ##is_sig = ~is_noise
-    # n_hits_sig = is_sig.sum()
-    # n_sig_hits_per_event = scatter_count(batch[is_sig])
-
-    # Per-cluster boolean, indicating whether cluster is an object or noise
-    # is_object = scatter_max(is_sig.long(), cluster_index)[0].bool()
-    # is_noise_cluster = ~is_object
-
-    # FIXME: This assumes noise_cluster_index == 0!!
-    # Not sure how to do this in a performant way in case noise_cluster_index != 0
-    # if noise_cluster_index != 0:
-    #    raise NotImplementedError
-    # object_index_per_event = cluster_index_per_event[is_sig] - 1
-    # object_index, n_objects_per_event = batch_cluster_indices(
-    #    object_index_per_event, batch[is_sig]
-    # )
-    # n_hits_per_object = scatter_count(object_index)
-    # print("n_hits_per_object", n_hits_per_object)
-    # batch_object = batch_cluster[is_object]
-    # n_objects = is_object.sum()
-
-    # assert object_index.size() == (n_hits_sig,)
-    # assert is_object.size() == (n_clusters,)
-    # assert torch.all(n_hits_per_object > 0)
-    # assert object_index.max() + 1 == n_objects
-
-    # ________________________________
-    # L_V term
-
-    # Calculate q
-    if beta_stabilizing == "paper":
-        q = beta.arctanh() ** 2 + qmin
-    elif beta_stabilizing == "clip":
-        beta = beta.clip(0.0, 1 - 1e-4)
-        q = beta.arctanh() ** 2 + qmin
-    elif beta_stabilizing == "soft_q_scaling":
-        q = (beta.clip(0.0, 1 - 1e-4) / 1.002).arctanh() ** 2 + qmin
-    else:
-        raise ValueError(f"beta_stablizing mode {beta_stabilizing} is not known")
-    if torch.isnan(beta).any():
-        print("There are nans in beta!", len(beta[torch.isnan(beta)]))
-
-    beta = torch.nan_to_num(beta, nan=0.0)
-    assert_no_nans(q)
-    assert q.device == device
-    assert q.size() == (n_hits,)
-    # TODO:  continue here
-    # Calculate q_alpha, the max q per object, and the indices of said maxima
-    q_alpha, index_alpha = scatter_max(q, cluster_index)
-    assert q_alpha.size() == (n_clusters,)
-
-    # Get the cluster space coordinates and betas for these maxima hits too
-    index_alpha -= 1  # why do we need this?
-    x_alpha = cluster_space_coords[index_alpha]
-    beta_alpha = beta[index_alpha]
-
-    positions_particles_pred = g.ndata["pos_hits_xyz"][index_alpha]
-    positions_particles_pred = (
-        positions_particles_pred + distance_threshold[index_alpha]
-    )
-
-    is_sig_everything = torch.ones_like(batch).bool()
-
-    e_particles_pred, pid_particles_pred, mom_particles_pred = calc_energy_pred(
-        batch,
-        g,
-        cluster_index_per_event,
-        is_sig_everything,
-        q,
-        beta,
-        energy_correction,
-        predicted_pid,
-        momentum,
-    )
-    pid_particles_pred = post_pid_pool_module(
-        pid_particles_pred
-    )  # project the pooled PID embeddings to the final "one hot encoding" space
-
-    mass_particles_pred = e_particles_pred**2 - mom_particles_pred**2
-    mass_particles_pred[mass_particles_pred < 0] = 0.0
-    mass_particles_pred = torch.sqrt(mass_particles_pred)
-
-    pid_pred = pid_particles_pred.argmax(dim=1).detach().tolist()
-    return (
-        pid_pred,
-        pid_particles_pred,
-        mass_particles_pred,
-        e_particles_pred,
-        mom_particles_pred,
-    )
 
 
 def formatted_loss_components_string(components: dict) -> str:
@@ -1429,3 +1126,6 @@ def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combination
         L_clusters = L_clusters / number_of_pairs
 
     return L_clusters
+
+
+## deprecated code:
