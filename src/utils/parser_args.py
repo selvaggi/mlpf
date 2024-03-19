@@ -445,9 +445,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--hgcalloss",
+    "--losstype",
     action="store_true",
-    default=False,
+    default="hgcalimplementation",
     help="use the hgcal loss",
 )
 parser.add_argument(
@@ -531,14 +531,14 @@ parser.add_argument(
     "--global-features",
     default=False,
     action="store_true",
-    help="if toggled, also adds global features to the graphs for energy correction"
+    help="if toggled, also adds global features to the graphs for energy correction",
 )
 
 parser.add_argument(
     "--graph-level-features",
     default=False,
     action="store_true",
-    help="if toggled, considers the 'high-level' features for energy corr. (energy of the hits, number of the hits etc.)"
+    help="if toggled, considers the 'high-level' features for energy corr. (energy of the hits, number of the hits etc.)",
 )
 
 
@@ -546,6 +546,5 @@ parser.add_argument(
     "--use-gt-clusters",
     default=False,
     action="store_true",
-    help="If toggled, uses ground-truth clusters instead of the predicted ones by the model. We can use this to simulate 'ideal' clustering."
+    help="If toggled, uses ground-truth clusters instead of the predicted ones by the model. We can use this to simulate 'ideal' clustering.",
 )
-
