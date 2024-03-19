@@ -199,7 +199,7 @@ def modify_index_link_for_gamma_e(
         mask2 = a == i
         number_of_p[p] = len(torch.unique(b[mask2]))
     pid_particles = torch.tensor(output["pf_features"][6, 0:number_part])
-    electron_photon_mask = (pid_particles[a_u.long()] == 11) + (
+    electron_photon_mask = (torch.abs(pid_particles[a_u.long()]) == 11) + (
         pid_particles[a_u.long()] == 22
     )
     electron_photon_mask = electron_photon_mask * (number_of_p > 1)
