@@ -358,7 +358,7 @@ def calc_LV_Lbeta(
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    if loss_type == "hgcal_implementation":
+    if loss_type == "hgcalimplementation":
         if dis:
             norms = norms / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
             norms_rep = torch.exp(-(norms)) * M_inv
@@ -450,7 +450,7 @@ def calc_LV_Lbeta(
     # print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
-    if loss_type == "hgcal_implementation":
+    if loss_type == "hgcalimplementation":
         # version one:
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
