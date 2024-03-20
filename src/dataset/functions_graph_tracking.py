@@ -184,7 +184,10 @@ def create_graph_tracking_global(output, get_vtx=False, vector=False):
         number_of_vtx = torch.sum(mask_vtx)
         number_of_dc = torch.sum(mask_dc)
         g = dgl.DGLGraph()
-        g.add_nodes(number_of_vtx + number_of_dc * 2)
+        if vector:
+            g.add_nodes(number_of_vtx + number_of_dc)
+        else:
+            g.add_nodes(number_of_vtx + number_of_dc * 2)
 
         left_right_pos = features_hits[:, 3:9][mask_dc]
         left_post = left_right_pos[:, 0:3]
