@@ -48,25 +48,25 @@ def create_and_store_graph_output(
 
         X = dic["graph"].ndata["coords"]
 
-        labels_clustering = clustering_obtain_labels(
-            X, dic["graph"].ndata["beta"].view(-1), model_output.device
-        )
+        # labels_clustering = clustering_obtain_labels(
+        #     X, dic["graph"].ndata["beta"].view(-1), model_output.device
+        # )
         labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        shower_p_unique = torch.unique(labels_clustering)
-        shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
-            labels_clustering,
-            dic,
-            particle_ids,
-            model_output,
-            local_rank,
-            i,
-            path_save,
-            tracks=tracks,
-        )
+        # shower_p_unique = torch.unique(labels_clustering)
+        # shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
+        #     labels_clustering,
+        #     dic,
+        #     particle_ids,
+        #     model_output,
+        #     local_rank,
+        #     i,
+        #     path_save,
+        #     tracks=tracks,
+        # )
         shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb, iou_m = match_showers(
             labels_hdb,
             dic,
@@ -112,20 +112,20 @@ def create_and_store_graph_output(
         #         + ".pt",
         #     )
         if len(shower_p_unique_hdb) > 1:
-            df_event, number_of_showers_total = generate_showers_data_frame(
-                labels_clustering,
-                dic,
-                shower_p_unique,
-                particle_ids,
-                row_ind,
-                col_ind,
-                i_m_w,
-                e_corr=e_corr,
-                number_of_showers_total=number_of_showers_total,
-                step=step,
-                number_in_batch=i,
-                tracks=tracks,
-            )
+            # df_event, number_of_showers_total = generate_showers_data_frame(
+            #     labels_clustering,
+            #     dic,
+            #     shower_p_unique,
+            #     particle_ids,
+            #     row_ind,
+            #     col_ind,
+            #     i_m_w,
+            #     e_corr=e_corr,
+            #     number_of_showers_total=number_of_showers_total,
+            #     step=step,
+            #     number_in_batch=i,
+            #     tracks=tracks,
+            # )
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -140,8 +140,8 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            if len(df_event) > 1:
-                df_list.append(df_event)
+            # if len(df_event) > 1:
+            #     df_list.append(df_event)
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
             if predict:
@@ -162,7 +162,7 @@ def create_and_store_graph_output(
                 if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
         number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
-    df_batch = pd.concat(df_list)
+    # df_batch = pd.concat(df_list)
     df_batch1 = pd.concat(df_list1)
     if predict:
         df_batch_pandora = pd.concat(df_list_pandora)
@@ -172,7 +172,7 @@ def create_and_store_graph_output(
     if store:
         store_at_batch_end(
             path_save,
-            df_batch,
+            # df_batch,
             df_batch1,
             df_batch_pandora,
             local_rank,
@@ -182,14 +182,14 @@ def create_and_store_graph_output(
             store=store_epoch,
         )
     if predict:
-        return df_batch_pandora, df_batch1, df_batch
+        return df_batch_pandora, df_batch1 #, df_batch
     else:
         return df_batch1
 
 
 def store_at_batch_end(
     path_save,
-    df_batch,
+    # df_batch,
     df_batch1,
     df_batch_pandora,
     local_rank=0,
@@ -198,12 +198,12 @@ def store_at_batch_end(
     predict=False,
     store=False,
 ):
-    path_save_ = (
-        path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
-    )
-    if store and predict:
-        df_batch.to_pickle(path_save_)
-    log_efficiency(df_batch, clustering=True)
+    # path_save_ = (
+    #     path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
+    # )
+    # if store and predict:
+    #     df_batch.to_pickle(path_save_)
+    # log_efficiency(df_batch, clustering=True)
     path_save_ = (
         path_save
         + "/"
