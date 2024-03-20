@@ -86,7 +86,7 @@ def find_mask_no_energy(
                 or (number_of_hits[index] < 2)
                 or (y[index, 8] == 1)
                 or number_of_tracks[index] == 2
-                or number_of_daughters > 1
+                or number_of_daughters[index] > 1
             ):
                 list_remove.append(p)
         else:
@@ -95,7 +95,7 @@ def find_mask_no_energy(
                 or int(p) not in filt1
                 or (number_of_hits[index] < 2)
                 or number_of_tracks[index] == 2
-                or number_of_daughters > 1
+                or number_of_daughters[index] > 1
             ):
                 list_remove.append(p)
 
