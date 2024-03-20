@@ -36,7 +36,6 @@ def get_number_of_daughters(hit_type_feature, hit_particle_link, daughters):
     number_of_p = torch.zeros_like(a_u)
     for p, i in enumerate(a_u):
         mask2 = a == i
-        print(torch.unique(b[mask2]))
         number_of_p[p] = torch.sum(torch.unique(b[mask2]) != -1)
     return number_of_p
 
