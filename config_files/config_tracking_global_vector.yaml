@@ -1,0 +1,113 @@
+graph_config:
+   only_hits: true
+   k: 40
+   tracking: true
+   global: true
+   VTX: true
+   vector: true
+
+custom_model_kwargs:
+   # add custom model kwargs here
+   n_postgn_dense_blocks: 4
+   clust_space_norm: none
+
+
+#treename:
+selection:
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   #(jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) & (((sample_isQCD==0) & (fj_isQCD==0)) | ((sample_isQCD==1) & (fj_isQCD==1))) & (event_no%7!=0)
+   #(recojet_e>=5)
+
+test_time_selection:
+   ### selection to apply at test time (i.e., when running w/ --predict)
+   #(jet_tightId==1) & (jet_no<2) & (fj_pt>200) & (fj_pt<2500) & (((sample_isQCD==0) & (fj_isQCD==0)) | ((sample_isQCD==1) & (fj_isQCD==1))) & (event_no%7==0)
+   #(recojet_e<5)
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   #pfcand_mask: awkward.JaggedArray.ones_like(pfcand_etarel)
+   #sv_mask: awkward.JaggedArray.ones_like(sv_etarel)
+   #pfcand_mask: awkward.JaggedArray.ones_like(pfcand_e)
+   hit_mask: ak.ones_like(hit_EDep)
+   part_mask: ak.ones_like(part_p)
+
+preprocess:
+  ### method: [manual, auto] - whether to use manually specified parameters for variable standardization
+  ### [note]: `[var]_mask` will not be transformed even if `method=auto`
+  method: auto
+  ### data_fraction: fraction of events to use when calculating the mean/scale for the standardization
+  data_fraction: 0.1
+
+inputs:
+   pf_points:
+      pad_mode: wrap
+      length: 25000
+      vars:
+         - [hit_x, null]
+         - [hit_y, null]
+         - [hit_z, null]
+   pf_features:
+      pad_mode: wrap
+      length: 25000
+      vars:
+         - [hit_x, null] #VX
+         - [hit_y, null] #VX
+         - [hit_z, null] #VX
+         - [leftPosition_x, null] # DC
+         - [leftPosition_y, null] # DC
+         - [leftPosition_z, null] # DC
+         - [rightPosition_x, null] # DC
+         - [rightPosition_y, null] # DC
+         - [rightPosition_z, null] # DC
+         - [hit_type, null] # VX DC
+         - [hit_cellID, null] # VX DC
+        
+
+   pf_vectors:
+      length: 25000
+      pad_mode: wrap
+      vars:
+         - [part_theta, null] 
+         - [part_phi, null]
+         - [part_m, null]
+         - [part_pid, null] 
+         - [part_id, null] 
+         - [part_p, null] 
+         - [part_parent, null] 
+   pf_vectoronly:
+      length: 25000
+      pad_mode: wrap
+      vars:
+      - [hit_genlink0, null] 
+
+
+
+   pf_mask:
+      length: 25000
+      pad_mode: constant
+      vars:
+         - [hit_mask, null]
+         - [part_mask, null]
+
+
+labels:
+   ### type can be `simple`, `custom`
+  ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   #type: simple
+   #value: [
+   #   hit_ty
+   #   ]
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   # type: custom
+   # value:
+      # target_mass: np.where(fj_isQCD, fj_genjet_sdmass, fj_gen_mass)
+
+observers:
+   #- recojet_e
+   #- recojet_theta
+   #- recojet_phi
+   #- recojet_m
+   #- n_pfcand
+

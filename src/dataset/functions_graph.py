@@ -48,7 +48,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
-        cluster_id, hit_type_feature, e_hits, y_data_graph, prediction
+        cluster_id, hit_type_feature, e_hits, y_data_graph,daughters,  prediction
     )
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
@@ -149,7 +149,8 @@ def create_graph(
         # g.ndata["p_hits"] = p_hits
         g.ndata[
             "e_hits"
-        ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
+        ] = e_hits # if no tracks this is e and if there are tracks this fills the tracks e values with p
+
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link
         # g.ndata["theta_hits"] = theta_hits

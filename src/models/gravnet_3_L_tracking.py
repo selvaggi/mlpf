@@ -186,7 +186,7 @@ class GravnetModel(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            # hgcalloss=self.args.hgcalloss,
             tracking=True,
         )
         loss = loss
@@ -214,7 +214,7 @@ class GravnetModel(L.LightningModule):
             frac_clustering_loss=0,
             clust_loss_only=self.args.clustering_loss_only,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            # hgcalloss=self.args.hgcalloss,
             tracking=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
@@ -360,7 +360,7 @@ def object_condensation_loss_tracking(
     repul_weight=1.0,
     fill_loss_weight=1.0,
     use_average_cc_pos=0.0,
-    hgcalloss=False,
+    loss_type="hgcalimplementation",
     output_dim=4,
     clust_space_norm="none",
     tracking=False,
@@ -407,7 +407,7 @@ def object_condensation_loss_tracking(
         repul_weight=repul_weight,
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
-        hgcal_implementation=hgcalloss,
+        loss_type=loss_type,
         tracking=tracking,
     )
 

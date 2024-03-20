@@ -29,8 +29,27 @@ def get_number_hits(e_hits, part_idx):
     return (number_of_hits[1:].flatten()).tolist()
 
 
-def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=False):
+def get_number_of_daughters(hit_type_feature, hit_particle_link, daughters):
+    mask = hit_type_feature > 1
+    a = hit_particle_link[mask]
+    b = daughters[mask]
+    a_u = torch.unique(a)
+    number_of_p = torch.zeros_like(a_u)
+    for p, i in enumerate(a_u):
+        mask2 = a == i
+        number_of_p[p] = len(torch.unique(b[mask2]))
+    return number_of_p
+
+
+def find_mask_no_energy(
+    hit_particle_link, hit_type_a, hit_energies, y, daughters, predict=False
+):
     """This function remove particles with tracks only and remove particles with low fractions
+    # Remove 2212 going to multiple particles without tracks for now
+    # remove particles below energy cut
+    # remove particles that decayed in the tracker
+    # remove particles with two tracks (due to bad tracking)
+    # remove particles with daughters for the moment
 
     Args:
         hit_particle_link (_type_): _description_
@@ -41,28 +60,25 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
     Returns:
         _type_: _description_
     """
-    energy_cut = 0.01
-    # REMOVE THE WEIRD ONES
+
+    number_of_daughters = get_number_of_daughters(
+        hit_type_a, hit_particle_link, daughters
+    )
     list_p = np.unique(hit_particle_link)
-    # print(list_p)
     list_remove = []
     part_frac = torch.tensor(get_ratios(hit_energies, hit_particle_link, y))
     number_of_hits = get_number_hits(hit_energies, hit_particle_link)
-    # print(part_frac)
     if predict:
         energy_cut = 0.1
         filt1 = (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     else:
         energy_cut = 0.01
-        filt1 = (
-            (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
-        )  # only keep these particles
+        filt1 = (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     number_of_tracks = scatter_add(1 * (hit_type_a == 1), hit_particle_link.long())[1:]
     for index, p in enumerate(list_p):
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
-        # if np.array_equal(hit_types, [0, 1]):
-        #     print("will remove particle", p)
+
         if predict:
             if (
                 np.array_equal(hit_types, [0, 1])
@@ -70,31 +86,18 @@ def find_mask_no_energy(hit_particle_link, hit_type_a, hit_energies, y, predict=
                 or (number_of_hits[index] < 2)
                 or (y[index, 8] == 1)
                 or number_of_tracks[index] == 2
-            ):  # This is commented to disable filtering
+                or number_of_daughters > 1
+            ):
                 list_remove.append(p)
-                # print(
-                #     "percentage of energy, number of hits",
-                #     part_frac[int(p) - 1],
-                #     number_of_hits[index],
-                #     y[index, 3],
-                #     y[index, 7],
-                #     y[index, 8],
-                # )
-                # assert part_frac[int(p) - 1] <= energy_cut
         else:
             if (
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
                 or (number_of_hits[index] < 2)
                 or number_of_tracks[index] == 2
-            ):  # This is commented to disable filtering
+                or number_of_daughters > 1
+            ):
                 list_remove.append(p)
-                # print(
-                #     "percentage of energy, number of hits",
-                #     part_frac[int(p) - 1],
-                #     number_of_hits[index],
-                #     y[index, 3],
-                # )
 
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
