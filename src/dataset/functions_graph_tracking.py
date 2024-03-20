@@ -256,7 +256,7 @@ def create_graph_tracking_global(output, get_vtx=False, vector=False):
             )
             pos_xyz = torch.cat((left_post, right_post), dim=0)
             hit_type_all = torch.cat((hit_type, hit_type), dim=0)
-        if args.vector_like_data:
+        if vector_like_data:
             g.ndata["vector"] = vector_data
         g.ndata["hit_type"] = hit_type_all
         g.ndata["particle_number"] = particle_number
