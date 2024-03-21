@@ -325,16 +325,25 @@ def calc_LV_Lbeta(
         V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
         L_V_attractive = torch.mean(V_attractive)
     elif loss_type == "vrepweighted":
-        e_hits = g.ndata["e_hits"][is_sig].view(-1)
-        p_hits = g.ndata["h"][:, -1].view(-1)
-        e_sum_hits = scatter_add(e_hits + p_hits, object_index)
-        e_rel = (e_hits + p_hits) / e_sum_hits[object_index]
-        V_attractive = (
-            e_rel.unsqueeze(-1)
-            * q[is_sig].unsqueeze(-1)
-            * q_alpha.unsqueeze(0)
-            * norms_att
-        )
+        if tracking:
+            # weight the vtx hits inside the shower 
+            V_attractive = (
+                g.ndata["weights"][is_sig].unsqueeze(-1)
+                * q[is_sig].unsqueeze(-1)
+                * q_alpha.unsqueeze(0)
+                * norms_att
+            )
+        else:
+            e_hits = g.ndata["e_hits"][is_sig].view(-1)
+            p_hits = g.ndata["h"][:, -1].view(-1)
+            e_sum_hits = scatter_add(e_hits + p_hits, object_index)
+            e_rel = (e_hits + p_hits) / e_sum_hits[object_index]
+            V_attractive = (
+                e_rel.unsqueeze(-1)
+                * q[is_sig].unsqueeze(-1)
+                * q_alpha.unsqueeze(0)
+                * norms_att
+            )
         assert V_attractive.size() == (n_hits_sig, n_objects)
         V_attractive = V_attractive.sum(dim=0)  # K objects
         L_V_attractive = torch.mean(V_attractive)

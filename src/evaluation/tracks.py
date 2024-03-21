@@ -20,23 +20,35 @@ hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
 
 
-log_scale = False
+log_scale = True
 
-PATH_store = "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/200124_global_1/showers_df_evaluation/"
-path_hgcal = PATH_store + "0_0_0.pt"
+PATH_store = [
+    "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard/showers_df_evaluation/",
+    "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard_fullp/showers_df_evaluation/",
+    "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard_v/showers_df_evaluation/",
+]
+label_list = ["180324_Zcard", "180324_Zcard_fullp", "180324_Zcard_v"]
+PATH_comparison = (
+    "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/plots_comparison/"
+)
+path_hgcal = "0_0_0.pt"
 
 
 def main():
+    list_dataframes = []
+    for path in PATH_store:
+        sd_hgb, matched_hgb = open_mlpf_dataframe(path + path_hgcal, False)
+        list_dataframes.append(sd_hgb)
+    # dict_1 = obtain_metrics(matched_hgb)
 
-    sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, False)
-    dict_1 = obtain_metrics(matched_hgb)
-
-    plot_efficiency_all(sd_hgb, PATH_store, log=True)
-
-    plot_metrics(
-        dict_1,
-        PATH_store=PATH_store,
+    plot_efficiency_all(
+        list_dataframes, PATH_store, PATH_comparison, label_list, log=log_scale
     )
+
+    # plot_metrics(
+    #     dict_1,
+    #     PATH_store=PATH_store,
+    # )
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ class ExampleWrapper(L.LightningModule):
             in_mv_channels=1,
             out_mv_channels=1,
             hidden_mv_channels=hidden_mv_channels,
-            in_s_channels=2,
+            in_s_channels=1,
             out_s_channels=1,
             hidden_s_channels=hidden_s_channels,
             num_blocks=blocks,
@@ -95,23 +95,10 @@ class ExampleWrapper(L.LightningModule):
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
         self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
-        self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
-        self.beta = nn.Linear(2, 1)
+        self.clustering = nn.Linear(17, self.output_dim - 1, bias=False)
+        self.beta = nn.Linear(17, 1)
 
     def forward(self, g, y, step_count, eval=""):
-        """Forward pass.
-
-        Parameters
-        ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
-
-        Returns
-        -------
-        outputs : torch.Tensor with shape (*batch_dimensions, 1)
-            Model prediction: a single scalar for the whole point cloud.
-        """
-
         inputs = g.ndata["pos_hits_xyz"]
 
         if self.trainer.is_global_zero and step_count % 500 == 0:
@@ -120,35 +107,28 @@ class ExampleWrapper(L.LightningModule):
                 g,
                 path="input_coords",
                 outdir=self.args.model_prefix,
-                # features_type="ones",
                 predict=self.args.predict,
                 epoch=str(self.current_epoch) + eval,
                 step_count=step_count,
             )
-        inputs_scalar = g.ndata["hit_type"].view(-1, 1)
+        inputs_scalar = g.ndata["h"][:, -2] + g.ndata["h"][:, -1]
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
-        # inputs = inputs.unsqueeze(0)
         embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
-        embedded_inputs = embedded_inputs.unsqueeze(
-            -2
-        )  # (batch_size*num_points, 1, 16)
+        embedded_inputs = embedded_inputs.unsqueeze(-2)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = g.ndata["h"][:, -2:]  # this corresponds to e,p
-        # Pass data through GATr
+        scalars = g.ndata["hit_type"].view(-1, 1)
+
         embedded_outputs, scalar_outputs = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
-        )  # (..., num_points, 1, 16)
+        )  #
 
-        points = extract_point(embedded_outputs[:, 0, :])
-
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-
-        x_point = points
-        x_scalar = torch.cat(
-            (nodewise_outputs.view(-1, 1), scalar_outputs.view(-1, 1)), dim=1
+        output = torch.cat(
+            (embedded_outputs[:, 0, :], scalar_outputs.view(-1, 1)), dim=1
         )
+
+        x_point = output
+        x_scalar = output
 
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
@@ -170,25 +150,6 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
         return x, pred_energy_corr, 0
-
-    def build_attention_mask(self, g):
-        """Construct attention mask from pytorch geometric batch.
-
-        Parameters
-        ----------
-        inputs : torch_geometric.data.Batch
-            Data batch.
-
-        Returns
-        -------
-        attention_mask : xformers.ops.fmha.BlockDiagonalMask
-            Block-diagonal attention mask: within each sample, each token can attend to each other
-            token.
-        """
-        batch_numbers = obtain_batch_numbers(g)
-        return BlockDiagonalMask.from_seqlens(
-            torch.bincount(batch_numbers.long()).tolist()
-        )
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -373,7 +334,6 @@ class ExampleWrapper(L.LightningModule):
                 # multiple of "trainer.check_val_every_n_epoch".
             },
         }
-
 
 def obtain_batch_numbers(g):
     graphs_eval = dgl.unbatch(g)
