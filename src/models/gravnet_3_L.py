@@ -363,7 +363,7 @@ class GravnetModel(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            loss_type=self.args.losstype,
         )
         if self.args.correction:
             debug_regress_e_sum = False
@@ -538,7 +538,7 @@ class GravnetModel(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            loss_type=self.args.losstype,
         )
         loss_ec = 0
         if self.args.correction:

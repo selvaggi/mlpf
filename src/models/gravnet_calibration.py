@@ -202,7 +202,7 @@ def object_condensation_loss2(
     repul_weight=1.0,
     fill_loss_weight=1.0,
     use_average_cc_pos=0.0,
-    hgcalloss=False,
+    loss_type="hgcalimplementation",
     output_dim=4,
     clust_space_norm="none",
     dis=False,
@@ -290,7 +290,7 @@ def object_condensation_loss2(
         repul_weight=repul_weight,
         fill_loss_weight=fill_loss_weight,
         use_average_cc_pos=use_average_cc_pos,
-        hgcal_implementation=hgcalloss,
+        loss_type=loss_type,
         dis=dis,
     )
     if return_resolution:

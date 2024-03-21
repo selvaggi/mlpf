@@ -7,7 +7,13 @@ import sys
 # sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
+from gatr.interface import (
+    embed_point,
+    extract_scalar,
+    extract_point,
+    embed_scalar,
+    embed_translation,
+)
 import torch
 import torch.nn as nn
 from src.logger.plotting_tools import PlotCoordinates
@@ -89,6 +95,7 @@ class ExampleWrapper(L.LightningModule):
         self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(1, 1)
+        self.vector_like_data = False
 
     def forward(self, g, y, step_count, eval=""):
         """Forward pass.
@@ -119,7 +126,14 @@ class ExampleWrapper(L.LightningModule):
         inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
-        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
+        if self.vector_like_data:
+            velocities = g.ndata["vector"]
+            velocities = embed_translation(velocities)
+            embedded_inputs = (
+                embed_point(inputs) + embed_scalar(inputs_scalar) + velocities
+            )
+        else:
+            embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
         embedded_inputs = embedded_inputs.unsqueeze(
             -2
         )  # (batch_size*num_points, 1, 16)
@@ -201,7 +215,7 @@ class ExampleWrapper(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            # loss_type=self.args.losstype,
             tracking=True,
         )
         loss = loss
@@ -229,7 +243,7 @@ class ExampleWrapper(L.LightningModule):
             frac_clustering_loss=0,
             clust_loss_only=self.args.clustering_loss_only,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            # loss_type=self.args.losstype,
             tracking=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +

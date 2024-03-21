@@ -432,48 +432,73 @@ def plot_per_energy_resolution(
             )
 
 
-def plot_efficiency_all(sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store):
-    photons_dic = create_eff_dic(sd_pandora, sd_hgb, 22)
-    electrons_dic = create_eff_dic(sd_pandora, sd_hgb, 11)
-    pions_dic = create_eff_dic(sd_pandora, sd_hgb, 211)
-    kaons_dic = create_eff_dic(sd_pandora, sd_hgb, 130)
+def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
+
+    photons_dic = create_eff_dic_pandora(sd_pandora, 22)
+    electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
+    pions_dic = create_eff_dic_pandora(sd_pandora, 211)
+    kaons_dic = create_eff_dic_pandora(sd_pandora, 130)
+
+    for var_i, sd_hgb in enumerate(df_list):
+        photons_dic = create_eff_dic(photons_dic, sd_hgb, 22, var_i=var_i)
+        electrons_dic = create_eff_dic(electrons_dic, sd_hgb, 11, var_i=var_i)
+        pions_dic = create_eff_dic(pions_dic, sd_hgb, 211, var_i=var_i)
+        kaons_dic = create_eff_dic(kaons_dic, sd_hgb, 130, var_i=var_i)
     plot_eff(
-        "Electromagnetic Shower Reconstruction Efficiency",
+        "Electromagnetic",
         photons_dic,
-        electrons_dic,
         "Photons",
+        PATH_store,
+        labels,
+    )
+    plot_eff(
+        "Electromagnetic",
+        electrons_dic,
         "Electrons",
         PATH_store,
+        labels,
     )
     plot_eff(
-        "Hadronic Shower Reconstruction Efficiency",
+        "Hadronic",
         pions_dic,
-        kaons_dic,
         "Pions",
+        PATH_store,
+        labels,
+    )
+    plot_eff(
+        "Hadronic",
+        kaons_dic,
         "Kaons",
         PATH_store,
+        labels,
     )
 
 
-def create_eff_dic(matched_pandora, matched_, id):
+def create_eff_dic_pandora(matched_pandora, id):
     pids_pandora = np.abs(matched_pandora["pid"].values)
     mask_id = pids_pandora == id
-    pids = np.abs(matched_["pid"].values)
     df_id_pandora = matched_pandora[mask_id]
-    mask_id = pids == id
-    df_id = matched_[mask_id]
     eff_p, energy_eff_p = calculate_eff(df_id_pandora, False)
-    eff, energy_eff = calculate_eff(df_id, False)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
     photons_dic["energy_eff_p"] = energy_eff_p
-    photons_dic["eff"] = eff
-    photons_dic["energy_eff"] = energy_eff
     return photons_dic
 
 
-def plot_eff(title, photons_dic, electrons_dic, label1, label2, PATH_store):
+def create_eff_dic(photons_dic, matched_, id, var_i):
+    pids = np.abs(matched_["pid"].values)
+    mask_id = pids == id
+    df_id = matched_[mask_id]
+
+    eff, energy_eff = calculate_eff(df_id, False)
+    photons_dic["eff_" + str(var_i)] = eff
+    photons_dic["energy_eff_" + str(var_i)] = energy_eff
+    return photons_dic
+
+
+def plot_eff(title, photons_dic, label1, PATH_store, labels):
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
+    markers = ["^", "*", "x", "d"]
     fig = plt.figure()
     j = 0
     plt.xlabel("Energy [GeV]")
@@ -481,15 +506,14 @@ def plot_eff(title, photons_dic, electrons_dic, label1, label2, PATH_store):
     # ax[row_i, j].set_xscale("log")
     plt.title(title)
     plt.grid()
-    plt.scatter(
-        photons_dic["energy_eff"],
-        photons_dic["eff"],
-        facecolors=colors_list[1],
-        edgecolors=colors_list[1],
-        label="ML " + label1,
-        marker="x",
-        s=50,
-    )
+    for i in range(0, len(labels)):
+        plt.scatter(
+            photons_dic["energy_eff_" + str(i)],
+            photons_dic["eff_" + str(i)],
+            label="ML " + labels[i],
+            marker=markers[i],
+            s=50,
+        )
     plt.scatter(
         photons_dic["energy_eff_p"],
         photons_dic["eff_p"],
@@ -499,32 +523,14 @@ def plot_eff(title, photons_dic, electrons_dic, label1, label2, PATH_store):
         marker="x",
         s=50,
     )
-    plt.scatter(
-        electrons_dic["energy_eff"],
-        electrons_dic["eff"],
-        facecolors=colors_list[1],
-        edgecolors=colors_list[1],
-        marker="o",
-        label="ML " + label2,
-        s=80,
-    )
-    plt.scatter(
-        electrons_dic["energy_eff_p"],
-        electrons_dic["eff_p"],
-        facecolors=colors_list[2],
-        edgecolors=colors_list[2],
-        marker="o",
-        label="Pandora " + label2,
-        s=50,
-    )
 
     plt.legend(loc="lower right")
-    if title == "Electromagnetic Shower Reconstruction Efficiency":
-        plt.ylim([0.7, 1.1])
+    if title == "Electromagnetic":
+        plt.ylim([0.5, 1.1])
     else:
-        plt.ylim([0.7, 1.1])
+        plt.ylim([0.5, 1.1])
     fig.savefig(
-        PATH_store + title + "_v0.png",
+        PATH_store + title + label1 + ".png",
         bbox_inches="tight",
     )
 

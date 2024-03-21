@@ -218,7 +218,7 @@ class ExampleWrapper(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            loss_type=self.args.losstype,
             dis=True,
         )
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
@@ -272,7 +272,7 @@ class ExampleWrapper(L.LightningModule):
             repul_weight=self.args.L_repulsive_weight,
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
-            hgcalloss=self.args.hgcalloss,
+            loss_type=self.args.losstype,
             dis=True,
         )
         loss_ec = 0

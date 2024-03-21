@@ -294,9 +294,10 @@ class _SimpleIter(object):
             if self._data_config.graph_config.get("tracking", False):
                 if self._data_config.graph_config.get("global", False):
                     get_vtx = self._data_config.graph_config.get("VTX", False)
+                    vector = self._data_config.graph_config.get("vector", False)
 
                     [g, features_partnn], graph_empty = create_graph_tracking_global(
-                        X, get_vtx
+                        X, get_vtx, vector
                     )
                 else:
                     [g, features_partnn], graph_empty = create_graph_tracking(

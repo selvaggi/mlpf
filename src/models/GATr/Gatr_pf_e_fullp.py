@@ -32,12 +32,13 @@ from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
-from src.layers.obtain_statistics import (
-    obtain_statistics_graph,
-    create_stats_dict,
-    save_stat_dict,
-    plot_distributions,
-)
+
+# from src.layers.obtain_statistics import (
+#     obtain_statistics_graph_tracking,
+#     create_stats_dict,
+#     save_stat_dict,
+#     plot_distributions,
+# )
 from src.utils.nn.tools import log_losses_wandb
 
 
@@ -86,31 +87,18 @@ class ExampleWrapper(L.LightningModule):
             in_mv_channels=1,
             out_mv_channels=1,
             hidden_mv_channels=hidden_mv_channels,
-            in_s_channels=None,
-            out_s_channels=None,
+            in_s_channels=1,
+            out_s_channels=1,
             hidden_s_channels=hidden_s_channels,
             num_blocks=blocks,
             attention=SelfAttentionConfig(),  # Use default parameters for attention
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
         self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
-        self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
-        self.beta = nn.Linear(1, 1)
+        self.clustering = nn.Linear(17, self.output_dim - 1, bias=False)
+        self.beta = nn.Linear(17, 1)
 
     def forward(self, g, y, step_count, eval=""):
-        """Forward pass.
-
-        Parameters
-        ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
-
-        Returns
-        -------
-        outputs : torch.Tensor with shape (*batch_dimensions, 1)
-            Model prediction: a single scalar for the whole point cloud.
-        """
-
         inputs = g.ndata["pos_hits_xyz"]
 
         if self.trainer.is_global_zero and step_count % 500 == 0:
@@ -119,34 +107,27 @@ class ExampleWrapper(L.LightningModule):
                 g,
                 path="input_coords",
                 outdir=self.args.model_prefix,
-                features_type="ones",
                 predict=self.args.predict,
                 epoch=str(self.current_epoch) + eval,
                 step_count=step_count,
             )
-        inputs_scalar = g.ndata["hit_type"].view(-1, 1)
+        inputs_scalar = g.ndata["h"][:, -2] + g.ndata["h"][:, -1]
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
-        # inputs = inputs.unsqueeze(0)
-        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
-        embedded_inputs = embedded_inputs.unsqueeze(
-            -2
-        )  # (batch_size*num_points, 1, 16)
+        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar.view(-1, 1))
+        embedded_inputs = embedded_inputs.unsqueeze(-2)
         mask = self.build_attention_mask(g)
-        scalars = torch.zeros((inputs.shape[0], 1))
-        # Pass data through GATr
-        embedded_outputs, _ = self.gatr(
+        # scalars = torch.zeros((inputs.shape[0], 1))
+        scalars = 1.0 * g.ndata["hit_type"].view(-1, 1)
+        embedded_outputs, scalar_outputs = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
-        )  # (..., num_points, 1, 16)
-        # assert embedded_outputs.shape[2:] == (1, 16)
+        )  #
 
-        points = extract_point(embedded_outputs[:, 0, :])
+        output = torch.cat(
+            (embedded_outputs[:, 0, :], scalar_outputs.view(-1, 1)), dim=1
+        )
 
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        # # # outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
-        # embedded_outputs = nodewise_outputs.view(-1, 1)
-        x_point = points
-        x_scalar = nodewise_outputs
+        x_point = output
+        x_scalar = output
 
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
@@ -191,8 +172,6 @@ class ExampleWrapper(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        # if self.trainer.is_global_zero and self.current_epoch == 0:
-        #     self.stat_dict = obtain_statistics_graph(self.stat_dict, y, batch_g)
         if self.trainer.is_global_zero:
             model_output, e_cor, loss_ll = self(batch_g, y, batch_idx)
         else:
@@ -301,6 +280,8 @@ class ExampleWrapper(L.LightningModule):
         self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
+        if self.trainer.is_global_zero and self.current_epoch == 0:
+            self.stat_dict = {}
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):

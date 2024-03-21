@@ -157,7 +157,7 @@ def create_graph_tracking(
     return [g, y_data_graph], graph_empty
 
 
-def create_graph_tracking_global(output, get_vtx=False):
+def create_graph_tracking_global(output, get_vtx=False, vector=False):
     (
         y_data_graph,
         hit_type_one_hot,  # [no_tracks],
@@ -184,42 +184,74 @@ def create_graph_tracking_global(output, get_vtx=False):
         number_of_vtx = torch.sum(mask_vtx)
         number_of_dc = torch.sum(mask_dc)
         g = dgl.DGLGraph()
-        g.add_nodes(number_of_vtx + number_of_dc * 2)
+        if vector:
+            g.add_nodes(number_of_vtx + number_of_dc)
+        else:
+            g.add_nodes(number_of_vtx + number_of_dc * 2)
 
         left_right_pos = features_hits[:, 3:9][mask_dc]
         left_post = left_right_pos[:, 0:3]
         right_post = left_right_pos[:, 3:]
-
+        vector_like_data = vector
         if get_vtx:
-            particle_number = torch.cat(
-                (cluster_id[mask_vtx], cluster_id[mask_dc], cluster_id[mask_dc]), dim=0
-            )
-            particle_number_nomap = torch.cat(
-                (
-                    hit_particle_link[mask_vtx],
-                    hit_particle_link[mask_dc],
-                    hit_particle_link[mask_dc],
-                ),
-                dim=0,
-            )
-            pos_xyz = torch.cat(
-                (features_hits[:, 0:3][mask_vtx], left_post, right_post), dim=0
-            )
-            hit_type_all = torch.cat(
-                (hit_type[mask_vtx], hit_type[mask_dc], hit_type[mask_dc]), dim=0
-            )
-            cellid = torch.cat(
-                (
-                    features_hits[:, -1][mask_vtx].view(-1, 1),
-                    features_hits[:, -1][mask_dc].view(-1, 1),
-                    features_hits[:, -1][mask_dc].view(-1, 1),
-                ),
-                dim=0,
-            )
-            # print(
-            #     features_hits[:, -1][mask_vtx].view(-1, 1).shape,
-            #     features_hits[:, -1][mask_dc].view(-1, 1).shape,
-            # )
+            if vector_like_data:
+                particle_number = torch.cat(
+                    (cluster_id[mask_vtx], cluster_id[mask_dc]), dim=0
+                )
+                particle_number_nomap = torch.cat(
+                    (
+                        hit_particle_link[mask_vtx],
+                        hit_particle_link[mask_dc],
+                    ),
+                    dim=0,
+                )
+                pos_xyz = torch.cat((features_hits[:, 0:3][mask_vtx], left_post), dim=0)
+                vector_data = torch.cat(
+                    (0 * features_hits[:, 0:3][mask_vtx], right_post - left_post), dim=0
+                )
+                hit_type_all = torch.cat((hit_type[mask_vtx], hit_type[mask_dc]), dim=0)
+                cellid = torch.cat(
+                    (
+                        features_hits[:, -1][mask_vtx].view(-1, 1),
+                        features_hits[:, -1][mask_dc].view(-1, 1),
+                    ),
+                    dim=0,
+                )
+                # print(
+                #     features_hits[:, -1][mask_vtx].view(-1, 1).shape,
+                #     features_hits[:, -1][mask_dc].view(-1, 1).shape,
+                # )
+            else:
+                particle_number = torch.cat(
+                    (cluster_id[mask_vtx], cluster_id[mask_dc], cluster_id[mask_dc]),
+                    dim=0,
+                )
+                particle_number_nomap = torch.cat(
+                    (
+                        hit_particle_link[mask_vtx],
+                        hit_particle_link[mask_dc],
+                        hit_particle_link[mask_dc],
+                    ),
+                    dim=0,
+                )
+                pos_xyz = torch.cat(
+                    (features_hits[:, 0:3][mask_vtx], left_post, right_post), dim=0
+                )
+                hit_type_all = torch.cat(
+                    (hit_type[mask_vtx], hit_type[mask_dc], hit_type[mask_dc]), dim=0
+                )
+                cellid = torch.cat(
+                    (
+                        features_hits[:, -1][mask_vtx].view(-1, 1),
+                        features_hits[:, -1][mask_dc].view(-1, 1),
+                        features_hits[:, -1][mask_dc].view(-1, 1),
+                    ),
+                    dim=0,
+                )
+                # print(
+                #     features_hits[:, -1][mask_vtx].view(-1, 1).shape,
+                #     features_hits[:, -1][mask_dc].view(-1, 1).shape,
+                # )
         else:
             particle_number = torch.cat((cluster_id, cluster_id), dim=0)
             particle_number_nomap = torch.cat(
@@ -227,7 +259,8 @@ def create_graph_tracking_global(output, get_vtx=False):
             )
             pos_xyz = torch.cat((left_post, right_post), dim=0)
             hit_type_all = torch.cat((hit_type, hit_type), dim=0)
-
+        if vector_like_data:
+            g.ndata["vector"] = vector_data
         g.ndata["hit_type"] = hit_type_all
         g.ndata["particle_number"] = particle_number
         g.ndata["particle_number_nomap"] = particle_number_nomap
