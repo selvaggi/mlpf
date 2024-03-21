@@ -116,9 +116,8 @@ class ExampleWrapper(L.LightningModule):
         embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar.view(-1, 1))
         embedded_inputs = embedded_inputs.unsqueeze(-2)
         mask = self.build_attention_mask(g)
-        scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = g.ndata["hit_type"].view(-1, 1)
-
+        # scalars = torch.zeros((inputs.shape[0], 1))
+        scalars = 1.0 * g.ndata["hit_type"].view(-1, 1)
         embedded_outputs, scalar_outputs = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
         )  #
@@ -150,6 +149,25 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr = torch.ones_like(beta.view(-1, 1))
 
         return x, pred_energy_corr, 0
+
+    def build_attention_mask(self, g):
+        """Construct attention mask from pytorch geometric batch.
+
+        Parameters
+        ----------
+        inputs : torch_geometric.data.Batch
+            Data batch.
+
+        Returns
+        -------
+        attention_mask : xformers.ops.fmha.BlockDiagonalMask
+            Block-diagonal attention mask: within each sample, each token can attend to each other
+            token.
+        """
+        batch_numbers = obtain_batch_numbers(g)
+        return BlockDiagonalMask.from_seqlens(
+            torch.bincount(batch_numbers.long()).tolist()
+        )
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
