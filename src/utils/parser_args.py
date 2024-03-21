@@ -446,7 +446,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--losstype",
-    action="store_true",
+    type=str,
     default="hgcalimplementation",
     help="use the hgcal loss",
 )

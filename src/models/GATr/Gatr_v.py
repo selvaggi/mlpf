@@ -93,8 +93,8 @@ class ExampleWrapper(L.LightningModule):
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
         self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
-        self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
-        self.beta = nn.Linear(1, 1)
+        self.clustering = nn.Linear(16, self.output_dim - 1, bias=False)
+        self.beta = nn.Linear(16, 1)
         self.vector_like_data = True
 
     def forward(self, g, y, step_count, eval=""):
@@ -134,25 +134,25 @@ class ExampleWrapper(L.LightningModule):
             )
         else:
             embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
-        embedded_inputs = embedded_inputs.unsqueeze(
-            -2
-        )  # (batch_size*num_points, 1, 16)
+        embedded_inputs = embedded_inputs.unsqueeze(-2)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        # Pass data through GATr
+
+        embedded_outputs, _ = self.gatr(
+            embedded_inputs, scalars=scalars, attention_mask=mask
+        )
+
+        # points = extract_point(embedded_outputs[:, 0, :])
+        # nodewise_outputs = extract_scalar(embedded_outputs)
+        # x_point = points
+        # x_scalar = nodewise_outputs
+
         embedded_outputs, _ = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
         )  # (..., num_points, 1, 16)
-        # assert embedded_outputs.shape[2:] == (1, 16)
-
-        points = extract_point(embedded_outputs[:, 0, :])
-
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        # # # outputs = torch.mean(nodewise_outputs, dim=(-3, -2))  # (..., 1)
-        # embedded_outputs = nodewise_outputs.view(-1, 1)
-        x_point = points
-        x_scalar = nodewise_outputs
+        output = embedded_outputs[:, 0, :]
+        x_point = output
+        x_scalar = output
 
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
