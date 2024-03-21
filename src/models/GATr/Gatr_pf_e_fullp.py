@@ -113,7 +113,7 @@ class ExampleWrapper(L.LightningModule):
             )
         inputs_scalar = g.ndata["h"][:, -2] + g.ndata["h"][:, -1]
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
-        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
+        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar.view(-1, 1))
         embedded_inputs = embedded_inputs.unsqueeze(-2)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
@@ -289,7 +289,7 @@ class ExampleWrapper(L.LightningModule):
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
                     ),
-                    # df_batch=self.df_showers,
+                    df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
                     step=0,
@@ -334,6 +334,7 @@ class ExampleWrapper(L.LightningModule):
                 # multiple of "trainer.check_val_every_n_epoch".
             },
         }
+
 
 def obtain_batch_numbers(g):
     graphs_eval = dgl.unbatch(g)
