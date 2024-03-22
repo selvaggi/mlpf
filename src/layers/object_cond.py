@@ -333,6 +333,10 @@ def calc_LV_Lbeta(
                 * q_alpha.unsqueeze(0)
                 * norms_att
             )
+            assert V_attractive.size() == (n_hits_sig, n_objects)
+            V_attractive = V_attractive.sum(dim=0)  # K objects
+
+            L_V_attractive = torch.mean(V_attractive.view(-1))
         else:
             # # weight per hit per shower to compensate for ecal hcal unbalance in hadronic showers
             # ecal_hits = scatter_add(
@@ -383,9 +387,24 @@ def calc_LV_Lbeta(
                 * q_alpha.unsqueeze(0)
                 * norms_att
             )
-        assert V_attractive.size() == (n_hits_sig, n_objects)
-        V_attractive = V_attractive.sum(dim=0)  # K objects
-        L_V_attractive = torch.mean(V_attractive.view(-1))
+
+            # weight modified showers with a higher weight
+            modified_showers = scatter_max(
+                g.ndata["hit_link_modified"], g.ndata["particle_number"].long()
+            )[0]
+            n_modified = torch.sum(modified_showers)
+            weight_modified = len(modified_showers) / (2 * n_modified)
+            weight_unmodified = len(modified_showers) / (
+                2 * (len(modified_showers) - n_modified)
+            )
+            modified_showers[modified_showers > 0] = weight_modified
+            modified_showers[modified_showers == 0] = weight_unmodified
+            assert V_attractive.size() == (n_hits_sig, n_objects)
+            V_attractive = V_attractive.sum(dim=0)  # K objects
+
+            L_V_attractive = torch.sum(
+                modified_showers.view(-1) * V_attractive.view(-1)
+            ) / len(modified_showers)
     else:
         # Final potential term
         # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
