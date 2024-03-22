@@ -48,7 +48,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
-        cluster_id, hit_type_feature, e_hits, y_data_graph,daughters,  prediction
+        cluster_id, hit_type_feature, e_hits, y_data_graph, daughters, prediction
     )
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
@@ -144,12 +144,18 @@ def create_graph(
         g.ndata["h"] = hit_features_graph
         # g.ndata["pos_hits"] = coord_cart_hits
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
+
+        x = pos_xyz_hits[:, 0]
+        y = pos_xyz_hits[:, 1]
+        distance_radial = torch.sqrt(x**2 + y**2) - 2150
+        g.ndata["radial_distance"] = distance_radial
+        g.ndata["radial_distance_exp"] = torch.exp(-distance_radial / 1000)
         # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type
         # g.ndata["p_hits"] = p_hits
         g.ndata[
             "e_hits"
-        ] = e_hits # if no tracks this is e and if there are tracks this fills the tracks e values with p
+        ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
 
         g.ndata["particle_number"] = cluster_id
         g.ndata["particle_number_nomap"] = hit_particle_link

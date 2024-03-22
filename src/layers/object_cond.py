@@ -326,7 +326,7 @@ def calc_LV_Lbeta(
         L_V_attractive = torch.mean(V_attractive)
     elif loss_type == "vrepweighted":
         if tracking:
-            # weight the vtx hits inside the shower 
+            # weight the vtx hits inside the shower
             V_attractive = (
                 g.ndata["weights"][is_sig].unsqueeze(-1)
                 * q[is_sig].unsqueeze(-1)
@@ -334,19 +334,58 @@ def calc_LV_Lbeta(
                 * norms_att
             )
         else:
-            e_hits = g.ndata["e_hits"][is_sig].view(-1)
-            p_hits = g.ndata["h"][:, -1].view(-1)
-            e_sum_hits = scatter_add(e_hits + p_hits, object_index)
-            e_rel = (e_hits + p_hits) / e_sum_hits[object_index]
+            # # weight per hit per shower to compensate for ecal hcal unbalance in hadronic showers
+            # ecal_hits = scatter_add(
+            #     1 * (g.ndata["hit_type"][is_sig] == 2), object_index
+            # )
+            # hcal_hits = scatter_add(
+            #     1 * (g.ndata["hit_type"][is_sig] == 3), object_index
+            # )
+            # weights = torch.ones_like(g.ndata["hit_type"][is_sig])
+            # weight_ecal_per_object = 1.0 * ecal_hits.clone() + 1
+            # weight_hcal_per_object = 1.0 * ecal_hits.clone() + 1
+            # mask = (ecal_hits > 2) * (hcal_hits > 2)
+            # weight_ecal_per_object[mask] = (ecal_hits + hcal_hits)[mask] / (
+            #     2 * ecal_hits
+            # )[mask]
+            # weight_hcal_per_object[mask] = (ecal_hits + hcal_hits)[mask] / (
+            #     2 * hcal_hits
+            # )[mask]
+            # weights[g.ndata["hit_type"][is_sig] == 2] = weight_ecal_per_object[
+            #     object_index
+            # ]
+            # weights[g.ndata["hit_type"][is_sig] == 3] = weight_hcal_per_object[
+            #     object_index
+            # ]
+
+            # # weight with an energy log of the hits
+            # e_hits = g.ndata["e_hits"][is_sig].view(-1)
+            # p_hits = g.ndata["h"][:, -1][is_sig].view(-1)
+            # log_scale_s = torch.log(e_hits + p_hits) + 10
+            # e_sum_hits = scatter_add(log_scale_s, object_index)
+            # # need to take out the weight of alpha otherwise it won't add up to 1
+            # e_sum_hits = e_sum_hits - (log_scale_s[index_alpha])
+            # e_rel = (log_scale_s) / e_sum_hits[object_index]
+
+            # weight of the hit depending on the radial distance:
+            # this weight should help to seed
+            weight_radial_distance = torch.exp(
+                -g.ndata["radial_distance"][is_sig] / 100
+            )
+            weight_per_object = scatter_add(weight_radial_distance, object_index)
+            weight_radial_distance = (
+                weight_radial_distance / weight_per_object[object_index]
+            )
+
             V_attractive = (
-                e_rel.unsqueeze(-1)
+                weight_radial_distance.unsqueeze(-1)
                 * q[is_sig].unsqueeze(-1)
                 * q_alpha.unsqueeze(0)
                 * norms_att
             )
         assert V_attractive.size() == (n_hits_sig, n_objects)
         V_attractive = V_attractive.sum(dim=0)  # K objects
-        L_V_attractive = torch.mean(V_attractive)
+        L_V_attractive = torch.mean(V_attractive.view(-1))
     else:
         # Final potential term
         # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
@@ -367,7 +406,7 @@ def calc_LV_Lbeta(
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    if loss_type == "hgcalimplementation":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         if dis:
             norms = norms / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
             norms_rep = torch.exp(-(norms)) * M_inv
@@ -387,7 +426,7 @@ def calc_LV_Lbeta(
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
     nope = n_objects_per_event - 1
     nope[nope == 0] = 1
-    if loss_type == "hgcalimplementation":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         #! sum each object repulsive terms
         L_V_repulsive = V_repulsive.sum(dim=0)  # size number of objects
         number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
@@ -459,7 +498,7 @@ def calc_LV_Lbeta(
     # print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
-    if loss_type == "hgcalimplementation":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         # version one:
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
@@ -582,7 +621,7 @@ def calc_LV_Lbeta(
     # except:
     #    pass
     L_exp = L_beta
-    if loss_type == "hgcalimplementation":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         if not tracking:
             return (
                 L_V,  # 0
