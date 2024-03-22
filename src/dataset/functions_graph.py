@@ -145,11 +145,12 @@ def create_graph(
         # g.ndata["pos_hits"] = coord_cart_hits
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
 
-        x = pos_xyz_hits[:, 0]
-        y = pos_xyz_hits[:, 1]
-        distance_radial = torch.sqrt(x**2 + y**2) - 2150
-        g.ndata["radial_distance"] = distance_radial
-        g.ndata["radial_distance_exp"] = torch.exp(-distance_radial / 1000)
+        # x = pos_xyz_hits[:, 0]
+        # y = pos_xyz_hits[:, 1]
+        # distance_radial = torch.sqrt(x**2 + y**2) - 2150
+        # g.ndata["radial_distance"] = distance_radial
+        # g.ndata["radial_distance_exp"] = torch.exp(-distance_radial / 1000)
+        g = calculate_distance_to_boundary(g)
         # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type
         # g.ndata["p_hits"] = p_hits
@@ -175,6 +176,25 @@ def create_graph(
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
     return [g, y_data_graph], graph_empty
+
+
+def calculate_distance_to_boundary(g):
+    r = 2150
+    r_in_endcap = 2307
+    mask_endcap =  (torch.abs(g.ndata["pos_hits_xyz"][:,2])-r_in_endcap)>0
+    mask_barrer = ~mask_endcap
+    weight = torch.ones_like(g.ndata["pos_hits_xyz"][:,0])
+    C = g.ndata["pos_hits_xyz"]
+    A  = torch.Tensor([0,0,1]).to(C.device)
+    P = r*1/(torch.norm(torch.cross(A.view(1,-1), C,dim=-1),dim=1)).unsqueeze(1)*C
+    P1 = torch.abs(r_in_endcap/g.ndata["pos_hits_xyz"][:,2].unsqueeze(1))*C
+    weight[mask_barrer] = torch.norm(P-C,dim=1)[mask_barrer]
+    weight[mask_endcap] = torch.norm(P1[mask_endcap]-C[mask_endcap],dim=1)
+    g.ndata["radial_distance"] = weight
+    weight_ = torch.exp(-(weight/1000))
+    g.ndata["radial_distance_exp"] = weight_
+    return g
+
 
 
 def graph_batch_func(list_graphs):
