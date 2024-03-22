@@ -389,9 +389,9 @@ def calc_LV_Lbeta(
             )
 
             # weight modified showers with a higher weight
-            modified_showers = scatter_max(
-                g.ndata["hit_link_modified"], g.ndata["particle_number"].long()
-            )[0]
+            modified_showers = scatter_max(g.ndata["hit_link_modified"], object_index)[
+                0
+            ]
             n_modified = torch.sum(modified_showers)
             weight_modified = len(modified_showers) / (2 * n_modified)
             weight_unmodified = len(modified_showers) / (
