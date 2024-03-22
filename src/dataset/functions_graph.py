@@ -40,6 +40,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         hit_type_feature,
         pandora_pfo_link,
         daughters,
+        hit_link_modified,
     ) = get_hit_features(output, number_hits, prediction, number_part)
 
     # features particles
@@ -65,6 +66,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pfo_energy[~mask_hits],
         pandora_pfo_link[~mask_hits],
         hit_type_feature[~mask_hits],
+        hit_link_modified[~mask_hits],
     ]
     hit_type = hit_type_feature[~mask_hits]
     # if hits only remove tracks, otherwise leave tracks
@@ -114,6 +116,7 @@ def create_graph(
         pandora_pfo_energy,
         pandora_pfo_link,
         hit_type,
+        hit_link_modified,
         hit_type_one_hot,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
@@ -159,6 +162,7 @@ def create_graph(
         ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
 
         g.ndata["particle_number"] = cluster_id
+        g.ndata["hit_link_modified"] = hit_link_modified
         g.ndata["particle_number_nomap"] = hit_particle_link
         # g.ndata["theta_hits"] = theta_hits
         # g.ndata["phi_hits"] = phi_hits
@@ -181,20 +185,24 @@ def create_graph(
 def calculate_distance_to_boundary(g):
     r = 2150
     r_in_endcap = 2307
-    mask_endcap =  (torch.abs(g.ndata["pos_hits_xyz"][:,2])-r_in_endcap)>0
+    mask_endcap = (torch.abs(g.ndata["pos_hits_xyz"][:, 2]) - r_in_endcap) > 0
     mask_barrer = ~mask_endcap
-    weight = torch.ones_like(g.ndata["pos_hits_xyz"][:,0])
+    weight = torch.ones_like(g.ndata["pos_hits_xyz"][:, 0])
     C = g.ndata["pos_hits_xyz"]
-    A  = torch.Tensor([0,0,1]).to(C.device)
-    P = r*1/(torch.norm(torch.cross(A.view(1,-1), C,dim=-1),dim=1)).unsqueeze(1)*C
-    P1 = torch.abs(r_in_endcap/g.ndata["pos_hits_xyz"][:,2].unsqueeze(1))*C
-    weight[mask_barrer] = torch.norm(P-C,dim=1)[mask_barrer]
-    weight[mask_endcap] = torch.norm(P1[mask_endcap]-C[mask_endcap],dim=1)
+    A = torch.Tensor([0, 0, 1]).to(C.device)
+    P = (
+        r
+        * 1
+        / (torch.norm(torch.cross(A.view(1, -1), C, dim=-1), dim=1)).unsqueeze(1)
+        * C
+    )
+    P1 = torch.abs(r_in_endcap / g.ndata["pos_hits_xyz"][:, 2].unsqueeze(1)) * C
+    weight[mask_barrer] = torch.norm(P - C, dim=1)[mask_barrer]
+    weight[mask_endcap] = torch.norm(P1[mask_endcap] - C[mask_endcap], dim=1)
     g.ndata["radial_distance"] = weight
-    weight_ = torch.exp(-(weight/1000))
+    weight_ = torch.exp(-(weight / 1000))
     g.ndata["radial_distance_exp"] = weight_
     return g
-
 
 
 def graph_batch_func(list_graphs):

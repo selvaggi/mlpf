@@ -192,6 +192,7 @@ def get_particle_features(unique_list_particles, output, prediction):
 def modify_index_link_for_gamma_e(
     hit_type_feature, hit_particle_link, daughters, output, number_part
 ):
+    hit_link_modified = torch.zeros_like(hit_particle_link).to(hit_particle_link.device)
     mask = hit_type_feature > 1
     a = hit_particle_link[mask]
     b = daughters[mask]
@@ -214,7 +215,8 @@ def modify_index_link_for_gamma_e(
     for i in index_change:
         mask_n = mask * (hit_particle_link == i)
         hit_particle_link[mask_n] = daughters[mask_n]
-    return hit_particle_link
+        hit_link_modified[mask_n] = 1
+    return hit_particle_link,hit_link_modified
 
 
 def get_hit_features(output, number_hits, prediction, number_part):
@@ -234,7 +236,7 @@ def get_hit_features(output, number_hits, prediction, number_part):
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
 
-    hit_particle_link = modify_index_link_for_gamma_e(
+    hit_particle_link, hit_link_modified = modify_index_link_for_gamma_e(
         hit_type_feature, hit_particle_link, daughters, output, number_part
     )
 
@@ -265,6 +267,7 @@ def get_hit_features(output, number_hits, prediction, number_part):
         hit_type_feature,
         pandora_pfo_link,
         daughters,
+        hit_link_modified
     )
 
 
