@@ -123,7 +123,7 @@ class ExampleWrapper(L.LightningModule):
         scalars = torch.cat(
             (
                 1.0 * g.ndata["hit_type"].view(-1, 1),
-                g.ndata["h"][:, -2:], #e, p
+                g.ndata["h"][:, -2:],  # e, p
                 g.ndata["radial_distance"].view(-1, 1),
             ),
             dim=1,
@@ -188,6 +188,11 @@ class ExampleWrapper(L.LightningModule):
         else:
             model_output, e_cor, loss_ll = self(batch_g, y, 1)
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        # access step change loss:
+        if self.current_step < 200:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -241,6 +246,10 @@ class ExampleWrapper(L.LightningModule):
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
+        if self.current_step < 200:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
