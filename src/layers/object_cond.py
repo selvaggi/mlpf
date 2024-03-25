@@ -373,17 +373,16 @@ def calc_LV_Lbeta(
 
             # weight of the hit depending on the radial distance:
             # this weight should help to seed
-            weight_radial_distance = torch.exp(
-                -g.ndata["radial_distance"][is_sig] / 100
-            )
-            weight_per_object = scatter_add(weight_radial_distance, object_index)
-            weight_radial_distance = (
-                weight_radial_distance / weight_per_object[object_index]
-            )
+            # weight_radial_distance = torch.exp(
+            #     -g.ndata["radial_distance"][is_sig] / 100
+            # )
+            # weight_per_object = scatter_add(weight_radial_distance, object_index)
+            # weight_radial_distance = (
+            #     weight_radial_distance / weight_per_object[object_index]
+            # )
 
             V_attractive = (
-                weight_radial_distance.unsqueeze(-1)
-                * q[is_sig].unsqueeze(-1)
+                q[is_sig].unsqueeze(-1)  ## weight_radial_distance.unsqueeze(-1)
                 * q_alpha.unsqueeze(0)
                 * norms_att
             )

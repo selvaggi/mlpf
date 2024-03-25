@@ -123,7 +123,7 @@ class ExampleWrapper(L.LightningModule):
         scalars = torch.cat(
             (
                 1.0 * g.ndata["hit_type"].view(-1, 1),
-                g.ndata["h"][:, -2:],
+                g.ndata["h"][:, -2:], #e, p
                 g.ndata["radial_distance"].view(-1, 1),
             ),
             dim=1,
@@ -304,6 +304,7 @@ class ExampleWrapper(L.LightningModule):
     def make_mom_zero(self):
         if self.current_epoch > 1 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
+            self.ScaledGooeyBatchNorm2_2.momentum = 0
 
     def on_validation_epoch_end(self):
         if self.trainer.is_global_zero:

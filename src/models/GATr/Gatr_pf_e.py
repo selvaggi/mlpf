@@ -328,7 +328,7 @@ class ExampleWrapper(L.LightningModule):
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
                     ),
-                    # df_batch=self.df_showers,
+                    df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
                     step=0,
