@@ -189,7 +189,7 @@ class ExampleWrapper(L.LightningModule):
             model_output, e_cor, loss_ll = self(batch_g, y, 1)
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         # access step change loss:
-        if self.trainer.total_training_steps < 200:
+        if self.global_step < 200:
             self.args.losstype = "hgcalimplementation"
         else:
             self.args.losstype = "vrepweighted"
@@ -246,7 +246,7 @@ class ExampleWrapper(L.LightningModule):
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
-        if self.trainer.total_training_steps < 200:
+        if self.global_step < 200:
             self.args.losstype = "hgcalimplementation"
         else:
             self.args.losstype = "vrepweighted"
