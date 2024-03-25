@@ -560,7 +560,7 @@ class GravnetModel(L.LightningModule):
                 e_corr = e_cor1
             else:
                 e_corr = None
-            (df_batch_pandora, df_batch1) = create_and_store_graph_output(
+            (df_batch_pandora, df_batch1, df_batch) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -573,7 +573,7 @@ class GravnetModel(L.LightningModule):
                 e_corr=e_corr,
                 tracks=self.args.tracks,
             )
-            # self.df_showers.append(df_batch)
+            self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
 
@@ -617,14 +617,14 @@ class GravnetModel(L.LightningModule):
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
 
-                # self.df_showers = pd.concat(self.df_showers)
+                self.df_showers = pd.concat(self.df_showers)
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
                     ),
-                    # df_batch=self.df_showers,
+                    df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
                     step=0,
