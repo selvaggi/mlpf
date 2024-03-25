@@ -398,6 +398,7 @@ def calc_LV_Lbeta(
             )
             modified_showers[modified_showers > 0] = weight_modified
             modified_showers[modified_showers == 0] = weight_unmodified
+            print(modified_showers)
             assert V_attractive.size() == (n_hits_sig, n_objects)
             V_attractive = V_attractive.sum(dim=0)  # K objects
             L_V_attractive = torch.sum(
