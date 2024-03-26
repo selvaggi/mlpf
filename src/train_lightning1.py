@@ -107,6 +107,7 @@ def main():
     args = parser.parse_args()
     args = get_samples_steps_per_epoch(args)
     args.local_rank = 0
+
     training_mode = not args.predict
     if training_mode:
         train_loader, val_loader, data_config, train_input_names = train_load(args)
@@ -129,14 +130,14 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None and args.correction:
-            from src.models.gravnet_3_L import GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0
             )
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0
