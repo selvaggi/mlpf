@@ -321,7 +321,11 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def make_mom_zero(self):
-        if self.current_epoch > 1 or self.args.predict:
+        if (
+            self.current_epoch > 1
+            or self.args.predict
+            or self.args.load_model_weights != None
+        ):
             self.ScaledGooeyBatchNorm2_1.momentum = 0
 
     def on_validation_epoch_end(self):
