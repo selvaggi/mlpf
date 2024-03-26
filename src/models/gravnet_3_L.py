@@ -823,7 +823,7 @@ def obtain_clustering_for_matched_showers(
 
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
-            shower_p_unique, row_ind, col_ind, i_m_w = match_showers(
+            shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
                 labels, dic, particle_ids, model_output, local_rank, i, None
             )
             row_ind = torch.Tensor(row_ind).to(model_output.device).long()
