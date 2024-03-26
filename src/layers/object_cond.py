@@ -398,9 +398,9 @@ def calc_LV_Lbeta(
             )
             modified_showers[modified_showers > 0] = weight_modified
             modified_showers[modified_showers == 0] = weight_unmodified
+            print(modified_showers)
             assert V_attractive.size() == (n_hits_sig, n_objects)
             V_attractive = V_attractive.sum(dim=0)  # K objects
-
             L_V_attractive = torch.sum(
                 modified_showers.view(-1) * V_attractive.view(-1)
             ) / len(modified_showers)
@@ -467,8 +467,16 @@ def calc_LV_Lbeta(
         # if tracking:
         #     L_V_repulsive = torch.mean(L_V_repulsive * per_shower_weight)
         # else:
-        L_V_repulsive = torch.mean(L_V_repulsive)
-        L_V_repulsive2 = torch.mean(L_V_repulsive)
+        if loss_type == "vrepweighted":
+            L_V_repulsive = torch.sum(
+                modified_showers.view(-1) * L_V_repulsive.view(-1)
+            ) / len(modified_showers)
+            L_V_repulsive2 = torch.sum(
+                modified_showers.view(-1) * L_V_repulsive2.view(-1)
+            ) / len(modified_showers)
+        else:
+            L_V_repulsive = torch.mean(L_V_repulsive)
+            L_V_repulsive2 = torch.mean(L_V_repulsive2)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)

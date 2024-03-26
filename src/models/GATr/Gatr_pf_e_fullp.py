@@ -177,6 +177,11 @@ class ExampleWrapper(L.LightningModule):
         else:
             model_output, e_cor, loss_ll = self(batch_g, y, 1)
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+        # access step change loss:
+        if self.global_step < 200:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -230,6 +235,10 @@ class ExampleWrapper(L.LightningModule):
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
+        if self.global_step < 200:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -293,6 +302,7 @@ class ExampleWrapper(L.LightningModule):
     def make_mom_zero(self):
         if self.current_epoch > 1 or self.args.predict:
             self.ScaledGooeyBatchNorm2_1.momentum = 0
+            self.ScaledGooeyBatchNorm2_2.momentum = 0
 
     def on_validation_epoch_end(self):
         if self.trainer.is_global_zero:
