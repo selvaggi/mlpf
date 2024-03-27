@@ -174,7 +174,7 @@ def main():
             # accumulate_grad_batches=1,
             strategy="ddp",
             # limit_train_batches=100,
-            limit_val_batches=10,
+            limit_val_batches=100,
             # precision=16
             # resume_from_checkpoint=args.load_model_weights,
         )
