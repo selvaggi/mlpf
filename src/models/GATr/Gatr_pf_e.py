@@ -114,7 +114,7 @@ class ExampleWrapper(L.LightningModule):
 
         inputs = g.ndata["pos_hits_xyz"]
 
-        if self.trainer.is_global_zero and step_count % 1000 == 0:
+        if self.trainer.is_global_zero and step_count % 5000 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -157,7 +157,7 @@ class ExampleWrapper(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 1000 == 0:
+        if self.trainer.is_global_zero and step_count % 5000 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -255,7 +255,7 @@ class ExampleWrapper(L.LightningModule):
             model_output, e_cor1, loss_ll = self(batch_g, y, 1)
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
-        # preds = model_output.squeeze()
+        preds = model_output.squeeze()
         # if self.global_step < 200:
         #     self.args.losstype = "hgcalimplementation"
         # else:
