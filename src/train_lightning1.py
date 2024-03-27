@@ -149,7 +149,7 @@ def main():
             dirpath=args.model_prefix,  # checkpoints_path, # <--- specify this on the trainer itself for version control
             filename="_{epoch}_{step}",
             # every_n_epochs=val_every_n_epochs,
-            every_n_train_steps=500,
+            every_n_train_steps=1000,
             save_top_k=-1,  # <--- this is important!
             save_weights_only=True,
         )

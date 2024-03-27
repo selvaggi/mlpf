@@ -114,7 +114,7 @@ class ExampleWrapper(L.LightningModule):
 
         inputs = g.ndata["pos_hits_xyz"]
 
-        if self.trainer.is_global_zero and step_count % 500 == 0:
+        if self.trainer.is_global_zero and step_count % 1000 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -157,7 +157,7 @@ class ExampleWrapper(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 500 == 0:
+        if self.trainer.is_global_zero and step_count % 1000 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -198,11 +198,11 @@ class ExampleWrapper(L.LightningModule):
         else:
             model_output, e_cor, loss_ll = self(batch_g, y, 1)
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
-        # access step change loss:
-        # if self.global_step < 200:
-        #     self.args.losstype = "hgcalimplementation"
-        # else:
-        #     self.args.losstype = "vrepweighted"
+
+        if self.global_step < 500:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -255,11 +255,11 @@ class ExampleWrapper(L.LightningModule):
             model_output, e_cor1, loss_ll = self(batch_g, y, 1)
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
-        preds = model_output.squeeze()
-        # if self.global_step < 200:
-        #     self.args.losstype = "hgcalimplementation"
-        # else:
-        #     self.args.losstype = "vrepweighted"
+        # preds = model_output.squeeze()
+        if self.global_step < 500:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -310,8 +310,8 @@ class ExampleWrapper(L.LightningModule):
         self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
-        if self.trainer.is_global_zero and self.current_epoch == 0:
-            self.stat_dict = {}
+        # if self.trainer.is_global_zero and self.current_epoch == 0:
+        #     self.stat_dict = {}
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
@@ -321,11 +321,8 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def make_mom_zero(self):
-        if (
-            self.current_epoch > 1
-            or self.args.predict
-            or self.args.load_model_weights != None
-        ):
+        if self.current_epoch > 1 or self.args.predict:
+            print("making momentum 0")
             self.ScaledGooeyBatchNorm2_1.momentum = 0
 
     def on_validation_epoch_end(self):
@@ -369,6 +366,9 @@ class ExampleWrapper(L.LightningModule):
                     tracks=self.args.tracks,
                 )
         self.validation_step_outputs = []
+        self.df_showers = []
+        self.df_showers_pandora = []
+        self.df_showes_db = []
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
