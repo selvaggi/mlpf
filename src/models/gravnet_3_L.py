@@ -189,7 +189,7 @@ class GravnetModel(L.LightningModule):
         graphs = []
         loss_regularizing_neig = 0.0
         loss_ll = 0
-        if self.trainer.is_global_zero and (step_count % 100 == 0):
+        if self.trainer.is_global_zero and (step_count % 1000 == 0):
             PlotCoordinates(
                 g,
                 path="input_coords",
@@ -228,7 +228,7 @@ class GravnetModel(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and (step_count % 100 == 0):
+        if self.trainer.is_global_zero and (step_count % 1000 == 0):
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -349,6 +349,10 @@ class GravnetModel(L.LightningModule):
         assert (torch.abs(energies_sums - energies_sums_features) < 0.001).all()"""
         # print(model_output.shape, e_cor.shape, e_cor1.shape)
         # e_cor1 += 1.  # We regress the number around zero!!! # TODO: uncomment this if needed
+        if self.global_step < 500:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -463,18 +467,18 @@ class GravnetModel(L.LightningModule):
                     )
                     if not os.path.exists(cluster_features_path):
                         os.makedirs(cluster_features_path)
-                    ''' covariances = []
+                    """ covariances = []
                     for b_i in batch_idx.unique():
                         mask_b_i = batch_idx == b_i
                         xyz = batch_g.ndata["h"][mask_b_i, 0:3]
                         cov = torch.cov(xyz, rowvar=False)
                         covariances.append(cov.flatten())
-                    covariances = torch.stack(covariances)'''
+                    covariances = torch.stack(covariances)"""
                     save_features(
                         cluster_features_path,
                         {
                             "x": graph_level_features.detach().cpu(),
-                           ''' "xyz_covariance_matrix": covariances.cpu(),'''
+                            """ "xyz_covariance_matrix": covariances.cpu(),"""
                             "e_true": true_e.detach().cpu(),
                             "e_reco": model_e_corr.detach().cpu(),
                             "true_e_corr": true_e_corr.detach().cpu(),
@@ -524,6 +528,10 @@ class GravnetModel(L.LightningModule):
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
+        if self.global_step < 500:
+            self.args.losstype = "hgcalimplementation"
+        else:
+            self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -831,7 +839,7 @@ def obtain_clustering_for_matched_showers(
             index_matches = col_ind + 1
             index_matches = index_matches.to(model_output.device).long()
 
-            '''
+            """
                         ### Plot shapes of some showers, to debug what's wrong with the energies
                         debug_showers = False
                         if debug_showers:
@@ -857,7 +865,7 @@ def obtain_clustering_for_matched_showers(
                                 ax.set_title(f"gr. {i}, E c.f. = {str(round(energy_true_part[pnum].item() / energy_sum_hits[1:][pnum].item() - 1, 2))}, Etrue = {round(energy_true_part[pnum].item(), 2)}, Esum_hits = {round(energy_sum_hits[1:][pnum].item(), 2)}, Nnoisehits = {n_hits_noise}, Enoise = {energy_noise}, eta={part_eta},phi={part_phi}")
                             # log to wandb
                             wandb.log({"showers": [wandb.Image(fig, caption="showers")]})
-            '''
+            """
             for unique_showers_label in shower_p_unique:
                 if torch.sum(unique_showers_label == index_matches) == 1:
                     index_in_matched = torch.argmax(

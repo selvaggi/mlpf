@@ -398,7 +398,6 @@ def calc_LV_Lbeta(
             )
             modified_showers[modified_showers > 0] = weight_modified
             modified_showers[modified_showers == 0] = weight_unmodified
-            print(modified_showers)
             assert V_attractive.size() == (n_hits_sig, n_objects)
             V_attractive = V_attractive.sum(dim=0)  # K objects
             L_V_attractive = torch.sum(
@@ -431,7 +430,8 @@ def calc_LV_Lbeta(
             norms_rep2 = torch.exp(-(norms) * 5) * M_inv
         else:
             norms_rep = torch.exp(-(norms) / 2) * M_inv
-            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
+            # norms_rep2 = torch.exp(-(norms) * 10) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 10) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
@@ -485,8 +485,8 @@ def calc_LV_Lbeta(
     if not tracking:
         L_V = (
             attr_weight * L_V_attractive
-            + repul_weight * L_V_repulsive
-            # + L_V_repulsive2
+            # + repul_weight * L_V_repulsive
+            + L_V_repulsive2 / 300
             # + L_clusters
             # + fill_loss
         )
@@ -494,7 +494,7 @@ def calc_LV_Lbeta(
         L_V = (
             attr_weight * L_V_attractive
             + repul_weight * L_V_repulsive
-            # + L_V_repulsive2
+            # + L_V_repulsive2 / 300
             # + L_clusters
             # + fill_loss
         )
@@ -524,8 +524,7 @@ def calc_LV_Lbeta(
     # print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
-        # version one:
+    if loss_type == "hgcalimplementation":
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
         L_beta_sig = torch.mean(
@@ -541,6 +540,17 @@ def calc_LV_Lbeta(
         # beta_pen = beta_pen + 1 - torch.clip(beta_per_object_c, 0, 1)
         # L_beta_sig = beta_pen.sum() / len(beta_pen)
         # L_beta_sig = L_beta_sig / 4
+        L_beta_noise = L_beta_noise / batch_size
+        # ? note: the training that worked quite well was dividing this by the batch size (1/4)
+
+    elif loss_type == "vrepweighted":
+        # version one:
+        beta_per_object_c = scatter_add(beta[is_sig], object_index)
+        beta_alpha = beta[is_sig][index_alpha]
+        L_beta_sig = 1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
+        L_beta_sig = torch.sum(L_beta_sig.view(-1) * modified_showers.view(-1))
+        L_beta_sig = L_beta_sig / len(modified_showers)
+
         L_beta_noise = L_beta_noise / batch_size
         # ? note: the training that worked quite well was dividing this by the batch size (1/4)
 
