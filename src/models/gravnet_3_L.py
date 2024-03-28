@@ -349,10 +349,10 @@ class GravnetModel(L.LightningModule):
         assert (torch.abs(energies_sums - energies_sums_features) < 0.001).all()"""
         # print(model_output.shape, e_cor.shape, e_cor1.shape)
         # e_cor1 += 1.  # We regress the number around zero!!! # TODO: uncomment this if needed
-        if self.global_step < 500:
-            self.args.losstype = "hgcalimplementation"
-        else:
-            self.args.losstype = "vrepweighted"
+        # if self.global_step < 500:
+        #     self.args.losstype = "hgcalimplementation"
+        # else:
+        #     self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -528,10 +528,10 @@ class GravnetModel(L.LightningModule):
             loss_ll = 0
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
         preds = model_output.squeeze()
-        if self.global_step < 500:
-            self.args.losstype = "hgcalimplementation"
-        else:
-            self.args.losstype = "vrepweighted"
+        # if self.global_step < 500:
+        #     self.args.losstype = "hgcalimplementation"
+        # else:
+        #     self.args.losstype = "vrepweighted"
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
