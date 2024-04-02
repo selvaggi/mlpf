@@ -36,6 +36,10 @@ from src.dataset.functions_graph import graph_batch_func
 from src.utils.parser_args import parser
 import warnings
 
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+
 
 def find_free_port():
     """https://stackoverflow.com/questions/1365265/on-localhost-how-do-i-pick-a-free-port-number"""
@@ -59,16 +63,12 @@ def _main(args):
         # from src.utils.nn.tools_condensation import plot_regression_resolution
     else:
         # this trains a correction per graph
-        from src.utils.nn.tools_condensation_correction_v1 import (
+        from src.utils.nn.tools_n import (
             train_regression as train,
         )
-        from src.utils.nn.tools_condensation_correction_v1 import (
+        from src.utils.nn.tools_n import (
             evaluate_regression as evaluate,
         )
-
-        # from src.utils.nn.tools_condensation_correction_v1 import (
-        #     plot_regression_resolution,
-        # )
 
     # training/testing mode
     training_mode = not args.predict
@@ -87,7 +87,7 @@ def _main(args):
             torch.cuda.set_device(local_rank)
             gpus = [local_rank]
             dev = torch.device(local_rank)
-            print("initizaing group process")
+            print("initizaing group process", dev)
             torch.distributed.init_process_group(backend=args.backend)
             _logger.info(f"Using distributed PyTorch with {args.backend} backend")
             print("ended initizaing group process")
@@ -128,6 +128,7 @@ def _main(args):
         # DistributedDataParallel
         if args.backend is not None:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            print("device_ids = gpus", gpus)
             model = torch.nn.parallel.DistributedDataParallel(
                 model,
                 device_ids=gpus,
@@ -148,15 +149,9 @@ def _main(args):
             # model = model.to(dev)
 
         # training loop
-        best_valid_metric = np.inf if args.regression_mode else 0
+        best_valid_metric = np.inf
         grad_scaler = torch.cuda.amp.GradScaler() if args.use_amp else None
-        tb = None
-        steps = 0  # for wandb logging
-        add_energy_loss = False
-        if args.clustering_and_energy_loss:
-            add_energy_loss = True
-            if args.energy_loss_delay > 0:
-                add_energy_loss = False
+        steps = 0
         for epoch in range(args.num_epochs):
             if args.load_epoch is not None:
                 if epoch <= args.load_epoch:
@@ -168,22 +163,16 @@ def _main(args):
                 add_energy_loss = True
             steps += train(
                 model,
-                loss_func,
                 opt,
                 scheduler,
                 train_loader,
                 dev,
                 epoch,
                 steps_per_epoch=args.steps_per_epoch,
-                grad_scaler=grad_scaler,
-                tb_helper=tb,
-                logwandb=args.log_wandb,
-                local_rank=local_rank,
                 current_step=steps,
-                loss_terms=[args.clustering_loss_only, add_energy_loss],
+                grad_scaler=grad_scaler,
+                local_rank=local_rank,
                 args=args,
-                args_model=data_config,
-                alternate_steps=args.alternate_steps_beta_clustering,
             )
 
             if args.model_prefix and (args.backend is None or local_rank == 0):
@@ -218,21 +207,11 @@ def _main(args):
                 val_loader,
                 dev,
                 epoch,
-                loss_func=loss_func,
                 steps_per_epoch=args.steps_per_epoch_val,
-                tb_helper=tb,
-                logwandb=args.log_wandb,
-                energy_weighted=args.energy_loss,
                 local_rank=local_rank,
-                step=steps,
-                loss_terms=[args.clustering_loss_only, args.clustering_and_energy_loss],
                 args=args,
             )
-            is_best_epoch = (
-                (valid_metric < best_valid_metric)
-                if args.regression_mode
-                else (valid_metric > best_valid_metric)
-            )
+            is_best_epoch = valid_metric < best_valid_metric
             if is_best_epoch:
                 print("Best epoch!")
                 best_valid_metric = valid_metric
@@ -286,32 +265,6 @@ def _main(args):
 
         for name, get_test_loader in test_loaders.items():
             test_loader = get_test_loader()
-            # run prediction
-            # if args.model_prefix.endswith(".onnx"):
-            #     _logger.info("Loading model %s for eval" % args.model_prefix)
-            #     from src.utils.nn.tools import evaluate_onnx
-
-            #     test_metric, scores, labels, observers = evaluate_onnx(
-            #         args.model_prefix, test_loader
-            #     )
-            # else:
-            # if len(args.data_plot):
-            #     from pathlib import Path
-            #     Path(args.data_plot).mkdir(parents=True, exist_ok=True)
-            #     import matplotlib.pyplot as plt
-
-            #     print("Plotting")
-            #     figs = plot_regression_resolution(model, test_loader, dev)
-            #     for name, fig in figs.items():
-            #         fname = os.path.join(args.data_plot, name + ".pdf")
-            #         fig.savefig(fname)
-            #         print("Wrote to", fname)
-            #         plt.close(fig)
-            #     # write all cmdline arguments to a txt file
-            #     with open(os.path.join(args.data_plot, "args.txt"), "w") as f:
-            #         f.write(" ".join(sys.argv))
-            #         f.write("\n")
-            # else:
             test_metric, scores, labels, observers = evaluate(
                 model,
                 test_loader,
@@ -330,27 +283,6 @@ def _main(args):
 
             _logger.info("Test metric %.5f" % test_metric, color="bold")
             del test_loader
-
-            # if args.predict_output:
-            #     if "/" not in args.predict_output:
-            #         predict_output = os.path.join(
-            #             os.path.dirname(args.model_prefix),
-            #             "predict_output",
-            #             args.predict_output,
-            #         )
-            #     else:
-            #         predict_output = args.predict_output
-            #     os.makedirs(os.path.dirname(predict_output), exist_ok=True)
-            #     if name == "":
-            #         output_path = predict_output
-            #     else:
-            #         base, ext = os.path.splitext(predict_output)
-            #         output_path = base + "_" + name + ext
-            #     if output_path.endswith(".root"):
-            #         save_root(args, output_path, data_config, scores, labels, observers)
-            #     else:
-            #         save_parquet(args, output_path, scores, labels, observers)
-            #     _logger.info("Written output to %s" % output_path, color="bold")
 
 
 def main():
@@ -405,6 +337,7 @@ def main():
     if args.predict_gpus is None:
         args.predict_gpus = args.gpus
 
+    print("local rank _______", int(os.environ.get("LOCAL_RANK", "0")))
     args.local_rank = (
         None if args.backend is None else int(os.environ.get("LOCAL_RANK", "0"))
     )
