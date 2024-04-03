@@ -114,7 +114,7 @@ class ExampleWrapper(L.LightningModule):
 
         inputs = g.ndata["pos_hits_xyz"]
 
-        if self.trainer.is_global_zero and step_count % 5000 == 0:
+        if self.trainer.is_global_zero and step_count % 500 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -157,7 +157,7 @@ class ExampleWrapper(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 5000 == 0:
+        if self.trainer.is_global_zero and step_count % 500 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -223,8 +223,11 @@ class ExampleWrapper(L.LightningModule):
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
-        self.loss_final = loss + self.loss_final
+        self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
+        del model_output
+        del e_cor
+        del losses
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -303,7 +306,10 @@ class ExampleWrapper(L.LightningModule):
             self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
-        print("end of validation step ")
+
+        del losses
+        del loss
+        del model_output
 
     def on_train_epoch_end(self):
 
@@ -365,6 +371,8 @@ class ExampleWrapper(L.LightningModule):
                     predict=False,
                     tracks=self.args.tracks,
                 )
+                del model_output1
+                del batch_g
         self.validation_step_outputs = []
         self.df_showers = []
         self.df_showers_pandora = []
