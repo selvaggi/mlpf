@@ -104,6 +104,7 @@ def evaluate_regression(
             for batch_index, batch in enumerate(tq):
                 loss = model.module.mod.validation_step(batch, batch_index)
 
+                total_loss = total_loss + loss.item()
                 num_batches += 1
                 if steps_per_epoch is not None and num_batches >= steps_per_epoch:
                     break
