@@ -500,8 +500,10 @@ class GravnetModel(nn.Module):  # L.LightningModule
         if self.local_rank == 0:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
-        self.loss_final = loss + self.loss_final
+        self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
+        del model_output
+        del losses
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -589,6 +591,8 @@ class GravnetModel(nn.Module):  # L.LightningModule
             self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
+        del model_output
+        del losses
         return loss
 
     def on_train_epoch_end(self):
