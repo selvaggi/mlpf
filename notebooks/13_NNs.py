@@ -28,12 +28,45 @@ import torch
 
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
-DEVICE = torch.device("cuda:0")
+DEVICE = torch.device("cuda:3")
+prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_Klong_and_piplus_1/"
 
 
-prefix = "/eos/user/g/gkrzmanc/2024/1_4_/NN_train_and_eval_all_5percent_loss/"
 # make dir
 os.makedirs(prefix, exist_ok=True)
+
+def get_eval_fig(ytrue, ypred, step, criterion, p=None):
+    # calc losses, and plot loss histogram for  energy (ytrue) ranges [0, 6], [6, 12] etc. You need to filter by ytrue!
+    fig, ax = plt.subplots(2, 1, figsize=(10, 10))
+    ax[0].scatter(ytrue, ypred, alpha=0.2)
+    if p is not None:
+        ax[0].scatter(ytrue, p, color="red", alpha=0.2)
+    ax[0].set_ylabel("Predicted energy")
+    ax[0].set_xlabel("True energy")
+    acceptable_loss = 1e-2
+    rages = [[0, 6], [6, 12], [12, 18], [18, 24], [24, 30], [30, 36], [36, 42], [42, 48], [48, 54], [54, 60]]
+    for i, r in enumerate(rages):
+        mask = (ytrue >= r[0]) & (ytrue < r[1])
+        # % BELOW ACCEPTABLE LOSS
+        #frac = torch.mean((((ypred[mask] - ytrue[mask]).abs() < acceptable_loss)))*100
+        #print(frac)
+        #print(torch.mean(((ypred[mask] - ytrue[mask]).abs() < acceptable_loss).float()).item())
+        frac = torch.mean(((ypred[mask] - ytrue[mask]).abs() < acceptable_loss).float())
+        # if is nan, change to 0
+        if torch.isnan(frac):
+            frac = 0
+        if mask.sum() > 0:
+            losses = [criterion(ypred[mask][i], ytrue[mask][i], step).detach().cpu() for i in range(mask.sum())]
+            losses = torch.tensor(losses)
+            ax[1].hist(torch.clamp(torch.log10(losses), -5, 5), bins=100, alpha=0.5, label=f"{r[0]}-{r[1]} ({str(int(frac*100))}%)")
+    ax[0].plot([0, max(ytrue)], [0, max(ytrue)], "--", color="gray")
+    ax[1].set_xlim([-5, 5])
+    ax[1].set_xlabel("log10(loss)")
+    # log scale
+    ax[1].set_yscale("log")
+    ax[1].set_ylabel("Count")
+    ax[1].legend()
+    return fig
 
 def get_dataset():
     path = "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features"
@@ -89,7 +122,7 @@ def calculate_eta(x, y, z):
     theta = np.arctan2(np.sqrt(x ** 2 + y ** 2), z)
     return -np.log(np.tan(theta / 2))
 
-def get_nn(patience):
+def get_nn(patience, save_to_folder=None):
     # pytorch impl. of a neural network
     import torch
     import torch.nn as nn
@@ -143,7 +176,7 @@ def get_nn(patience):
             self.model = Net()
             self.model.to(DEVICE)
             self.model.train()
-            batch_size = 512
+            batch_size = 64
             optimizer = optim.Adam(self.model.parameters(), lr=0.001)
             def criterion(ypred, ytrue, step):
                 #if step < 12000:
@@ -217,21 +250,37 @@ def get_nn(patience):
                 ax[0].set_ylabel("Loss")
                 ax[0].set_xlabel("Epoch")
                 ax[1].plot(epoch_losses)
+                ax[0].set_yscale("log")
                 ax[1].set_ylabel("Loss")
                 ax[1].set_xlabel("Epoch")
                 ax[1].set_yscale("log")
                 fig.savefig(fname)
                 plt.clf()
-                if epoch % 10 == 0:
+                if epoch % 30 == 0:
                     print("Epoch", epoch, "loss:", np.mean(losses_this_epoch))
+                    if save_to_folder is not None:
+                        fig = get_eval_fig(torch.tensor(ytrue_epoch), torch.tensor(ypred_epoch), total_step,
+                                           criterion, p=ps_epoch)
+                        fig.savefig(os.path.join(save_to_folder, f"epoch_{epoch}.pdf"))
+                        fig.clf()
+                        # also save the losses
+                        fig, ax = plt.subplots(2, 1, figsize=(10, 10))
+                        ax[0].plot(losses_all)
+                        ax[0].set_ylabel("Loss")
+                        ax[0].set_xlabel("Epoch")
+                        ax[1].plot(epoch_losses)
+                        ax[1].set_ylabel("Loss")
+                        ax[1].set_xlabel("Epoch")
+                        ax[1].set_yscale("log")
+                        fig.savefig(os.path.join(save_to_folder, f"losses.pdf"))
             return losses_all, epoch_losses
     return NetWrapper()
 
 
 def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_energy_regression=False,
-         train_only_on_PIDs=[], remove_sum_e=False, use_model="gradboost", patience=1000):
+         train_only_on_PIDs=[], remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None):
     split = list(get_split(ds))
-    model = get_nn(patience=patience)
+    model = get_nn(patience=patience, save_to_folder=save_to_folder)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
     #    from sklearn.ensemble import GradientBoostingRegressor
@@ -279,6 +328,10 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         ysum = split[1][:, 6]
         ypred = epred / ysum - 1
         energies = split[5]
+        #if save_to_folder is not None:
+        #    fig = get_eval_fig(ytrue, ypred, 0, lambda x, y, z: 0, p=split[1][:, 3])
+        #    fig.savefig(os.path.join(save_to_folder, "eval.pdf"))
+        #    fig.clf()
         return ytrue, epred, energies, split[1], model, split, result
         # log scatterplots of validation results per energy
 
@@ -422,9 +475,11 @@ def is_pid_neutral(pid):
     return pid in [22, 130, 2112]
 
 
-def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="gradboost", patience=1000):
+def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None):
+    if not os.path.exists(save_to_folder):
+        os.makedirs(save_to_folder)
     yt, yp, en, _, model, split, lossfn = main(ds=ds, train_energy_regression=energy_regression, train_only_on_PIDs=PIDs,
-                                       remove_sum_e=remove_sum_e, use_model=use_model, patience=patience)
+                                       remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder)
     import shap
     import numpy as np
     # te = shap.TreeExplainer(model)
@@ -438,25 +493,33 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
         fig, upper, lower, x = get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split,
                                                                        neutral=is_pid_neutral(pid))
         results[pid] = [fig, upper, lower, x, model]
-
     return results, lossfn
 
-all_pids = [22, 130, 2112, 211, -211, 2212, -2212]
-#all_pids = [211]
+all_pids = [130, 211]
+plots_all, result_all = get_plots(all_pids, energy_regression=True, patience=50000, save_to_folder=os.path.join(prefix, "intermediate_plots"))
+fig, ax = plt.subplots()
+ax.plot(list(range(len(result_all[1]))), result_all[1])
+ax.set_yscale("log")
+ax.set_xlabel("Batch")
+ax.set_ylabel("Loss")
+fig.savefig(prefix + "train_all_loss.pdf")
+fig.clf()
 
-
-
-'''plots_all, result_all = get_plots([22, 130, 2112, 211, -211, 2212, -2212], energy_regression=False, patience=10)
 for pid in all_pids:
+    model = plots_all[pid][4]
+    pickle.dump(model.model.model, open(prefix + "NN_model_all_{}.pkl".format(pid), "wb"))
     fig = plots_all[pid][0]
     fig.savefig(prefix + "NN_train_all_{}.pdf".format(pid))
 
-'''
+
 results_per_pid = {}
 
 for pid in all_pids:
-    results_per_pid[pid], lossfn = get_plots([pid], energy_regression=True, patience=5000)
+    results_per_pid[pid], lossfn = get_plots([pid], energy_regression=True, patience=50000,
+                                             save_to_folder=os.path.join(prefix, "intermediate_plots_" + str(pid)))
     fig = results_per_pid[pid][pid][0]
+    model = results_per_pid[pid][pid][4]
+    pickle.dump(model, open(prefix + "NN_model_{}.pkl".format(pid), "wb"))
     fig.savefig(prefix + "PID_" + str(pid) + ".pdf")
     fig, ax = plt.subplots()
     ax.plot(list(range(len(lossfn[1]))), lossfn[1])
@@ -466,8 +529,15 @@ for pid in all_pids:
     fig.savefig(prefix + "PID_" + str(pid) + "_loss.pdf")
     fig.clf()
 
+'''
+for pid in all_pids:
+    model = results_per_pid[pid][pid][4].model.model
+    pickle.dump(model, open(prefix + "NN_model_{}.pkl".format(pid), "wb"))
+'''
+'''
 #print("Pickling")
 #import pickle
 #pickle.dump(results_per_pid, open(prefix + "results_per_pid_NN.pkl", "wb"))
 #pickle.dump(plots_all, open(prefix + "results_all_NN.pkl", "wb"))
 #print("Pickled!")
+'''

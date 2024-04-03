@@ -268,7 +268,8 @@ def get_nn(patience):
                 fig.savefig(fname)
                 plt.clf()
                 if epoch % 10 == 0:
-                    fig = get_eval_fig(torch.tensor(ytrue_epoch), torch.tensor(ypred_epoch), total_step, criterion, p=ps_epoch)
+                    fig = get_eval_fig(torch.tensor(ytrue_epoch), torch.tensor(ypred_epoch), total_step,
+                                       criterion, p=ps_epoch)
                     fig.savefig(prefix + f"epoch_{epoch}.pdf")
                 if np.mean(losses_this_epoch) < best_loss - tolerance:
                     best_loss = np.mean(losses_this_epoch)
