@@ -473,8 +473,8 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         ax[1].set_yscale("log")
                         fig.savefig(os.path.join(save_to_folder, f"losses.pdf"))
                         pickle.dump(losses_all, open(os.path.join(save_to_folder, "losses_all_.pkl"), "wb"))
-                        pickle.dump(epoch_losses, open(os.path.join(save_to_folder, "epoch_losses_.pkl"), "wb")
-                if total_step % 10000:
+                        pickle.dump(epoch_losses, open(os.path.join(save_to_folder, "epoch_losses_.pkl"), "wb"))
+                if total_step % 10000 == 0:
                     # make eval plots data
                     print("Evaluating!")
                     if eval_callback is not None:
