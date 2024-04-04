@@ -290,7 +290,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                             pidtrue_idx = pidbatch.argmax(dim=1)
                             class_names = all_pids
                             wandb.log({"confusion_matrix" + self.model.wandb_log_name: wandb.sklearn.plot_confusion_matrix(pidtrue_idx.cpu().numpy(), pidpred_idx.cpu().numpy())})
-                    if i < 3000:
+                    if i < 100:
                         ytrue_epoch += ybatch.detach().cpu().numpy().tolist()
                         ypred_epoch += ypred.detach().cpu().numpy().flatten().tolist()
                         ps_epoch += xbatch[:, 3].detach().cpu().numpy().flatten().tolist()
