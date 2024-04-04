@@ -14,7 +14,6 @@ import os
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
-import catboost
 import xgboost
 
 os.environ.get("LD_LIBRARY_PATH")
@@ -37,6 +36,9 @@ parser.add_argument("--PIDs", type=str, required=True) # comma-separated list of
 parser.add_argument("--loss", type=str, default="default") # loss to use
 parser.add_argument("--patience", type=int, default=50000) # patience for early stopping
 parser.add_argument("--pid-loss", action="store_true")
+parser.add_argument("--ecal-hcal-loss", action="store_true")
+parser.add_argument("--dataset-path", type=str, default="/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features")
+parser.add_argument("--batch-size", type=int, default=64)
 
 
 args = parser.parse_args()
@@ -44,13 +46,12 @@ prefix = args.prefix
 wandb_name = args.wandb_name
 all_pids = args.PIDs.split(",")
 assert len(all_pids) > 0
-PIDs = [int(pid) for pid in all_pids]
-print("Training on PIDs:", PIDs)
-
+all_pids = [int(pid) for pid in all_pids]
+print("Training on PIDs:", all_pids)
 
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
-DEVICE = torch.device("cuda:3")
+DEVICE = torch.device("cuda:0")
 #prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_neutral_l1_loss_only/"
 
 wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)
@@ -81,10 +82,13 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
         if torch.isnan(frac):
             frac = 0
         if mask.sum() > 0:
-            losses = [criterion(ypred[mask][i], ytrue[mask][i], step).detach().cpu() for i in range(mask.sum())]
+            ypred_mask = ypred[mask]
+            ytrue_mask = ytrue[mask]
+            losses = [criterion(ypred_mask[i], ytrue_mask[i], step).detach().cpu() for i in range(mask.sum())]
             losses = torch.tensor(losses)
             ax[1].hist(torch.clamp(torch.log10(losses), -5, 5), bins=100, alpha=0.5, label=f"{r[0]}-{r[1]} ({str(int(frac*100))}%)")
-    ax[0].plot([0, max(ytrue)], [0, max(ytrue)], "--", color="gray")
+    if len(ytrue) > 0:
+        ax[0].plot([0, max(ytrue)], [0, max(ytrue)], "--", color="gray")
     ax[1].set_xlim([-5, 5])
     ax[1].set_xlabel("log10(loss)")
     # log scale
@@ -93,8 +97,10 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
     ax[1].legend()
     return fig
 
+import io
+
 def get_dataset():
-    path = "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features"
+    path = args.dataset_path
     r = {}
     n = 0
     # nmax = 257
@@ -102,7 +108,14 @@ def get_dataset():
         # n += 1
         # if n > nmax:
         #    break
-        f = pickle.load(open(os.path.join(path, file), "rb"))
+        #f = pickle.load(open(os.path.join(path, file), "rb"))
+        class CPU_Unpickler(pickle.Unpickler):
+            def find_class(self, module, name):
+                if module == 'torch.storage' and name == '_load_from_bytes':
+                    return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+                else:
+                    return super().find_class(module, name)
+        f = CPU_Unpickler(open(os.path.join(path, file), "rb")).load()
         for key in f:
             if key not in r:
                 r[key] = f[key]
@@ -177,7 +190,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             for layer in self.model:
                 x = layer(x)
             if self.out_features > 1:
-                return x[0, :], x[1:, :]
+                return x[:, 0], x[:, 1:]
             return x
 
         def freeze_batchnorm(self):
@@ -211,7 +224,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             self.model = Net(out_features = 1+pid_predict_channels)
             self.model.to(DEVICE)
             self.model.train()
-            batch_size = 64
+            batch_size = args.batch_size
             optimizer = optim.Adam(self.model.parameters(), lr=0.001)
             def criterion(ypred, ytrue, step):
                 if step < 5000:
@@ -259,11 +272,14 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                     if pid is None:
                         ypred = self.model(xbatch)
                     else:
-                        ypred, pidpred = self.model(xbatch, pidbatch)
-                    loss = criterion(ypred.flatten(), ybatch, total_step)
+                        # concat xbatch and pidbatch
+                        ypred, pidpred = self.model(xbatch)
+                    loss_y = criterion(ypred.flatten(), ybatch, total_step)
+                    pid_loss = 0.
                     if pid is not None:
-                        pid_loss = torch.nn.BCELoss()(pidpred, pidbatch)
-                        loss += 0.1 * pid_loss
+                        pid_loss = torch.nn.BCEWithLogitsLoss()(pidpred.float(), pidbatch.float())
+
+                    loss = loss_y + pid_loss
                     loss.backward()
                     losses_all.append(loss.item())
                     losses_this_epoch.append(loss.item())
@@ -271,7 +287,12 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         wandb.log({self.model.wandb_log_name: loss.item()})
                         if pid is not None:
                             wandb.log({"pid_loss" + self.model.wandb_log_name: pid_loss.item()})
-                    if i < 3000:
+                            # log also confusion matrix
+                            pidpred_idx = pidpred.argmax(dim=1)
+                            pidtrue_idx = pidbatch.argmax(dim=1)
+                            class_names = all_pids
+                            wandb.log({"confusion_matrix" + self.model.wandb_log_name: wandb.sklearn.plot_confusion_matrix(pidtrue_idx.cpu().numpy(), pidpred_idx.cpu().numpy())})
+                    if i < 100 and epoch % 30 == 0:
                         ytrue_epoch += ybatch.detach().cpu().numpy().tolist()
                         ypred_epoch += ypred.detach().cpu().numpy().flatten().tolist()
                         ps_epoch += xbatch[:, 3].detach().cpu().numpy().flatten().tolist()
@@ -331,6 +352,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
     else:
         pid_channels = 0
     model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels)
+    print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
     #    from sklearn.ensemble import GradientBoostingRegressor
