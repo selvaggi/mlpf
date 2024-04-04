@@ -13,7 +13,7 @@ import os
 import os
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
-
+from PIL import Image
 import xgboost
 
 os.environ.get("LD_LIBRARY_PATH")
@@ -48,7 +48,6 @@ all_pids = args.PIDs.split(",")
 assert len(all_pids) > 0
 all_pids = [int(pid) for pid in all_pids]
 print("Training on PIDs:", all_pids)
-
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
 DEVICE = torch.device("cuda:0")
@@ -103,11 +102,11 @@ def get_dataset():
     path = args.dataset_path
     r = {}
     n = 0
-    # nmax = 257
+    nmax = 257
     for file in os.listdir(path):
-        # n += 1
-        # if n > nmax:
-        #    break
+        n += 1
+        if n > nmax:
+            break
         #f = pickle.load(open(os.path.join(path, file), "rb"))
         class CPU_Unpickler(pickle.Unpickler):
             def find_class(self, module, name):
@@ -150,6 +149,136 @@ def get_gb():
     model = xgboost.XGBRegressor(n_estimators=1000, max_depth=7, learning_rate=0.05, verbosity=1,
                                  tree_method="gpu_hist", gpu_id=DEVICE)
     return model
+
+
+# %%
+
+# %%
+import numpy as np
+
+
+def get_std68(theHist, bin_edges, percentage=0.683, epsilon=0.01):
+    # theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
+    wmin = 0.2
+    wmax = 1.0
+
+    weight = 0.0
+    points = []
+    sums = []
+
+    # fill list of bin centers and the integral up to those point
+    for i in range(len(bin_edges) - 1):
+        weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
+        points.append([(bin_edges[i + 1] + bin_edges[i]) / 2, weight])
+        sums.append(weight)
+    low = wmin
+    high = wmax
+    width = 100
+    for i in range(len(points)):
+        for j in range(i, len(points)):
+            wy = points[j][1] - points[i][1]
+            if abs(wy - percentage) < epsilon:
+                wx = points[j][0] - points[i][0]
+                if wx < width:
+                    low = points[i][0]
+                    high = points[j][0]
+                    width = wx
+
+    return 0.5 * (high - low), low, high
+
+
+def mean_without_outliers(data):
+    remove_count = int(len(data) * 0.01)
+    # Sort the array
+    sorted_arr = np.sort(data)
+    # Remove the lowest and highest 1% of the elements
+    trimmed_arr = sorted_arr[remove_count:-remove_count]
+    # Calculate the mean of the trimmed array
+    mean = np.mean(trimmed_arr)
+    return mean
+
+
+def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(-1, 5, 0.01), epsilon=0.01):
+    hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
+    ind_max_hist = np.argmax(hist)
+    # MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
+    std68, low, high = get_std68(hist, bin_edges, epsilon=epsilon)
+    MPV = mean_without_outliers(data_for_hist)
+    return MPV, std68, low, high
+
+
+def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
+    # trim the data for hist by removing the top and bottom 1%
+    if len(data_for_hist) != 0:
+        data_for_hist = data_for_hist[
+            (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
+    # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
+    bins_per_binned_E = np.arange(0, 2, 1e-3)
+    return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
+
+
+# %%
+def get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split, neutral=False):
+    e_thresholds = [0, 6, 12, 18, 24, 30, 36, 42, 48]  # True E thresholds!
+    mpvs_model, s68s_model = [], []
+    mpvs_pandora, s68s_pandora = [], []
+    mpvs_sum_hits, s68s_sum_hits = [], []
+    e_true = (1 + yt) * split[1][:, 6].numpy()
+    e_pred = yp
+    frac_pred = e_pred / e_true
+    frac_e_sum = split[1][:, 6].clone().detach().cpu().numpy() / e_true
+    e_track = split[1][:, 3].clone().detach().cpu().numpy()
+    frac_track = e_track / e_true
+    track_filter = ((split[1][:, 3] > 0) & (split[1][:, 7] == 1))
+    if neutral:
+        track_filter = ~track_filter
+        track_filter = track_filter & (split[1][:, 7] == 0)
+    track_filter = track_filter & (split[-1] == pid).cpu()
+    track_filter = track_filter.numpy()
+    binsize = 0.01
+    bins_x = []
+
+    for i, e_threshold in enumerate(e_thresholds):
+        if i == 0:
+            continue
+        bins_x.append(0.5 * (e_thresholds[i] + e_thresholds[i - 1]))
+        filt_energy = (e_true < e_thresholds[i]) & (e_true >= e_thresholds[i - 1])
+        mpv, s68, lo, hi = obtain_MPV_and_68(frac_pred[filt_energy & track_filter],
+                                             bins_per_binned_E=np.arange(0, 5, binsize))
+        mpvs_model.append(mpv)
+        s68s_model.append(s68)
+        mpv, s68, lo, hi = obtain_MPV_and_68(frac_track[filt_energy & track_filter].clip(max=5),
+                                             bins_per_binned_E=np.arange(0, 5, binsize))
+        mpvs_pandora.append(mpv)
+        s68s_pandora.append(s68)
+        mpv, s68, _, _ = obtain_MPV_and_68(frac_e_sum[filt_energy & track_filter],
+                                           bins_per_binned_E=np.arange(0, 5, binsize))
+        mpvs_sum_hits.append(mpv)
+        s68s_sum_hits.append(s68)
+
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True,
+                           gridspec_kw={'height_ratios': [2, 1]})  # Height of 2 subplots.
+    ax[0].plot(bins_x, np.array(s68s_model) / np.array(mpvs_model), ".--", label="model")
+    ax[0].plot(bins_x, np.array(s68s_pandora) / np.array(mpvs_pandora), ".--", label="track p")
+    ax[0].plot(bins_x, np.array(s68s_sum_hits) / np.array(mpvs_sum_hits), ".--", label="sum hits")
+    ax[0].legend()
+    ax[1].set_xlabel("Energy [GeV]")
+    ax[0].set_ylabel("σ / E")
+    # ax[0].set_ylim([0, 0.4])
+    # ax[0].set_ylim([0, 0.4])
+    # ax[0].set_ylim([0, 0.4])
+    ax[1].plot(bins_x, mpvs_model, ".--", label="GradBoost")
+    ax[1].plot(bins_x, mpvs_pandora, ".--", label="track p")
+    ax[1].plot(bins_x, mpvs_sum_hits, ".--", label="sum hits")
+    ax[1].set_ylim([0.95, 1.05])
+    ax[1].set_ylabel("response")
+    ax[0].set_title("PID: " + str(pid))
+    upper_plot = {"ML": np.array(s68s_model) / np.array(mpvs_model),
+                  "p": np.array(s68s_pandora) / np.array(mpvs_pandora),
+                  "sum": np.array(s68s_sum_hits) / np.array(mpvs_sum_hits)}
+    lower_plot = {"ML": mpvs_model, "p": mpvs_pandora, "sum": mpvs_sum_hits}
+    return fig, upper_plot, lower_plot, bins_x
+
 
 
 def calculate_phi(x, y):
@@ -208,9 +337,12 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             x = torch.tensor(x).to(DEVICE)
             self.model.eval()
             with torch.no_grad():
+                pred = self.model(x)
+                if isinstance(pred, tuple):
+                    return pred[0].cpu().numpy().flatten()
                 return self.model(x).cpu().numpy().flatten()
 
-        def fit(self, x, y, pid=None):
+        def fit(self, x, y, pid=None, eval_callback=None):
             # PID: one-hot encoded values of the PID (or some other identification) to additionally use in the loss.
             # It can be real PID or some other identification, i.e. has track / ECAL / ECAL+HCAL etc.
             print("---> Fit - x.shape", x.shape, " y.shape", y.shape)
@@ -340,6 +472,11 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         ax[1].set_xlabel("Epoch")
                         ax[1].set_yscale("log")
                         fig.savefig(os.path.join(save_to_folder, f"losses.pdf"))
+                if epoch % 300 == 0:
+                    # make eval plots data
+                    print("Evaluating!")
+                    if eval_callback is not None:
+                        eval_callback(self, epoch)
             return losses_all, epoch_losses
     return NetWrapper()
 
@@ -392,7 +529,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
             pids_onehot = np.zeros((len(pids), pid_channels))
             for i, pid in enumerate(pids):
                 pids_onehot[i, all_pids.index(pid)] = 1.
-            result = model.fit(split[0].numpy(), split[2].numpy(), )
+            result = model.fit(split[0].numpy(), split[2].numpy(), pids_onehot)
         else:
             result = model.fit(split[0].numpy(), split[2].numpy())
         # print("Fitted model:", result)
@@ -405,15 +542,36 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         return ytrue, epred, energies, split[1], model, split, result
     else:
         print("Fitting")
+        def eval_callback(self, epoch):
+            e_pred = self.predict(split[1].numpy())
+            for pid in all_pids:
+                data = get_charged_response_resol_plot_for_PID(pid, e_pred, split[3], split[5], self, split, neutral=False)
+                fig = data[0]
+                fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch))
+                #wandb.log({"eval_fig_eval_data_" + str(pid): fig})
+                buf = io.BytesIO()
+                fig.savefig(buf, format='png')
+
+                buf.seek(0)
+                wandb.log({"eval_fig_eval_data_" + str(pid): wandb.Image(Image.open(buf))})
+                buf.close()
+            ''' # ALSO WITH TRAIN DATA
+            e_pred = self.predict(split[0].numpy())
+            for pid in all_pids:
+                data = get_charged_response_resol_plot_for_PID(pid, e_pred, split[2], split[4], self, split, neutral=False)
+                fig = data[0]
+                fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch) + " (Training data!!)")
+                wandb.log({"eval_fig_train_data_" + str(pid): fig})'''
+
         if pid_channels > 0:
             pids = split[6].detach().cpu().tolist()
             pids = [int(x) for x in pids]
             pids_onehot = np.zeros((len(pids), pid_channels))
             for i, pid in enumerate(pids):
                 pids_onehot[i, all_pids.index(pid)] = 1.
-            result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
+            result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot, eval_callback=eval_callback)
         else:
-            result = model.fit(split[0].numpy(), split[4].numpy())
+            result = model.fit(split[0].numpy(), split[4].numpy(), eval_callback=eval_callback)
         # print("Fitted model:", result)
         # validation
         epred = model.predict(split[1].numpy())
@@ -435,132 +593,6 @@ print("Loaded dataset")
 # yt, yp, en, _, model, split = main(ds=ds, train_energy_regression=False, train_only_on_PIDs=[211], remove_sum_e=False)
 len(ds)
 
-# %%
-
-# %%
-import numpy as np
-
-
-def get_std68(theHist, bin_edges, percentage=0.683, epsilon=0.01):
-    # theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
-    wmin = 0.2
-    wmax = 1.0
-
-    weight = 0.0
-    points = []
-    sums = []
-
-    # fill list of bin centers and the integral up to those point
-    for i in range(len(bin_edges) - 1):
-        weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
-        points.append([(bin_edges[i + 1] + bin_edges[i]) / 2, weight])
-        sums.append(weight)
-    low = wmin
-    high = wmax
-    width = 100
-    for i in range(len(points)):
-        for j in range(i, len(points)):
-            wy = points[j][1] - points[i][1]
-            if abs(wy - percentage) < epsilon:
-                wx = points[j][0] - points[i][0]
-                if wx < width:
-                    low = points[i][0]
-                    high = points[j][0]
-                    width = wx
-
-    return 0.5 * (high - low), low, high
-
-
-def mean_without_outliers(data):
-    remove_count = int(len(data) * 0.01)
-    # Sort the array
-    sorted_arr = np.sort(data)
-    # Remove the lowest and highest 1% of the elements
-    trimmed_arr = sorted_arr[remove_count:-remove_count]
-    # Calculate the mean of the trimmed array
-    mean = np.mean(trimmed_arr)
-    return mean
-
-
-def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(-1, 5, 0.01), epsilon=0.01):
-    hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
-    ind_max_hist = np.argmax(hist)
-    # MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
-    std68, low, high = get_std68(hist, bin_edges, epsilon=epsilon)
-    MPV = mean_without_outliers(data_for_hist)
-    return MPV, std68, low, high
-
-
-def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
-    # trim the data for hist by removing the top and bottom 1%
-    if len(data_for_hist) != 0:
-        data_for_hist = data_for_hist[
-            (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
-    # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
-    bins_per_binned_E = np.arange(0, 2, 1e-3)
-    return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
-
-
-# %%
-def get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split, neutral=False):
-    e_thresholds = [0, 6, 12, 18, 24, 30, 36, 42, 48]  # True E thresholds!
-    mpvs_model, s68s_model = [], []
-    mpvs_pandora, s68s_pandora = [], []
-    mpvs_sum_hits, s68s_sum_hits = [], []
-    e_true = (1 + yt) * split[1][:, 6].numpy()
-    e_pred = yp
-    frac_pred = e_pred / e_true
-    frac_e_sum = split[1][:, 6].clone().detach().cpu().numpy() / e_true
-    e_track = split[1][:, 3].clone().detach().cpu().numpy()
-    frac_track = e_track / e_true
-    track_filter = ((split[1][:, 3] > 0) & (split[1][:, 7] == 1))
-    if neutral:
-        track_filter = ~track_filter
-        track_filter = track_filter & (split[1][:, 7] == 0)
-    track_filter = track_filter & (split[-1] == pid).cpu()
-    binsize = 0.01
-    bins_x = []
-
-    for i, e_threshold in enumerate(e_thresholds):
-        if i == 0:
-            continue
-        bins_x.append(0.5 * (e_thresholds[i] + e_thresholds[i - 1]))
-        filt_energy = (e_true < e_thresholds[i]) & (e_true >= e_thresholds[i - 1])
-        mpv, s68, lo, hi = obtain_MPV_and_68(frac_pred[filt_energy & track_filter],
-                                             bins_per_binned_E=np.arange(0, 5, binsize))
-        mpvs_model.append(mpv)
-        s68s_model.append(s68)
-        mpv, s68, lo, hi = obtain_MPV_and_68(frac_track[filt_energy & track_filter].clip(max=5),
-                                             bins_per_binned_E=np.arange(0, 5, binsize))
-        mpvs_pandora.append(mpv)
-        s68s_pandora.append(s68)
-        mpv, s68, _, _ = obtain_MPV_and_68(frac_e_sum[filt_energy & track_filter],
-                                           bins_per_binned_E=np.arange(0, 5, binsize))
-        mpvs_sum_hits.append(mpv)
-        s68s_sum_hits.append(s68)
-
-    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True,
-                           gridspec_kw={'height_ratios': [2, 1]})  # Height of 2 subplots.
-    ax[0].plot(bins_x, np.array(s68s_model) / np.array(mpvs_model), ".--", label="model")
-    ax[0].plot(bins_x, np.array(s68s_pandora) / np.array(mpvs_pandora), ".--", label="track p")
-    ax[0].plot(bins_x, np.array(s68s_sum_hits) / np.array(mpvs_sum_hits), ".--", label="sum hits")
-    ax[0].legend()
-    ax[1].set_xlabel("Energy [GeV]")
-    ax[0].set_ylabel("σ / E")
-    # ax[0].set_ylim([0, 0.4])
-    # ax[0].set_ylim([0, 0.4])
-    # ax[0].set_ylim([0, 0.4])
-    ax[1].plot(bins_x, mpvs_model, ".--", label="GradBoost")
-    ax[1].plot(bins_x, mpvs_pandora, ".--", label="track p")
-    ax[1].plot(bins_x, mpvs_sum_hits, ".--", label="sum hits")
-    ax[1].set_ylim([0.95, 1.05])
-    ax[1].set_ylabel("response")
-    ax[0].set_title("PID: " + str(pid))
-    upper_plot = {"ML": np.array(s68s_model) / np.array(mpvs_model),
-                  "p": np.array(s68s_pandora) / np.array(mpvs_pandora),
-                  "sum": np.array(s68s_sum_hits) / np.array(mpvs_sum_hits)}
-    lower_plot = {"ML": mpvs_model, "p": mpvs_pandora, "sum": mpvs_sum_hits}
-    return fig, upper_plot, lower_plot, bins_x
 
 
 def is_pid_neutral(pid):
@@ -571,7 +603,7 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
     if not os.path.exists(save_to_folder):
         os.makedirs(save_to_folder)
     yt, yp, en, _, model, split, lossfn = main(ds=ds, train_energy_regression=energy_regression, train_only_on_PIDs=PIDs,
-                                       remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder,
+                                               remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder,
                                                wandb_log_name = wandb_log_name)
     # import shap
     # import numpy as np
