@@ -9,154 +9,196 @@ from torch_geometric.nn.conv import MessagePassing
 import torch.nn as nn
 import dgl
 import dgl.function as fn
+import numpy as np
+from dgl.nn import EdgeWeightNorm
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import torch_cmspepr
+from src.layers.GravNetConv3 import knn_per_graph
 
 
-class GravNetConv(MessagePassing):
-    """The GravNet operator from the `"Learning Representations of Irregular
-    Particle-detector Geometry with Distance-weighted Graph
-    Networks" <https://arxiv.org/abs/1902.07987>`_ paper, where the graph is
-    dynamically constructed using nearest neighbors.
-    The neighbors are constructed in a learnable low-dimensional projection of
-    the feature space.
-    A second projection of the input feature space is then propagated from the
-    neighbors to each vertex using distance weights that are derived by
-    applying a Gaussian function to the distances.
-    Args:
-        in_channels (int): The number of input channels.
-        out_channels (int): The number of output channels.
-        space_dimensions (int): The dimensionality of the space used to
-           construct the neighbors; referred to as :math:`S` in the paper.
-        propagate_dimensions (int): The number of features to be propagated
-           between the vertices; referred to as :math:`F_{\textrm{LR}}` in the
-           paper.
-        k (int): The number of nearest neighbors.
-        num_workers (int): Number of workers to use for k-NN computation.
-            Has no effect in case :obj:`batch` is not :obj:`None`, or the input
-            lies on the GPU. (default: :obj:`1`)
-        **kwargs (optional): Additional arguments of
-            :class:`torch_geometric.nn.conv.MessagePassing`.
+def src_dot_dst(src_field, dst_field, out_field):
+    def func(edges):
+        return {
+            out_field: (edges.src[src_field] * edges.dst[dst_field]).sum(
+                -1, keepdim=True
+            )
+        }
+
+    return func
+
+
+def src_dot_distance(src_field, dst_field, out_field):
+    def func(edges):
+        dij = (edges.src[src_field] - edges.dst[dst_field]).pow(2).sum(-1, keepdim=True)
+        edge_weight = torch.sqrt(dij + 1e-6)
+        edge_weight = torch.exp(-torch.square(dij))
+        return {out_field: edge_weight}
+
+    return func
+
+
+def scaled_exp(field, scale_constant):
+    def func(edges):
+        # clamp for softmax numerical stability
+        return {field: torch.exp((edges.data[field] / scale_constant).clamp(-5, 5))}
+
+    return func
+
+
+def score_dij(field):
+    def func(edges):
+        # clamp for softmax numerical stability
+        return {field: edges.data["score"].view(-1) * edges.data["dij"].view(-1)}
+
+    return func
+
+
+class MultiHeadAttentionLayer(nn.Module):
+    def __init__(self, in_dim, out_dim, num_heads, use_bias):
+        super().__init__()
+
+        self.out_dim = out_dim
+        self.num_heads = num_heads
+
+        if use_bias:
+            self.Q = nn.Linear(in_dim, out_dim * num_heads, bias=True)
+            self.K = nn.Linear(in_dim, out_dim * num_heads, bias=True)
+            self.V = nn.Linear(in_dim, out_dim * num_heads, bias=True)
+        else:
+            self.Q = nn.Linear(in_dim, out_dim * num_heads, bias=False)
+            self.K = nn.Linear(in_dim, out_dim * num_heads, bias=False)
+            self.V = nn.Linear(in_dim, out_dim * num_heads, bias=False)
+
+    def propagate_attention(self, g):
+        # Compute attention score
+        g.apply_edges(src_dot_dst("K_h", "Q_h", "score"))  # , edges)
+        g.apply_edges(scaled_exp("score", np.sqrt(self.out_dim)))
+
+        g.apply_edges(src_dot_distance("s_l", "s_l", "dij"))
+        g.apply_edges(score_dij("news"))
+        # Send weighted values to target nodes
+        eids = g.edges()
+        g.send_and_recv(eids, fn.u_mul_e("V_h", "news", "V_h"), fn.sum("V_h", "wV"))
+        g.send_and_recv(eids, fn.copy_e("score", "score"), fn.sum("score", "z"))
+
+    def forward(self, g, h):
+
+        Q_h = self.Q(h)
+        K_h = self.K(h)
+        V_h = self.V(h)
+
+        # Reshaping into [num_nodes, num_heads, feat_dim] to
+        # get projections for multi-head attention
+        g.ndata["Q_h"] = Q_h.view(-1, self.num_heads, self.out_dim)
+        g.ndata["K_h"] = K_h.view(-1, self.num_heads, self.out_dim)
+        g.ndata["V_h"] = V_h.view(-1, self.num_heads, self.out_dim)
+        self.propagate_attention(g)
+        g.ndata["z"] = g.ndata["z"].tile((1, 1, self.out_dim))
+        mask_empty = g.ndata["z"] > 0
+        head_out = g.ndata["wV"]
+        head_out[mask_empty] = head_out[mask_empty] / (g.ndata["z"][mask_empty])
+        g.ndata["z"] = g.ndata["z"][:, :, 0].view(
+            g.ndata["wV"].shape[0], self.num_heads, 1
+        )
+        return head_out
+
+
+class GraphTransformerLayer(nn.Module):
+    """
+    Param:
     """
 
     def __init__(
         self,
-        in_channels: int,
-        out_channels: int,
-        space_dimensions: int,
-        propagate_dimensions: int,
-        k: int,
-        num_workers: int = 1,
-        **kwargs
+        in_dim,
+        out_dim,
+        num_heads,
+        k,
+        dropout=0.0,
+        layer_norm=False,
+        batch_norm=True,
+        residual=False,
+        use_bias=False,
     ):
-        super(GravNetConv, self).__init__(flow="target_to_source", **kwargs)
+        super().__init__()
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
+        self.in_channels = in_dim
+        self.out_channels = out_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.residual = residual
+        self.layer_norm = layer_norm
+        self.batch_norm = batch_norm
         self.k = k
-        self.num_workers = num_workers
-        self.batchnorm_gravconv = nn.BatchNorm1d(2 * propagate_dimensions)
-        self.lin_s = Linear(in_channels, space_dimensions, bias=False)
-        self.lin_s.weight.data.copy_(torch.eye(space_dimensions, in_channels))
-        self.lin_h = Linear(in_channels, propagate_dimensions)
-        self.lin = Linear(
-            in_channels + 2 * propagate_dimensions + space_dimensions, out_channels
+        space_dimensions = 3
+        self.lin_s = Linear(self.in_channels, space_dimensions, bias=False)
+        self.lin_h = Linear(self.in_channels, self.out_channels)
+        self.lin = Linear(self.in_channels + self.out_channels, self.out_channels)
+        self.attention = MultiHeadAttentionLayer(
+            in_dim, out_dim // num_heads, num_heads, use_bias
         )
 
-        # self.reset_parameters()
+        self.O = nn.Linear(out_dim, out_dim)
 
-    def reset_parameters(self):
-        self.lin_s.reset_parameters()
-        self.lin_h.reset_parameters()
-        self.lin.reset_parameters()
+        if self.layer_norm:
+            self.layer_norm1 = nn.LayerNorm(out_dim)
 
-    def forward(self, g, x: Tensor, batch: OptTensor = None) -> Tensor:
-        """"""
+        if self.batch_norm:
+            self.batch_norm1 = nn.BatchNorm1d(out_dim)
 
-        assert x.dim() == 2, "Static graphs not supported in `GravNetConv`."
+        # FFN
+        self.FFN_layer1 = nn.Linear(out_dim, out_dim * 2)
+        self.FFN_layer2 = nn.Linear(out_dim * 2, out_dim)
 
-        b: OptTensor = None
-        if isinstance(batch, Tensor):
-            b = batch
-        h_l: Tensor = self.lin_h(x)
-        s_l: Tensor = self.lin_s(x)
+        if self.layer_norm:
+            self.layer_norm2 = nn.LayerNorm(out_dim)
 
+        if self.batch_norm:
+            self.batch_norm2 = nn.BatchNorm1d(out_dim)
+
+    def forward(self, g, h):
+        h_l = self.lin_h(h)
+        s_l = self.lin_s(h)
         graph = knn_per_graph(g, s_l, self.k)
         graph.ndata["s_l"] = s_l
-        row = graph.edges()[0]
-        col = graph.edges()[1]
-        edge_index = torch.stack([row, col], dim=0)
+        h_in1 = h_l  # for first residual connection
 
-        edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
-        # edge_weight = torch.exp(-10.0 * edge_weight)  # 10 gives a better spread
+        # multi-head attention out
+        attn_out = self.attention(graph, h)
+        h = attn_out.view(-1, self.out_channels)
 
-        #! AverageDistanceRegularizer
-        dist = edge_weight
-        dist = torch.sqrt(dist + 1e-3)
-        graph.edata["dist"] = dist
-        graph.ndata["ones"] = torch.ones_like(s_l)
-        # average dist per node and divide by the number of neighbourgs
-        graph.update_all(fn.u_mul_e("ones", "dist", "m"), fn.mean("m", "dist"))
-        avdist = graph.ndata["dist"]
-        loss_regularizing_neig = 1e-2 * torch.mean(torch.square(avdist - 0.5))
-        # propagate_type: (x: OptPairTensor, edge_weight: OptTensor)
+        h = F.dropout(h, self.dropout, training=self.training)
 
-        #! LLRegulariseGravNetSpace
-        original_coord = g.ndata["pos_hits_xyz"]
-        dit_orig = (
-            (original_coord[edge_index[0]] - original_coord[edge_index[1]])
-            .pow(2)
-            .sum(-1)
-        )
-        gndist = torch.sqrt(dit_orig + 1e-6)
-        loss_llregulariser = 5 * torch.mean(torch.square(dist - gndist))
-        #! this is the output_feature_transform
+        h = self.O(h)
+        
+        h = self.lin(torch.cat((h_l, h), dim=1))
+        if self.residual:
+            h = h_in1 + h  # residual connection
 
-        out = self.propagate(
-            edge_index,
-            x=[h_l, None],
-            edge_weight=edge_weight,
-            size=(s_l.size(0), s_l.size(0)),
-        )
+        if self.layer_norm:
+            h = self.layer_norm1(h)
 
-        #! not sure this cat is exactly the same that is happening in the RaggedGravNet but they also cat
-        out = self.batchnorm_gravconv(out)
-        return (
-            self.lin(torch.cat([out, x, s_l], dim=-1)),
-            graph,
-            s_l,
-            loss_regularizing_neig,
-            loss_llregulariser,
-        )
+        if self.batch_norm:
+            h = self.batch_norm1(h)
 
-    def message(self, x_j: Tensor, edge_weight: Tensor) -> Tensor:
-        return x_j * edge_weight.unsqueeze(1)
+        h_in2 = h  # for second residual connection
 
-    def aggregate(
-        self, inputs: Tensor, index: Tensor, dim_size: Optional[int] = None
-    ) -> Tensor:
+        # FFN
+        h = self.FFN_layer1(h)
+        h = F.relu(h)
+        h = F.dropout(h, self.dropout, training=self.training)
+        h = self.FFN_layer2(h)
 
-        out_mean = scatter(
-            inputs, index, dim=self.node_dim, dim_size=dim_size, reduce="mean"
-        )
+        if self.residual:
+            h = h_in2 + h  # residual connection
 
-        out_max = scatter(
-            inputs, index, dim=self.node_dim, dim_size=dim_size, reduce="max"
-        )
-        return torch.cat([out_mean, out_max], dim=-1)
+        if self.layer_norm:
+            h = self.layer_norm2(h)
 
-    def __repr__(self):
-        return "{}({}, {}, k={})".format(
-            self.__class__.__name__, self.in_channels, self.out_channels, self.k
-        )
+        if self.batch_norm:
+            h = self.batch_norm2(h)
 
-
-def knn_per_graph(g, sl, k):
-    graphs_list = dgl.unbatch(g)
-    node_counter = 0
-    new_graphs = []
-    for graph in graphs_list:
-        non = graph.number_of_nodes()
-        sls_graph = sl[node_counter : node_counter + non]
-        new_graph = dgl.knn_graph(sls_graph, k, exclude_self=True)
-        new_graphs.append(new_graph)
-        node_counter = node_counter + non
-    return dgl.batch(new_graphs)
+        return h, s_l

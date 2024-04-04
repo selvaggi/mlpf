@@ -1,11 +1,11 @@
 import torch
-from src.models.transformer_Lpc import GraphT as GravnetModel
+from src.models.FocusedAttention import FocusedAttention
 
 
 class GraphTransformerNetWrapper(torch.nn.Module):
     def __init__(self, args, dev, **kwargs) -> None:
         super().__init__()
-        self.mod = GravnetModel(args, dev, **kwargs)
+        self.mod = FocusedAttention(args, dev, **kwargs)
 
     def forward(self, g, step_count):
         return self.mod(g, step_count)
