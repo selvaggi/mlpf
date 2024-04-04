@@ -443,7 +443,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         # make eval plots data
                         print("Evaluating!")
                         if eval_callback is not None:
-                            eval_callback(self, epoch)
+                            eval_callback(self, total_step)
                 if patience_counter > patience:
                     break
                 epoch_losses.append(np.mean(losses_this_epoch))
@@ -555,12 +555,12 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 e_true = split[5]
                 data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
-                fig.suptitle("PID: " + str(_pid) + " / epoch " + str(epoch))
+                fig.suptitle("step" + str(epoch))
                 #wandb.log({"eval_fig_eval_data_" + str(pid): fig})
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png')
                 buf.seek(0)
-                wandb.log({"eval_fig_eval_data_" + str(pid): wandb.Image(Image.open(buf))})
+                wandb.log({"eval_fig_eval_data_" + str(_pid): wandb.Image(Image.open(buf))})
                 buf.close()
             ''' # ALSO WITH TRAIN DATA
             e_pred = self.predict(split[0].numpy())
