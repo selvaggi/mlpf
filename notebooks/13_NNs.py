@@ -105,8 +105,8 @@ def get_dataset():
     nmax = 257
     for file in os.listdir(path):
         n += 1
-        #if n > nmax:
-        #    break
+        if n > nmax:
+            break
         #f = pickle.load(open(os.path.join(path, file), "rb"))
         class CPU_Unpickler(pickle.Unpickler):
             def find_class(self, module, name):
@@ -218,26 +218,25 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
 
 
 # %%
-def get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split, neutral=False):
+def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=False):
     e_thresholds = [0, 6, 12, 18, 24, 30, 36, 42, 48]  # True E thresholds!
     mpvs_model, s68s_model = [], []
     mpvs_pandora, s68s_pandora = [], []
     mpvs_sum_hits, s68s_sum_hits = [], []
-    e_true = (1 + yt) * split[1][:, 6].numpy()
-    e_pred = yp
+    #e_true = (1 + yt) * split[1][:, 6].numpy()
+    #e_pred = yp
     frac_pred = e_pred / e_true
-    frac_e_sum = split[1][:, 6].clone().detach().cpu().numpy() / e_true
-    e_track = split[1][:, 3].clone().detach().cpu().numpy()
+    frac_e_sum = e_sum_hits.clone().detach().cpu().numpy() / e_true
+    #e_track = split[1][:, 3].clone().detach().cpu().numpy()
     frac_track = e_track / e_true
-    track_filter = ((split[1][:, 3] > 0) & (split[1][:, 7] == 1))
+    track_filter = ((e_track > 0) & (n_track > 0))
     if neutral:
         track_filter = ~track_filter
-        track_filter = track_filter & (split[1][:, 7] == 0)
-    track_filter = track_filter & (split[-1] == pid).cpu()
+        track_filter = track_filter & (n_track == 0)
+    track_filter = track_filter & (torch.tensor(pids) == pid).cpu()
     track_filter = track_filter.numpy()
     binsize = 0.01
     bins_x = []
-
     for i, e_threshold in enumerate(e_thresholds):
         if i == 0:
             continue
@@ -440,7 +439,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         if patience_counter > patience:
                             print("Early stopping at running mean loss:", np.mean(rolling_loss))
                             break
-                    if total_step % 10000 == 0:
+                    if total_step % 100 == 0:
                         # make eval plots data
                         print("Evaluating!")
                         if eval_callback is not None:
@@ -547,8 +546,14 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         print("Fitting")
         def eval_callback(self, epoch):
             e_pred = self.predict(split[1].numpy())
-            for pid in all_pids:
-                data = get_charged_response_resol_plot_for_PID(pid, e_pred, split[3], split[5], self, split, neutral=False)
+            pids = split[7].detach().cpu()
+            for _pid in all_pids:
+                # pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track,
+                n_track = split[1][:, 7]
+                e_track = split[1][:, 3]
+                e_sum_hits = split[1][:, 6]
+                e_true = split[3]
+                data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
                 fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch))
                 #wandb.log({"eval_fig_eval_data_" + str(pid): fig})
@@ -616,16 +621,16 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
     h_names = ["hit_x_avg", "hit_y_avg", "hit_z_avg", "eta", "phi"]
     # shap.summary_plot(shap_vals_r, split[1], feature_names=x_names + h_names, use_log_scale=True, show=False)
     # plt.show()
-    results = {}
-    for pid in PIDs:
-        fig, upper, lower, x = get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split,
-                                                                       neutral=is_pid_neutral(pid))
-        results[pid] = [fig, upper, lower, x, model]
-        if  wandb_log_name is not None:
-            try:
-                wandb.log({"fig_" + wandb_log_name: fig})
-            except:
-                print("Could not log fig")
+    #results = {}
+    #for pid in PIDs:
+        #fig, upper, lower, x = get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split,
+        #                                                               neutral=is_pid_neutral(pid))
+        #results[pid] = [fig, upper, lower, x, model]
+        #if  wandb_log_name is not None:
+        #    try:
+        #        wandb.log({"fig_" + wandb_log_name: fig})
+        ##    except:
+        #        print("Could not log fig")
     return results, lossfn
 
 #all_pids = [22,130,2112]
