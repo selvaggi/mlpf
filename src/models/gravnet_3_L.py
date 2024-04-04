@@ -40,7 +40,7 @@ from src.layers.obtain_statistics import (
 )
 
 
-class GravnetModel(L.LightningModule):
+class GravnetModel(L.LightningModule): #L.LightningModule
     def __init__(
         self,
         args,
@@ -176,6 +176,7 @@ class GravnetModel(L.LightningModule):
         #        print("--> param name: ", p.name, " dir: ", dir(p))
         # print("Num of trainable params in the sub NN" , len([param for param in self.GatedGCNNet.parameters() if param.requires_grad]))
         x = g.ndata["h"]
+        
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
         device = x.device
@@ -495,8 +496,11 @@ class GravnetModel(L.LightningModule):
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
 
-        self.loss_final = loss + self.loss_final
+        self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
+        del model_output
+        del e_cor
+        del losses
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -584,6 +588,9 @@ class GravnetModel(L.LightningModule):
             self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
+        del loss
+        del losses 
+        del model_output
 
     def on_train_epoch_end(self):
         # if self.current_epoch == 0 and self.trainer.is_global_zero:
