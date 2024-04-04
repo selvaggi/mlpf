@@ -37,6 +37,7 @@ parser.add_argument("--loss", type=str, default="default") # loss to use
 parser.add_argument("--patience", type=int, default=50000) # patience for early stopping
 parser.add_argument("--pid-loss", action="store_true")
 parser.add_argument("--ecal-hcal-loss", action="store_true")
+parser.add_argument("--dataset-path", type=str, default="/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features")
 
 args = parser.parse_args()
 prefix = args.prefix
@@ -95,7 +96,7 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
 import io
 
 def get_dataset():
-    path = "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features"
+    path = args.dataset_path
     r = {}
     n = 0
     # nmax = 257
