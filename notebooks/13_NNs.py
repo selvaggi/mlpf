@@ -38,6 +38,8 @@ parser.add_argument("--patience", type=int, default=50000) # patience for early 
 parser.add_argument("--pid-loss", action="store_true")
 parser.add_argument("--ecal-hcal-loss", action="store_true")
 parser.add_argument("--dataset-path", type=str, default="/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features")
+parser.add_argument("--batch-size", type=int, default=64)
+
 
 args = parser.parse_args()
 prefix = args.prefix
@@ -220,7 +222,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             self.model = Net(out_features = 1+pid_predict_channels)
             self.model.to(DEVICE)
             self.model.train()
-            batch_size = 64
+            batch_size = args.batch_size
             optimizer = optim.Adam(self.model.parameters(), lr=0.001)
             def criterion(ypred, ytrue, step):
                 if step < 5000:
