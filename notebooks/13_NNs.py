@@ -105,8 +105,8 @@ def get_dataset():
     nmax = 257
     for file in os.listdir(path):
         n += 1
-        if n > nmax:
-            break
+        #if n > nmax:
+        #    break
         #f = pickle.load(open(os.path.join(path, file), "rb"))
         class CPU_Unpickler(pickle.Unpickler):
             def find_class(self, module, name):
