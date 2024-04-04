@@ -104,7 +104,7 @@ def get_dataset():
     n = 0
     nmax = 257
     for file in os.listdir(path):
-        n += 1
+        #n += 1
         #if n > nmax:
         #    break
         #f = pickle.load(open(os.path.join(path, file), "rb"))
@@ -439,7 +439,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         if patience_counter > patience:
                             print("Early stopping at running mean loss:", np.mean(rolling_loss))
                             break
-                    if total_step % 100 == 0:
+                    if total_step % 10000 == 0:
                         # make eval plots data
                         print("Evaluating!")
                         if eval_callback is not None:
@@ -552,7 +552,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 n_track = split[1][:, 7]
                 e_track = split[1][:, 3]
                 e_sum_hits = split[1][:, 6]
-                e_true = split[3]
+                e_true = split[5]
                 data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
                 fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch))
