@@ -1,6 +1,7 @@
 import wandb
 import numpy as np
 import mplhep as hep
+import wandb
 
 hep.style.use("CMS")
 import matplotlib
@@ -25,12 +26,36 @@ import os
 import pickle
 import numpy as np
 import torch
+import argparse
+
+
+# args: prefix, wandb name, PIDs to train on, loss to use
+parser = argparse.ArgumentParser()
+parser.add_argument("--prefix", type=str, required=True)
+parser.add_argument("--wandb_name", type=str, required=True)
+parser.add_argument("--PIDs", type=str, required=True) # comma-separated list of PIDs to train and evaluate on
+parser.add_argument("--loss", type=str, default="default") # loss to use
+parser.add_argument("--patience", type=int, default=50000) # patience for early stopping
+parser.add_argument("--pid-loss", action="store_true")
+
+
+args = parser.parse_args()
+prefix = args.prefix
+wandb_name = args.wandb_name
+all_pids = args.PIDs.split(",")
+assert len(all_pids) > 0
+PIDs = [int(pid) for pid in all_pids]
+print("Training on PIDs:", PIDs)
+
 
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
 DEVICE = torch.device("cuda:3")
-prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_Klong_and_piplus_1/"
+#prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_neutral_l1_loss_only/"
 
+wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)
+# wandb log code
+wandb.run.log_code(".")
 
 # make dir
 os.makedirs(prefix, exist_ok=True)
@@ -122,15 +147,16 @@ def calculate_eta(x, y, z):
     theta = np.arctan2(np.sqrt(x ** 2 + y ** 2), z)
     return -np.log(np.tan(theta / 2))
 
-def get_nn(patience, save_to_folder=None):
+def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_channels=0):
     # pytorch impl. of a neural network
     import torch
     import torch.nn as nn
     import torch.optim as optim
     import torch.nn.functional as F
     class Net(nn.Module):
-        def __init__(self):
+        def __init__(self, out_features=1):
             super(Net, self).__init__()
+            self.out_features = out_features
             self.model = nn.ModuleList([
                 #nn.BatchNorm1d(13),
                 nn.Linear(13, 64),
@@ -140,8 +166,9 @@ def get_nn(patience, save_to_folder=None):
                 nn.ReLU(),
                 nn.Linear(64, 64),
                 nn.ReLU(),
-                nn.Linear(64, 1)]
+                nn.Linear(64, out_features)]
             )
+            self.wandb_log_name = wandb_log_name
             '''self.model = nn.ModuleList([
                 nn.Linear(13, 1, bias=False)
             ])'''
@@ -149,6 +176,8 @@ def get_nn(patience, save_to_folder=None):
         def forward(self, x):
             for layer in self.model:
                 x = layer(x)
+            if self.out_features > 1:
+                return x[0, :], x[1:, :]
             return x
 
         def freeze_batchnorm(self):
@@ -168,23 +197,23 @@ def get_nn(patience, save_to_folder=None):
             with torch.no_grad():
                 return self.model(x).cpu().numpy().flatten()
 
-        def fit(self, x, y):
+        def fit(self, x, y, pid=None):
+            # PID: one-hot encoded values of the PID (or some other identification) to additionally use in the loss.
+            # It can be real PID or some other identification, i.e. has track / ECAL / ECAL+HCAL etc.
             print("---> Fit - x.shape", x.shape, " y.shape", y.shape)
+            if pid is not None:
+                print("   --> Also using PID")
             x = torch.tensor(x).to(DEVICE)
             y = torch.tensor(y).to(DEVICE)
+            if pid is not None:
+                pid = torch.tensor(pid).to(DEVICE)
             total_step = 0
-            self.model = Net()
+            self.model = Net(out_features = 1+pid_predict_channels)
             self.model.to(DEVICE)
             self.model.train()
             batch_size = 64
             optimizer = optim.Adam(self.model.parameters(), lr=0.001)
             def criterion(ypred, ytrue, step):
-                #if step < 12000:
-                #    return F.mse_loss(ypred, ytrue)
-                #elif step < 20000:
-                #    return F.l1_loss(ypred, ytrue)
-                #else:
-                #    # relative loss
                 if step < 5000:
                     return F.l1_loss(ypred, ytrue)
                 else:
@@ -197,6 +226,11 @@ def get_nn(patience, save_to_folder=None):
                             mask = (losses > top_percentile)
                             losses[mask] = 0.0
                     return losses.mean()
+            def criterion_L1(ypred, ytrue, step):
+                return F.l1_loss(ypred, ytrue)
+            if args.loss == "L1":
+                print("Using L1 loss")
+                criterion = criterion_L1
             tolerance = 1e-3
             epochs = 10000
             # calc loss of last 100 batches
@@ -215,16 +249,28 @@ def get_nn(patience, save_to_folder=None):
                         self.model.freeze_batchnorm()
                     xbatch = x[i*batch_size:i*batch_size + batch_size].to(DEVICE)
                     ybatch = y[i*batch_size:i*batch_size + batch_size].to(DEVICE)
+                    if pid is not None:
+                        pidbatch = pid[i*batch_size:i*batch_size + batch_size].to(DEVICE)
                     # if only one sample, skip
                     if xbatch.shape[0] == 1:
                         print("Skipping batch of size 1")
                         continue
                     optimizer.zero_grad()
-                    ypred = self.model(xbatch)
+                    if pid is None:
+                        ypred = self.model(xbatch)
+                    else:
+                        ypred, pidpred = self.model(xbatch, pidbatch)
                     loss = criterion(ypred.flatten(), ybatch, total_step)
+                    if pid is not None:
+                        pid_loss = torch.nn.BCELoss()(pidpred, pidbatch)
+                        loss += 0.1 * pid_loss
                     loss.backward()
                     losses_all.append(loss.item())
                     losses_this_epoch.append(loss.item())
+                    if i % 100 == 0 and self.model.wandb_log_name is not None:
+                        wandb.log({self.model.wandb_log_name: loss.item()})
+                        if pid is not None:
+                            wandb.log({"pid_loss" + self.model.wandb_log_name: pid_loss.item()})
                     if i < 3000:
                         ytrue_epoch += ybatch.detach().cpu().numpy().tolist()
                         ypred_epoch += ypred.detach().cpu().numpy().flatten().tolist()
@@ -278,9 +324,13 @@ def get_nn(patience, save_to_folder=None):
 
 
 def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_energy_regression=False,
-         train_only_on_PIDs=[], remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None):
+         train_only_on_PIDs=[], remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None, wandb_log_name=None):
     split = list(get_split(ds))
-    model = get_nn(patience=patience, save_to_folder=save_to_folder)
+    if args.pid_loss:
+        pid_channels = len(all_pids)
+    else:
+        pid_channels = 0
+    model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
     #    from sklearn.ensemble import GradientBoostingRegressor
@@ -299,17 +349,30 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
     elif train_only_on_PIDs:
         print("getting mask")
         mask = [i in train_only_on_PIDs for i in split[6].tolist()]
+        masktest = [i in train_only_on_PIDs for i in split[7].tolist()]
         print("got mask")
         mask = torch.tensor(mask)
         print("Mask covers this fraction:", mask.float().mean().item())
         split[0] = split[0][mask]
+        split[1] = split[1][masktest]
         split[2] = split[2][mask]
+        split[3] = split[3][masktest]
         split[4] = split[4][mask]
+        split[5] = split[5][masktest]
+        split[6] = split[6][mask]
+        split[7] = split[7][masktest]
     if remove_sum_e:
         split[0][:, 6] = 0.0  # remove the sum of the hits
     if not train_energy_regression:
         print("Fitting")
-        result = model.fit(split[0].numpy(), split[2].numpy())
+        if pid_channels > 0:
+            pids = split[6].detach().cpu().numpy()  # todo fix this?
+            pids_onehot = np.zeros((len(pids), pid_channels))
+            for i, pid in enumerate(pids):
+                pids_onehot[i, all_pids.index(pid)] = 1.
+            result = model.fit(split[0].numpy(), split[2].numpy(), )
+        else:
+            result = model.fit(split[0].numpy(), split[2].numpy())
         # print("Fitted model:", result)
         # validation
         ysum = split[1][:, 6]
@@ -320,7 +383,15 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         return ytrue, epred, energies, split[1], model, split, result
     else:
         print("Fitting")
-        result = model.fit(split[0].numpy(), split[4].numpy())
+        if pid_channels > 0:
+            pids = split[6].detach().cpu().tolist()
+            pids = [int(x) for x in pids]
+            pids_onehot = np.zeros((len(pids), pid_channels))
+            for i, pid in enumerate(pids):
+                pids_onehot[i, all_pids.index(pid)] = 1.
+            result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
+        else:
+            result = model.fit(split[0].numpy(), split[4].numpy())
         # print("Fitted model:", result)
         # validation
         epred = model.predict(split[1].numpy())
@@ -470,18 +541,18 @@ def get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split, neutr
     return fig, upper_plot, lower_plot, bins_x
 
 
-
 def is_pid_neutral(pid):
     return pid in [22, 130, 2112]
 
 
-def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None):
+def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None, wandb_log_name=None):
     if not os.path.exists(save_to_folder):
         os.makedirs(save_to_folder)
     yt, yp, en, _, model, split, lossfn = main(ds=ds, train_energy_regression=energy_regression, train_only_on_PIDs=PIDs,
-                                       remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder)
-    import shap
-    import numpy as np
+                                       remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder,
+                                               wandb_log_name = wandb_log_name)
+    # import shap
+    # import numpy as np
     # te = shap.TreeExplainer(model)
     # shap_vals_r = te.shap_values(np.array(split[1]))
     x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks"]
@@ -493,10 +564,19 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
         fig, upper, lower, x = get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split,
                                                                        neutral=is_pid_neutral(pid))
         results[pid] = [fig, upper, lower, x, model]
+        if  wandb_log_name is not None:
+            try:
+                wandb.log({"fig_" + wandb_log_name: fig})
+            except:
+                print("Could not log fig")
     return results, lossfn
 
-all_pids = [130, 211]
-plots_all, result_all = get_plots(all_pids, energy_regression=True, patience=50000, save_to_folder=os.path.join(prefix, "intermediate_plots"))
+#all_pids = [22,130,2112]
+#all_pids = [211, -211, 2212, -2212]
+
+plots_all, result_all = get_plots(all_pids, energy_regression=True, patience=args.patience,
+                                  save_to_folder=os.path.join(prefix, "intermediate_plots"),
+                                  wandb_log_name="loss_train_all")
 fig, ax = plt.subplots()
 ax.plot(list(range(len(result_all[1]))), result_all[1])
 ax.set_yscale("log")
@@ -506,19 +586,23 @@ fig.savefig(prefix + "train_all_loss.pdf")
 fig.clf()
 
 for pid in all_pids:
-    model = plots_all[pid][4]
+    model = plots_all[pid][4].model.model
     pickle.dump(model.model.model, open(prefix + "NN_model_all_{}.pkl".format(pid), "wb"))
     fig = plots_all[pid][0]
     fig.savefig(prefix + "NN_train_all_{}.pdf".format(pid))
+    plots = [plots_all[pid][1], plots_all[pid][2]]
+    pickle.dump(plots, open(prefix + "plots_train_all_{}.pkl".format(pid), "wb"))
+    wandb.log("final_plot_" + str(pid), fig)
 
-
-results_per_pid = {}
-
+'''
 for pid in all_pids:
-    results_per_pid[pid], lossfn = get_plots([pid], energy_regression=True, patience=50000,
-                                             save_to_folder=os.path.join(prefix, "intermediate_plots_" + str(pid)))
+    results_per_pid[pid], lossfn = get_plots([pid], energy_regression=True, patience=args.patience,
+                                             save_to_folder=os.path.join(prefix, "intermediate_plots_" + str(pid)),
+                                             wandb_log_name="loss_train_{}".format(pid))
     fig = results_per_pid[pid][pid][0]
-    model = results_per_pid[pid][pid][4]
+    model = results_per_pid[pid][pid][4].model.model
+    plots = [results_per_pid[pid][pid][1], results_per_pid[pid][pid][2]]
+    pickle.dump(model, open(prefix + "plots_{}.pkl".format(pid), "wb"))
     pickle.dump(model, open(prefix + "NN_model_{}.pkl".format(pid), "wb"))
     fig.savefig(prefix + "PID_" + str(pid) + ".pdf")
     fig, ax = plt.subplots()
@@ -530,10 +614,14 @@ for pid in all_pids:
     fig.clf()
 
 '''
-for pid in all_pids:
-    model = results_per_pid[pid][pid][4].model.model
-    pickle.dump(model, open(prefix + "NN_model_{}.pkl".format(pid), "wb"))
+
 '''
+for pid in all_pids:
+    plots = [results_per_pid[pid][pid][1], results_per_pid[pid][pid][2]]
+    pickle.dump(model, open(prefix + "plots_{}.pkl".format(pid), "wb"))
+
+'''
+
 '''
 #print("Pickling")
 #import pickle
@@ -541,3 +629,4 @@ for pid in all_pids:
 #pickle.dump(plots_all, open(prefix + "results_all_NN.pkl", "wb"))
 #print("Pickled!")
 '''
+
