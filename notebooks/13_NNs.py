@@ -555,6 +555,13 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 e_true = split[5]
                 data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
+                plot = [data[1], data[2]]
+                if save_to_folder is not None:
+                    try:
+                        pickle.dump(plot, open(os.path.join(save_to_folder, f"plots_step_{epoch}_pid_{_pid}.pkl"), "wb"))
+                        pickle.dump(self.model.model, open(os.path.join(save_to_folder, f"model_step_{epoch}_pid_{_pid}.pkl"), "wb"))# save model
+                    except:
+                        print("Could not save intermediate eval. plots and model")
                 fig.suptitle("step" + str(epoch))
                 #wandb.log({"eval_fig_eval_data_" + str(pid): fig})
                 buf = io.BytesIO()
@@ -630,12 +637,13 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
         #        wandb.log({"fig_" + wandb_log_name: fig})
         ##    except:
         #        print("Could not log fig")
-    return results, lossfn
+    #return results, lossfn
+    return model
 
 #all_pids = [22,130,2112]
 #all_pids = [211, -211, 2212, -2212]
 
-plots_all, result_all = get_plots(all_pids, energy_regression=True, patience=args.patience,
+model = get_plots(all_pids, energy_regression=True, patience=args.patience,
                                   save_to_folder=os.path.join(prefix, "intermediate_plots"),
                                   wandb_log_name="loss_train_all")
 fig, ax = plt.subplots()
