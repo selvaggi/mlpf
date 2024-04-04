@@ -82,7 +82,9 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
         if torch.isnan(frac):
             frac = 0
         if mask.sum() > 0:
-            losses = [criterion(ypred[mask][i], ytrue[mask][i], step).detach().cpu() for i in range(mask.sum())]
+            ypred_mask = ypred[mask]
+            ytrue_mask = ytrue[mask]
+            losses = [criterion(ypred_mask[i], ytrue_mask[i], step).detach().cpu() for i in range(mask.sum())]
             losses = torch.tensor(losses)
             ax[1].hist(torch.clamp(torch.log10(losses), -5, 5), bins=100, alpha=0.5, label=f"{r[0]}-{r[1]} ({str(int(frac*100))}%)")
     if len(ytrue) > 0:
