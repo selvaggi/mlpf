@@ -555,11 +555,10 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 e_true = split[5]
                 data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
-                fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch))
+                fig.suptitle("PID: " + str(_pid) + " / epoch " + str(epoch))
                 #wandb.log({"eval_fig_eval_data_" + str(pid): fig})
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png')
-
                 buf.seek(0)
                 wandb.log({"eval_fig_eval_data_" + str(pid): wandb.Image(Image.open(buf))})
                 buf.close()
