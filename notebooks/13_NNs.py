@@ -559,7 +559,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 if save_to_folder is not None:
                     try:
                         pickle.dump(plot, open(os.path.join(save_to_folder, f"plots_step_{epoch}_pid_{_pid}.pkl"), "wb"))
-                        pickle.dump(self.model.model, open(os.path.join(save_to_folder, f"model_step_{epoch}_pid_{_pid}.pkl"), "wb"))# save model
+                        pickle.dump(self.model.model, open(os.path.join(save_to_folder, f"model_step_{epoch}_pid_{_pid}.pkl"), "wb"))  # save model
                     except:
                         print("Could not save intermediate eval. plots and model")
                 fig.suptitle("step" + str(epoch))
