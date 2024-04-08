@@ -478,7 +478,6 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         fig.savefig(os.path.join(save_to_folder, f"losses.pdf"))
                         pickle.dump(losses_all, open(os.path.join(save_to_folder, "losses_all_.pkl"), "wb"))
                         pickle.dump(epoch_losses, open(os.path.join(save_to_folder, "epoch_losses_.pkl"), "wb"))
-
             return losses_all, epoch_losses
     return NetWrapper()
 
