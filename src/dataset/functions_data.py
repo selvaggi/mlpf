@@ -231,7 +231,6 @@ def modify_index_link_for_gamma_e(
         number_of_p[p] = len(list_of_daugthers)
         if (number_of_p[p] > 1) and (torch.sum(list_of_daugthers == i) > 0):
             connections_list.append([i, torch.unique(b[mask2])])
-    print("connections_list", connections_list)
     pid_particles = torch.tensor(output["pf_features"][6, 0:number_part])
     electron_photon_mask = (torch.abs(pid_particles[a_u.long()]) == 11) + (
         pid_particles[a_u.long()] == 22
