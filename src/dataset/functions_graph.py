@@ -10,6 +10,8 @@ from src.dataset.functions_data import (
     find_cluster_id,
     get_particle_features,
     get_hit_features,
+    calculate_distance_to_boundary,
+    concatenate_Particles_GT,
 )
 
 
@@ -41,10 +43,13 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pandora_pfo_link,
         daughters,
         hit_link_modified,
+        connection_list,
     ) = get_hit_features(output, number_hits, prediction, number_part)
 
     # features particles
-    y_data_graph = get_particle_features(unique_list_particles, output, prediction)
+    y_data_graph = get_particle_features(
+        unique_list_particles, output, prediction, connection_list
+    )
 
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
@@ -53,9 +58,9 @@ def create_inputs_from_table(output, hits_only, prediction=False):
     )
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
-
+    y_data_graph.mask(~mask_particles)
     result = [
-        y_data_graph[~mask_particles],
+        y_data_graph,  # y_data_graph[~mask_particles],
         p_hits[~mask_hits],
         e_hits[~mask_hits],
         cluster_id,
@@ -90,6 +95,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         )
 
     result.append(hit_type_one_hot)
+    result.append(connection_list)
     return result
 
 
@@ -118,6 +124,7 @@ def create_graph(
         hit_type,
         hit_link_modified,
         hit_type_one_hot,
+        connections_list,
     ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
@@ -171,6 +178,8 @@ def create_graph(
             g.ndata["pandora_pfo"] = pandora_pfo_link
             g.ndata["pandora_cluster_energy"] = pandora_cluster_energy
             g.ndata["pandora_pfo_energy"] = pandora_pfo_energy
+
+        y_data_graph.calculate_corrected_E(g, connections_list)
         if len(y_data_graph) < 4:
             graph_empty = True
     else:
@@ -180,29 +189,6 @@ def create_graph(
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
     return [g, y_data_graph], graph_empty
-
-
-def calculate_distance_to_boundary(g):
-    r = 2150
-    r_in_endcap = 2307
-    mask_endcap = (torch.abs(g.ndata["pos_hits_xyz"][:, 2]) - r_in_endcap) > 0
-    mask_barrer = ~mask_endcap
-    weight = torch.ones_like(g.ndata["pos_hits_xyz"][:, 0])
-    C = g.ndata["pos_hits_xyz"]
-    A = torch.Tensor([0, 0, 1]).to(C.device)
-    P = (
-        r
-        * 1
-        / (torch.norm(torch.cross(A.view(1, -1), C, dim=-1), dim=1)).unsqueeze(1)
-        * C
-    )
-    P1 = torch.abs(r_in_endcap / g.ndata["pos_hits_xyz"][:, 2].unsqueeze(1)) * C
-    weight[mask_barrer] = torch.norm(P - C, dim=1)[mask_barrer]
-    weight[mask_endcap] = torch.norm(P1[mask_endcap] - C[mask_endcap], dim=1)
-    g.ndata["radial_distance"] = weight
-    weight_ = torch.exp(-(weight / 1000))
-    g.ndata["radial_distance_exp"] = weight_
-    return g
 
 
 def graph_batch_func(list_graphs):
@@ -215,19 +201,10 @@ def graph_batch_func(list_graphs):
         batch dgl: dgl batch of graphs
     """
     list_graphs_g = [el[0] for el in list_graphs]
-    list_y = add_batch_number(list_graphs)
-    ys = torch.cat(list_y, dim=0)
-    ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
+    # list_y = add_batch_number(list_graphs)
+    # ys = torch.cat(list_y, dim=0)
+    # ys = torch.reshape(ys, [-1, list_y[0].shape[1]])
+    ys = concatenate_Particles_GT(list_graphs)
     bg = dgl.batch(list_graphs_g)
     # reindex particle number
     return bg, ys
-
-
-def add_batch_number(list_graphs):
-    list_y = []
-    for i, el in enumerate(list_graphs):
-        y = el[1]
-        batch_id = torch.ones(y.shape[0], 1) * i
-        y = torch.cat((y, batch_id), dim=1)
-        list_y.append(y)
-    return list_y

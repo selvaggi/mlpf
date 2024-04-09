@@ -35,7 +35,7 @@ def create_and_store_graph_output(
             batch_g.ndata["correction"] = model_output[:, 4]
 
     graphs = dgl.unbatch(batch_g)
-    batch_id = y[:, -1].view(-1)
+    batch_id = y.batch_number.view(-1)  # y[:, -1].view(-1)
 
     df_list = []
     df_list1 = []
@@ -44,7 +44,9 @@ def create_and_store_graph_output(
         mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
-        dic["part_true"] = y[mask]
+        y1 = y.copy()
+        y1.mask(mask)
+        dic["part_true"] = y1  # y[mask]
 
         X = dic["graph"].ndata["coords"]
         if predict:
@@ -98,20 +100,20 @@ def create_and_store_graph_output(
                 tracks=tracks,
             )
 
-        # if len(row_ind_hdb) < len(dic["part_true"]):
-        #     print(len(row_ind_hdb), len(dic["part_true"]))
-        #     print("storing  event", local_rank, step, i)
-        #     torch.save(
-        #         dic,
-        #         path_save
-        #         + "/graphs_all_comparing/"
-        #         + str(local_rank)
-        #         + "_"
-        #         + str(step)
-        #         + "_"
-        #         + str(i)
-        #         + ".pt",
-        #     )
+        # # if len(row_ind_hdb) < len(dic["part_true"]):
+        # print(len(row_ind_hdb), len(dic["part_true"]))
+        # print("storing  event", local_rank, step, i)
+        # torch.save(
+        #     dic,
+        #     path_save
+        #     + "/graphs_all_comparing/"
+        #     + str(local_rank)
+        #     + "_"
+        #     + str(step)
+        #     + "_"
+        #     + str(i)
+        #     + ".pt",
+        # )
         if len(shower_p_unique_hdb) > 1:
             if predict:
                 df_event, number_of_showers_total = generate_showers_data_frame(
@@ -186,7 +188,7 @@ def create_and_store_graph_output(
             store=store_epoch,
         )
     if predict:
-        return df_batch_pandora, df_batch1 , df_batch
+        return df_batch_pandora, df_batch1, df_batch
     else:
         return df_batch1
 
@@ -201,10 +203,17 @@ def store_at_batch_end(
     epoch=None,
     predict=False,
     store=False,
-):  
+):
     if predict:
         path_save_ = (
-            path_save + "/" + str(local_rank) + "_" + str(step) + "_" + str(epoch) + ".pt"
+            path_save
+            + "/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(epoch)
+            + ".pt"
         )
         if store and predict:
             df_batch.to_pickle(path_save_)
@@ -291,9 +300,11 @@ def generate_showers_data_frame(
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
-    energy_t = dic["part_true"][:, 3].to(e_pred_showers.device)
+    energy_t = (
+        dic["part_true"].E.view(-1).to(e_pred_showers.device)
+    )  # dic["part_true"][:, 3].to(e_pred_showers.device)
 
-    pid_t = dic["part_true"][:, 6].to(e_pred_showers.device)
+    pid_t = dic["part_true"].pid.to(e_pred_showers.device)
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
@@ -369,7 +380,7 @@ def generate_showers_data_frame(
             dim=0,
         )
         pid_t = torch.cat(
-            (pid_t, fake_showers_showers_e_truw),
+            (pid_t.view(-1), fake_showers_showers_e_truw),
             dim=0,
         )
         e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)

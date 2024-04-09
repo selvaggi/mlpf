@@ -18,7 +18,8 @@ def get_ratios(e_hits, part_idx, y):
         _type_: _description_
     """
     energy_from_showers = scatter_sum(e_hits, part_idx.long(), dim=0)
-    y_energy = y[:, 3]
+    # y_energy = y[:, 3]
+    y_energy = y.E
     energy_from_showers = energy_from_showers[1:]
     assert len(energy_from_showers) > 0
     return (energy_from_showers.flatten() / y_energy).tolist()
@@ -83,7 +84,8 @@ def find_mask_no_energy(
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
                 or (number_of_hits[index] < 2)
-                or (y[index, 8] == 1)
+                # or (y[index, 8] == 1)
+                or (y.decayed_in_tracker[index] == 1)
                 or number_of_tracks[index] == 2
                 or number_of_daughters[index] > 1
             ):
@@ -138,7 +140,7 @@ def scatter_count(input: torch.Tensor):
     return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
 
 
-def get_particle_features(unique_list_particles, output, prediction):
+def get_particle_features(unique_list_particles, output, prediction, connection_list):
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     if prediction:
         number_particle_features = 12 - 2  # include these if added phi, theta
@@ -163,60 +165,85 @@ def get_particle_features(unique_list_particles, output, prediction):
     y_energy = torch.sqrt(y_mass**2 + y_mom**2)
     y_pid = features_particles[:, 4].view(-1).unsqueeze(1)
     if prediction:
-        y_data_graph = torch.cat(
-            (
-                particle_coord,
-                y_energy,  # 3
-                y_mom,  # 4
-                y_mass,  # 5
-                y_pid,  # 6 particle ID (discrete)
-                features_particles[:, 5].view(-1).unsqueeze(1),  # decayed in calo
-                features_particles[:, 6].view(-1).unsqueeze(1),  # decayed in tracker
-            ),
-            dim=1,
+        y_data_graph = Particles_GT(
+            particle_coord,
+            y_energy,
+            y_mom,
+            y_mass,
+            y_pid,
+            features_particles[:, 5].view(-1).unsqueeze(1),
+            features_particles[:, 6].view(-1).unsqueeze(1),
+            unique_list_particles=unique_list_particles,
         )
+        # y_data_graph = torch.cat(
+        #     (
+        #         particle_coord,
+        #         y_energy,  # 3
+        #         y_mom,  # 4
+        #         y_mass,  # 5
+        #         y_pid,  # 6 particle ID (discrete)
+        #         features_particles[:, 5].view(-1).unsqueeze(1),  # decayed in calo
+        #         features_particles[:, 6].view(-1).unsqueeze(1),  # decayed in tracker
+        #     ),
+        #     dim=1,
+        # )
     else:
-        y_data_graph = torch.cat(
-            (
-                particle_coord,
-                y_energy,
-                y_mom,
-                y_mass,
-                y_pid,  # particle ID (discrete)
-            ),
-            dim=1,
+        y_data_graph = Particles_GT(
+            particle_coord,
+            y_energy,
+            y_mom,
+            y_mass,
+            y_pid,
+            unique_list_particles=unique_list_particles,
         )
+        # y_data_graph = torch.cat(
+        #     (
+        #         particle_coord,
+        #         y_energy,
+        #         y_mom,
+        #         y_mass,
+        #         y_pid,  # particle ID (discrete)
+        #     ),
+        #     dim=1,
+        # )
     return y_data_graph
 
 
 def modify_index_link_for_gamma_e(
     hit_type_feature, hit_particle_link, daughters, output, number_part
 ):
+    """Split all particles that have daughters, mostly for brems and conversions but also for protons and neutrons
+
+    Returns:
+        hit_particle_link: new link
+        hit_link_modified: bool for modified hits
+    """
     hit_link_modified = torch.zeros_like(hit_particle_link).to(hit_particle_link.device)
     mask = hit_type_feature > 1
     a = hit_particle_link[mask]
     b = daughters[mask]
     a_u = torch.unique(a)
     number_of_p = torch.zeros_like(a_u)
+    connections_list = []
     for p, i in enumerate(a_u):
         mask2 = a == i
-        number_of_p[p] = len(torch.unique(b[mask2]))
+        list_of_daugthers = torch.unique(b[mask2])
+        number_of_p[p] = len(list_of_daugthers)
+        if (number_of_p[p] > 1) and (torch.sum(list_of_daugthers == i) > 0):
+            connections_list.append([i, torch.unique(b[mask2])])
+    print("connections_list", connections_list)
     pid_particles = torch.tensor(output["pf_features"][6, 0:number_part])
     electron_photon_mask = (torch.abs(pid_particles[a_u.long()]) == 11) + (
         pid_particles[a_u.long()] == 22
     )
-    electron_photon_mask = electron_photon_mask * (number_of_p > 1)
+    electron_photon_mask = number_of_p > 1  # electron_photon_mask *
     index_change = a_u[electron_photon_mask]
-    # print("index change", index_change)
-    # if len(index_change) > 0:
-    #     for i in index_change:
-    #         print("daughters changed", daughters[hit_particle_link == i])
 
     for i in index_change:
         mask_n = mask * (hit_particle_link == i)
         hit_particle_link[mask_n] = daughters[mask_n]
         hit_link_modified[mask_n] = 1
-    return hit_particle_link,hit_link_modified
+    return hit_particle_link, hit_link_modified, connections_list
 
 
 def get_hit_features(output, number_hits, prediction, number_part):
@@ -236,7 +263,11 @@ def get_hit_features(output, number_hits, prediction, number_part):
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
 
-    hit_particle_link, hit_link_modified = modify_index_link_for_gamma_e(
+    (
+        hit_particle_link,
+        hit_link_modified,
+        connection_list,
+    ) = modify_index_link_for_gamma_e(
         hit_type_feature, hit_particle_link, daughters, output, number_part
     )
 
@@ -267,7 +298,8 @@ def get_hit_features(output, number_hits, prediction, number_part):
         hit_type_feature,
         pandora_pfo_link,
         daughters,
-        hit_link_modified
+        hit_link_modified,
+        connection_list,
     )
 
 
@@ -296,3 +328,151 @@ def spherical_to_cartesian(theta, phi, r, normalized=False):
     y = r * torch.sin(phi) * torch.sin(theta)
     z = r * torch.cos(phi)
     return torch.cat((x.unsqueeze(1), y.unsqueeze(1), z.unsqueeze(1)), dim=1)
+
+
+def calculate_distance_to_boundary(g):
+    r = 2150
+    r_in_endcap = 2307
+    mask_endcap = (torch.abs(g.ndata["pos_hits_xyz"][:, 2]) - r_in_endcap) > 0
+    mask_barrer = ~mask_endcap
+    weight = torch.ones_like(g.ndata["pos_hits_xyz"][:, 0])
+    C = g.ndata["pos_hits_xyz"]
+    A = torch.Tensor([0, 0, 1]).to(C.device)
+    P = (
+        r
+        * 1
+        / (torch.norm(torch.cross(A.view(1, -1), C, dim=-1), dim=1)).unsqueeze(1)
+        * C
+    )
+    P1 = torch.abs(r_in_endcap / g.ndata["pos_hits_xyz"][:, 2].unsqueeze(1)) * C
+    weight[mask_barrer] = torch.norm(P - C, dim=1)[mask_barrer]
+    weight[mask_endcap] = torch.norm(P1[mask_endcap] - C[mask_endcap], dim=1)
+    g.ndata["radial_distance"] = weight
+    weight_ = torch.exp(-(weight / 1000))
+    g.ndata["radial_distance_exp"] = weight_
+    return g
+
+
+class Particles_GT:
+    def __init__(
+        self,
+        coordinates,
+        energy,
+        momentum,
+        mass,
+        pid,
+        decayed_in_calo=None,
+        decayed_in_tracker=None,
+        batch_number=None,
+        unique_list_particles=None,
+    ):
+        self.coord = coordinates
+        self.E = energy
+        self.E_corrected = energy
+        self.m = momentum
+        self.mass = mass
+        self.pid = pid
+        if unique_list_particles is not None:
+            self.unique_list_particles = unique_list_particles
+        if decayed_in_calo is not None:
+            self.decayed_in_calo = decayed_in_calo
+        if decayed_in_tracker is not None:
+            self.decayed_in_tracker = decayed_in_tracker
+        if batch_number is not None:
+            self.batch_number = batch_number
+
+    def __len__(self):
+        return len(self.E)
+
+    def mask(self, mask):
+        for k in self.__dict__:
+            setattr(self, k, getattr(self, k)[mask])
+
+    def copy(self):
+        obj = type(self).__new__(self.__class__)
+        obj.__dict__.update(self.__dict__)
+        return obj
+
+    def calculate_corrected_E(self, g, connections_list):
+        for element in connections_list:
+            # checked there is track
+            parent_particle = element[0]
+            mask_i = g.ndata["particle_number_nomap"] == parent_particle
+            track_number = torch.sum(g.ndata["hit_type"][mask_i] == 1)
+            if track_number > 0:
+                # find index in list
+                index_parent = torch.argmax(
+                    1 * (self.unique_list_particles == parent_particle)
+                )
+                energy_daugthers = 0
+                for daugther in element[1]:
+                    if daugther != parent_particle:
+                        print(
+                            parent_particle,
+                            daugther,
+                            torch.sum(self.unique_list_particles == daugther),
+                        )
+                        if torch.sum(self.unique_list_particles == daugther) > 0:
+                            index_daugthers = torch.argmax(
+                                1 * (self.unique_list_particles == daugther)
+                            )
+                            print("energy daugh", self.E[index_daugthers])
+                            energy_daugthers = (
+                                self.E[index_daugthers] + energy_daugthers
+                            )
+                print("energy parent", self.E_corrected[index_parent])
+                self.E_corrected[index_parent] = (
+                    self.E_corrected[index_parent] - energy_daugthers
+                )
+
+
+def concatenate_Particles_GT(list_of_Particles_GT):
+    list_coord = [p[1].coord for p in list_of_Particles_GT]
+    list_coord = torch.cat(list_coord, dim=0)
+    list_E = [p[1].E for p in list_of_Particles_GT]
+    list_E = torch.cat(list_E, dim=0)
+    list_m = [p[1].m for p in list_of_Particles_GT]
+    list_m = torch.cat(list_m, dim=0)
+    list_mass = [p[1].mass for p in list_of_Particles_GT]
+    list_mass = torch.cat(list_mass, dim=0)
+    list_pid = [p[1].pid for p in list_of_Particles_GT]
+    list_pid = torch.cat(list_pid, dim=0)
+    if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
+        list_dec_calo = [p[1].decayed_in_calo for p in list_of_Particles_GT]
+        list_dec_track = [p[1].decayed_in_tracker for p in list_of_Particles_GT]
+        list_dec_calo = torch.cat(list_dec_calo, dim=0)
+        list_dec_track = torch.cat(list_dec_track, dim=0)
+    else:
+        list_dec_calo = None
+        list_dec_track = None
+    batch_number = add_batch_number(list_of_Particles_GT)
+    return Particles_GT(
+        list_coord,
+        list_E,
+        list_m,
+        list_mass,
+        list_pid,
+        list_dec_calo,
+        list_dec_track,
+        batch_number,
+    )
+
+
+# def add_batch_number(list_graphs):
+#     list_y = []
+#     for i, el in enumerate(list_graphs):
+#         y = el[1]
+#         batch_id = torch.ones(y.shape[0], 1) * i
+#         y = torch.cat((y, batch_id), dim=1)
+#         list_y.append(y)
+#     return list_y
+
+
+def add_batch_number(list_graphs):
+    list_y = []
+    for i, el in enumerate(list_graphs):
+        y = el[1]
+        batch_id = torch.ones(y.E.shape[0], 1) * i
+        list_y.append(batch_id)
+    list_y = torch.cat(list_y, dim=0)
+    return list_y

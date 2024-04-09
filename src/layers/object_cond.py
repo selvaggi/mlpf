@@ -191,8 +191,8 @@ def calc_LV_Lbeta(
     assert beta_alpha.size() == (n_objects,)
 
     if not tracking:
-        x_particles = y[:, 0:3]
-        e_particles = y[:, 3]
+        # x_particles = y[:, 0:3]
+        # e_particles = y[:, 3]
         # mom_particles_true = y[:, 4]
         # mass_particles_true = y[:, 5]
         # # particles_mask = y[:, 6]
@@ -211,7 +211,7 @@ def calc_LV_Lbeta(
         e_particle_pred_per_particle = e_particles_pred_per_object[
             object_index
         ] * energy_correction[is_sig].view(-1)
-        e_true = y[:, 3].clone()
+        e_true = y.E.clone()  # y[:, 3].clone()
         e_true = e_true.to(e_particles_pred_per_object.device)
         e_true_particle = e_true[object_index]
         L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
