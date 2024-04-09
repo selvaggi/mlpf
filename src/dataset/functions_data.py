@@ -84,7 +84,6 @@ def find_mask_no_energy(
                 np.array_equal(hit_types, [0, 1])
                 or int(p) not in filt1
                 or (number_of_hits[index] < 2)
-                # or (y[index, 8] == 1)
                 or (y.decayed_in_tracker[index] == 1)
                 or number_of_tracks[index] == 2
                 or number_of_daughters[index] > 1
@@ -99,7 +98,6 @@ def find_mask_no_energy(
                 or number_of_daughters[index] > 1
             ):
                 list_remove.append(p)
-
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
@@ -143,7 +141,7 @@ def scatter_count(input: torch.Tensor):
 def get_particle_features(unique_list_particles, output, prediction, connection_list):
     unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
     if prediction:
-        number_particle_features = 12 - 2  # include these if added phi, theta
+        number_particle_features = 12 - 2
     else:
         number_particle_features = 9 - 2
     features_particles = torch.permute(
@@ -175,18 +173,6 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             features_particles[:, 6].view(-1).unsqueeze(1),
             unique_list_particles=unique_list_particles,
         )
-        # y_data_graph = torch.cat(
-        #     (
-        #         particle_coord,
-        #         y_energy,  # 3
-        #         y_mom,  # 4
-        #         y_mass,  # 5
-        #         y_pid,  # 6 particle ID (discrete)
-        #         features_particles[:, 5].view(-1).unsqueeze(1),  # decayed in calo
-        #         features_particles[:, 6].view(-1).unsqueeze(1),  # decayed in tracker
-        #     ),
-        #     dim=1,
-        # )
     else:
         y_data_graph = Particles_GT(
             particle_coord,
@@ -196,16 +182,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             y_pid,
             unique_list_particles=unique_list_particles,
         )
-        # y_data_graph = torch.cat(
-        #     (
-        #         particle_coord,
-        #         y_energy,
-        #         y_mom,
-        #         y_mass,
-        #         y_pid,  # particle ID (discrete)
-        #     ),
-        #     dim=1,
-        # )
+
     return y_data_graph
 
 
@@ -235,7 +212,9 @@ def modify_index_link_for_gamma_e(
     electron_photon_mask = (torch.abs(pid_particles[a_u.long()]) == 11) + (
         pid_particles[a_u.long()] == 22
     )
-    electron_photon_mask = number_of_p > 1  # electron_photon_mask *
+    electron_photon_mask = (
+        electron_photon_mask * number_of_p > 1
+    )  # electron_photon_mask *
     index_change = a_u[electron_photon_mask]
 
     for i in index_change:
@@ -245,18 +224,28 @@ def modify_index_link_for_gamma_e(
     return hit_particle_link, hit_link_modified, connections_list
 
 
-def get_hit_features(output, number_hits, prediction, number_part):
-    # identification of particles, clusters, pfos
+def get_hit_features(output, number_hits, prediction, number_part, hit_chis):
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
     pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
     daughters = torch.tensor(output["pf_vectoronly"][3, 0:number_hits])
     if prediction:
-        pandora_cluster_energy = torch.tensor(output["pf_features"][-2, 0:number_hits])
-        pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
+        if hit_chis:
+            pandora_cluster_energy = torch.tensor(
+                output["pf_features"][-3, 0:number_hits]
+            )
+            pfo_energy = torch.tensor(output["pf_features"][-2, 0:number_hits])
+            chi_squared_tracks = torch.tensor(output["pf_features"][-1, 0:number_hits])
+        else:
+            pandora_cluster_energy = torch.tensor(
+                output["pf_features"][-2, 0:number_hits]
+            )
+            pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
+            chi_squared_tracks = pandora_cluster * 0
     else:
         pandora_cluster_energy = pandora_cluster * 0
         pfo_energy = pandora_cluster * 0
+        chi_squared_tracks = pandora_cluster * 0
     # hit type
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
@@ -299,6 +288,7 @@ def get_hit_features(output, number_hits, prediction, number_part):
         daughters,
         hit_link_modified,
         connection_list,
+        chi_squared_tracks,
     )
 
 
@@ -406,20 +396,13 @@ class Particles_GT:
                 energy_daugthers = 0
                 for daugther in element[1]:
                     if daugther != parent_particle:
-                        print(
-                            parent_particle,
-                            daugther,
-                            torch.sum(self.unique_list_particles == daugther),
-                        )
                         if torch.sum(self.unique_list_particles == daugther) > 0:
                             index_daugthers = torch.argmax(
                                 1 * (self.unique_list_particles == daugther)
                             )
-                            print("energy daugh", self.E[index_daugthers])
                             energy_daugthers = (
                                 self.E[index_daugthers] + energy_daugthers
                             )
-                print("energy parent", self.E_corrected[index_parent])
                 self.E_corrected[index_parent] = (
                     self.E_corrected[index_parent] - energy_daugthers
                 )
