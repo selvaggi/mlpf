@@ -115,21 +115,20 @@ def create_and_store_graph_output(
         #     + ".pt",
         # )
         if len(shower_p_unique_hdb) > 1:
-            if predict:
-                df_event, number_of_showers_total = generate_showers_data_frame(
-                    labels_clustering,
-                    dic,
-                    shower_p_unique,
-                    particle_ids,
-                    row_ind,
-                    col_ind,
-                    i_m_w,
-                    e_corr=e_corr,
-                    number_of_showers_total=number_of_showers_total,
-                    step=step,
-                    number_in_batch=i,
-                    tracks=tracks,
-                )
+            # df_event, number_of_showers_total = generate_showers_data_frame(
+            #     labels_clustering,
+            #     dic,
+            #     shower_p_unique,
+            #     particle_ids,
+            #     row_ind,
+            #     col_ind,
+            #     i_m_w,
+            #     e_corr=e_corr,
+            #     number_of_showers_total=number_of_showers_total,
+            #     step=step,
+            #     number_in_batch=i,
+            #     tracks=tracks,
+            # )
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -144,8 +143,8 @@ def create_and_store_graph_output(
                 number_in_batch=i,
                 tracks=tracks,
             )
-            if predict and len(df_event) > 1:
-                df_list.append(df_event)
+            # if predict and len(df_event) > 1:
+            #     df_list.append(df_event)
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
             if predict:
@@ -165,11 +164,12 @@ def create_and_store_graph_output(
                 )
                 if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
-        number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
+        # print("number of showers total", number_of_showers_total)
+        # number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
+        # print("number of showers total", number_of_showers_total)
 
     df_batch1 = pd.concat(df_list1)
     if predict:
-        df_batch = pd.concat(df_list)
         df_batch_pandora = pd.concat(df_list_pandora)
     else:
         df_batch = []
@@ -180,7 +180,7 @@ def create_and_store_graph_output(
             path_save,
             df_batch1,
             df_batch_pandora,
-            df_batch,
+            # df_batch,
             local_rank,
             step,
             epoch,
@@ -188,7 +188,7 @@ def create_and_store_graph_output(
             store=store_epoch,
         )
     if predict:
-        return df_batch_pandora, df_batch1, df_batch
+        return df_batch_pandora, df_batch1
     else:
         return df_batch1
 
@@ -197,7 +197,7 @@ def store_at_batch_end(
     path_save,
     df_batch1,
     df_batch_pandora,
-    df_batch,
+    # df_batch,
     local_rank=0,
     step=0,
     epoch=None,
@@ -215,9 +215,9 @@ def store_at_batch_end(
             + str(epoch)
             + ".pt"
         )
-        if store and predict:
-            df_batch.to_pickle(path_save_)
-        log_efficiency(df_batch, clustering=True)
+        # if store and predict:
+        #     df_batch.to_pickle(path_save_)
+        # log_efficiency(df_batch, clustering=True)
     path_save_ = (
         path_save
         + "/"
@@ -326,6 +326,14 @@ def generate_showers_data_frame(
         else:
             matched_es_cali = matched_es.clone()
             number_of_showers = e_pred_showers[index_matches].shape[0]
+            a = corrections_per_shower[
+                number_of_showers_total : number_of_showers_total + number_of_showers
+            ]
+            print("a", a.shape, number_of_showers_total, number_of_showers)
+            print("matched_es_cali", matched_es_cali[row_ind].shape)
+            print(e_pred_showers.shape, index_matches)
+            b = e_pred_showers[index_matches]
+            print("b", b.shape)
             matched_es_cali[row_ind] = (
                 corrections_per_shower[
                     number_of_showers_total : number_of_showers_total
@@ -346,7 +354,7 @@ def generate_showers_data_frame(
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
-
+    print("moving on to the next event,", number_of_showers_total)
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
