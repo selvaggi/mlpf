@@ -190,6 +190,11 @@ def main():
         # TODO use accumulate_grad_batches=7
 
     if args.data_test:
+        if args.load_model_weights is not None and args.correction:
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0
+            )
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
@@ -198,13 +203,21 @@ def main():
             logger=wandb_logger,
             # limit_val_batches=19,
         )
-        for name, get_test_loader in test_loaders.items():
-            test_loader = get_test_loader()
-            trainer.validate(
-                model=model,
-                ckpt_path=args.load_model_weights,
-                dataloaders=test_loader,
-            )
+        if args.correction:
+            for name, get_test_loader in test_loaders.items():
+                test_loader = get_test_loader()
+                trainer.validate(
+                    model=model,
+                    dataloaders=test_loader,
+                )
+        else:
+            for name, get_test_loader in test_loaders.items():
+                test_loader = get_test_loader()
+                trainer.validate(
+                    model=model,
+                    ckpt_path=args.load_model_weights,
+                    dataloaders=test_loader,
+                )
 
 
 if __name__ == "__main__":
