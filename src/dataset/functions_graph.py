@@ -15,7 +15,7 @@ from src.dataset.functions_data import (
 )
 
 
-def create_inputs_from_table(output, hits_only, prediction=False):
+def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False):
     """Used by graph creation to get nodes and edge features
 
     Args:
@@ -44,7 +44,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         daughters,
         hit_link_modified,
         connection_list,
-        hit_chis
+        chi_squared_tracks
     ) = get_hit_features(output, number_hits, prediction, number_part, hit_chis=None)
 
     # features particles
@@ -73,6 +73,7 @@ def create_inputs_from_table(output, hits_only, prediction=False):
         pandora_pfo_link[~mask_hits],
         hit_type_feature[~mask_hits],
         hit_link_modified[~mask_hits],
+        chi_squared_tracks[~mask_hits],
     ]
     hit_type = hit_type_feature[~mask_hits]
     # if hits only remove tracks, otherwise leave tracks
@@ -111,6 +112,7 @@ def create_graph(
     # standardize_coords = config.graph_config.get("standardize_coords", False)
     extended_coords = config.graph_config.get("extended_coords", False)
     prediction = config.graph_config.get("prediction", False)
+    hit_chis = config.graph_config.get("hit_chis_track", False)
     (
         y_data_graph,
         p_hits,
@@ -124,9 +126,10 @@ def create_graph(
         pandora_pfo_link,
         hit_type,
         hit_link_modified,
+        chi_squared_tracks, 
         hit_type_one_hot,
         connections_list,
-    ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction)
+    ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction, hit_chis=hit_chis)
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
         graph_empty = False
@@ -170,6 +173,7 @@ def create_graph(
         ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
 
         g.ndata["particle_number"] = cluster_id
+        g.ndata["chi_squared_tracks"] = chi_squared_tracks
         g.ndata["hit_link_modified"] = hit_link_modified
         g.ndata["particle_number_nomap"] = hit_particle_link
         # g.ndata["theta_hits"] = theta_hits
