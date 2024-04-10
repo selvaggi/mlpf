@@ -219,6 +219,7 @@ class ExampleWrapper(L.LightningModule):
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             # print("Also computing graph-level features")
             graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e)
+            pred_energy_corr = torch.ones(graphs_high_level_features.shape[0])
             node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
             node_features_avg = node_features_avg[:, 0:3]
             eta, phi = calculate_eta(
