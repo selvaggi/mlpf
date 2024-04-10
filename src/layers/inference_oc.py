@@ -277,7 +277,7 @@ def generate_showers_data_frame(
     number_in_batch=0,
     tracks=False,
 ):
-    print("e_corr_____________________________", e_corr)
+    
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(
@@ -329,11 +329,9 @@ def generate_showers_data_frame(
             a = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
-            print("a", a.shape, number_of_showers_total, number_of_showers)
-            print("matched_es_cali", matched_es_cali[row_ind].shape)
-            print(e_pred_showers.shape, index_matches)
+            
             b = e_pred_showers[index_matches]
-            print("b", b.shape)
+
             matched_es_cali[row_ind] = (
                 corrections_per_shower[
                     number_of_showers_total : number_of_showers_total
@@ -341,20 +339,13 @@ def generate_showers_data_frame(
                 ]
                 * e_pred_showers[index_matches]
             )
-            print(
-                "corrections per shower",
-                corrections_per_shower[
-                    number_of_showers_total : number_of_showers_total
-                    + number_of_showers
-                ].shape,
-                e_pred_showers[index_matches].shape,
-            )
+            
             calibration_per_shower = matched_es.clone()
             calibration_per_shower[row_ind] = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
-    print("moving on to the next event,", number_of_showers_total)
+    
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
