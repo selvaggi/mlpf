@@ -254,11 +254,13 @@ class ExampleWrapper(L.LightningModule):
                 graphs_high_level_features.shape[0]
                 == graphs_new.batch_num_nodes().shape[0]
             )
+            features_neutral_no_nan = graphs_high_level_features[neutral_idx]
+            features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
             charged_energies = self.ec_model_wrapper_charged.predict(
                 graphs_high_level_features[charged_idx]
             ).flatten()
             neutral_energies = self.ec_model_wrapper_neutral.predict(
-                graphs_high_level_features[neutral_idx]
+                features_neutral_no_nan
             ).flatten()
             pred_energy_corr[charged_idx.flatten()] = (
                 charged_energies / sum_e.flatten()[charged_idx.flatten()]
