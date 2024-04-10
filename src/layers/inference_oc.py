@@ -277,6 +277,7 @@ def generate_showers_data_frame(
     number_in_batch=0,
     tracks=False,
 ):
+    print("e_corr_____________________________", e_corr)
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(

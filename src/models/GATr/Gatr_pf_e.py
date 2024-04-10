@@ -219,7 +219,9 @@ class ExampleWrapper(L.LightningModule):
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             # print("Also computing graph-level features")
             graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e)
-            pred_energy_corr = torch.ones(graphs_high_level_features.shape[0])
+            pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
+                graphs_new.ndata["h"].device
+            )
             node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
             node_features_avg = node_features_avg[:, 0:3]
             eta, phi = calculate_eta(
@@ -356,6 +358,7 @@ class ExampleWrapper(L.LightningModule):
         self.validation_step_outputs = []
         y = batch[1]
         batch_g = batch[0]
+
         if self.args.correction:
             (
                 model_output,
@@ -367,11 +370,12 @@ class ExampleWrapper(L.LightningModule):
                 graph_level_features,
             ) = self(batch_g, y, 1)
             loss_ll = 0
-            print(e_cor)
+            e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
             model_output, e_cor1, loss_ll = self(batch_g, y, 1)
             loss_ll = 0
-            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+            e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
+            e_cor = e_cor1
         preds = model_output.squeeze()
         # if self.global_step < 200:
         #     self.args.losstype = "hgcalimplementation"
@@ -380,7 +384,7 @@ class ExampleWrapper(L.LightningModule):
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
             model_output,
-            e_cor,
+            e_cor1,
             y,
             clust_loss_only=True,
             add_energy_loss=False,
@@ -408,7 +412,7 @@ class ExampleWrapper(L.LightningModule):
             else:
                 model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
                 e_corr = None
-            
+
             (df_batch_pandora, df_batch1, df_batch) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
