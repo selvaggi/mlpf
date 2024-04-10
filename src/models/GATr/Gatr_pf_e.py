@@ -102,8 +102,8 @@ class ExampleWrapper(L.LightningModule):
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
-        self.ec_model_wrapper_charged = NetWrapper("/afs/cern.ch/work/g/gkrzmanc/models/charged22000.pkl", dev)
-        self.ec_model_wrapper_neutral = NetWrapper("/afs/cern.ch/work/g/gkrzmanc/models/neutral22000.pkl", dev)
+        self.ec_model_wrapper_charged = NetWrapper("/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev)
+        self.ec_model_wrapper_neutral = NetWrapper("/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev)
         # freeze these models completely
         for param in self.ec_model_wrapper_charged.model.parameters():
             param.requires_grad = False
