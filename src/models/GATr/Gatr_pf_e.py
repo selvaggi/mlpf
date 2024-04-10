@@ -114,10 +114,10 @@ class ExampleWrapper(L.LightningModule):
             "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
         )
         # freeze these models completely
-        for param in self.ec_model_wrapper_charged.model.parameters():
-            param.requires_grad = False
-        for param in self.ec_model_wrapper_neutral.model.parameters():
-            param.requires_grad = False
+        #for param in self.ec_model_wrapper_charged.model.parameters():
+        #    param.requires_grad = False
+        #for param in self.ec_model_wrapper_neutral.model.parameters():
+        #    param.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         """Forward pass.
