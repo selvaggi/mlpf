@@ -303,7 +303,6 @@ def object_condensation_loss2(
         #     )
         if add_energy_loss:
             loss += a[2]  # TODO add weight as argument
-
     else:
         loss = (
             a[0]

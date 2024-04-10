@@ -327,7 +327,7 @@ class ExampleWrapper(L.LightningModule):
             e_cor,
             y,
             clust_loss_only=True,
-            add_energy_loss=False,
+            add_energy_loss=self.args.correction,
             calc_e_frac_loss=False,
             q_min=self.args.qmin,
             frac_clustering_loss=self.args.frac_cluster_loss,
@@ -340,7 +340,6 @@ class ExampleWrapper(L.LightningModule):
         loss = loss  # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_ll)
-
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
         del model_output
