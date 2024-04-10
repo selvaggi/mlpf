@@ -17,8 +17,6 @@ import warnings
 
 from torch import nn
 import torch.nn.functional as F
-from torchvision import transforms
-from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 import lightning as L
 from src.utils.parser_args import parser
@@ -159,7 +157,7 @@ def main():
             checkpoint_callback,
             lr_monitor,
         ]
-        if args.correction:
+        if args.freeze_clustering:
             callbacks.append(FreezeClustering())
         # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
 

@@ -150,7 +150,7 @@ def main():
             checkpoint_callback,
             lr_monitor,
         ]
-        if args.correction:
+        if args.freeze_clustering:
             callbacks.append(FreezeClustering())
         profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
 

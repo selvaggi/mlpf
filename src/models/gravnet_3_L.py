@@ -38,7 +38,7 @@ from src.layers.obtain_statistics import (
     save_stat_dict,
     plot_distributions,
 )
-
+from copy import copy
 
 class GravnetModel(L.LightningModule): #L.LightningModule
     def __init__(
@@ -55,7 +55,6 @@ class GravnetModel(L.LightningModule): #L.LightningModule
         weird_batchnom=False,
         use_correction=False,
     ):
-
         super(GravnetModel, self).__init__()
         self.dev = dev
         self.loss_final = 0
@@ -700,8 +699,8 @@ class FreezeClustering(BaseFinetuning):
         # Here, we are freezing `feature_extractor`
 
         self.freeze(pl_module.ScaledGooeyBatchNorm2_1)
-        self.freeze(pl_module.Dense_1)
-        self.freeze(pl_module.gravnet_blocks)
+        #self.freeze(pl_module.Dense_1)
+        self.freeze(pl_module.gatr)
         self.freeze(pl_module.postgn_dense)
         self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
         self.freeze(pl_module.clustering)
@@ -810,7 +809,7 @@ def init_weights(m):
 
 
 def obtain_clustering_for_matched_showers(
-    batch_g, model_output, y, local_rank, use_gt_clusters=False
+    batch_g, model_output, y_all, local_rank, use_gt_clusters=False
 ):
     graphs_showers_matched = []
     true_energy_showers = []
@@ -818,12 +817,16 @@ def obtain_clustering_for_matched_showers(
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
     graphs = dgl.unbatch(batch_g)
-    batch_id = y[:, -1].view(-1)
+    batch_id = y_all.batch_number
     for i in range(0, len(graphs)):
         mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
-        dic["part_true"] = y[mask]
+        y = copy(y_all)
+        if "unique_list_particles" in y.__dict__:
+            del y.unique_list_particles
+        y.mask(mask.flatten())
+        dic["part_true"] = y
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
@@ -896,7 +899,7 @@ def obtain_clustering_for_matched_showers(
                         ),
                         dim=1,
                     )
-                    energy_t = dic["part_true"][:, 3].to(model_output.device)
+                    energy_t = dic["part_true"].E.to(model_output.device)
                     true_energy_shower = energy_t[row_ind[index_in_matched]]
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)

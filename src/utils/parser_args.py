@@ -1,6 +1,15 @@
 import argparse
 
 parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "--freeze-clustering",
+    action="store_true",
+    default=False,
+    help="Freeze the clustering part of the model",
+)
+
+
 parser.add_argument(
     "--regression-mode",
     action="store_true",
