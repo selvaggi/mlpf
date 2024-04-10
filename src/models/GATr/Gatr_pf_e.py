@@ -481,7 +481,13 @@ class ExampleWrapper(L.LightningModule):
                 e_corr = self.validation_step_outputs[0][1]
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
-                model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                if self.args.correction:
+                    model_output1 = model_output
+                    e_corr = e_corr
+                else:
+                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+                    e_corr = None
+               
                 create_and_store_graph_output(
                     batch_g,
                     model_output1,
@@ -494,6 +500,7 @@ class ExampleWrapper(L.LightningModule):
                     ),
                     store=True,
                     predict=False,
+                    e_corr=e_corr,
                     tracks=self.args.tracks,
                 )
                 del model_output1
