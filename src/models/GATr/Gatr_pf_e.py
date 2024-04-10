@@ -22,7 +22,11 @@ from src.models.gravnet_calibration import (
     obtain_batch_numbers,
 )
 from src.models.gravnet_3_L import obtain_clustering_for_matched_showers
-from src.utils.post_clustering_features import get_post_clustering_features, calculate_eta, calculate_phi
+from src.utils.post_clustering_features import (
+    get_post_clustering_features,
+    calculate_eta,
+    calculate_phi,
+)
 from src.models.energy_correction_NN import NetWrapper
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
@@ -79,6 +83,7 @@ class ExampleWrapper(L.LightningModule):
         hidden_s_channels=64,
     ):
         super().__init__()
+        self.strict_loading = False
         self.input_dim = 3
         self.output_dim = 4
         self.loss_final = 0
@@ -102,13 +107,18 @@ class ExampleWrapper(L.LightningModule):
         self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
-        self.ec_model_wrapper_charged = NetWrapper("/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev)
-        self.ec_model_wrapper_neutral = NetWrapper("/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev)
+        self.ec_model_wrapper_charged = NetWrapper(
+            "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
+        )
+        self.ec_model_wrapper_neutral = NetWrapper(
+            "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
+        )
         # freeze these models completely
         for param in self.ec_model_wrapper_charged.model.parameters():
             param.requires_grad = False
         for param in self.ec_model_wrapper_neutral.model.parameters():
             param.requires_grad = False
+
     def forward(self, g, y, step_count, eval="", return_train=False):
         """Forward pass.
 
@@ -198,9 +208,7 @@ class ExampleWrapper(L.LightningModule):
             print("Using global features of the graphs as well")
             # graphs_num_nodes = graphs_new.batch_num_nodes
             # add num_nodes for each node
-            graphs_sum_features = scatter_add(
-                graphs_new.ndata["h"], batch_idx, dim=0
-            )
+            graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
             # now multiply graphs_sum_features so the shapes match
             graphs_sum_features = graphs_sum_features[batch_idx]
             # append the new features to "h" (graphs_sum_features)
@@ -210,14 +218,14 @@ class ExampleWrapper(L.LightningModule):
             )
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             # print("Also computing graph-level features")
-            graphs_high_level_features = get_post_clustering_features(
-                graphs_new, sum_e
-            )
-            node_features_avg = scatter_mean(
-                graphs_new.ndata["h"], batch_idx, dim=0
-            )
+            graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e)
+            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
             node_features_avg = node_features_avg[:, 0:3]
-            eta, phi = calculate_eta(node_features_avg[:, 0], node_features_avg[:, 1], node_features_avg[:, 2]), calculate_phi(node_features_avg[:, 0], node_features_avg[:, 1])
+            eta, phi = calculate_eta(
+                node_features_avg[:, 0],
+                node_features_avg[:, 1],
+                node_features_avg[:, 2],
+            ), calculate_phi(node_features_avg[:, 0], node_features_avg[:, 1])
             graphs_high_level_features = torch.cat(
                 (graphs_high_level_features, node_features_avg), dim=1
             )
@@ -235,7 +243,7 @@ class ExampleWrapper(L.LightningModule):
             neutral_idx = torch.where(num_tracks < 1)[0]
             # assert their union is the whole set
             assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
-            #assert (num_tracks > 1).sum() == 0
+            # assert (num_tracks > 1).sum() == 0
             if (num_tracks > 1).sum() > 0:
                 print("! Particles with more than one track !")
                 print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
@@ -243,19 +251,23 @@ class ExampleWrapper(L.LightningModule):
                 graphs_high_level_features.shape[0]
                 == graphs_new.batch_num_nodes().shape[0]
             )
-            charged_energies = self.ec_model_wrapper_charged.predict(graphs_high_level_features[charged_idx]).flatten()
-            neutral_energies = self.ec_model_wrapper_neutral.predict(graphs_high_level_features[neutral_idx]).flatten()
-            pred_energy_corr[charged_idx.flatten()] = charged_energies / sum_e.flatten()[charged_idx.flatten()]
-            pred_energy_corr[neutral_idx.flatten()] = neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
-            #print("Pred energy corr:", pred_energy_corr)
-            #print("Charged energy corr:", pred_energy_corr[charged_idx])
-            #print("Neutral energy corr:", pred_energy_corr[neutral_idx])
+            charged_energies = self.ec_model_wrapper_charged.predict(
+                graphs_high_level_features[charged_idx]
+            ).flatten()
+            neutral_energies = self.ec_model_wrapper_neutral.predict(
+                graphs_high_level_features[neutral_idx]
+            ).flatten()
+            pred_energy_corr[charged_idx.flatten()] = (
+                charged_energies / sum_e.flatten()[charged_idx.flatten()]
+            )
+            pred_energy_corr[neutral_idx.flatten()] = (
+                neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
+            )
+            # print("Pred energy corr:", pred_energy_corr)
+            # print("Charged energy corr:", pred_energy_corr[charged_idx])
+            # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (
-                    x,
-                    pred_energy_corr,
-                    true_new
-                )
+                return (x, pred_energy_corr, true_new)
             else:
                 return (
                     x,
@@ -269,7 +281,6 @@ class ExampleWrapper(L.LightningModule):
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
             return x, pred_energy_corr, 0
-        return x, pred_energy_corr, 0
 
     def build_attention_mask(self, g):
         """Construct attention mask from pytorch geometric batch.
@@ -294,7 +305,9 @@ class ExampleWrapper(L.LightningModule):
         y = batch[1]
         batch_g = batch[0]
         if self.trainer.is_global_zero:
-            model_output, e_cor, loss_ll = self(batch_g, y, batch_idx, return_train=True)
+            model_output, e_cor, loss_ll = self(
+                batch_g, y, batch_idx, return_train=True
+            )
         else:
             model_output, e_cor, loss_ll = self(batch_g, y, 1, return_train=True)
             e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
@@ -345,7 +358,7 @@ class ExampleWrapper(L.LightningModule):
         if self.args.correction:
             (
                 model_output,
-                e_cor1,
+                e_cor,
                 true_e,
                 sum_e,
                 new_graphs,
@@ -353,7 +366,7 @@ class ExampleWrapper(L.LightningModule):
                 graph_level_features,
             ) = self(batch_g, y, 1)
             loss_ll = 0
-            e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
+            print(e_cor)
         else:
             model_output, e_cor1, loss_ll = self(batch_g, y, 1)
             loss_ll = 0
