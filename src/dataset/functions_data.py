@@ -358,6 +358,9 @@ class Particles_GT:
         self.coord = coordinates
         self.E = energy
         self.E_corrected = energy
+        if len(coordinates) != len(energy):
+            print("!!!!!!!!!!!!!!!!!!!")
+            raise Exception
         self.m = momentum
         self.mass = mass
         self.pid = pid

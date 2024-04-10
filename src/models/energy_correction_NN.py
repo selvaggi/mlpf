@@ -1,14 +1,17 @@
 '''
     PID predict energy correction
+    The model taken from notebooks/13_NNs.py
+    At first the model is fixed and the weights are loaded from earlier training
 '''
 
 
+import pickle
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-pid_predict_channels = 15 # TODO fix
+pid_predict_channels = 15  # TODO fix
 
 class Net(nn.Module):
     def __init__(self, out_features=1):
@@ -40,13 +43,19 @@ class Net(nn.Module):
                 print("Frozen batchnorm in 1st layer only - ", layer)
                 break
 
-class NetWrapper():
-    def __init__(self):
-        pass
+class NetWrapper(torch.nn.Module):
+    def __init__(self, ckpt_file, device):
+        super(NetWrapper, self).__init__()
+        self.model = Net(out_features=1 + pid_predict_channels)
+        # load weights from pickle
+        #self.model.load_state_dict(torch.load(ckpt_file))
+        self.model.model = pickle.load(open(ckpt_file, 'rb'))
+        self.model.to(device)
+
     def predict(self, x):
         self.model.eval()
         with torch.no_grad():
             pred = self.model(x)
             if isinstance(pred, tuple):
-                return pred[0].cpu().numpy().flatten()
-            return self.model(x).cpu().numpy().flatten()
+                return pred[0].flatten()
+            return self.model(x).flatten()

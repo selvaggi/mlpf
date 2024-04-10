@@ -45,7 +45,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
         hit_link_modified,
         connection_list,
         chi_squared_tracks
-    ) = get_hit_features(output, number_hits, prediction, number_part, hit_chis)
+    ) = get_hit_features(output, number_hits, prediction, number_part, hit_chis=None)
 
     # features particles
     y_data_graph = get_particle_features(

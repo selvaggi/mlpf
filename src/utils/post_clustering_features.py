@@ -1,6 +1,11 @@
 import torch
 from torch_scatter import scatter_sum
 
+def calculate_phi(x, y):
+    return torch.arctan2(y, x)
+def calculate_eta(x, y, z):
+    theta = torch.arctan2(torch.sqrt(x ** 2 + y ** 2), z)
+    return -torch.log(torch.tan(theta / 2))
 
 def get_post_clustering_features(graphs_new, sum_e):
     '''
@@ -28,7 +33,6 @@ def get_post_clustering_features(graphs_new, sum_e):
     for i in range(len(e_hits_f)):
         per_graph_e_hits_ecal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_ecal_mean[batch_idx_f[i]]) ** 2
     per_graph_e_hits_ecal_dispersion = per_graph_e_hits_ecal_dispersion / batch_num_nodes
-
     per_graph_e_hits_hcal = scatter_sum(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1)
     per_graph_e_hits_hcal_mean = per_graph_e_hits_hcal / batch_num_nodes
     per_graph_e_hits_hcal_dispersion = torch.zeros_like(per_graph_e_hits_hcal)
@@ -38,8 +42,10 @@ def get_post_clustering_features(graphs_new, sum_e):
         per_graph_e_hits_hcal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_hcal_mean[batch_idx_f[i]]) ** 2
     track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)
     num_tracks = scatter_sum((graphs_new.ndata["h"][:, 7] > 0).type(torch.int), batch_idx)
+    track_p = track_p / num_tracks
     num_hits = graphs_new.batch_num_nodes()
     # print shapes of the below things
+
     return torch.stack([per_graph_e_hits_ecal / sum_e,
                         per_graph_e_hits_hcal / sum_e,
                         num_hits, track_p,
