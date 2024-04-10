@@ -401,8 +401,13 @@ class ExampleWrapper(L.LightningModule):
             )
         self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
-            model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
-            e_corr = None
+            if self.args.correction:
+                model_output1 = model_output
+                e_corr = e_cor
+            else:
+                model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
+                e_corr = None
+            
             (df_batch_pandora, df_batch1, df_batch) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
