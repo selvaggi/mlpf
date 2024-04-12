@@ -159,22 +159,22 @@ def main():
         ]
         if args.freeze_clustering:
             callbacks.append(FreezeClustering())
-        # profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
-
+        #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
         trainer = L.Trainer(
             callbacks=callbacks,
             accelerator="gpu",
             devices=gpus,
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            # profiler=profiler,
+            #profiler=profiler,
             max_epochs=200,
             # accumulate_grad_batches=1,
             strategy="ddp",
             # limit_train_batches=100,
             limit_val_batches=100,
             # precision=16
-            # resume_from_checkpoint=args.load_model_weights,
+            # resume_from_checkpoint=args.load_model_weig
+            # hts,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
