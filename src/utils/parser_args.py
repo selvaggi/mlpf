@@ -8,8 +8,12 @@ parser.add_argument(
     default=False,
     help="Freeze the clustering part of the model",
 )
-
-
+parser.add_argument(
+    "--save-features",
+    default=False,
+    action="store_true",
+    help="Save the clust. features for the energy correction model"
+)
 parser.add_argument(
     "--regression-mode",
     action="store_true",

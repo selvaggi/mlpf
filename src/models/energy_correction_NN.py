@@ -48,10 +48,9 @@ class NetWrapper(torch.nn.Module):
         super(NetWrapper, self).__init__()
         self.model = Net(out_features=1 + pid_predict_channels)
         # load weights from pickle
-        #self.model.load_state_dict(torch.load(ckpt_file))
         self.model.model = pickle.load(open(ckpt_file, 'rb'))
+        #print("Temporarily not loading the model weights")
         self.model.to(device)
-
     def predict(self, x):
         pred = self.model(x)
         if isinstance(pred, tuple):

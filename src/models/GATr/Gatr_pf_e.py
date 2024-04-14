@@ -11,6 +11,7 @@ from gatr.interface import embed_point, extract_scalar, extract_point, embed_sca
 from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
+from src.utils.save_features import save_features
 from src.logger.plotting_tools import PlotCoordinates
 import numpy as np
 from typing import Tuple, Union, List
@@ -167,12 +168,10 @@ class ExampleWrapper(L.LightningModule):
 
         # Extract scalar and aggregate outputs from point cloud
         nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-
         x_point = points
         x_scalar = torch.cat(
             (nodewise_outputs.view(-1, 1), scalar_outputs.view(-1, 1)), dim=1
         )
-
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
         if self.args.tracks:
@@ -194,7 +193,7 @@ class ExampleWrapper(L.LightningModule):
 
         if self.args.correction:
             time_matching_start = time()
-            graphs_new, true_new, sum_e = obtain_clustering_for_matched_showers(
+            graphs_new, true_new, sum_e, true_pid = obtain_clustering_for_matched_showers(
                 g,
                 x,
                 y,
@@ -276,11 +275,12 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr[neutral_idx.flatten()] = (
                 neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
             )
+            pred_energy_corr[pred_energy_corr < 0] = 0.  # Temporary fix
             # print("Pred energy corr:", pred_energy_corr)
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e)
+                return (x, pred_energy_corr, true_new, sum_e, true_pid)
             else:
                 return (
                     x,
@@ -290,7 +290,7 @@ class ExampleWrapper(L.LightningModule):
                     graphs_new,
                     batch_idx,
                     graphs_high_level_features,
-
+                    true_pid
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -316,22 +316,15 @@ class ExampleWrapper(L.LightningModule):
         )
 
     def training_step(self, batch, batch_idx):
-        print("TRAINING STEP")
         y = batch[1]
         batch_g = batch[0]
         initial_time = time()
         if self.trainer.is_global_zero:
-            model_output, e_cor, e_true, e_sum_hits = self(
-                batch_g, y, batch_idx, return_train=True
+            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched = self(
+                batch_g, y, batch_idx
             )
         else:
-            model_output, e_cor, e_true, e_sum_hits = self(batch_g, y, 1, return_train=True)
-            #e_cor = torch.ones_like(model_output[:, 0].view(-1, 1))
-
-        # if self.global_step < 200:
-        #     self.args.losstype = "hgcalimplementation"
-        # else:
-        #     self.args.losstype = "vrepweighted"
+            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched = self(batch_g, y, 1)
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -358,6 +351,28 @@ class ExampleWrapper(L.LightningModule):
             wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
             #loss = loss_EC
+            if self.args.save_features:
+                cluster_features_path = os.path.join(
+                    self.args.model_prefix, "cluster_features"
+                )
+                if not os.path.exists(cluster_features_path):
+                    os.makedirs(cluster_features_path)
+                save_features(
+                    cluster_features_path,
+                    {
+                        "x": graph_level_features.detach().cpu(),
+                        #""" "xyz_covariance_matrix": covariances.cpu(),"""
+                        "e_true": e_true.detach().cpu(),
+                        "e_reco": e_cor.detach().cpu(),
+                        "true_e_corr": (e_true / e_sum_hits - 1).detach().cpu(),
+                        # "node_features_avg": scatter_mean(
+                        #    batch_g.ndata["h"], batch_idx, dim=0
+                        # ),  # graph-averaged node features
+                        "y_particles": y,
+                        "pid_y": pid_true_matched
+                    },
+                )
+
         misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
@@ -394,6 +409,7 @@ class ExampleWrapper(L.LightningModule):
                 new_graphs,
                 batch_id,
                 graph_level_features,
+                pids_true
             ) = self(batch_g, y, 1)
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
