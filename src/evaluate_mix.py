@@ -34,15 +34,32 @@ log_scale = False
 tracks = True
 if all_E:
     PATH_store = (
-        "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/comparison_plots/"
+        "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/comparison_plots/E_corr/"
     )
     path_list = [
-        "gatr1_200324_E/showers_df_evaluation/0_0_None_hdbscan.pt",
+        # "gatr1_200324_E/showers_df_evaluation/0_0_None_hdbscan.pt",
+        # "gatr1_210324_E_v1/showers_df_evaluation/0_0_None_hdbscan.pt",
+        # "gravnet_250324/showers_df_evaluation/1epoch/0_0_None_hdbscan.pt",
+        # "gatr1_250324_E/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "gatr1_250324_E_cont/showers_df_evaluation/0_0_None_hdbscan.pt",
+        # "280324_gravnet/showers_df_evaluation/0_0_None_hdbscan.pt",
     ]
-    path_pandora = "gatr1_200324_E/showers_df_evaluation/" + "0_0_None_pandora.pt"
+    path_pandora = "gatr1_250324_E_cont/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/"
+    # path_list = [
+    #     "030424_gatr_dr05/showers_df_evaluation/0_0_None_hdbscan.pt",
+    # ]
+    # path_pandora = "030424_gatr_dr05/showers_df_evaluation/" + "0_0_None_pandora.pt"
 
-labels = ["gatr1_200324_E"]
+labels = [
+    # "gatr1_200324_E",
+    # "gatr1_210324_E_v1",
+    # "gravnet_250324_1E",
+    # "gatr1_250324_E",
+    "gatr1_250324_E_cont",
+    # "280324_gravnet"
+    # "030424_gatr_dr05",
+]
 
 
 def main():
@@ -58,14 +75,14 @@ def main():
 
     print("finished collection of data and started plotting")
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
-    # plot_per_energy_resolution2(
-    #     sd_pandora,
-    #     sd_hgb,
-    #     matched_pandora,
-    #     matched_hgb,
-    #     PATH_store + "plots/",
-    #     tracks=tracks,
-    # )
+    plot_per_energy_resolution2(
+        sd_pandora,
+        sd_hgb,
+        matched_pandora,
+        matched_hgb,
+        PATH_store + "plots/",
+        tracks=tracks,
+    )
     # plot_metrics(
     #     neutrals_only,
     #     dic1,
