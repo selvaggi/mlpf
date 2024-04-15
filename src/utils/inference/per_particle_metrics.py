@@ -12,6 +12,7 @@ from utils.inference.inference_metrics import calculate_eff
 
 # TODO paralellize this script or make the data larger so that the binning needed is larger
 from scipy.optimize import curve_fit
+from utils.inference.inference_metrics import get_sigma_gaussian
 
 
 def get_mask_id(id, pids_pandora):
@@ -52,6 +53,11 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         mean_baseline,
         variance_om_baseline,
     ) = calculate_response(df_id, False, False, tracks=tracks)
+    print(variance_om_p)
+    print(variance_om)
+    print("recoooo")
+    print(variance_om_true_rec_p)
+    print(variance_om_true_rec)
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -277,20 +283,29 @@ def resolution(E, a, b, c):
 def plot_per_energy_resolution2(
     sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
 ):
+    mask = matched_["calibration_factor"] > 0
+    matched_ = matched_[mask]
     if tracks:
         tracks_label = "tracks"
     else:
         tracks_label = ""
     plot_response = True
     if plot_response:
-        list_plots = [""]  # "","_reco"
+        list_plots = ["", "_reco"]  # "","_reco"
+        photons_dic = get_response_for_id_i(
+            [22], matched_pandora, matched_, tracks=tracks
+        )
+        electrons_dic = get_response_for_id_i(
+            [11], matched_pandora, matched_, tracks=tracks
+        )
+        hadrons_dic = get_response_for_id_i(
+            [130], matched_pandora, matched_, tracks=tracks
+        )
+        hadrons_dic2 = get_response_for_id_i(
+            [211], matched_pandora, matched_, tracks=tracks
+        )
         for el in list_plots:
-            photons_dic = get_response_for_id_i(
-                [22], matched_pandora, matched_, tracks=tracks
-            )
-            electrons_dic = get_response_for_id_i(
-                [11], matched_pandora, matched_, tracks=tracks
-            )
+
             plot_one_label(
                 "Electromagnetic Resolution",
                 photons_dic,
@@ -327,15 +342,13 @@ def plot_per_energy_resolution2(
                 el,
                 tracks=tracks_label,
             )
-            hadrons_dic = get_response_for_id_i(
-                [130, 2112, 211], matched_pandora, matched_, tracks=tracks
-            )
+
             plot_one_label(
                 "Hadronic Resolution",
                 hadrons_dic,
                 "variance_om",
                 PATH_store,
-                "Hadrons",
+                "KL",
                 el,
                 tracks=tracks_label,
             )
@@ -344,7 +357,26 @@ def plot_per_energy_resolution2(
                 hadrons_dic,
                 "mean",
                 PATH_store,
-                "Hadrons",
+                "KL",
+                el,
+                tracks=tracks_label,
+            )
+
+            plot_one_label(
+                "Hadronic Resolution",
+                hadrons_dic2,
+                "variance_om",
+                PATH_store,
+                "Pions",
+                el,
+                tracks=tracks_label,
+            )
+            plot_one_label(
+                "Hadronic Response",
+                hadrons_dic2,
+                "mean",
+                PATH_store,
+                "Pions",
                 el,
                 tracks=tracks_label,
             )
@@ -498,7 +530,7 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
 
 def plot_eff(title, photons_dic, label1, PATH_store, labels):
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
-    markers = ["^", "*", "x", "d"]
+    markers = ["^", "*", "x", "d", ".", "s"]
     fig = plt.figure()
     j = 0
     plt.xlabel("Energy [GeV]")
@@ -562,7 +594,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
     # energy_resolutions_reco = [r[2] for ind, r in enumerate(output_results)]
     # toc = time.time()
     # print("time with paralel version", toc - tic)
-
+    print("START PANDORA")
     binning = 1e-3
     if pandora:
         bins_per_binned_E = np.arange(0, 2, binning)
@@ -584,23 +616,40 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
                 pred_e = matched.pandora_calibrated_E[mask]
         else:
             pred_e = matched.calibrated_E[mask]
+        pred_e_nocor = matched.pred_showers_E[mask]
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
             e_over_reco = true_rec / true_e
-            mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
+            e_over_reco_ML = pred_e_nocor / true_rec
+            # mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
+            #     e_over_true, bins_per_binned_E
+            # )
+
+            mean_predtotrue, var_predtotrue = get_sigma_gaussian(
                 e_over_true, bins_per_binned_E
             )
-            mean_reco_true, var_reco_true = obtain_MPV_and_68(
+
+            mean_reco_true, var_reco_true = get_sigma_gaussian(
                 e_over_reco, bins_per_binned_E
             )
 
+            mean_reco_ML, var_reco_ML = get_sigma_gaussian(
+                e_over_reco_ML, bins_per_binned_E
+            )
+            # mean_reco_true, var_reco_true = obtain_MPV_and_68(
+            #     e_over_reco, bins_per_binned_E
+            # )
+
             # mean_predtotrue = np.mean(e_over_true)
             # var_predtotrue = np.var(e_over_true) / mean_predtotrue
+            mean_true_rec.append(mean_reco_ML)
+            variance_om_true_rec.append(np.abs(var_reco_ML))
             mean_baseline.append(mean_reco_true)
-            variance_om_baseline.append(var_reco_true)
+            variance_om_baseline.append(np.abs(var_reco_true))
             mean.append(mean_predtotrue)
-            variance_om.append(var_predtotrue)
+            variance_om.append(np.abs(var_predtotrue))
             energy_resolutions.append((bin_i1 + bin_i) / 2)
+            energy_resolutions_reco.append((bin_i1 + bin_i) / 2)
 
     return (
         mean,

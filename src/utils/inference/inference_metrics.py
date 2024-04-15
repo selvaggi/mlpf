@@ -2,6 +2,9 @@ import matplotlib
 
 matplotlib.rc("font", size=25)
 import numpy as np
+from scipy import stats
+from scipy.optimize import curve_fit
+from scipy import asarray as ar, exp
 
 
 def calculate_eff(sd, log_scale=False):
@@ -136,7 +139,7 @@ def calculate_response(matched, pandora, log_scale=False):
             mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
                 e_over_true, bins_per_binned_E
             )
-
+            # mean_predtotrue, var_predtotrue = get_sigma_gaussian(e_over_true,bins_per_binned_E)
             # mean_predtotrue = np.mean(e_over_true)
             # var_predtotrue = np.var(e_over_true) / mean_predtotrue
             print(
@@ -160,6 +163,28 @@ def calculate_response(matched, pandora, log_scale=False):
         energy_resolutions_reco,
         dic_histograms,
     )
+
+
+def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
+    hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
+    # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
+    def gaus(X, C, X_mean, sigma):
+        return C * exp(-((X - X_mean) ** 2) / (2 * sigma**2))
+
+    n = len(hist)
+    x_hist = np.zeros((n), dtype=float)
+    for ii in range(n):
+        x_hist[ii] = (bin_edges[ii + 1] + bin_edges[ii]) / 2
+
+    y_hist = hist
+
+    mean = sum(x_hist * y_hist) / sum(y_hist)
+    sigma = sum(y_hist * (x_hist - mean) ** 2) / sum(y_hist)
+    
+    param_optimised, param_covariance_matrix = curve_fit(
+        gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
+    )
+    return param_optimised[1], param_optimised[2] / param_optimised[1]
 
 
 def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
