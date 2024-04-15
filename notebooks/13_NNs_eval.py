@@ -12,6 +12,11 @@ hep.style.use("CMS")
 import matplotlib
 matplotlib.rc('font', size=13)
 
+from src.utils.inference.inference_metrics import get_sigma_gaussian
+from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+
+
+
 # %%
 import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -100,11 +105,17 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
 
 import io
 
-def get_dataset():
+def get_dataset(save_ckpt=None):
+    if save_ckpt is not None:
+        # check if file exists
+        if os.path.exists(save_ckpt):
+            print("Loading dataset from", save_ckpt)
+            return pickle.load(open(save_ckpt, "rb"))
+
     path = args.dataset_path
     r = {}
     n = 0
-    nmax = 999999
+    nmax = 10000000000
     print("Loading dataset (a bit slow, TODO fix)")
     for file in tqdm.tqdm(os.listdir(path)):
         n += 1
@@ -126,8 +137,8 @@ def get_dataset():
                 if key not in r:
                     r[key] = torch.tensor(f[key])
                 else:
-                    r[key] = torch.concatenate(r[key], f[key])
-            if key != "y_particles" or old_dataset:
+                    r[key] = torch.concatenate([r[key], torch.tensor(f[key])])
+            elif key != "y_particles" or old_dataset:
                 if key not in r:
                     r[key] = f[key]
                 else:
@@ -149,6 +160,13 @@ def get_dataset():
         eta_phi = torch.stack([calculate_eta(xyz[:, 0], xyz[:, 1], xyz[:, 2]), calculate_phi(xyz[:, 0], xyz[:, 1])],
                               dim=1)
         r["x"] = torch.cat([r["x"], xyz, eta_phi], dim=1)
+    if "pid_y" in r:
+        r["y_particles"] = r["pid_y"]
+    if save_ckpt is not None:
+        ds = r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
+        "e_true"], r["e_reco"], r["y_particles"]
+        pickle.dump(ds, open(save_ckpt, "wb"))
+        print("Dumped dataset to file", save_ckpt)
     return r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
         "e_true"], r["e_reco"], r["y_particles"]
 
@@ -232,8 +250,11 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
     #        (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
     # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
     bins_per_binned_E = np.arange(0, 2, 1e-3)
-    return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
-
+    if len(data_for_hist) == 0:
+        return 0, 0, 0, 0
+    response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
+    #return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
+    return response, resolution, 0, 0
 
 # %%
 def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=False):
@@ -458,7 +479,15 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 pids_onehot[i, all_pids.index(pid)] = 1.
             result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
 
-            model.model.model = pickle.load(open("/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", "rb"))
+            # Try loading the "fine-tuned" model ...
+            args.correction = True
+            model1 = GravnetModel.load_from_checkpoint(
+                "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/FT_EC_perffix_GT_Clusters/_epoch=0_step=9000.ckpt", args=args, dev=0
+            )
+            model.model.model = model1.ec_model_wrapper_neutral.model.model
+            model.model.to(DEVICE)
+            #print("Set the model to the head inside GATr")
+            #model.model.model = pickle.load(open("/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", "rb"))
         else:
             result = None
             model.model.model = pickle.load(open("/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", "rb"))
@@ -494,8 +523,9 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         # log scatterplots of validation results per energy
 
 # %%
-ds = get_dataset()
+ds = get_dataset(save_ckpt="/eos/user/g/gkrzmanc/2024/datasets/dataset_new_model_clusters.pkl")
 print("Loaded dataset")
+
 # print value counts of ds[-1]
 import pandas as pd
 print("Value counts:", pd.Series(ds[-1]).value_counts( normalize=True))

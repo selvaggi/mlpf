@@ -1,6 +1,6 @@
 import matplotlib
-
-matplotlib.rc("font", size=25)
+import torch
+#matplotlib.rc("font", size=25)
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
@@ -177,15 +177,20 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
         x_hist[ii] = (bin_edges[ii + 1] + bin_edges[ii]) / 2
 
     y_hist = hist
-
+    if (torch.tensor(hist) == 0).all():
+        return 0,0
     mean = sum(x_hist * y_hist) / sum(y_hist)
     sigma = sum(y_hist * (x_hist - mean) ** 2) / sum(y_hist)
-    
     param_optimised, param_covariance_matrix = curve_fit(
         gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
     )
+    if param_optimised[2] < 0:
+        param_optimised[2] = sigma
+    if param_optimised[1] < 0:
+       param_optimised[1] = mean  # due to some weird fitting errors
+    assert param_optimised[1] >= 0
+    assert param_optimised[2] >= 0
     return param_optimised[1], param_optimised[2] / param_optimised[1]
-
 
 def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
