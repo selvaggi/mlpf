@@ -701,8 +701,8 @@ class FreezeClustering(BaseFinetuning):
         self.freeze(pl_module.ScaledGooeyBatchNorm2_1)
         #self.freeze(pl_module.Dense_1)
         self.freeze(pl_module.gatr)
-        self.freeze(pl_module.postgn_dense)
-        self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
+        #self.freeze(pl_module.postgn_dense)
+        #self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
         self.freeze(pl_module.clustering)
         self.freeze(pl_module.beta)
 
@@ -811,9 +811,12 @@ def init_weights(m):
 def obtain_clustering_for_matched_showers(
     batch_g, model_output, y_all, local_rank, use_gt_clusters=False
 ):
+    if use_gt_clusters:
+        print("!!! Using GT clusters for Energy Correction !!!!")
     graphs_showers_matched = []
     true_energy_showers = []
     reco_energy_showers = []
+    y_pids_matched = []
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
     graphs = dgl.unbatch(batch_g)
@@ -848,7 +851,6 @@ def obtain_clustering_for_matched_showers(
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
             index_matches = col_ind + 1
             index_matches = index_matches.to(model_output.device).long()
-
             """
                         ### Plot shapes of some showers, to debug what's wrong with the energies
                         debug_showers = False
@@ -901,6 +903,7 @@ def obtain_clustering_for_matched_showers(
                     )
                     energy_t = dic["part_true"].E.to(model_output.device)
                     true_energy_shower = energy_t[row_ind[index_in_matched]]
+                    y_pids_matched.append(y.pid[row_ind[index_in_matched]].item())
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
@@ -910,7 +913,7 @@ def obtain_clustering_for_matched_showers(
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
 
-    return graphs_showers_matched, true_energy_showers, reco_energy_showers
+    return graphs_showers_matched, true_energy_showers, reco_energy_showers, y_pids_matched
 
 
 def loss_reco_true(e_cor, true_e, sum_e):

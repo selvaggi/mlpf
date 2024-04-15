@@ -1,5 +1,5 @@
 import torch
-from torch_scatter import scatter_sum
+from torch_scatter import scatter_sum, scatter_std
 
 def calculate_phi(x, y):
     return torch.arctan2(y, x)
@@ -26,26 +26,30 @@ def get_post_clustering_features(graphs_new, sum_e):
     hcal_hits = graphs_new.ndata["h"][:, 5]
     filter_hcal = torch.where(hcal_hits)[0]
     per_graph_e_hits_ecal = scatter_sum(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1)
-    per_graph_e_hits_ecal_mean = per_graph_e_hits_ecal / batch_num_nodes
+    #per_graph_e_hits_ecal_mean = per_graph_e_hits_ecal / batch_num_nodes
     per_graph_e_hits_ecal_dispersion = torch.zeros_like(per_graph_e_hits_ecal)
-    e_hits_f = e_hits[filter_ecal]
-    batch_idx_f = batch_idx[filter_ecal]
-    for i in range(len(e_hits_f)):
-        per_graph_e_hits_ecal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_ecal_mean[batch_idx_f[i]]) ** 2
+    #e_hits_f = e_hits[filter_ecal]
+    #batch_idx_f = batch_idx[filter_ecal]
+    #for i in range(len(e_hits_f)):
+    #    per_graph_e_hits_ecal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_ecal_mean[batch_idx_f[i]]) ** 2
     per_graph_e_hits_ecal_dispersion = per_graph_e_hits_ecal_dispersion / batch_num_nodes
+    # similar  as above but with scatter_std
+    per_graph_e_hits_ecal_dispersion = scatter_std(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1) ** 2
     per_graph_e_hits_hcal = scatter_sum(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1)
-    per_graph_e_hits_hcal_mean = per_graph_e_hits_hcal / batch_num_nodes
-    per_graph_e_hits_hcal_dispersion = torch.zeros_like(per_graph_e_hits_hcal)
-    e_hits_f = e_hits[filter_hcal]
-    batch_idx_f = batch_idx[filter_hcal]
-    for i in range(len(e_hits_f)):
-        per_graph_e_hits_hcal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_hcal_mean[batch_idx_f[i]]) ** 2
+    #per_graph_e_hits_hcal_mean = per_graph_e_hits_hcal / batch_num_nodes
+    #per_graph_e_hits_hcal_dispersion = torch.zeros_like(per_graph_e_hits_hcal)
+    #e_hits_f = e_hits[filter_hcal]
+    #batch_idx_f = batch_idx[filter_hcal]
+    #for i in range(len(e_hits_f)):
+    #   per_graph_e_hits_hcal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_hcal_mean[batch_idx_f[i]]) ** 2
+    #per_graph_e_hits_hcal_dispersion = per_graph_e_hits_hcal_dispersion / batch_num_nodes
+    # similar as above but with scatter_std  -- !!! TODO: Retrain the base EC models using this definition !!!!!
+    per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
     track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)
     num_tracks = scatter_sum((graphs_new.ndata["h"][:, 7] > 0).type(torch.int), batch_idx)
     track_p = track_p / num_tracks
     num_hits = graphs_new.batch_num_nodes()
     # print shapes of the below things
-
     return torch.stack([per_graph_e_hits_ecal / sum_e,
                         per_graph_e_hits_hcal / sum_e,
                         num_hits, track_p,
