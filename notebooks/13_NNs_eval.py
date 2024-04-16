@@ -481,9 +481,11 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
 
             # Try loading the "fine-tuned" model ...
             args.correction = True
+            #model1 = GravnetModel.load_from_checkpoint(
+            #    "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/FT_EC_perffix_GT_Clusters/_epoch=0_step=9000.ckpt", args=args, dev=0
+            #)
             model1 = GravnetModel.load_from_checkpoint(
-                "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/FT_EC_perffix_GT_Clusters/_epoch=0_step=9000.ckpt", args=args, dev=0
-            )
+                "/afs/cern.ch/work/g/gkrzmanc/mlpf_results/FT_EC_perffix/_epoch=0_step=9000.ckpt", args=args, dev=0)
             model.model.model = model1.ec_model_wrapper_neutral.model.model
             model.model.to(DEVICE)
             #print("Set the model to the head inside GATr")
@@ -524,6 +526,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
 
 # %%
 ds = get_dataset(save_ckpt="/eos/user/g/gkrzmanc/2024/datasets/dataset_new_model_clusters.pkl")
+ds = get_dataset(save_ckpt="/eos/user/g/gkrzmanc/2024/datasets/dataset_new_model_clusters_with_eval_DS.pkl")
 print("Loaded dataset")
 
 # print value counts of ds[-1]
