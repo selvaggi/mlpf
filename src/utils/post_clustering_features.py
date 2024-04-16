@@ -54,16 +54,20 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
 
     # print shapes of the below things
     if add_hit_chis:
-        return torch.stack([per_graph_e_hits_ecal / sum_e,
+        return torch.nan_to_num(
+            torch.stack([per_graph_e_hits_ecal / sum_e,
                             per_graph_e_hits_hcal / sum_e,
                             num_hits, track_p,
                             per_graph_e_hits_ecal_dispersion,
                             per_graph_e_hits_hcal_dispersion,
                             sum_e, num_tracks, chis_tracks]).T
+        )
     else:
-        return torch.stack([per_graph_e_hits_ecal / sum_e,
+        return torch.nan_to_num(
+            torch.stack([per_graph_e_hits_ecal / sum_e,
                             per_graph_e_hits_hcal / sum_e,
                             num_hits, track_p,
                             per_graph_e_hits_ecal_dispersion,
                             per_graph_e_hits_hcal_dispersion,
                             sum_e, num_tracks]).T
+        )  # nan_to_num due to division by zero when there is zero tracks

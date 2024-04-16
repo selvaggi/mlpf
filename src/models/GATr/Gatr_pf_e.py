@@ -109,12 +109,17 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            self.ec_model_wrapper_charged = NetWrapper(
-                "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
-            )
-            self.ec_model_wrapper_neutral = NetWrapper(
-                "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
-            )
+            if not self.args.add_track_chis:
+                self.ec_model_wrapper_charged = NetWrapper(
+                    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
+                )
+                self.ec_model_wrapper_neutral = NetWrapper(
+                    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
+                )
+            else:
+                # For now, take a fresh model to train it with chi squared
+                self.ec_model_wrapper_charged = NetWrapper(ckpt_file=None, device=dev, in_features=14)
+                self.ec_model_wrapper_neutral = NetWrapper(ckpt_file=None, device=dev, in_features=14)
         # freeze these models completely
         #for param in self.ec_model_wrapper_charged.model.parameters():
         #    param.requires_grad = False
