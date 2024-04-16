@@ -193,7 +193,7 @@ class ExampleWrapper(L.LightningModule):
 
         if self.args.correction:
             time_matching_start = time()
-            graphs_new, true_new, sum_e, true_pid = obtain_clustering_for_matched_showers(
+            graphs_new, true_new, sum_e, true_pid, e_true_corr_daughters = obtain_clustering_for_matched_showers(
                 g,
                 x,
                 y,
@@ -222,7 +222,7 @@ class ExampleWrapper(L.LightningModule):
             )
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             # print("Also computing graph-level features")
-            graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e)
+            graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e, add_hit_chis=self.args.add_track_chis)
             pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
                 graphs_new.ndata["h"].device
             )
@@ -280,7 +280,7 @@ class ExampleWrapper(L.LightningModule):
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e, true_pid)
+                return (x, pred_energy_corr, true_new, sum_e, true_pid, e_true_corr_daughters)
             else:
                 return (
                     x,
@@ -290,7 +290,8 @@ class ExampleWrapper(L.LightningModule):
                     graphs_new,
                     batch_idx,
                     graphs_high_level_features,
-                    true_pid
+                    true_pid,
+                    e_true_corr_daughters
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -320,11 +321,11 @@ class ExampleWrapper(L.LightningModule):
         batch_g = batch[0]
         initial_time = time()
         if self.trainer.is_global_zero:
-            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched = self(
+            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters = self(
                 batch_g, y, batch_idx
             )
         else:
-            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched = self(batch_g, y, 1)
+            model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters = self(batch_g, y, 1)
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -365,6 +366,7 @@ class ExampleWrapper(L.LightningModule):
                         "e_true": e_true.detach().cpu(),
                         "e_reco": e_cor.detach().cpu(),
                         "true_e_corr": (e_true / e_sum_hits - 1).detach().cpu(),
+                        "e_true_corrected_daughters": e_true_corr_daughters.detach().cpu(),
                         # "node_features_avg": scatter_mean(
                         #    batch_g.ndata["h"], batch_idx, dim=0
                         # ),  # graph-averaged node features
@@ -409,7 +411,8 @@ class ExampleWrapper(L.LightningModule):
                 new_graphs,
                 batch_id,
                 graph_level_features,
-                pids_true
+                pids_true,
+                e_corr_daughters
             ) = self(batch_g, y, 1)
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))

@@ -7,7 +7,7 @@ def calculate_eta(x, y, z):
     theta = torch.arctan2(torch.sqrt(x ** 2 + y ** 2), z)
     return -torch.log(torch.tan(theta / 2))
 
-def get_post_clustering_features(graphs_new, sum_e):
+def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
     '''
     Obtain graph-level qualitative features that can then be used to regress the energy corr. factor.
     :param graph_batch: Output from the previous step - clustered, matched showers
@@ -46,14 +46,24 @@ def get_post_clustering_features(graphs_new, sum_e):
     # similar as above but with scatter_std  -- !!! TODO: Retrain the base EC models using this definition !!!!!
     per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
     track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)
+    chis_tracks = scatter_sum(graphs_new.ndata["chi_squared_tracks"], batch_idx)
     num_tracks = scatter_sum((graphs_new.ndata["h"][:, 7] > 0).type(torch.int), batch_idx)
     track_p = track_p / num_tracks
+    chis_tracks = chis_tracks / num_tracks
     num_hits = graphs_new.batch_num_nodes()
-    # print shapes of the below things
-    return torch.stack([per_graph_e_hits_ecal / sum_e,
-                        per_graph_e_hits_hcal / sum_e,
-                        num_hits, track_p,
-                        per_graph_e_hits_ecal_dispersion,
-                        per_graph_e_hits_hcal_dispersion,
-                        sum_e, num_tracks]).T
 
+    # print shapes of the below things
+    if add_hit_chis:
+        return torch.stack([per_graph_e_hits_ecal / sum_e,
+                            per_graph_e_hits_hcal / sum_e,
+                            num_hits, track_p,
+                            per_graph_e_hits_ecal_dispersion,
+                            per_graph_e_hits_hcal_dispersion,
+                            sum_e, num_tracks, chis_tracks]).T
+    else:
+        return torch.stack([per_graph_e_hits_ecal / sum_e,
+                            per_graph_e_hits_hcal / sum_e,
+                            num_hits, track_p,
+                            per_graph_e_hits_ecal_dispersion,
+                            per_graph_e_hits_hcal_dispersion,
+                            sum_e, num_tracks]).T

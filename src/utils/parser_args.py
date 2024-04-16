@@ -547,13 +547,28 @@ parser.add_argument(
     help="if toggled, also adds global features to the graphs for energy correction",
 )
 
+# TODO: implement these. For now, the "daughter-corrected" energy is returned next to the original one, but not used in the training for now
+
+parser.add_argument(
+    "--add-track-chis",
+    default=False,
+    action="store_true",
+    help="add the chi squared of the tracks to the node features",
+)
+
+parser.add_argument(
+    "--remove-energy-of-daughters",
+    default=False,
+    action="store_true",
+    help="use the 'corrected' version of the energy (minus the energy of the daughters)",
+)
+
 parser.add_argument(
     "--graph-level-features",
     default=False,
     action="store_true",
     help="if toggled, considers the 'high-level' features for energy corr. (energy of the hits, number of the hits etc.)",
 )
-
 
 parser.add_argument(
     "--use-gt-clusters",

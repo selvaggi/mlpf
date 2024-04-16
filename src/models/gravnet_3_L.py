@@ -816,6 +816,7 @@ def obtain_clustering_for_matched_showers(
     graphs_showers_matched = []
     true_energy_showers = []
     reco_energy_showers = []
+    energy_true_daughters = []
     y_pids_matched = []
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
@@ -906,20 +907,21 @@ def obtain_clustering_for_matched_showers(
                         ),
                         dim=1,
                     )
+                    g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
                     energy_t = dic["part_true"].E.to(model_output.device)
+                    energy_t_corr_daughters = dic["part_true"].E_corrected.to(model_output.device)
                     true_energy_shower = energy_t[row_ind[j]]
                     y_pids_matched.append(y.pid[row_ind[j]].item())
+                    energy_true_daughters.append(energy_t_corr_daughters[row_ind[j]])
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
                     reco_energy_showers.append(reco_energy_shower.view(-1))
-
     graphs_showers_matched = dgl.batch(graphs_showers_matched)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
-
-    return graphs_showers_matched, true_energy_showers, reco_energy_showers, y_pids_matched
-
+    e_true_corr_daughters = torch.cat(energy_true_daughters, dim=0)
+    return graphs_showers_matched, true_energy_showers, reco_energy_showers, y_pids_matched, e_true_corr_daughters
 
 def loss_reco_true(e_cor, true_e, sum_e):
     # m = nn.ELU()
