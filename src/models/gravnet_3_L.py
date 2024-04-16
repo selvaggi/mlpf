@@ -830,7 +830,6 @@ def obtain_clustering_for_matched_showers(
         #if "unique_list_particles" in y.__dict__:
         #    del y.unique_list_particles
         y.mask(mask.flatten())
-        print("in obtain_cluster", y.E, y.E.shape)
         dic["part_true"] = y
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
@@ -839,22 +838,18 @@ def obtain_clustering_for_matched_showers(
             clustering = get_clustering(betas, X)
         elif clustering_mode == "dbscan":
             if use_gt_clusters:
-                print("Using GT clusters")
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
                 #print("Obtained labels in obtain_clustering", labels)
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
-            print("in obtain_clustering -->", scatter_add(torch.ones_like(labels), labels))
             shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
                 labels, dic, particle_ids, model_output, local_rank, i, None
             )
             row_ind = torch.Tensor(row_ind).to(model_output.device).long()
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
             index_matches = col_ind + 1
-            print("index_matches", index_matches)
-            print("row_ind", row_ind)
             index_matches = index_matches.to(model_output.device).long()
             """
                         ### Plot shapes of some showers, to debug what's wrong with the energies
@@ -926,9 +921,9 @@ def obtain_clustering_for_matched_showers(
 def loss_reco_true(e_cor, true_e, sum_e):
     # m = nn.ELU()
     # e_cor = m(e_cor)
-    print("corection", e_cor[0:5])
-    print("sum_e", sum_e[0:5])
-    print("true_e", true_e[0:5])
+    #print("corection", e_cor[0:5])
+    #print("sum_e", sum_e[0:5])
+    #print("true_e", true_e[0:5])
     # true_e = -1 * sum_e  # Temporarily, to debug - so the model would have to learn corr. factor of -1 for each particle...
     loss = torch.square(((e_cor) * sum_e - true_e) / true_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
@@ -941,9 +936,9 @@ def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     # implementation of a loss that regresses the sum of the hits instead of the corr. factor ( just for debugging )
     # m = nn.ELU()
     # e_cor = m(e_cor)
-    print("corection", e_cor[0:5])
-    print("sum_e", sum_e[0:5])
-    print("true_e", true_e[0:5])
+    #print("corection", e_cor[0:5])
+    #print("sum_e", sum_e[0:5])
+    #print("true_e", true_e[0:5])
     # true_e = -1 * sum_e  # Temporarily, to debug - so the model would have to learn corr. factor of -1 for each particle...
     loss = torch.square(e_cor - sum_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
