@@ -183,7 +183,6 @@ def create_graph(
             g.ndata["pandora_pfo"] = pandora_pfo_link
             g.ndata["pandora_cluster_energy"] = pandora_cluster_energy
             g.ndata["pandora_pfo_energy"] = pandora_pfo_energy
-
         y_data_graph.calculate_corrected_E(g, connections_list)
         if len(y_data_graph) < 4:
             graph_empty = True
@@ -194,7 +193,6 @@ def create_graph(
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
     return [g, y_data_graph], graph_empty
-
 
 def graph_batch_func(list_graphs):
     """collator function for graph dataloader
