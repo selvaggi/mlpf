@@ -44,8 +44,10 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
         daughters,
         hit_link_modified,
         connection_list,
-        chi_squared_tracks
-    ) = get_hit_features(output, number_hits, prediction, number_part, hit_chis=None)
+        chi_squared_tracks,
+    ) = get_hit_features(
+        output, number_hits, prediction, number_part, hit_chis=hit_chis
+    )
 
     # features particles
     y_data_graph = get_particle_features(
@@ -126,10 +128,12 @@ def create_graph(
         pandora_pfo_link,
         hit_type,
         hit_link_modified,
-        chi_squared_tracks, 
+        chi_squared_tracks,
         hit_type_one_hot,
         connections_list,
-    ) = create_inputs_from_table(output, hits_only=hits_only, prediction=prediction, hit_chis=hit_chis)
+    ) = create_inputs_from_table(
+        output, hits_only=hits_only, prediction=prediction, hit_chis=hit_chis
+    )
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
         graph_empty = False
