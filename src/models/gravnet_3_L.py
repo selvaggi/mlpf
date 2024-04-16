@@ -825,10 +825,11 @@ def obtain_clustering_for_matched_showers(
         mask = batch_id == i
         dic = {}
         dic["graph"] = graphs[i]
-        y = copy(y_all)
-        if "unique_list_particles" in y.__dict__:
-            del y.unique_list_particles
+        y = y_all.copy()
+        #if "unique_list_particles" in y.__dict__:
+        #    del y.unique_list_particles
         y.mask(mask.flatten())
+        print("in obtain_cluster", y.E, y.E.shape)
         dic["part_true"] = y
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
@@ -841,15 +842,18 @@ def obtain_clustering_for_matched_showers(
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
-
+                #print("Obtained labels in obtain_clustering", labels)
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
+            print("in obtain_clustering -->", scatter_add(torch.ones_like(labels), labels))
             shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
                 labels, dic, particle_ids, model_output, local_rank, i, None
             )
             row_ind = torch.Tensor(row_ind).to(model_output.device).long()
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
             index_matches = col_ind + 1
+            print("index_matches", index_matches)
+            print("row_ind", row_ind)
             index_matches = index_matches.to(model_output.device).long()
             """
                         ### Plot shapes of some showers, to debug what's wrong with the energies
@@ -878,11 +882,12 @@ def obtain_clustering_for_matched_showers(
                             # log to wandb
                             wandb.log({"showers": [wandb.Image(fig, caption="showers")]})
             """
-            for unique_showers_label in shower_p_unique:
+            for j, unique_showers_label in enumerate(index_matches):
                 if torch.sum(unique_showers_label == index_matches) == 1:
                     index_in_matched = torch.argmax(
                         (unique_showers_label == index_matches) * 1
                     )
+
                     mask = labels == unique_showers_label
                     # non_graph = torch.sum(mask)
                     sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
@@ -902,8 +907,8 @@ def obtain_clustering_for_matched_showers(
                         dim=1,
                     )
                     energy_t = dic["part_true"].E.to(model_output.device)
-                    true_energy_shower = energy_t[row_ind[index_in_matched]]
-                    y_pids_matched.append(y.pid[row_ind[index_in_matched]].item())
+                    true_energy_shower = energy_t[row_ind[j]]
+                    y_pids_matched.append(y.pid[row_ind[j]].item())
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
