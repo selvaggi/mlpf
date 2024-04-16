@@ -47,7 +47,6 @@ def create_and_store_graph_output(
         y1 = y.copy()
         y1.mask(mask)
         dic["part_true"] = y1  # y[mask]
-
         X = dic["graph"].ndata["coords"]
         if predict:
             labels_clustering = clustering_obtain_labels(
@@ -58,7 +57,7 @@ def create_and_store_graph_output(
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        if predict:
+        '''if predict:
             shower_p_unique = torch.unique(labels_clustering)
             shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
                 labels_clustering,
@@ -69,7 +68,7 @@ def create_and_store_graph_output(
                 i,
                 path_save,
                 tracks=tracks,
-            )
+            )'''
         shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb, iou_m = match_showers(
             labels_hdb,
             dic,
@@ -277,7 +276,6 @@ def generate_showers_data_frame(
     number_in_batch=0,
     tracks=False,
 ):
-    
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(
@@ -329,9 +327,7 @@ def generate_showers_data_frame(
             a = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
-            
             b = e_pred_showers[index_matches]
-
             matched_es_cali[row_ind] = (
                 corrections_per_shower[
                     number_of_showers_total : number_of_showers_total
@@ -339,18 +335,15 @@ def generate_showers_data_frame(
                 ]
                 * e_pred_showers[index_matches]
             )
-            
             calibration_per_shower = matched_es.clone()
             calibration_per_shower[row_ind] = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
-    
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
         intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
-
         pred_showers[index_matches] = -1
         pred_showers[
             0
@@ -553,7 +546,6 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     else:
         return 0
 
-
 def plot_iou_matrix(iou_matrix, image_path, hdbscan=False):
     iou_matrix = torch.transpose(iou_matrix[1:, :], 1, 0)
     fig, ax = plt.subplots()
@@ -619,7 +611,6 @@ def match_showers(
             # plot_iou_matrix(iou_matrix, image_path, hdbscan)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
     return shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix
-
 
 def clustering_obtain_labels(X, betas, device):
     clustering = get_clustering(betas, X)

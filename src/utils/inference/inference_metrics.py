@@ -181,9 +181,12 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
         return 0,0
     mean = sum(x_hist * y_hist) / sum(y_hist)
     sigma = sum(y_hist * (x_hist - mean) ** 2) / sum(y_hist)
-    param_optimised, param_covariance_matrix = curve_fit(
-        gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
-    )
+    try:
+        param_optimised, param_covariance_matrix = curve_fit(
+            gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
+        )
+    except:
+        return mean, sigma/mean
     if param_optimised[2] < 0:
         param_optimised[2] = sigma
     if param_optimised[1] < 0:

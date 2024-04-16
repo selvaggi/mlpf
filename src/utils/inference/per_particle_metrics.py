@@ -304,6 +304,13 @@ def plot_per_energy_resolution2(
         hadrons_dic2 = get_response_for_id_i(
             [211], matched_pandora, matched_, tracks=tracks
         )
+        neutrons = get_response_for_id_i(
+            [2112], matched_pandora, matched_, tracks=tracks
+        )
+        protons = get_response_for_id_i(
+            [2212], matched_pandora, matched_, tracks=tracks
+        )
+
         for el in list_plots:
 
             plot_one_label(
@@ -377,6 +384,34 @@ def plot_per_energy_resolution2(
                 "mean",
                 PATH_store,
                 "Pions",
+                el,
+                tracks=tracks_label,
+            )
+            # plot the neutrons and protons
+            plot_one_label(
+                "Hadronic Resolution (neutrons)",
+                neutrons,
+                "variance_om",
+                PATH_store,
+                "Neutrons",
+                el,
+                tracks=tracks_label,
+            )
+            plot_one_label(
+                "Hadronic Response (neutrons)",
+                neutrons,
+                "mean",
+                PATH_store,
+                "Neutrons",
+                el,
+                tracks=tracks_label,
+            )
+            plot_one_label(
+                "Hadronic Resolution (protons)",
+                protons,
+                "variance_om",
+                PATH_store,
+                "Protons",
                 el,
                 tracks=tracks_label,
             )
