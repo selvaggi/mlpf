@@ -354,10 +354,13 @@ class Particles_GT:
         decayed_in_tracker=None,
         batch_number=None,
         unique_list_particles=None,
+        energy_corrected=None,
     ):
         self.coord = coordinates
         self.E = energy
         self.E_corrected = energy
+        if energy_corrected is not None:
+            self.E_corrected = energy_corrected
         if len(coordinates) != len(energy):
             print("!!!!!!!!!!!!!!!!!!!")
             raise Exception
@@ -416,6 +419,8 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_coord = torch.cat(list_coord, dim=0)
     list_E = [p[1].E for p in list_of_Particles_GT]
     list_E = torch.cat(list_E, dim=0)
+    list_E_corr = [p[1].E_corrected for p in list_of_Particles_GT]
+    list_E_corr = torch.cat(list_E_corr, dim=0)
     list_m = [p[1].m for p in list_of_Particles_GT]
     list_m = torch.cat(list_m, dim=0)
     list_mass = [p[1].mass for p in list_of_Particles_GT]
@@ -440,6 +445,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
         list_dec_calo,
         list_dec_track,
         batch_number,
+        energy_corrected=list_E_corr
     )
 
 
