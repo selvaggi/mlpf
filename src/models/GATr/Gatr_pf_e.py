@@ -49,7 +49,19 @@ import wandb
 #     plot_distributions,
 # )
 from src.utils.nn.tools import log_losses_wandb
+import torch.nn.functional as F
 
+def criterion(ypred, ytrue, step):
+    if step < 5000:
+        return F.l1_loss(ypred, ytrue)
+    else:
+        losses = F.l1_loss(ypred, ytrue, reduction='none') / ytrue.abs()
+        if len(losses.shape) > 0:
+            if int(losses.size(0) * 0.05) > 1:
+                top_percentile = torch.kthvalue(losses, int(losses.size(0) * 0.95)).values
+                mask = (losses > top_percentile)
+                losses[mask] = 0.0
+        return losses.mean()
 
 class ExampleWrapper(L.LightningModule):
     """Example wrapper around a GATr model.
@@ -353,7 +365,9 @@ class ExampleWrapper(L.LightningModule):
         loss_time_end = time()
         wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
-            loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
+            # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
+            step = self.trainer.global_step
+            loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
             wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
             #loss = loss_EC
