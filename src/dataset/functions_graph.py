@@ -137,7 +137,7 @@ def create_graph(
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
         graph_empty = False
-        g = dgl.DGLGraph()
+        g = dgl.graph(([], []))
         g.add_nodes(graph_coordinates.shape[0])
         if extended_coords:
             hit_features_graph = torch.cat(

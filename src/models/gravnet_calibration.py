@@ -266,7 +266,7 @@ def object_condensation_loss2(
 
     len_batch = len(batch.batch_num_nodes())
     batch_numbers = torch.repeat_interleave(
-        torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
+        torch.arange(0, len_batch).to(dev), batch.batch_num_nodes()
     ).to(dev)
 
     a = calc_LV_Lbeta(
@@ -346,7 +346,7 @@ def object_condensation_inference(self, batch, pred):
     dev = batch.device
     len_batch = len(batch.batch_num_nodes())
     batch_numbers = torch.repeat_interleave(
-        torch.range(0, len_batch - 1).to(dev), batch.batch_num_nodes()
+        torch.arange(0, len_batch).to(dev), batch.batch_num_nodes()
     ).to(dev)
 
     pred = calc_LV_Lbeta_inference(
