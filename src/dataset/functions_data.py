@@ -117,6 +117,17 @@ def find_mask_no_energy(
         mask_particles = np.full((len(list_p)), False, dtype=bool)
     return mask, mask_particles
 
+class CachedIndexList:
+    def __init__(self, lst):
+        self.lst = lst
+        self.cache = {}
+    def index(self, value):
+        if value in self.cache:
+            return self.cache[value]
+        else:
+            idx = self.lst.index(value)
+            self.cache[value] = idx
+            return idx
 
 def find_cluster_id(hit_particle_link):
     unique_list_particles = list(np.unique(hit_particle_link))
@@ -124,15 +135,16 @@ def find_cluster_id(hit_particle_link):
         non_noise_idx = torch.where(unique_list_particles != -1)[0]
         noise_idx = torch.where(unique_list_particles == -1)[0]
         non_noise_particles = unique_list_particles[non_noise_idx]
-        cluster_id = map(lambda x: non_noise_particles.index(x), hit_particle_link)
+        c_non_noise_particles = CachedIndexList(non_noise_particles)
+        cluster_id = map(lambda x: c_non_noise_particles.index(x), hit_particle_link.tolist())
         cluster_id = torch.Tensor(list(cluster_id)) + 1
         unique_list_particles[non_noise_idx] = cluster_id
         unique_list_particles[noise_idx] = 0
     else:
-        cluster_id = map(lambda x: unique_list_particles.index(x), hit_particle_link)
+        c_unique_list_particles = CachedIndexList(unique_list_particles)
+        cluster_id = map(lambda x: c_unique_list_particles.index(x), hit_particle_link.tolist())
         cluster_id = torch.Tensor(list(cluster_id)) + 1
     return cluster_id, unique_list_particles
-
 
 def scatter_count(input: torch.Tensor):
     return scatter_add(torch.ones_like(input, dtype=torch.long), input.long())
