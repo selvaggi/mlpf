@@ -115,9 +115,11 @@ def main():
     model = model_setup(args, data_config)
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]
+        print("Using GPUs:", gpus)
     else:
         print("No GPUs flag provided - Setting GPUs to [0]")
         gpus = [0]
+        raise Exception("Please provide GPU number")
     wandb_logger = WandbLogger(
         project=args.wandb_projectname,
         entity=args.wandb_entity,
@@ -198,7 +200,8 @@ def main():
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
-            devices=[1],
+            #profiler=profiler,
+            devices=gpus,
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # limit_val_batches=19,
