@@ -28,7 +28,7 @@ from src.utils.post_clustering_features import (
     calculate_eta,
     calculate_phi,
 )
-from src.models.energy_correction_NN import NetWrapper
+from src.models.energy_correction_NN import ECNetWrapper, ECNetWrapperGNN
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
@@ -121,17 +121,28 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            if not self.args.add_track_chis:
-                self.ec_model_wrapper_charged = NetWrapper(
-                    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
-                )
-                self.ec_model_wrapper_neutral = NetWrapper(
-                    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
-                )
+            if self.args.ec_model == "gat":
+                in_features = 17
+                if self.args.add_track_chis:
+                    in_features += 1
+                num_global_features = 14
+                self.ec_model_wrapper_charged = ECNetWrapperGNN(device=dev, in_features=in_features + num_global_features)
+                self.ec_model_wrapper_neutral = ECNetWrapperGNN(device=dev, in_features=in_features + num_global_features)
             else:
-                # For now, take a fresh model to train it with chi squared
-                self.ec_model_wrapper_charged = NetWrapper(ckpt_file=None, device=dev, in_features=14)
-                self.ec_model_wrapper_neutral = NetWrapper(ckpt_file=None, device=dev, in_features=14)
+                if not self.args.add_track_chis:
+                    #self.ec_model_wrapper_charged = NetWrapper(
+                    #    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
+                    #)
+                    #self.ec_model_wrapper_neutral = NetWrapper(
+                    #    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
+                    #)
+                    self.ec_model_wrapper_charged = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
+                    self.ec_model_wrapper_neutral = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
+                else:
+                    # For now, take a fresh model to train it with chi squared
+                    self.ec_model_wrapper_charged = ECNetWrapper(ckpt_file=None, device=dev, in_features=14)
+                    self.ec_model_wrapper_neutral = ECNetWrapper(ckpt_file=None, device=dev, in_features=14)
+
         # freeze these models completely
         #for param in self.ec_model_wrapper_charged.model.parameters():
         #    param.requires_grad = False
@@ -268,21 +279,32 @@ class ExampleWrapper(L.LightningModule):
             # assert their union is the whole set
             assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
             # assert (num_tracks > 1).sum() == 0
-            if (num_tracks > 1).sum() > 0:
-                print("! Particles with more than one track !")
-                print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
+            #if (num_tracks > 1).sum() > 0:
+            #    print("! Particles with more than one track !")
+            #    print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
             assert (
                 graphs_high_level_features.shape[0]
                 == graphs_new.batch_num_nodes().shape[0]
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
             features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
-            charged_energies, charged_pid = self.ec_model_wrapper_charged.predict(
-                graphs_high_level_features[charged_idx]
-            )
-            neutral_energies, neutral_pid = self.ec_model_wrapper_neutral.predict(
-                features_neutral_no_nan
-            )
+            if self.args.ec_model == "gat":
+                unbatched = dgl.unbatch(graphs_new)
+                charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+                neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+                charged_energies = self.ec_model_wrapper_charged.predict(
+                    graphs_high_level_features[charged_idx], charged_graphs
+                )
+                neutral_energies = self.ec_model_wrapper_neutral.predict(
+                    features_neutral_no_nan, neutral_graphs
+                )
+            else:
+                charged_energies, charged_pid = self.ec_model_wrapper_charged.predict(
+                    graphs_high_level_features[charged_idx]
+                )
+                neutral_energies, neutral_pid = self.ec_model_wrapper_neutral.predict(
+                    features_neutral_no_nan
+                )
             neutral_energies = neutral_energies.flatten()
             charged_energies = charged_energies.flatten()
             # dummy loss to make it work without complaining about not using params in loss

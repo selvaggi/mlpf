@@ -576,3 +576,10 @@ parser.add_argument(
     action="store_true",
     help="If toggled, uses ground-truth clusters instead of the predicted ones by the model. We can use this to simulate 'ideal' clustering.",
 )
+
+parser.add_argument(
+    "--ec-model",
+    default="",
+    type=str,
+    help="Which energy correction model to use. Default: neural network with global features, GAT: GAT GNN with concatenated global features",
+)

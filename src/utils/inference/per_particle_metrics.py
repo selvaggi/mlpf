@@ -671,6 +671,10 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
             mean_reco_ML, var_reco_ML = get_sigma_gaussian(
                 e_over_reco_ML, bins_per_binned_E
             )
+            # raise err if mean_reco_ML is nan
+            if np.isnan(mean_reco_ML):
+                raise ValueError("mean_reco_ML is nan")
+
             # mean_reco_true, var_reco_true = obtain_MPV_and_68(
             #     e_over_reco, bins_per_binned_E
             # )
