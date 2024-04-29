@@ -863,7 +863,6 @@ def obtain_clustering_for_matched_showers(
                             #frac_energy_sum = energy_sum_hits / energy_true_part[1:]
                             import matplotlib.pyplot as plt
                             n_particles = len(particle_ids)
-            
                             fig = plt.figure(figsize=(18, 4 * n_particles))
                             for j in range(n_particles):
                                 mask = labels == j
@@ -883,7 +882,6 @@ def obtain_clustering_for_matched_showers(
                     index_in_matched = torch.argmax(
                         (unique_showers_label == index_matches) * 1
                     )
-
                     mask = labels == unique_showers_label
                     # non_graph = torch.sum(mask)
                     sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]

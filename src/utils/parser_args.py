@@ -583,3 +583,9 @@ parser.add_argument(
     type=str,
     help="Which energy correction model to use. Default: neural network with global features, GAT: GAT GNN with concatenated global features",
 )
+parser.add_argument(
+    "--explain-ec",
+    default=False,
+    action="store_true",
+    help="Whether to compute SHAP explations"
+)

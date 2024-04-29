@@ -23,6 +23,7 @@ def create_and_store_graph_output(
     predict=False,
     tracking=False,
     e_corr=None,
+    shap_vals=None,
     tracks=False,
     store_epoch=False,
 ):
@@ -48,6 +49,8 @@ def create_and_store_graph_output(
         y1.mask(mask)
         dic["part_true"] = y1  # y[mask]
         X = dic["graph"].ndata["coords"]
+        #if shap_vals is not None:
+        #    dic["shap_values"] = shap_vals[i]
         if predict:
             labels_clustering = clustering_obtain_labels(
                 X, dic["graph"].ndata["beta"].view(-1), model_output.device
