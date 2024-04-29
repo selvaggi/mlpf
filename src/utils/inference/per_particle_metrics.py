@@ -389,7 +389,7 @@ def plot_per_energy_resolution2(
             )
             # plot the neutrons and protons
             plot_one_label(
-                "Hadronic Resolution (neutrons)",
+                "Hadronic Resolution",
                 neutrons,
                 "variance_om",
                 PATH_store,
@@ -398,7 +398,7 @@ def plot_per_energy_resolution2(
                 tracks=tracks_label,
             )
             plot_one_label(
-                "Hadronic Response (neutrons)",
+                "Hadronic Response",
                 neutrons,
                 "mean",
                 PATH_store,
@@ -407,7 +407,7 @@ def plot_per_energy_resolution2(
                 tracks=tracks_label,
             )
             plot_one_label(
-                "Hadronic Resolution (protons)",
+                "Hadronic Resolution",
                 protons,
                 "variance_om",
                 PATH_store,
