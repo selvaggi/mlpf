@@ -161,7 +161,7 @@ def main():
         ]
         if args.freeze_clustering:
             callbacks.append(FreezeClustering())
-        #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs")
+        #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs_train_23042024_2")
         trainer = L.Trainer(
             callbacks=callbacks,
             accelerator="gpu",
@@ -197,6 +197,7 @@ def main():
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0
             )
+        #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs_eval_23042024")
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",

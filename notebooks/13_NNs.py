@@ -1,3 +1,6 @@
+import sys
+sys.path.extend("/afs/cern.ch/work/g/gkrzmanc/mlpf_2024")
+
 import wandb
 import numpy as np
 import mplhep as hep
@@ -14,7 +17,6 @@ import os
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 from PIL import Image
-import xgboost
 
 os.environ.get("LD_LIBRARY_PATH")
 # %%
@@ -26,6 +28,11 @@ import pickle
 import numpy as np
 import torch
 import argparse
+
+import numpy as np
+from scipy import stats
+from scipy.optimize import curve_fit
+from scipy import asarray as ar, exp
 
 
 # args: prefix, wandb name, PIDs to train on, loss to use
@@ -39,6 +46,10 @@ parser.add_argument("--pid-loss", action="store_true")
 parser.add_argument("--ecal-hcal-loss", action="store_true")
 parser.add_argument("--dataset-path", type=str, default="/afs/cern.ch/work/g/gkrzmanc/mlpf_results/clustering_gt_with_pid_and_mean_features/cluster_features")
 parser.add_argument("--batch-size", type=int, default=64)
+parser.add_argument("--corrected-energy", action="store_true", default=False) # whether to use the daughters-corr. energy
+parser.add_argument("--gnn-features-placeholders", type=int, default=0)
+# will add some N(0, 1) iid features to the NN to be used as placeholders for GNN features that will come later
+# - first just overfit the simple NN to perform energy regression
 
 args = parser.parse_args()
 prefix = args.prefix
@@ -49,7 +60,7 @@ all_pids = [int(pid) for pid in all_pids]
 print("Training on PIDs:", all_pids)
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
-DEVICE = torch.device("cuda:0")
+DEVICE = torch.device("cuda:1")
 #prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_neutral_l1_loss_only/"
 
 wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)
@@ -97,15 +108,22 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
 
 import io
 
-def get_dataset():
+def get_dataset(save_ckpt=None):
+    if save_ckpt is not None:
+        # check if file exists
+        if os.path.exists(save_ckpt):
+            print("Loading dataset from", save_ckpt)
+            return pickle.load(open(save_ckpt, "rb"))
+
     path = args.dataset_path
     r = {}
     n = 0
-    nmax = 257
-    for file in os.listdir(path):
-        #n += 1
-        #if n > nmax:
-        #    break
+    nmax = 10000000000
+    print("Loading dataset (a bit slow, TODO fix)")
+    for file in tqdm.tqdm(os.listdir(path)):
+        n += 1
+        if n > nmax:
+            break
         #f = pickle.load(open(os.path.join(path, file), "rb"))
         class CPU_Unpickler(pickle.Unpickler):
             def find_class(self, module, name):
@@ -114,19 +132,51 @@ def get_dataset():
                 else:
                     return super().find_class(module, name)
         f = CPU_Unpickler(open(os.path.join(path, file), "rb")).load()
+        if (len(file) != len("8510eujir6.pkl")):
+            continue
+        #print(f.keys())
+        if (f["e_reco"].flatten() == 1.).all():
+            continue  # some old files, ignore them for now
+        old_dataset = False
         for key in f:
-            if key not in r:
-                r[key] = f[key]
+            if key == "pid_y":
+                if key not in r:
+                    r[key] = torch.tensor(f[key])
+                else:
+                    r[key] = torch.concatenate([r[key], torch.tensor(f[key])])
+            elif key != "y_particles" or old_dataset:
+                if key not in r:
+                    r[key] = f[key]
+                else:
+                    r[key] = torch.concatenate((r[key], f[key]), axis=0)
             else:
-                r[key] = torch.concatenate((r[key], f[key]), axis=0)
-    x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks"]
+                if "pid_y" not in f.keys():
+                    if key not in r:
+                        r[key] = f[key].pid.flatten()
+                    else:
+                        r[key] = torch.concatenate((r[key], f[key].pid.flatten()), axis=0)
+    x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks", "track_p_chis"]
     h_names = ["hit_x_avg", "hit_y_avg", "hit_z_avg"]
     h1_names = ["hit_eta_avg", "hit_phi_avg"]
     print("x shape:", r["x"].shape)
-    xyz = r["node_features_avg"][:, [0, 1, 2]].cpu()
-    eta_phi = torch.stack([calculate_eta(xyz[:, 0], xyz[:, 1], xyz[:, 2]), calculate_phi(xyz[:, 0], xyz[:, 1])], dim=1)
-    return torch.concatenate([r["x"], xyz, eta_phi], dim=1), x_names + h_names + h1_names, r["true_e_corr"], r[
-        "e_true"], r["e_reco"], r["y_particles"][:, 6]
+    if old_dataset:
+        r["y_particles"] = r["y_particles"][:, 6]
+        xyz = r["node_features_avg"][:, [0, 1, 2]].cpu()
+        eta_phi = torch.stack([calculate_eta(xyz[:, 0], xyz[:, 1], xyz[:, 2]), calculate_phi(xyz[:, 0], xyz[:, 1])],
+                              dim=1)
+        r["x"] = torch.cat([r["x"], xyz, eta_phi], dim=1)
+    key = "e_true"
+    if args.corrected_energy:
+        key = "e_true_corrected_daughters"
+    if "pid_y" in r:
+        r["y_particles"] = r["pid_y"]
+    if save_ckpt is not None:
+        ds = r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
+        key], r["e_reco"], r["y_particles"]
+        pickle.dump(ds, open(save_ckpt, "wb"))
+        print("Dumped dataset to file", save_ckpt)
+    return r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
+        key], r["e_reco"], r["y_particles"]
 
 
 def get_split(ds, overfit=False):
@@ -196,7 +246,6 @@ def mean_without_outliers(data):
     mean = np.mean(trimmed_arr)
     return mean
 
-
 def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(-1, 5, 0.01), epsilon=0.01):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
@@ -205,16 +254,49 @@ def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(-1, 5, 0.01
     MPV = mean_without_outliers(data_for_hist)
     return MPV, std68, low, high
 
+def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
+    hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
+    # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
+    def gaus(X, C, X_mean, sigma):
+        return C * exp(-((X - X_mean) ** 2) / (2 * sigma**2))
+
+    n = len(hist)
+    x_hist = np.zeros((n), dtype=float)
+    for ii in range(n):
+        x_hist[ii] = (bin_edges[ii + 1] + bin_edges[ii]) / 2
+
+    y_hist = hist
+    if (torch.tensor(hist) == 0).all():
+        return 0,0
+    mean = sum(x_hist * y_hist) / sum(y_hist)
+    sigma = sum(y_hist * (x_hist - mean) ** 2) / sum(y_hist)
+    try:
+        param_optimised, param_covariance_matrix = curve_fit(
+            gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
+        )
+    except:
+        return mean, sigma/mean
+    if param_optimised[2] < 0:
+        param_optimised[2] = sigma
+    if param_optimised[1] < 0:
+       param_optimised[1] = mean  # due to some weird fitting errors
+    assert param_optimised[1] >= 0
+    assert param_optimised[2] >= 0
+    return param_optimised[1], param_optimised[2] / param_optimised[1]
+
 
 def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
     # trim the data for hist by removing the top and bottom 1%
-    if len(data_for_hist) != 0:
-        data_for_hist = data_for_hist[
-            (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
+    #if len(data_for_hist) != 0:
+    #    data_for_hist = data_for_hist[
+    #        (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
     # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
     bins_per_binned_E = np.arange(0, 2, 1e-3)
-    return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
-
+    if len(data_for_hist) == 0:
+        return 0, 0, 0, 0
+    response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
+    #return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
+    return response, resolution, 0, 0
 
 # %%
 def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=False):
@@ -297,9 +379,10 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
         def __init__(self, out_features=1):
             super(Net, self).__init__()
             self.out_features = out_features
+            self.n_gnn_feat = args.gnn_features_placeholders
             self.model = nn.ModuleList([
                 #nn.BatchNorm1d(13),
-                nn.Linear(13, 64),
+                nn.Linear(14 + args.gnn_features_placeholders, 64),
                 nn.ReLU(),
                 nn.Linear(64, 64),
                 #nn.BatchNorm1d(64),
@@ -314,6 +397,9 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             ])'''
 
         def forward(self, x):
+            # pad x with self.n_gnn_feat randomly distributed features
+            if self.n_gnn_feat > 0:
+                x = torch.cat([x, torch.randn(x.size(0), self.n_gnn_feat).to(DEVICE)], dim=1)
             for layer in self.model:
                 x = layer(x)
             if self.out_features > 1:
@@ -599,7 +685,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         # log scatterplots of validation results per energy
 
 # %%
-ds = get_dataset()
+ds = get_dataset(save_ckpt=os.path.join(args.dataset_path + "ds_corr_d.pkl"))
 print("Loaded dataset")
 # %%
 # yt, yp, en, _, model, split = main(ds=ds, train_energy_regression=False, train_only_on_PIDs=[211], remove_sum_e=False)

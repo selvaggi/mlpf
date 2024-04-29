@@ -15,8 +15,6 @@ matplotlib.rc('font', size=13)
 from src.utils.inference.inference_metrics import get_sigma_gaussian
 from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
 
-
-
 # %%
 import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -33,7 +31,6 @@ import pickle
 import numpy as np
 import torch
 import argparse
-
 
 # args: prefix, wandb name, PIDs to train on, loss to use
 parser = argparse.ArgumentParser()
