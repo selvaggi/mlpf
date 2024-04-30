@@ -34,7 +34,7 @@ class Net(nn.Module):
     def forward(self, x):
         x = torch.tensor(x)
         # pad with 32 random features | TODO - currently this is hardcoded for the vanilla DNN
-        # x = torch.cat([x, torch.randn(x.size(0), 32).to(x.device)], dim=1)
+        #x = torch.cat([x, torch.randn(x.size(0), 32).to(x.device)], dim=1)
         for layer in self.model:
             x = layer(x)
         if self.out_features > 1:
@@ -102,12 +102,15 @@ class ECNetWrapperGNN(torch.nn.Module):
 class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
     # use the GNN+NN model for energy correction
     # This one concatenates GNN features to the global features
-    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None):
+    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.model = Net(in_features=out_features_gnn + in_features_global, out_features=1)
         self.model.explainer_mode = False
         # use a GAT
-        self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
+        if gnn:
+            self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
+        else:
+            self.gnn = None
         if ckpt_file is not None:
             self.model.model = pickle.load(open(ckpt_file, 'rb'))
             print("Loaded energy correction model weights from", ckpt_file)
@@ -129,8 +132,12 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         node_global_features = x_global_features  #
         x = graphs_new.ndata["h"]
         edge_index = torch.stack(graphs_new.edges())
-        gnn_output = self.gnn(x, edge_index)
-        gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
+        if self.gnn is not None:
+            gnn_output = self.gnn(x, edge_index)
+            gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
+        else:
+            # normally distr. 32 features
+            gnn_output = torch.randn(x.shape[0], 32).to(x.device)
         model_x = torch.cat([node_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
         if explain:
             # take a selection of 10% or 50 samples to get typical feature values
@@ -144,6 +151,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                     parameter.requires_grad = False
                 explainer = shap.KernelExplainer(model_exp, model_x[:n_samples].detach().cpu().numpy())
                 shap_vals = explainer.shap_values(model_x.detach().cpu().numpy(), nsamples=200)
-            return self.model(model_x).flatten(), shap_vals
+            return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()
         return self.model(model_x).flatten()
 

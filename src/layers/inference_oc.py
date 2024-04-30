@@ -24,6 +24,7 @@ def create_and_store_graph_output(
     tracking=False,
     e_corr=None,
     shap_vals=None,
+    ec_x=None, # ec_x: "global" features (what gets inputted into the final deep neural network head) for energy correction
     tracks=False,
     store_epoch=False,
 ):
@@ -34,10 +35,8 @@ def create_and_store_graph_output(
     if not tracking:
         if e_corr is None:
             batch_g.ndata["correction"] = model_output[:, 4]
-
     graphs = dgl.unbatch(batch_g)
     batch_id = y.batch_number.view(-1)  # y[:, -1].view(-1)
-
     df_list = []
     df_list1 = []
     df_list_pandora = []
@@ -50,7 +49,9 @@ def create_and_store_graph_output(
         dic["part_true"] = y1  # y[mask]
         X = dic["graph"].ndata["coords"]
         #if shap_vals is not None:
-        #    dic["shap_values"] = shap_vals[i]
+        #    dic["shap_values"] = shap_vals
+        #if ec_x is not None:
+        #    dic["ec_x"] = ec_x  ## ? no mask ?!?
         if predict:
             labels_clustering = clustering_obtain_labels(
                 X, dic["graph"].ndata["beta"].view(-1), model_output.device
@@ -58,7 +59,6 @@ def create_and_store_graph_output(
         labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
-
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         '''if predict:
             shower_p_unique = torch.unique(labels_clustering)
@@ -144,6 +144,8 @@ def create_and_store_graph_output(
                 step=step,
                 number_in_batch=i,
                 tracks=tracks,
+                ec_x=ec_x,
+                shap_vals=shap_vals
             )
             # if predict and len(df_event) > 1:
             #     df_list.append(df_event)
@@ -278,7 +280,10 @@ def generate_showers_data_frame(
     step=0,
     number_in_batch=0,
     tracks=False,
+    shap_vals=None,
+    ec_x=None
 ):
+    shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(
@@ -305,13 +310,16 @@ def generate_showers_data_frame(
     energy_t = (
         dic["part_true"].E.view(-1).to(e_pred_showers.device)
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
-
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
+    if shap:
+        matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (torch.nan)
+        matched_shap_vals = matched_shap_vals.numpy()
+        matched_ec_x = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (torch.nan)
+        matched_ec_x = matched_ec_x.numpy()
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
     matched_es = matched_es.to(e_pred_showers.device)
-
     matched_es[row_ind] = e_pred_showers[index_matches]
     if pandora:
         matched_es_cali = matched_es.clone()
@@ -338,11 +346,15 @@ def generate_showers_data_frame(
                 ]
                 * e_pred_showers[index_matches]
             )
+            if shap:
+                matched_shap_vals[row_ind.cpu()] = shap_vals[index_matches.cpu()]
+                matched_ec_x[row_ind.cpu()] = ec_x[index_matches.cpu()]
             calibration_per_shower = matched_es.clone()
             calibration_per_shower[row_ind] = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
+
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
@@ -367,6 +379,18 @@ def generate_showers_data_frame(
         fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (
             torch.nan
         )
+        '''if shap:
+            fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
+                torch.nan
+            )
+            fake_showers_ec_x_t = torch.zeros((fake_showers_e.shape[0], ec_x_t.shape[1])) * (
+                torch.nan
+            )
+            #fake_showers_shap_vals = fake_showers_shap_vals.to(e_pred_showers.device)
+            #fake_showers_ec_x_t = fake_showers_ec_x_t.to(e_pred_showers.device)
+            shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
+            ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
+'''
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
@@ -390,6 +414,15 @@ def generate_showers_data_frame(
         if not pandora:
             calibration_factor = torch.cat(
                 (calibration_per_shower, fake_showers_e_cali_factor), dim=0
+            )
+
+        if shap:
+            # pad
+            matched_shap_vals = torch.cat(
+                (torch.tensor(matched_shap_vals), torch.zeros((fake_showers_e.shape[0], shap_vals.shape[1]))), dim=0
+            )
+            matched_ec_x = torch.cat(
+                (torch.tensor(matched_ec_x), torch.zeros((fake_showers_e.shape[0], ec_x.shape[1]))), dim=0
             )
 
         e_pred_t = torch.cat(
@@ -418,7 +451,7 @@ def generate_showers_data_frame(
                 "pid": pid_t.detach().cpu(),
                 "step": torch.ones_like(energy_t.detach().cpu()) * step,
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
-                * number_in_batch,
+                * number_in_batch
             }
         else:
             d = {
@@ -433,6 +466,13 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
             }
+        '''if shap:
+            print("Adding ec_x and shap_values to the dataframe")
+            d["ec_x"] = ec_x_t
+            d["shap_values"] = shap_vals_t'''
+        if shap:
+            d["shap_values"] = matched_shap_vals.tolist()
+            d["ec_x"] = matched_ec_x.tolist()
         df = pd.DataFrame(data=d)
         if number_of_showers_total is None:
             return df

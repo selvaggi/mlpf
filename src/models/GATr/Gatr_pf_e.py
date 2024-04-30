@@ -138,11 +138,11 @@ class ExampleWrapper(L.LightningModule):
                 num_global_features = 14
                 self.ec_model_wrapper_charged = (
                     ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features, in_features_gnn=in_features,
-                                                          ckpt_file=ckpt_charged)
+                                                          ckpt_file=ckpt_charged, gnn=True)
                 )
                 self.ec_model_wrapper_neutral = (
                     ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features, in_features_gnn=in_features,
-                                                          ckpt_file=ckpt_neutral)
+                                                          ckpt_file=ckpt_neutral, gnn=True)
                 )
             else:
                 if not self.args.add_track_chis:
@@ -155,9 +155,17 @@ class ExampleWrapper(L.LightningModule):
                     self.ec_model_wrapper_charged = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
                     self.ec_model_wrapper_neutral = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
                 else:
-                    # For now, take a fresh model to train it with chi squared
-                    self.ec_model_wrapper_charged = ECNetWrapper(ckpt_file=ckpt_charged, device=dev, in_features=14)
-                    self.ec_model_wrapper_neutral = ECNetWrapper(ckpt_file=ckpt_neutral, device=dev, in_features=14)
+                    num_global_features = 14
+                    self.ec_model_wrapper_charged = (
+                        ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features,
+                                                              in_features_gnn=18,
+                                                              ckpt_file=ckpt_charged, gnn=False)
+                    )
+                    self.ec_model_wrapper_neutral = (
+                        ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features,
+                                                              in_features_gnn=18,
+                                                              ckpt_file=ckpt_neutral, gnn=False)
+                    )
 
         # freeze these models completely
         #for param in self.ec_model_wrapper_charged.model.parameters():
@@ -315,13 +323,16 @@ class ExampleWrapper(L.LightningModule):
                     features_neutral_no_nan, neutral_graphs, explain=self.args.explain_ec
                 )
                 if self.args.explain_ec:
-                    charged_energies, charged_energies_shap_vals = charged_energies
-                    neutral_energies, neutral_energies_shap_vals = neutral_energies
+                    charged_energies, charged_energies_shap_vals, charged_energies_ec_x = charged_energies
+                    neutral_energies, neutral_energies_shap_vals, neutral_energies_ec_x = neutral_energies
                     shap_vals = torch.ones(graphs_high_level_features.shape[0], charged_energies_shap_vals[0].shape[1]).to(
                         graphs_new.ndata["h"].device
                     ).detach().cpu().numpy()
+                    ec_x = torch.zeros(graphs_high_level_features.shape[0], charged_energies_ec_x.shape[1])
                     shap_vals[charged_idx.detach().cpu().numpy()] = charged_energies_shap_vals[0]
                     shap_vals[neutral_idx.detach().cpu().numpy()] = neutral_energies_shap_vals[0]
+                    ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
+                    ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
             else:
                 charged_energies, charged_pid = self.ec_model_wrapper_charged.predict(
                     graphs_high_level_features[charged_idx]
@@ -356,7 +367,8 @@ class ExampleWrapper(L.LightningModule):
                         graphs_high_level_features,
                         true_pid,
                         e_true_corr_daughters,
-                        shap_vals
+                        shap_vals,
+                        ec_x
                     )
                 return (
                     x,
@@ -481,11 +493,11 @@ class ExampleWrapper(L.LightningModule):
         self.validation_step_outputs = []
         y = batch[1]
         batch_g = batch[0]
-
+        shap_vals, ec_x = None, None
         if self.args.correction:
             result = self(batch_g, y, 1)
             if self.args.explain_ec:
-                model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters, shap_vals = result
+                model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters, shap_vals, ec_x = result
             else:
                 model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters = result
             loss_ll = 0
@@ -524,7 +536,7 @@ class ExampleWrapper(L.LightningModule):
                 True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
             )
         if self.args.explain_ec:
-            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, shap_vals])
+            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, shap_vals, ec_x])
         else:
             self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
@@ -547,6 +559,8 @@ class ExampleWrapper(L.LightningModule):
                 predict=True,
                 e_corr=e_corr,
                 tracks=self.args.tracks,
+                shap_vals=shap_vals,
+                ec_x=ec_x
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
@@ -608,8 +622,9 @@ class ExampleWrapper(L.LightningModule):
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
                 shap_vals=None
-                #if self.args.explain_ec:
-                #    shap_vals = self.validation_step_outputs[0][4]
+                if self.args.explain_ec:
+                    shap_vals = self.validation_step_outputs[0][4]
+                    ec_x = self.validation_step_outputs[0][5]
                 if self.args.correction:
                     model_output1 = model_output
                     e_corr = e_corr
@@ -631,7 +646,8 @@ class ExampleWrapper(L.LightningModule):
                     predict=False,
                     e_corr=e_corr,
                     tracks=self.args.tracks,
-                    shap_vals=shap_vals
+                    shap_vals=shap_vals,
+                    ec_x=ec_x
                 )
                 del model_output1
                 del batch_g
