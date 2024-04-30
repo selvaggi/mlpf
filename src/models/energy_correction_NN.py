@@ -115,30 +115,30 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             self.model.model = pickle.load(open(ckpt_file, 'rb'))
             print("Loaded energy correction model weights from", ckpt_file)
         self.model.to(device)
-    def predict(self, x_global_features, graphs_new, explain=False):
+    def predict(self, x_global_features, graphs_new=None, explain=False):
         '''
         Forward, named 'predict' for compatibility reasons
         :param x_global_features: Global features of the graphs - to be concatenated to each node feature
         :param graphs_new:
         :return:
         '''
-        batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
-        batch_idx = []
-        batch_bounds = []
-        for i, n in enumerate(batch_num_nodes):
-            batch_idx.extend([i] * n)
-            batch_bounds.append(n)
-        batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
-        node_global_features = x_global_features  #
-        x = graphs_new.ndata["h"]
-        edge_index = torch.stack(graphs_new.edges())
-        if self.gnn is not None:
+        if graphs_new is not None and self.gnn is not None:
+            batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
+            batch_idx = []
+            batch_bounds = []
+            for i, n in enumerate(batch_num_nodes):
+                batch_idx.extend([i] * n)
+                batch_bounds.append(n)
+            batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+            node_global_features = x_global_features  #
+            x = graphs_new.ndata["h"]
+            edge_index = torch.stack(graphs_new.edges())
             gnn_output = self.gnn(x, edge_index)
             gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
         else:
             # normally distr. 32 features
-            gnn_output = torch.randn(x.shape[0], 32).to(x.device)
-        model_x = torch.cat([node_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
+            gnn_output = torch.randn(x_global_features.shape[0], 32).to(x_global_features.device)
+        model_x = torch.cat([x_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
         if explain:
             # take a selection of 10% or 50 samples to get typical feature values
             print(model_x.shape)

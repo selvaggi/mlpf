@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-
+import os
 matplotlib.rc("font", size=35)
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -240,7 +240,7 @@ def plot_X(
     fig.savefig(PATH_store + title + reco + label + "_v0.png", bbox_inches="tight")
 
 
-def plot_fit(fits, line_type_fits, color_list_fits):
+def plot_fit(fits, line_type_fits, color_list_fits, ax=None):
     fitlabel1 = r"$\frac{\sigma_E}{\langle E \rangle} = \sqrt{\frac{a^2}{E} + \frac{b^2}{E^2} + c^2}$"
     # fitlabel1 = r"$\frac{\sigma_E}{\langle E \rangle} = \sqrt{\frac{a^2}{E} + c^2}$"
     fitlabel2 = ""
@@ -252,7 +252,11 @@ def plot_fit(fits, line_type_fits, color_list_fits):
         fit_a = f"{np.abs(fit[1][0]):.2f}"
         fit_b = f"{np.abs(fit[1][1]):.2f}"
         fit_c = f"{np.abs(fit[1][2]):.2f}"
-        plt.plot(
+        if ax is None:
+            a = plt
+        else:
+            a = ax
+        a.plot(
             fit[0],
             resolution(fit[0], *fit[1]),
             line_type_fits[id_fix],
@@ -312,7 +316,6 @@ def plot_per_energy_resolution2(
         )
 
         for el in list_plots:
-
             plot_one_label(
                 "Electromagnetic Resolution",
                 photons_dic,
@@ -417,6 +420,194 @@ def plot_per_energy_resolution2(
             )
 
 
+def plot_per_energy_resolution2_multiple(
+    matched_pandora, matched_all, PATH_store, tracks=False
+):
+    # matched_all: label -> matched df
+    figs, axs = {}, {} # resolution
+    figs_r, axs_r = {}, {} # response
+    colors = {
+        "DNN": "green",
+        "GNN+DNN": "purple"
+    }
+    plot_pandora, plot_baseline = True, True
+    for pid in [22, 11, 130, 211, 2112, 2212]:
+        figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+        figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+    for key in matched_all:
+        matched_ = matched_all[key]
+        mask = matched_["calibration_factor"] > 0
+        matched_ = matched_[mask]
+        if tracks:
+            tracks_label = "tracks"
+        else:
+            tracks_label = ""
+        plot_response = True
+        if plot_response:
+            list_plots = [""]  # "","_reco"
+            photons_dic = get_response_for_id_i(
+                [22], matched_pandora, matched_, tracks=tracks
+            )
+            electrons_dic = get_response_for_id_i(
+                [11], matched_pandora, matched_, tracks=tracks
+            )
+            hadrons_dic = get_response_for_id_i(
+                [130], matched_pandora, matched_, tracks=tracks
+            )
+            hadrons_dic2 = get_response_for_id_i(
+                [211], matched_pandora, matched_, tracks=tracks
+            )
+            neutrons = get_response_for_id_i(
+                [2112], matched_pandora, matched_, tracks=tracks
+            )
+            protons = get_response_for_id_i(
+                [2212], matched_pandora, matched_, tracks=tracks
+            )
+            for el in list_plots:
+                plot_one_label(
+                    "Electromagnetic Resolution",
+                    photons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "Photons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[22], ax=axs[22], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Electromagnetic Response",
+                    photons_dic,
+                    "mean",
+                    PATH_store,
+                    "Photons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[22], ax=axs_r[22], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Electromagnetic Response",
+                    electrons_dic,
+                    "mean",
+                    PATH_store,
+                    "Electrons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[11], ax=axs_r[11], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Electromagnetic Resolution",
+                    electrons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "Electrons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[11], ax=axs[11], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Resolution",
+                    hadrons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "KL " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[130], ax=axs[130], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    hadrons_dic,
+                    "mean",
+                    PATH_store,
+                    "KL " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[130], ax=axs_r[130], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Resolution",
+                    hadrons_dic2,
+                    "variance_om",
+                    PATH_store,
+                    "Pions " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[211], ax=axs[211], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    hadrons_dic2,
+                    "mean",
+                    PATH_store,
+                    "Pions " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[211], ax=axs_r[211], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                # plot the neutrons and protons
+                plot_one_label(
+                    "Hadronic Resolution",
+                    neutrons,
+                    "variance_om",
+                    PATH_store,
+                    "Neutrons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[2112], ax=axs[2112], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    neutrons,
+                    "mean",
+                    PATH_store,
+                    "Neutrons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[2112], ax=axs_r[2112], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Resolution",
+                    protons,
+                    "variance_om",
+                    PATH_store,
+                    "Protons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs[2212], ax=axs[2212], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    neutrons,
+                    "mean",
+                    PATH_store,
+                    "Neutrons " + key,
+                    el,
+                    tracks=tracks_label,
+                    fig=figs_r[2212], ax=axs_r[2212], save=False,
+                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                )
+                plot_pandora = False
+                plot_baseline = False
+    for key in figs:
+        for a in axs[key]:
+            a.grid()
+        for a in axs_r[key]:
+            a.grid()
+        figs[key].tight_layout()
+        figs[key].savefig(os.path.join(PATH_store, f"comparison_resolution_{key}.pdf"), bbox_inches="tight")
+        figs_r[key].tight_layout()
+        figs_r[key].savefig(os.path.join(PATH_store, f"comparison_response_{key}.pdf"), bbox_inches="tight")
 def plot_per_energy_resolution(
     sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
 ):
@@ -743,51 +934,60 @@ def parallel_process(
     return results1
 
 
-def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=""):
+def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks="", fig=None, ax=None, save=True, plot_pandora=True, plot_baseline=True, color=None):
     if reco == "":
         label_add = " raw"
         label_add_pandora = " corrected"
     else:
         label_add = " raw"
         label_add_pandora = " raw"
-
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
-    fig = plt.figure()
+    if color is not None:
+        colors_list[1] = color
+
+    if fig is None or ax is None:
+        fig, ax = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
     j = 0
-    plt.xlabel("Energy [GeV]", fontsize=40)
+    ax[1].set_xlabel("Energy [GeV]", fontsize=40)
     # ax[row_i, j].set_xscale("log")
-    plt.title(title, fontsize=40)
-    plt.grid()
-    plt.scatter(
-        photons_dic["energy_resolutions" + reco],
-        photons_dic[y_axis + reco],
-        facecolors=colors_list[1],
-        edgecolors=colors_list[1],
-        label="ML " + label1 + label_add,
-        marker="x",
-        s=50,
-    )
-    plt.scatter(
-        photons_dic["energy_resolutions_p" + reco],
-        photons_dic[y_axis + "_p" + reco],
-        facecolors=colors_list[2],
-        edgecolors=colors_list[2],
-        label="Pandora " + label1 + label_add_pandora,
-        marker="x",
-        s=50,
-    )
+    ax[0].set_title(title, fontsize=40)
+    ax[0].grid()
+    ax[1].grid()
+    ax[1].set_yscale("log")
+    for a in ax:
+        a.scatter(
+            photons_dic["energy_resolutions" + reco],
+            photons_dic[y_axis + reco],
+            facecolors=colors_list[1],
+            edgecolors=colors_list[1],
+            label=label1,
+            marker="x",
+            s=50,
+        )
+        if plot_pandora:
+            a.scatter(
+                photons_dic["energy_resolutions_p" + reco],
+                photons_dic[y_axis + "_p" + reco],
+                facecolors=colors_list[2],
+                edgecolors=colors_list[2],
+                label="Pandora",
+                marker="x",
+                s=50,
+            )
 
     if title == "Electromagnetic Resolution" or title == "Hadronic Resolution":
         if reco == "":
-            plt.scatter(
-                photons_dic["energy_resolutions"],
-                photons_dic["variance_om_baseline"],
-                facecolors="black",
-                edgecolors="black",
-                marker=".",
-                label="Baseline " + label1 + " raw",
-                s=50,
-            )
+            for a in ax:
+                if plot_baseline:
+                    a.scatter(
+                        photons_dic["energy_resolutions"],
+                        photons_dic["variance_om_baseline"],
+                        facecolors="black",
+                        edgecolors="black",
+                        marker=".",
+                        label="Baseline",
+                        s=50,
+                    )
             dic0_fit = get_fit(
                 photons_dic["energy_resolutions"], photons_dic["variance_om_baseline"]
             )
@@ -801,28 +1001,31 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         )
         if reco == "":
             fits_l1 = [
-                dic0_fit,
+                #dic0_fit,
                 dic1_fit,
-                dic1_fit_pandora,
+                #dic1_fit_pandora,
             ]
-
             color_list_fits_l1 = [
-                "black",
+                #"black",
                 colors_list[1],
-                colors_list[2],
+                #colors_list[2],
             ]
-
-            line_type_fits_l1 = ["-", "-", "-."]
-            plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1)
+            line_type_fits_l1 = ["-"]#, "-", "-."]
+            if plot_baseline:
+                fits_l1.append(dic0_fit)
+                color_list_fits_l1.append("black")
+                line_type_fits_l1.append("-")
+            if plot_pandora:
+                fits_l1.append(dic1_fit_pandora)
+                color_list_fits_l1.append(colors_list[2])
+                line_type_fits_l1.append("-.")
+            for a in ax:
+                plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1, ax=a)
         else:
-            fits = [dic1_fit, dic1_fit_pandora]
-            color_list_fits = [
-                colors_list[1],
-                colors_list[2],
-            ]
-            line_type_fits = ["-", "-."]
-
-            plot_fit(fits, line_type_fits, color_list_fits)
+            raise NotImplementedError
+            #line_type_fits = ["-", "-."]
+            #for a in ax:
+            #    plot_fit(fits, line_type_fits, color_list_fits, ax=a)
 
         if reco == "_reco":
             plt.yscale("log")
@@ -831,21 +1034,27 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
                 ymax = 0.3
             else:
                 ymax = 0.6
-            plt.ylim([0, ymax])
-        plt.xlim([0, 55])
+            ax[0].set_ylim([0, ymax])
+            ax[1].set_ylim([0, ymax])
+        ax[0].set_xlim([0, 55])
+        ax[1].set_xlim([0, 55])
         ylabel = r"$\frac{\sigma_{E_{reco}}}{\langle E_{reco} \rangle}$"
-        plt.ylabel(ylabel, fontsize=40)
-
+        ax[0].set_ylabel(ylabel, fontsize=40)
+        ax[1].set_ylabel(ylabel, fontsize=40)
     else:
         ylabel = r"$\langle E_{reco} \rangle / E_{true}$"
-        plt.ylabel(ylabel, fontsize=40)
+        ax[0].set_ylabel(ylabel, fontsize=40)
+        ax[1].set_ylabel(ylabel, fontsize=40)
     # loc="upper right",
-    plt.tick_params(axis="both", which="major", labelsize=40)
+    #plt.tick_params(axis="both", which="major", labelsize=40)
+    ax[0].tick_params(axis="both", which="major", labelsize=40)
+    ax[1].tick_params(axis="both", which="major", labelsize=40)
     if title == "Electromagnetic Response" or title == "Hadronic Response":
-        plt.ylim([0.6, 1.4])
-    plt.legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
+        ax[0].set_ylim([0.6, 1.4])
+        ax[1].set_ylim([0.6, 1.4])
+    ax[0].legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
     label = label1
-
-    fig.savefig(
-        PATH_store + title + reco + label + tracks + "_v1.pdf", bbox_inches="tight"
-    )
+    if save:
+        fig.savefig(
+            PATH_store + title + reco + label + tracks + "_v1.pdf", bbox_inches="tight"
+        )

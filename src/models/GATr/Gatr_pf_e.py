@@ -312,7 +312,8 @@ class ExampleWrapper(L.LightningModule):
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
             features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
-            if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            if True:
                 unbatched = dgl.unbatch(graphs_new)
                 charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
                 neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
