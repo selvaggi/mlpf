@@ -29,58 +29,29 @@ def calculate_energy_per_event(
 ):
     sd = sd.reset_index(drop=True)
     sd_pandora = sd_pandora.reset_index(drop=True)
-    calibrated_list = []
+    corrected_list = []
     reco_list = []
-
-    calibrated_list_pandora = []
     reco_list_pandora = []
-    number_of_showers = len(sd["number_batch"].values)
-    counter_i = 0
-    counter_total = 0
-    while number_of_showers > counter_total + 20:
-        sum_by = np.argmax(sd["number_batch"].values != sd["number_batch"].values[0])
-        print("sum_by", sum_by)
-        if sum_by < 1:
-            print("sum by not enough", counter_i)
-            print(sd)
-            break
-        temp_sd = sd[0:sum_by]
-        counter_total = counter_total + sum_by
-        total_e_event = np.nansum(temp_sd["true_showers_E"].values)
-        total_e_reco = np.nansum(temp_sd["reco_showers_E"].values)
-        total_e_ML_cali = np.nansum(temp_sd["calibrated_E"].values)
-        total_e_reco_ML = np.nansum(temp_sd["pred_showers_E"].values)
-        calibrated_list.append(total_e_ML_cali / total_e_event)
-        reco_list.append(total_e_reco_ML / total_e_reco)
-        sd = sd.drop(np.arange(0, sum_by))
-        counter_i = np.mod(counter_i + 1, 4)
-        sd = sd.reset_index(drop=True)
-        print("1", number_of_showers, counter_total, number_of_showers - counter_total)
+    corrected_list_pandora = []
+    for i in range(0, int(np.max(sd.number_batch))):
+        mask = sd.number_batch == i
+        event_E_total_reco = np.nansum(sd.reco_showers_E[mask])
+        event_E_total_reco_corrected = np.nansum(sd.calibrated_E[mask])
+        event_ML_total_reco = np.nansum(sd.pred_showers_E[mask])
+        mask_p = sd_pandora.number_batch == i
+        event_E_total_reco_p = np.nansum(sd_pandora.reco_showers_E[mask_p])
+        event_ML_total_reco_p = np.nansum(sd_pandora.reco_showers_E[mask_p])
+        event_ML_total_reco_p_corrected = np.nansum(
+            sd_pandora.pandora_calibrated_pfo[mask_p]
+        )
 
-    number_of_showers = len(sd_pandora["number_batch"].values)
-    counter_i = 0
-    counter_total = 0
-
-    while number_of_showers > counter_total + 20:
-        sum_by = np.argmax(sd_pandora["number_batch"].values != counter_i)
-        temp_sd = sd_pandora[0:sum_by]
-        mask = (temp_sd["pred_showers_E"] > 0.6) * (
-            np.isnan(temp_sd["true_showers_E"])
-        ) + (~np.isnan(temp_sd["true_showers_E"]))
-        temp_sd = temp_sd[mask]
-        counter_total = counter_total + sum_by
-        total_e_event = np.nansum(temp_sd["true_showers_E"].values)
-        total_e_reco = np.nansum(temp_sd["reco_showers_E"].values)
-        total_e_ML_cali = np.nansum(temp_sd["pandora_calibrated_pfo"].values)
-        total_e_reco_ML = np.nansum(temp_sd["pred_showers_E"].values)
-        calibrated_list_pandora.append(total_e_ML_cali / total_e_event)
-        reco_list_pandora.append(total_e_reco_ML / total_e_reco)
-        sd_pandora = sd_pandora.drop(np.arange(0, sum_by))
-        counter_i = np.mod(counter_i + 1, 4)
-        sd_pandora = sd_pandora.reset_index(drop=True)
-        print("2", number_of_showers, counter_total, number_of_showers - counter_total)
-
-    return calibrated_list, calibrated_list_pandora, reco_list, reco_list_pandora
+        reco_list.append(event_ML_total_reco / event_E_total_reco)
+        corrected_list.append(event_E_total_reco_corrected / event_E_total_reco)
+        reco_list_pandora.append(event_ML_total_reco_p / event_E_total_reco_p)
+        corrected_list_pandora.append(
+            event_ML_total_reco_p_corrected / event_E_total_reco_p
+        )
+    return corrected_list, corrected_list_pandora, reco_list, reco_list_pandora
 
 
 def plot_per_event_energy_distribution(
