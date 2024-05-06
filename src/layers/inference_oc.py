@@ -308,7 +308,7 @@ def generate_showers_data_frame(
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
     energy_t = (
-        dic["part_true"].E.view(-1).to(e_pred_showers.device)
+        dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
     if shap:

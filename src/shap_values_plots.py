@@ -127,12 +127,9 @@ fig.tight_layout()
 fig.show()
 fig.savefig("/eos/user/g/gkrzmanc/2024/eval_dnn_3004_l1_training_longereval/showers_df_evaluation/shap_plots/summary_mean_abs_log.pdf")
 
-
-
-
 ###################
 
-#path = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_EC_shap_df/showers_df_evaluation/0_0_None_hdbscan.pt"
+#path = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_EC_shap_df/showersc_df_evaluation/0_0_None_hdbscan.pt"
 path = "/eos/user/g/gkrzmanc/2024/eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt" # clusters 30.4., eval. of the 29.4. GNN GAT run, with 40 eval files
 df = pickle.load(open(path, "rb"))
 print(len(df))
@@ -158,4 +155,6 @@ ax.set_xscale("log")
 fig.tight_layout()
 fig.show()
 fig.savefig("/eos/user/g/gkrzmanc/2024/eval_gnn_3004_l1_training/showers_df_evaluation/shap_plots/summary_mean_abs_log.pdf")
+
+###################
 

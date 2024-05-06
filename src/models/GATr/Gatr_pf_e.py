@@ -52,7 +52,7 @@ from src.utils.nn.tools import log_losses_wandb
 import torch.nn.functional as F
 
 def criterion(ypred, ytrue, step):
-    if True or step < 5000:
+    if True or step < 5000:  # Always use the L1 loss!!
         #### ! using L1 loss for this training only!
         return F.l1_loss(ypred, ytrue)
     else:
@@ -355,7 +355,7 @@ class ExampleWrapper(L.LightningModule):
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e, true_pid, e_true_corr_daughters)
+                return (x, pred_energy_corr, true_new, sum_e, true_pid, true_new)
             else:
                 if self.args.explain_ec:
                     return (
@@ -572,7 +572,6 @@ class ExampleWrapper(L.LightningModule):
         del model_output
 
     def on_train_epoch_end(self):
-
         self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
@@ -623,6 +622,7 @@ class ExampleWrapper(L.LightningModule):
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
                 shap_vals=None
+                ec_x = None
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
                     ec_x = self.validation_step_outputs[0][5]

@@ -42,6 +42,9 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         energy_resolutions_reco_p,
         mean_baseline,
         variance_om_baseline,
+        e_over_e_distr_pandora,
+        mean_errors_p,
+        variance_errors_p
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks)
     (
         mean,
@@ -52,6 +55,9 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         energy_resolutions_reco,
         mean_baseline,
         variance_om_baseline,
+        e_over_e_distr_model,
+        mean_errors,
+        variance_errors
     ) = calculate_response(df_id, False, False, tracks=tracks)
     print(variance_om_p)
     print(variance_om)
@@ -63,6 +69,10 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
     dic["variance_om_p"] = variance_om_p
     dic["variance_om"] = variance_om
     dic["mean"] = mean
+    dic["mean_errors"] = mean_errors
+    dic["variance_errors"] = variance_errors
+    dic["variance_errors_p"] = variance_errors_p
+    dic["mean_errors_p"] = mean_errors_p
     dic["energy_resolutions"] = energy_resolutions
     dic["energy_resolutions_p"] = energy_resolutions_p
     dic["mean_p_reco"] = mean_true_rec_p
@@ -73,8 +83,9 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
     dic["energy_resolutions_reco"] = energy_resolutions_reco
     dic["mean_baseline"] = mean_baseline
     dic["variance_om_baseline"] = variance_om_baseline
+    dic["distributions_pandora"] = e_over_e_distr_pandora
+    dic["distributions_model"] = e_over_e_distr_model
     return dic
-
 
 def plot_X(
     title,
@@ -92,9 +103,9 @@ def plot_X(
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
     fig = plt.figure()
     j = 0
-    plt.xlabel("Energy [GeV]", fontsize=40)
+    plt.xlabel("Energy [GeV]", fontsize=30)
     # ax[row_i, j].set_xscale("log")
-    plt.title(title, fontsize=40)
+    plt.title(title, fontsize=30)
     plt.grid()
     if plot_label1:
         plt.scatter(
@@ -223,16 +234,16 @@ def plot_X(
             plt.ylim([0, ymax])
         plt.xlim([0, 55])
         ylabel = r"$\frac{\sigma_{E_{reco}}}{\langle E_{reco} \rangle}$"
-        plt.ylabel(ylabel, fontsize=40)
+        plt.ylabel(ylabel, fontsize=30)
 
     else:
         ylabel = r"$\langle E_{reco} \rangle / E_{true}$"
-        plt.ylabel(ylabel, fontsize=40)
+        plt.ylabel(ylabel, fontsize=30)
     # loc="upper right",
     plt.tick_params(axis="both", which="major", labelsize=40)
     if title == "Electromagnetic Response" or title == "Hadronic Response":
         plt.ylim([0.6, 1.4])
-    plt.legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.legend(fontsize=30, bbox_to_anchor=(1.05, 1), loc="upper left")
     if plot_label1:
         label = label1
     if plot_label2:
@@ -276,7 +287,7 @@ def get_fit(energies, errors):
     errors = errors
     popt, pcov = curve_fit(resolution, energies, errors)
     xdata = np.arange(0, 51, 0.1)
-    return [xdata, popt]
+    return [xdata, popt, np.sqrt(np.diag(pcov))]
 
 
 def resolution(E, a, b, c):
@@ -295,7 +306,7 @@ def plot_per_energy_resolution2(
         tracks_label = ""
     plot_response = True
     if plot_response:
-        list_plots = ["", "_reco"]  # "","_reco"
+        list_plots = [""] #  "", "_reco"
         photons_dic = get_response_for_id_i(
             [22], matched_pandora, matched_, tracks=tracks
         )
@@ -418,7 +429,15 @@ def plot_per_energy_resolution2(
                 el,
                 tracks=tracks_label,
             )
-
+            plot_one_label(
+                "Hadronic Response",
+                protons,
+                "mean",
+                PATH_store,
+                "Protons",
+                el,
+                tracks=tracks_label,
+            )
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False
@@ -432,8 +451,8 @@ def plot_per_energy_resolution2_multiple(
     }
     plot_pandora, plot_baseline = True, True
     for pid in [22, 11, 130, 211, 2112, 2212]:
-        figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
-        figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+        figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
+        figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
     for key in matched_all:
         matched_ = matched_all[key]
         mask = matched_["calibration_factor"] > 0
@@ -742,7 +761,6 @@ def create_eff_dic_pandora(matched_pandora, id):
     photons_dic["energy_eff_p"] = energy_eff_p
     return photons_dic
 
-
 def create_eff_dic(photons_dic, matched_, id, var_i):
     pids = np.abs(matched_["pid"].values)
     mask_id = pids == id
@@ -792,26 +810,23 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
         bbox_inches="tight",
     )
 
-
 def calculate_response(matched, pandora, log_scale=False, tracks=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins = np.arange(0, 51, 6)
-    binning = 1e-4
-    if pandora:
-        bins_per_binned_E = np.arange(0.5, 1.5, binning)
-    else:
-        bins_per_binned_E = np.arange(0.5, 1.5, binning)
+        #bins = np.arange(0, 51, 6)
+        bins = [0, 5, 15, 35, 50]
     mean = []
     variance_om = []
     mean_baseline = []
     variance_om_baseline = []
     mean_true_rec = []
     variance_om_true_rec = []
+    mean_errors = []
+    variance_om_errors = []
     energy_resolutions = []
     energy_resolutions_reco = []
-
+    distributions = [] # distributions of E/Etrue for plotting later
     # tic = time.time()
     # vector = range(len(bins) - 1)
     # output_results = parallel_process(vector, bins, matched, pandora, bins_per_binned_E)
@@ -821,7 +836,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
     # toc = time.time()
     # print("time with paralel version", toc - tic)
     print("START PANDORA")
-    binning = 1e-3
+    binning = 1e-2
     if pandora:
         bins_per_binned_E = np.arange(0, 2, binning)
     else:
@@ -850,26 +865,23 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
             # mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
             #     e_over_true, bins_per_binned_E
             # )
-
-            mean_predtotrue, var_predtotrue = get_sigma_gaussian(
+            distributions.append(e_over_true)
+            mean_predtotrue, var_predtotrue, err_mean_predtotrue, err_var_predtotrue = get_sigma_gaussian(
                 e_over_true, bins_per_binned_E
             )
-
-            mean_reco_true, var_reco_true = get_sigma_gaussian(
+            print("Pandora", pandora, "err_var", err_var_predtotrue)
+            mean_reco_true, var_reco_true, err_mean_reco_true, err_var_reco_true = get_sigma_gaussian(
                 e_over_reco, bins_per_binned_E
             )
-
-            mean_reco_ML, var_reco_ML = get_sigma_gaussian(
+            mean_reco_ML, var_reco_ML, err_mean_reco_ML, err_mean_var_reco_ML = get_sigma_gaussian(
                 e_over_reco_ML, bins_per_binned_E
             )
             # raise err if mean_reco_ML is nan
             if np.isnan(mean_reco_ML):
                 raise ValueError("mean_reco_ML is nan")
-
             # mean_reco_true, var_reco_true = obtain_MPV_and_68(
             #     e_over_reco, bins_per_binned_E
             # )
-
             # mean_predtotrue = np.mean(e_over_true)
             # var_predtotrue = np.var(e_over_true) / mean_predtotrue
             mean_true_rec.append(mean_reco_ML)
@@ -880,6 +892,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
             variance_om.append(np.abs(var_predtotrue))
             energy_resolutions.append((bin_i1 + bin_i) / 2)
             energy_resolutions_reco.append((bin_i1 + bin_i) / 2)
+            mean_errors.append(err_mean_predtotrue)
+            variance_om_errors.append(err_var_predtotrue)
 
     return (
         mean,
@@ -890,6 +904,9 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
         energy_resolutions_reco,
         mean_baseline,
         variance_om_baseline,
+        distributions,
+        mean_errors,
+        variance_om_errors,
     )
 
 
@@ -944,35 +961,84 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
     if color is not None:
         colors_list[1] = color
-
+    fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions" + reco]), 1, figsize=(14, 18), sharex=True)
+    for i in range(len(photons_dic["energy_resolutions" + reco])):
+        distr_model = photons_dic["distributions_model"][i].values
+        distr_pandora = photons_dic["distributions_pandora"][i].values
+        max_distr_model = np.max(distr_model)
+        max_distr_pandora = np.max(distr_pandora)
+        # remove everything higher than 2.0 and note the fraction of such events
+        mask = distr_model < 2.0
+        distr_model = distr_model[mask]
+        frac_model_dropped = int((1 - len(distr_model) / len(photons_dic["distributions_model"][i]))*1000)
+        mask = distr_pandora < 2.0
+        distr_pandora = distr_pandora[mask]
+        frac_pandora_dropped = int((1 - len(distr_pandora) / len(photons_dic["distributions_pandora"][i]))*1000)
+        ax_distr[i].hist(distr_model, bins=np.arange(0, 2, 1e-2), color="blue", label="ML ("+str(frac_model_dropped) + "%.)", alpha=0.5)
+        ax_distr[i].hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora (" + str(frac_pandora_dropped) + "%.)", alpha=0.5)
+        # ALSO PLOT MU AND SIGMA #
+        mu = photons_dic["mean"][i]
+        sigma = (photons_dic["variance_om"][i]) * mu
+        mu_pandora = photons_dic["mean_p"][i]
+        sigma_pandora = (photons_dic["variance_om_p"][i]) * mu
+        ax_distr[i].axvline(mu, color="blue", linestyle="-", ymin=0.7, ymax=1.0)
+        ax_distr[i].axvline(mu + sigma, color="blue", linestyle="--", ymin=0.7, ymax=1.0)
+        ax_distr[i].axvline(mu - sigma, color="blue", linestyle="--", ymin=0.7, ymax=1.0)
+        ax_distr[i].axvline(mu_pandora, color="red", linestyle="-", ymin=0.7, ymax=1.0)
+        ax_distr[i].axvline(mu_pandora + sigma_pandora, color="red", linestyle="--", ymin=0.7, ymax=1.0)
+        ax_distr[i].axvline(mu_pandora - sigma_pandora, color="red", linestyle="--", ymin=0.7, ymax=1.0)
+        # variance_om
+        ax_distr[i].set_xlabel("E/Etrue")
+        ax_distr[i].set_xlim([0, 2])
+        ax_distr[i].set_title(f"{title} {photons_dic['energy_resolutions' + reco][i]:.2f} GeV / max model: " + str(max_distr_model) + " / max pandora: " + str(max_distr_pandora))
+        ax_distr[i].legend()
+        ax_distr[i].set_yscale("log")
+    fig_distr.tight_layout()
     if fig is None or ax is None:
-        fig, ax = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+        fig, ax = plt.subplots(2, 1, figsize=(14, 10), sharex=False)
     j = 0
-    ax[1].set_xlabel("Energy [GeV]", fontsize=40)
+    ax[1].set_xlabel("Energy [GeV]", fontsize=30)
+    ax[0].set_xlabel("Energy [GeV]", fontsize=30)
     # ax[row_i, j].set_xscale("log")
-    ax[0].set_title(title, fontsize=40)
+    ax[0].set_title(title, fontsize=30)
     ax[0].grid()
     ax[1].grid()
     ax[1].set_yscale("log")
+    if y_axis == "mean":
+        # error is the mean error
+        errors = photons_dic["mean_errors"]
+        pandora_errors = photons_dic["mean_errors_p"]
+    else:
+        errors = photons_dic["variance_errors"]
+        pandora_errors = photons_dic["variance_errors_p"]
     for a in ax:
-        a.scatter(
+        a.errorbar(
             photons_dic["energy_resolutions" + reco],
             photons_dic[y_axis + reco],
-            facecolors=colors_list[1],
-            edgecolors=colors_list[1],
+            yerr=errors,
+            color=colors_list[1],
+            #edgecolors=colors_list[1],
             label=label1,
             marker="x",
-            s=50,
+            markersize=8,
+            linestyle="None",
+            # error color
+            ecolor=colors_list[1],
+            capsize=5,
         )
         if plot_pandora:
-            a.scatter(
+            a.errorbar(
                 photons_dic["energy_resolutions_p" + reco],
                 photons_dic[y_axis + "_p" + reco],
-                facecolors=colors_list[2],
-                edgecolors=colors_list[2],
+                yerr=pandora_errors,
+                color=colors_list[2],
+                #edgecolors=colors_list[2],
                 label="Pandora",
                 marker="x",
-                s=50,
+                markersize=8,
+                capsize=5,
+                ecolor=colors_list[2],
+                linestyle="None"
             )
 
     if title == "Electromagnetic Resolution" or title == "Hadronic Resolution":
@@ -1026,7 +1092,6 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
             #line_type_fits = ["-", "-."]
             #for a in ax:
             #    plot_fit(fits, line_type_fits, color_list_fits, ax=a)
-
         if reco == "_reco":
             plt.yscale("log")
         else:
@@ -1039,22 +1104,24 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         ax[0].set_xlim([0, 55])
         ax[1].set_xlim([0, 55])
         ylabel = r"$\frac{\sigma_{E_{reco}}}{\langle E_{reco} \rangle}$"
-        ax[0].set_ylabel(ylabel, fontsize=40)
-        ax[1].set_ylabel(ylabel, fontsize=40)
+        ax[0].set_ylabel(ylabel, fontsize=30)
+        ax[1].set_ylabel(ylabel, fontsize=30)
     else:
         ylabel = r"$\langle E_{reco} \rangle / E_{true}$"
-        ax[0].set_ylabel(ylabel, fontsize=40)
-        ax[1].set_ylabel(ylabel, fontsize=40)
+        ax[0].set_ylabel(ylabel, fontsize=30)
+        ax[1].set_ylabel(ylabel, fontsize=30)
     # loc="upper right",
     #plt.tick_params(axis="both", which="major", labelsize=40)
-    ax[0].tick_params(axis="both", which="major", labelsize=40)
-    ax[1].tick_params(axis="both", which="major", labelsize=40)
+    ax[0].tick_params(axis="both", which="major", labelsize=30)
+    ax[1].tick_params(axis="both", which="major", labelsize=30)
     if title == "Electromagnetic Response" or title == "Hadronic Response":
         ax[0].set_ylim([0.6, 1.4])
         ax[1].set_ylim([0.6, 1.4])
     ax[0].legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
     label = label1
     if save:
+        fig.tight_layout()
         fig.savefig(
             PATH_store + title + reco + label + tracks + "_v1.pdf", bbox_inches="tight"
         )
+        fig_distr.savefig(PATH_store + title + reco + label + tracks + "_v1_distributions.pdf", bbox_inches="tight")

@@ -22,7 +22,7 @@ log_scale = False
 tracks = True
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_gnn_3004_l1_training/eval_comparison"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_gnn_3004_l1_training/eval_comparison1"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -36,6 +36,7 @@ if all_E:
     ]
     path_pandora = "eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/"
+
 
 labels = [
     "GNN+DNN",
