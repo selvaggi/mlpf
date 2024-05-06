@@ -28,7 +28,11 @@ from src.utils.post_clustering_features import (
     calculate_eta,
     calculate_phi,
 )
-from src.models.energy_correction_NN import ECNetWrapper, ECNetWrapperGNN, ECNetWrapperGNNGlobalFeaturesSeparate
+from src.models.energy_correction_NN import (
+    ECNetWrapper,
+    ECNetWrapperGNN,
+    ECNetWrapperGNNGlobalFeaturesSeparate,
+)
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
@@ -51,18 +55,22 @@ import wandb
 from src.utils.nn.tools import log_losses_wandb
 import torch.nn.functional as F
 
+
 def criterion(ypred, ytrue, step):
     if True or step < 5000:
         #### ! using L1 loss for this training only!
         return F.l1_loss(ypred, ytrue)
     else:
-        losses = F.l1_loss(ypred, ytrue, reduction='none') / ytrue.abs()
+        losses = F.l1_loss(ypred, ytrue, reduction="none") / ytrue.abs()
         if len(losses.shape) > 0:
             if int(losses.size(0) * 0.05) > 1:
-                top_percentile = torch.kthvalue(losses, int(losses.size(0) * 0.95)).values
-                mask = (losses > top_percentile)
+                top_percentile = torch.kthvalue(
+                    losses, int(losses.size(0) * 0.95)
+                ).values
+                mask = losses > top_percentile
                 losses[mask] = 0.0
         return losses.mean()
+
 
 class ExampleWrapper(L.LightningModule):
     """Example wrapper around a GATr model.
@@ -129,48 +137,70 @@ class ExampleWrapper(L.LightningModule):
                 if self.args.add_track_chis:
                     in_features += 1
                 num_global_features = 14
-                self.ec_model_wrapper_charged = ECNetWrapperGNN(device=dev, in_features=in_features + num_global_features)
-                self.ec_model_wrapper_neutral = ECNetWrapperGNN(device=dev, in_features=in_features + num_global_features)
+                self.ec_model_wrapper_charged = ECNetWrapperGNN(
+                    device=dev, in_features=in_features + num_global_features
+                )
+                self.ec_model_wrapper_neutral = ECNetWrapperGNN(
+                    device=dev, in_features=in_features + num_global_features
+                )
             elif self.args.ec_model == "gat-concat":
                 in_features = 17
                 if self.args.add_track_chis:
                     in_features += 1
                 num_global_features = 14
-                self.ec_model_wrapper_charged = (
-                    ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features, in_features_gnn=in_features,
-                                                          ckpt_file=ckpt_charged, gnn=True)
+                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                    device=dev,
+                    in_features_global=num_global_features,
+                    in_features_gnn=in_features,
+                    ckpt_file=ckpt_charged,
+                    gnn=True,
                 )
-                self.ec_model_wrapper_neutral = (
-                    ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features, in_features_gnn=in_features,
-                                                          ckpt_file=ckpt_neutral, gnn=True)
+                self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
+                    device=dev,
+                    in_features_global=num_global_features,
+                    in_features_gnn=in_features,
+                    ckpt_file=ckpt_neutral,
+                    gnn=True,
                 )
             else:
                 if not self.args.add_track_chis:
-                    #self.ec_model_wrapper_charged = NetWrapper(
+                    # self.ec_model_wrapper_charged = NetWrapper(
                     #    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
-                    #)
-                    #self.ec_model_wrapper_neutral = NetWrapper(
+                    # )
+                    # self.ec_model_wrapper_neutral = NetWrapper(
                     #    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
-                    #)
-                    self.ec_model_wrapper_charged = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
-                    self.ec_model_wrapper_neutral = ECNetWrapper(ckpt_file=None, device=dev, in_features=13)
+                    # )
+                    self.ec_model_wrapper_charged = ECNetWrapper(
+                        ckpt_file=None, device=dev, in_features=13
+                    )
+                    self.ec_model_wrapper_neutral = ECNetWrapper(
+                        ckpt_file=None, device=dev, in_features=13
+                    )
                 else:
                     num_global_features = 14
                     self.ec_model_wrapper_charged = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features,
-                                                              in_features_gnn=18,
-                                                              ckpt_file=ckpt_charged, gnn=False)
+                        ECNetWrapperGNNGlobalFeaturesSeparate(
+                            device=dev,
+                            in_features_global=num_global_features,
+                            in_features_gnn=18,
+                            ckpt_file=ckpt_charged,
+                            gnn=False,
+                        )
                     )
                     self.ec_model_wrapper_neutral = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(device=dev, in_features_global=num_global_features,
-                                                              in_features_gnn=18,
-                                                              ckpt_file=ckpt_neutral, gnn=False)
+                        ECNetWrapperGNNGlobalFeaturesSeparate(
+                            device=dev,
+                            in_features_global=num_global_features,
+                            in_features_gnn=18,
+                            ckpt_file=ckpt_neutral,
+                            gnn=False,
+                        )
                     )
 
         # freeze these models completely
-        #for param in self.ec_model_wrapper_charged.model.parameters():
+        # for param in self.ec_model_wrapper_charged.model.parameters():
         #    param.requires_grad = False
-        #for param in self.ec_model_wrapper_neutral.model.parameters():
+        # for param in self.ec_model_wrapper_neutral.model.parameters():
         #    param.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
@@ -245,7 +275,13 @@ class ExampleWrapper(L.LightningModule):
 
         if self.args.correction:
             time_matching_start = time()
-            graphs_new, true_new, sum_e, true_pid, e_true_corr_daughters = obtain_clustering_for_matched_showers(
+            (
+                graphs_new,
+                true_new,
+                sum_e,
+                true_pid,
+                e_true_corr_daughters,
+            ) = obtain_clustering_for_matched_showers(
                 g,
                 x,
                 y,
@@ -253,7 +289,9 @@ class ExampleWrapper(L.LightningModule):
                 use_gt_clusters=self.args.use_gt_clusters,
             )
             time_matching_end = time()
-            wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
+            wandb.log(
+                {"time_clustering_matching": time_matching_end - time_matching_start}
+            )
             batch_num_nodes = graphs_new.batch_num_nodes()
             batch_idx = []
             for i, n in enumerate(batch_num_nodes):
@@ -274,7 +312,9 @@ class ExampleWrapper(L.LightningModule):
             )
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
             # print("Also computing graph-level features")
-            graphs_high_level_features = get_post_clustering_features(graphs_new, sum_e, add_hit_chis=self.args.add_track_chis)
+            graphs_high_level_features = get_post_clustering_features(
+                graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
+            )
             pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
                 graphs_new.ndata["h"].device
             )
@@ -303,7 +343,7 @@ class ExampleWrapper(L.LightningModule):
             # assert their union is the whole set
             assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
             # assert (num_tracks > 1).sum() == 0
-            #if (num_tracks > 1).sum() > 0:
+            # if (num_tracks > 1).sum() > 0:
             #    print("! Particles with more than one track !")
             #    print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
             assert (
@@ -311,26 +351,54 @@ class ExampleWrapper(L.LightningModule):
                 == graphs_new.batch_num_nodes().shape[0]
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-            features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+            features_neutral_no_nan[
+                features_neutral_no_nan != features_neutral_no_nan
+            ] = 0
             if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
                 unbatched = dgl.unbatch(graphs_new)
                 charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
                 neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
                 charged_energies = self.ec_model_wrapper_charged.predict(
-                    graphs_high_level_features[charged_idx], charged_graphs, explain=self.args.explain_ec
+                    graphs_high_level_features[charged_idx],
+                    charged_graphs,
+                    explain=self.args.explain_ec,
                 )
                 neutral_energies = self.ec_model_wrapper_neutral.predict(
-                    features_neutral_no_nan, neutral_graphs, explain=self.args.explain_ec
+                    features_neutral_no_nan,
+                    neutral_graphs,
+                    explain=self.args.explain_ec,
                 )
                 if self.args.explain_ec:
-                    charged_energies, charged_energies_shap_vals, charged_energies_ec_x = charged_energies
-                    neutral_energies, neutral_energies_shap_vals, neutral_energies_ec_x = neutral_energies
-                    shap_vals = torch.ones(graphs_high_level_features.shape[0], charged_energies_shap_vals[0].shape[1]).to(
-                        graphs_new.ndata["h"].device
-                    ).detach().cpu().numpy()
-                    ec_x = torch.zeros(graphs_high_level_features.shape[0], charged_energies_ec_x.shape[1])
-                    shap_vals[charged_idx.detach().cpu().numpy()] = charged_energies_shap_vals[0]
-                    shap_vals[neutral_idx.detach().cpu().numpy()] = neutral_energies_shap_vals[0]
+                    (
+                        charged_energies,
+                        charged_energies_shap_vals,
+                        charged_energies_ec_x,
+                    ) = charged_energies
+                    (
+                        neutral_energies,
+                        neutral_energies_shap_vals,
+                        neutral_energies_ec_x,
+                    ) = neutral_energies
+                    shap_vals = (
+                        torch.ones(
+                            graphs_high_level_features.shape[0],
+                            charged_energies_shap_vals[0].shape[1],
+                        )
+                        .to(graphs_new.ndata["h"].device)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+                    ec_x = torch.zeros(
+                        graphs_high_level_features.shape[0],
+                        charged_energies_ec_x.shape[1],
+                    )
+                    shap_vals[
+                        charged_idx.detach().cpu().numpy()
+                    ] = charged_energies_shap_vals[0]
+                    shap_vals[
+                        neutral_idx.detach().cpu().numpy()
+                    ] = neutral_energies_shap_vals[0]
                     ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
                     ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
             else:
@@ -349,12 +417,19 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr[neutral_idx.flatten()] = (
                 neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
             )
-            pred_energy_corr[pred_energy_corr < 0] = 0.  # Temporary fix
+            pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
             # print("Pred energy corr:", pred_energy_corr)
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e, true_pid, e_true_corr_daughters)
+                return (
+                    x,
+                    pred_energy_corr,
+                    true_new,
+                    sum_e,
+                    true_pid,
+                    e_true_corr_daughters,
+                )
             else:
                 if self.args.explain_ec:
                     return (
@@ -368,7 +443,7 @@ class ExampleWrapper(L.LightningModule):
                         true_pid,
                         e_true_corr_daughters,
                         shap_vals,
-                        ec_x
+                        ec_x,
                     )
                 return (
                     x,
@@ -379,7 +454,7 @@ class ExampleWrapper(L.LightningModule):
                     batch_idx,
                     graphs_high_level_features,
                     true_pid,
-                    e_true_corr_daughters
+                    e_true_corr_daughters,
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -409,12 +484,20 @@ class ExampleWrapper(L.LightningModule):
         batch_g = batch[0]
         initial_time = time()
         if self.trainer.is_global_zero:
-            result = self(
-                batch_g, y, batch_idx
-            )
+            result = self(batch_g, y, batch_idx)
         else:
             result = self(batch_g, y, 1)
-        model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters = result
+        (
+            model_output,
+            e_cor,
+            e_true,
+            e_sum_hits,
+            new_graphs,
+            batch_id,
+            graph_level_features,
+            pid_true_matched,
+            e_true_corr_daughters,
+        ) = result
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -433,17 +516,17 @@ class ExampleWrapper(L.LightningModule):
             loss_type=self.args.losstype,
         )
         # Dummy loss to avoid errors
-        loss = loss #+ torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
+        loss = loss  # + torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         loss_time_end = time()
         wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
             loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
-            #loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
+            # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
-            #loss = loss_EC
+            # loss = loss_EC
             if self.args.save_features:
                 cluster_features_path = os.path.join(
                     self.args.model_prefix, "cluster_features"
@@ -454,7 +537,7 @@ class ExampleWrapper(L.LightningModule):
                     cluster_features_path,
                     {
                         "x": graph_level_features.detach().cpu(),
-                        #""" "xyz_covariance_matrix": covariances.cpu(),"""
+                        # """ "xyz_covariance_matrix": covariances.cpu(),"""
                         "e_true": e_true.detach().cpu(),
                         "e_reco": e_cor.detach().cpu(),
                         "true_e_corr": (e_true / e_sum_hits - 1).detach().cpu(),
@@ -463,7 +546,7 @@ class ExampleWrapper(L.LightningModule):
                         #    batch_g.ndata["h"], batch_idx, dim=0
                         # ),  # graph-averaged node features
                         "y_particles": y,
-                        "pid_y": pid_true_matched
+                        "pid_y": pid_true_matched,
                     },
                 )
 
@@ -479,7 +562,6 @@ class ExampleWrapper(L.LightningModule):
         wandb.log({"misc_time_inside_training": final_time - misc_time_start})
         wandb.log({"training_step_time": final_time - initial_time})
         return loss
-
 
     def validation_step(self, batch, batch_idx):
         cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
@@ -497,9 +579,31 @@ class ExampleWrapper(L.LightningModule):
         if self.args.correction:
             result = self(batch_g, y, 1)
             if self.args.explain_ec:
-                model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters, shap_vals, ec_x = result
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                    shap_vals,
+                    ec_x,
+                ) = result
             else:
-                model_output, e_cor, e_true, e_sum_hits, new_graphs, batch_id, graph_level_features, pid_true_matched, e_true_corr_daughters = result
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                ) = result
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
@@ -536,7 +640,9 @@ class ExampleWrapper(L.LightningModule):
                 True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
             )
         if self.args.explain_ec:
-            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, shap_vals, ec_x])
+            self.validation_step_outputs.append(
+                [model_output, e_cor, batch_g, y, shap_vals, ec_x]
+            )
         else:
             self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
@@ -547,7 +653,11 @@ class ExampleWrapper(L.LightningModule):
                 model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
                 e_corr = None
 
-            (df_batch_pandora, df_batch1) = create_and_store_graph_output(
+            (
+                df_batch_pandora,
+                df_batch1,
+                self.total_number_events,
+            ) = create_and_store_graph_output(
                 batch_g,
                 model_output1,
                 y,
@@ -560,10 +670,12 @@ class ExampleWrapper(L.LightningModule):
                 e_corr=e_corr,
                 tracks=self.args.tracks,
                 shap_vals=shap_vals,
-                ec_x=ec_x
+                ec_x=ec_x,
+                total_number_events=self.total_number_events,
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
+            print("Appending another batch", len(df_batch1))
             self.df_showes_db.append(df_batch1)
 
         del losses
@@ -580,6 +692,7 @@ class ExampleWrapper(L.LightningModule):
         self.make_mom_zero()
 
     def on_validation_epoch_start(self):
+        self.total_number_events = 0
         self.make_mom_zero()
         self.df_showers = []
         self.df_showers_pandora = []
@@ -595,6 +708,7 @@ class ExampleWrapper(L.LightningModule):
             if self.args.predict:
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
+
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
                     path_shap_vals = os.path.join(
@@ -621,7 +735,7 @@ class ExampleWrapper(L.LightningModule):
                 e_corr = self.validation_step_outputs[0][1]
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
-                shap_vals=None
+                shap_vals = None
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
                     ec_x = self.validation_step_outputs[0][5]
@@ -631,7 +745,7 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
                     e_corr = None
-               
+
                 create_and_store_graph_output(
                     batch_g,
                     model_output1,
@@ -647,7 +761,7 @@ class ExampleWrapper(L.LightningModule):
                     e_corr=e_corr,
                     tracks=self.args.tracks,
                     shap_vals=shap_vals,
-                    ec_x=ec_x
+                    ec_x=ec_x,
                 )
                 del model_output1
                 del batch_g

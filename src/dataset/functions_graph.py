@@ -62,28 +62,50 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
     y_data_graph.mask(~mask_particles)
-    result = [
-        y_data_graph,  # y_data_graph[~mask_particles],
-        p_hits[~mask_hits],
-        e_hits[~mask_hits],
-        cluster_id,
-        hit_particle_link[~mask_hits],
-        pos_xyz_hits[~mask_hits],
-        pandora_cluster[~mask_hits],
-        pandora_cluster_energy[~mask_hits],
-        pfo_energy[~mask_hits],
-        pandora_pfo_link[~mask_hits],
-        hit_type_feature[~mask_hits],
-        hit_link_modified[~mask_hits],
-        chi_squared_tracks[~mask_hits],
-    ]
+    if prediction:
+        result = [
+            y_data_graph,  # y_data_graph[~mask_particles],
+            p_hits[~mask_hits],
+            e_hits[~mask_hits],
+            cluster_id,
+            hit_particle_link[~mask_hits],
+            pos_xyz_hits[~mask_hits],
+            pandora_cluster[~mask_hits],
+            pandora_cluster_energy[~mask_hits],
+            pfo_energy[~mask_hits],
+            pandora_pfo_link[~mask_hits],
+            hit_type_feature[~mask_hits],
+            hit_link_modified[~mask_hits],
+        ]
+    else:
+        result = [
+            y_data_graph,  # y_data_graph[~mask_particles],
+            p_hits[~mask_hits],
+            e_hits[~mask_hits],
+            cluster_id,
+            hit_particle_link[~mask_hits],
+            pos_xyz_hits[~mask_hits],
+            pandora_cluster,
+            pandora_cluster_energy,
+            pfo_energy,
+            pandora_pfo_link,
+            hit_type_feature[~mask_hits],
+            hit_link_modified[~mask_hits],
+        ]
+    if hit_chis:
+        result.append(
+            chi_squared_tracks[~mask_hits],
+        )
+    else:
+        result.append(None)
     hit_type = hit_type_feature[~mask_hits]
     # if hits only remove tracks, otherwise leave tracks
     if hits_only:
         hit_mask = (hit_type == 0) | (hit_type == 1)
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
-            result[i] = result[i][hit_mask]
+            if result[i] is not None:
+                result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
             hit_type_feature[~mask_hits][hit_mask] - 2, num_classes=2
         )
@@ -93,7 +115,8 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
         hit_mask = hit_type == 0
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
-            result[i] = result[i][hit_mask]
+            if result[i] is not None:
+                result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
             hit_type_feature[~mask_hits][hit_mask] - 1, num_classes=3
         )
@@ -139,18 +162,7 @@ def create_graph(
         graph_empty = False
         g = dgl.graph(([], []))
         g.add_nodes(graph_coordinates.shape[0])
-        if extended_coords:
-            hit_features_graph = torch.cat(
-                (
-                    graph_coordinates,
-                    hit_type_one_hot,
-                    e_hits,
-                    p_hits,
-                    torch.log(e_hits),
-                ),
-                dim=1,
-            )  # dims = 3+4+1+1+1+1
-        elif hits_only == False:
+        if hits_only == False:
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
             )  # dims = 8
@@ -158,30 +170,19 @@ def create_graph(
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
             )  # dims = 9
-        #! currently we are not doing the pid or mass regression
-        g.ndata["h"] = hit_features_graph
-        # g.ndata["pos_hits"] = coord_cart_hits
-        g.ndata["pos_hits_xyz"] = pos_xyz_hits
 
-        # x = pos_xyz_hits[:, 0]
-        # y = pos_xyz_hits[:, 1]
-        # distance_radial = torch.sqrt(x**2 + y**2) - 2150
-        # g.ndata["radial_distance"] = distance_radial
-        # g.ndata["radial_distance_exp"] = torch.exp(-distance_radial / 1000)
+        g.ndata["h"] = hit_features_graph
+        g.ndata["pos_hits_xyz"] = pos_xyz_hits
         g = calculate_distance_to_boundary(g)
-        # g.ndata["pos_hits_norm"] = coord_cart_hits_norm
         g.ndata["hit_type"] = hit_type
-        # g.ndata["p_hits"] = p_hits
         g.ndata[
             "e_hits"
         ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
-
+        if hit_chis:
+            g.ndata["chi_squared_tracks"] = chi_squared_tracks
         g.ndata["particle_number"] = cluster_id
-        g.ndata["chi_squared_tracks"] = chi_squared_tracks
         g.ndata["hit_link_modified"] = hit_link_modified
         g.ndata["particle_number_nomap"] = hit_particle_link
-        # g.ndata["theta_hits"] = theta_hits
-        # g.ndata["phi_hits"] = phi_hits
         if prediction:
             g.ndata["pandora_cluster"] = pandora_cluster
             g.ndata["pandora_pfo"] = pandora_pfo_link
@@ -197,6 +198,7 @@ def create_graph(
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
     return [g, y_data_graph], graph_empty
+
 
 def graph_batch_func(list_graphs):
     """collator function for graph dataloader

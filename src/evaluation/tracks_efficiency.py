@@ -22,8 +22,17 @@ def plot_efficiency_all(list_dataframes, PATH_store, PATH_comparison, label_list
         all_particles_0_10 = create_eff_dic(
             sd_hgb, log, num_hits_min=0, num_hits_max=10
         )
-        all_particles_10_50 = create_eff_dic(
-            sd_hgb, log, num_hits_min=10, num_hits_max=50
+        all_particles_10_20 = create_eff_dic(
+            sd_hgb, log, num_hits_min=10, num_hits_max=20
+        )
+        all_particles_20_30 = create_eff_dic(
+            sd_hgb, log, num_hits_min=20, num_hits_max=30
+        )
+        all_particles_30_40 = create_eff_dic(
+            sd_hgb, log, num_hits_min=30, num_hits_max=40
+        )
+        all_particles_40_50 = create_eff_dic(
+            sd_hgb, log, num_hits_min=40, num_hits_max=50
         )
         all_particles_50_100 = create_eff_dic(
             sd_hgb, log, num_hits_min=50, num_hits_max=100
@@ -34,7 +43,10 @@ def plot_efficiency_all(list_dataframes, PATH_store, PATH_comparison, label_list
         list_ = [
             all_particles,
             all_particles_0_10,
-            all_particles_10_50,
+            all_particles_10_20,
+            all_particles_20_30,
+            all_particles_30_40,
+            all_particles_40_50,
             all_particles_50_100,
             all_particles_100_all,
         ]
@@ -91,8 +103,8 @@ def calculate_eff(sd, log_scale=False):
 
 
 def plot_eff(title, dataframe_list, label_list, PATH_store, log):
-    list_nh = ["all", "0-10", "10-50", "50-100", "100>"]
-    markers = ["^", "*", "x"]
+    list_nh = ["all", "0-10", "10-20", "20-30", "30-40", "40-50", "50-100", "100>"]
+    markers = ["^", "*", "x", "."]
     fig, axs = plt.subplots(1, len(list_nh), figsize=(80, 15))
     for index, plot_title in enumerate(list_nh):
         colors_list = ["#FF0000", "#FF0000", "#0000FF"]
@@ -115,11 +127,12 @@ def plot_eff(title, dataframe_list, label_list, PATH_store, log):
             axs[index].set_xscale("log")
         else:
             log_ = ""
-        axs[index].set_ylim([0, 1.1])
+        axs[index].set_ylim([0.5, 1.1])
         axs[index].legend(loc="lower left")
         axs[index].axvline(x=0.6)
         axs[index].axvline(x=0.1)
         axs[index].set_yticks(ticks=[0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1])
+        axs[index].set_xticks(ticks=[0.001, 0.01, 0.1, 1, 10, 100])
     fig.savefig(
         PATH_store + "comparison" + log_ + ".png",
         bbox_inches="tight",

@@ -24,9 +24,10 @@ def create_and_store_graph_output(
     tracking=False,
     e_corr=None,
     shap_vals=None,
-    ec_x=None, # ec_x: "global" features (what gets inputted into the final deep neural network head) for energy correction
+    ec_x=None,  # ec_x: "global" features (what gets inputted into the final deep neural network head) for energy correction
     tracks=False,
     store_epoch=False,
+    total_number_events=0,
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -48,9 +49,9 @@ def create_and_store_graph_output(
         y1.mask(mask)
         dic["part_true"] = y1  # y[mask]
         X = dic["graph"].ndata["coords"]
-        #if shap_vals is not None:
+        # if shap_vals is not None:
         #    dic["shap_values"] = shap_vals
-        #if ec_x is not None:
+        # if ec_x is not None:
         #    dic["ec_x"] = ec_x  ## ? no mask ?!?
         if predict:
             labels_clustering = clustering_obtain_labels(
@@ -60,7 +61,7 @@ def create_and_store_graph_output(
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        '''if predict:
+        """if predict:
             shower_p_unique = torch.unique(labels_clustering)
             shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
                 labels_clustering,
@@ -71,7 +72,7 @@ def create_and_store_graph_output(
                 i,
                 path_save,
                 tracks=tracks,
-            )'''
+            )"""
         shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb, iou_m = match_showers(
             labels_hdb,
             dic,
@@ -105,17 +106,17 @@ def create_and_store_graph_output(
         # # if len(row_ind_hdb) < len(dic["part_true"]):
         # print(len(row_ind_hdb), len(dic["part_true"]))
         # print("storing  event", local_rank, step, i)
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs_all_comparing/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        # )
+        torch.save(
+            dic,
+            path_save
+            + "/graphs_all_comparing/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(i)
+            + ".pt",
+        )
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
             #     labels_clustering,
@@ -142,10 +143,10 @@ def create_and_store_graph_output(
                 e_corr=e_corr,
                 number_of_showers_total=number_of_showers_total1,
                 step=step,
-                number_in_batch=i,
+                number_in_batch=total_number_events,
                 tracks=tracks,
                 ec_x=ec_x,
-                shap_vals=shap_vals
+                shap_vals=shap_vals,
             )
             # if predict and len(df_event) > 1:
             #     df_list.append(df_event)
@@ -163,11 +164,12 @@ def create_and_store_graph_output(
                     pandora=True,
                     tracking=tracking,
                     step=step,
-                    number_in_batch=i,
+                    number_in_batch=total_number_events,
                     tracks=tracks,
                 )
                 if len(df_event_pandora) > 1:
                     df_list_pandora.append(df_event_pandora)
+            total_number_events = total_number_events + 1
         # print("number of showers total", number_of_showers_total)
         # number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
         # print("number of showers total", number_of_showers_total)
@@ -192,7 +194,7 @@ def create_and_store_graph_output(
             store=store_epoch,
         )
     if predict:
-        return df_batch_pandora, df_batch1
+        return df_batch_pandora, df_batch1, total_number_events
     else:
         return df_batch1
 
@@ -281,7 +283,7 @@ def generate_showers_data_frame(
     number_in_batch=0,
     tracks=False,
     shap_vals=None,
-    ec_x=None
+    ec_x=None,
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -312,7 +314,9 @@ def generate_showers_data_frame(
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
     if shap:
-        matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (torch.nan)
+        matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (
+            torch.nan
+        )
         matched_shap_vals = matched_shap_vals.numpy()
         matched_ec_x = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (torch.nan)
         matched_ec_x = matched_ec_x.numpy()
@@ -379,7 +383,7 @@ def generate_showers_data_frame(
         fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (
             torch.nan
         )
-        '''if shap:
+        """if shap:
             fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
                 torch.nan
             )
@@ -390,7 +394,7 @@ def generate_showers_data_frame(
             #fake_showers_ec_x_t = fake_showers_ec_x_t.to(e_pred_showers.device)
             shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
             ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
-'''
+"""
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
@@ -419,10 +423,18 @@ def generate_showers_data_frame(
         if shap:
             # pad
             matched_shap_vals = torch.cat(
-                (torch.tensor(matched_shap_vals), torch.zeros((fake_showers_e.shape[0], shap_vals.shape[1]))), dim=0
+                (
+                    torch.tensor(matched_shap_vals),
+                    torch.zeros((fake_showers_e.shape[0], shap_vals.shape[1])),
+                ),
+                dim=0,
             )
             matched_ec_x = torch.cat(
-                (torch.tensor(matched_ec_x), torch.zeros((fake_showers_e.shape[0], ec_x.shape[1]))), dim=0
+                (
+                    torch.tensor(matched_ec_x),
+                    torch.zeros((fake_showers_e.shape[0], ec_x.shape[1])),
+                ),
+                dim=0,
             )
 
         e_pred_t = torch.cat(
@@ -451,7 +463,7 @@ def generate_showers_data_frame(
                 "pid": pid_t.detach().cpu(),
                 "step": torch.ones_like(energy_t.detach().cpu()) * step,
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
-                * number_in_batch
+                * number_in_batch,
             }
         else:
             d = {
@@ -466,10 +478,10 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
             }
-        '''if shap:
+        """if shap:
             print("Adding ec_x and shap_values to the dataframe")
             d["ec_x"] = ec_x_t
-            d["shap_values"] = shap_vals_t'''
+            d["shap_values"] = shap_vals_t"""
         if shap:
             d["shap_values"] = matched_shap_vals.tolist()
             d["ec_x"] = matched_ec_x.tolist()
@@ -589,6 +601,7 @@ def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
     else:
         return 0
 
+
 def plot_iou_matrix(iou_matrix, image_path, hdbscan=False):
     iou_matrix = torch.transpose(iou_matrix[1:, :], 1, 0)
     fig, ax = plt.subplots()
@@ -654,6 +667,7 @@ def match_showers(
             # plot_iou_matrix(iou_matrix, image_path, hdbscan)
     # row_ind are particles that are matched and col_ind the ind of preds they are matched to
     return shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix
+
 
 def clustering_obtain_labels(X, betas, device):
     clustering = get_clustering(betas, X)

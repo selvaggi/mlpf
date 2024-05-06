@@ -238,10 +238,14 @@ def modify_index_link_for_gamma_e(
 
 def get_hit_features(output, number_hits, prediction, number_part, hit_chis):
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
-    pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
-    pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
-    daughters = torch.tensor(output["pf_vectoronly"][3, 0:number_hits])
     if prediction:
+        indx_daugthers = 3
+    else:
+        indx_daugthers = 1
+    daughters = torch.tensor(output["pf_vectoronly"][indx_daugthers, 0:number_hits])
+    if prediction:
+        pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
+        pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
         if hit_chis:
             pandora_cluster_energy = torch.tensor(
                 output["pf_features"][-3, 0:number_hits]
@@ -253,11 +257,13 @@ def get_hit_features(output, number_hits, prediction, number_part, hit_chis):
                 output["pf_features"][-2, 0:number_hits]
             )
             pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
-            chi_squared_tracks = pandora_cluster * 0
+            chi_squared_tracks = None
     else:
-        pandora_cluster_energy = pandora_cluster * 0
-        pfo_energy = pandora_cluster * 0
-        chi_squared_tracks = pandora_cluster * 0
+        pandora_cluster = None
+        pandora_pfo_link = None
+        pandora_cluster_energy = None
+        pfo_energy = None
+        chi_squared_tracks = None
     # hit type
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
