@@ -447,7 +447,8 @@ def plot_per_energy_resolution2_multiple(
     figs_r, axs_r = {}, {} # response
     colors = {
         "DNN": "green",
-        "GNN+DNN": "purple"
+        "GNN+DNN": "purple",
+        "DNN w/o FT": "blue"
     }
     plot_pandora, plot_baseline = True, True
     for pid in [22, 11, 130, 211, 2112, 2212]:
@@ -974,8 +975,8 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         mask = distr_pandora < 2.0
         distr_pandora = distr_pandora[mask]
         frac_pandora_dropped = int((1 - len(distr_pandora) / len(photons_dic["distributions_pandora"][i]))*1000)
-        ax_distr[i].hist(distr_model, bins=np.arange(0, 2, 1e-2), color="blue", label="ML ("+str(frac_model_dropped) + "%.)", alpha=0.5)
-        ax_distr[i].hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora (" + str(frac_pandora_dropped) + "%.)", alpha=0.5)
+        ax_distr[i].hist(distr_model, bins=np.arange(0, 2, 1e-2), color="blue", label="ML ("+str(frac_model_dropped) + "%.)", alpha=0.5, histtype="step")
+        ax_distr[i].hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora (" + str(frac_pandora_dropped) + "%.)", alpha=0.5, histtype="step")
         # ALSO PLOT MU AND SIGMA #
         mu = photons_dic["mean"][i]
         sigma = (photons_dic["variance_om"][i]) * mu
@@ -1015,7 +1016,7 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         a.errorbar(
             photons_dic["energy_resolutions" + reco],
             photons_dic[y_axis + reco],
-            yerr=errors,
+            #yerr=errors,
             color=colors_list[1],
             #edgecolors=colors_list[1],
             label=label1,
@@ -1030,7 +1031,7 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
             a.errorbar(
                 photons_dic["energy_resolutions_p" + reco],
                 photons_dic[y_axis + "_p" + reco],
-                yerr=pandora_errors,
+                #yerr=pandora_errors,
                 color=colors_list[2],
                 #edgecolors=colors_list[2],
                 label="Pandora",

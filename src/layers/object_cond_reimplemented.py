@@ -387,7 +387,7 @@ def calc_LV_Lbeta(
         )  # *energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
         e_particle_pred_per_particle = e_particles_pred_per_object[
             object_index
-        ] * energy_correction[is_sig].view(-1)
+        ] * energy_correction.view(-1)
         e_true = y[:, 3].clone()
         e_true = e_true.to(e_particles_pred_per_object.device)
         e_true_particle = e_true[object_index]
