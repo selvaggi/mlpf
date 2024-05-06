@@ -170,30 +170,36 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
     # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
     def gaus(X, C, X_mean, sigma):
         return C * exp(-((X - X_mean) ** 2) / (2 * sigma**2))
-
     n = len(hist)
     x_hist = np.zeros((n), dtype=float)
     for ii in range(n):
         x_hist[ii] = (bin_edges[ii + 1] + bin_edges[ii]) / 2
-
     y_hist = hist
     if (torch.tensor(hist) == 0).all():
         return 0,0
     mean = sum(x_hist * y_hist) / sum(y_hist)
     sigma = sum(y_hist * (x_hist - mean) ** 2) / sum(y_hist)
+    # cut 1% of highest vals
+    #e_over_reco_filtered = np.sort(e_over_reco)
+    #e_over_reco_filtered = e_over_reco_filtered[:int(len(e_over_reco_filtered) * 0.99)]
+    #mean = np.mean(e_over_reco_filtered)
+    #sigma = np.std(e_over_reco_filtered)
     try:
         param_optimised, param_covariance_matrix = curve_fit(
             gaus, x_hist, y_hist, p0=[max(y_hist), mean, sigma], maxfev=10000
         )
     except:
-        return mean, sigma/mean
+        print("Error! Using this")
+        return mean, sigma/mean, 0.001, 0.001 # dummy errors temporarily
     if param_optimised[2] < 0:
         param_optimised[2] = sigma
     if param_optimised[1] < 0:
        param_optimised[1] = mean  # due to some weird fitting errors
     assert param_optimised[1] >= 0
     assert param_optimised[2] >= 0
-    return param_optimised[1], param_optimised[2] / param_optimised[1]
+    errors = np.sqrt(np.diag(param_covariance_matrix))
+    # sigma_over_E_error = errors[2] / param_optimised[1]
+    return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]
 
 def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)

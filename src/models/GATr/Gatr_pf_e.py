@@ -57,7 +57,7 @@ import torch.nn.functional as F
 
 
 def criterion(ypred, ytrue, step):
-    if True or step < 5000:
+    if True or step < 5000:  # Always use the L1 loss!!
         #### ! using L1 loss for this training only!
         return F.l1_loss(ypred, ytrue)
     else:
@@ -351,10 +351,9 @@ class ExampleWrapper(L.LightningModule):
                 == graphs_new.batch_num_nodes().shape[0]
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-            features_neutral_no_nan[
-                features_neutral_no_nan != features_neutral_no_nan
-            ] = 0
-            if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+            #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            if True:
                 unbatched = dgl.unbatch(graphs_new)
                 charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
                 neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
@@ -422,14 +421,7 @@ class ExampleWrapper(L.LightningModule):
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (
-                    x,
-                    pred_energy_corr,
-                    true_new,
-                    sum_e,
-                    true_pid,
-                    e_true_corr_daughters,
-                )
+                return (x, pred_energy_corr, true_new, sum_e, true_pid, true_new)
             else:
                 if self.args.explain_ec:
                     return (
@@ -683,7 +675,6 @@ class ExampleWrapper(L.LightningModule):
         del model_output
 
     def on_train_epoch_end(self):
-
         self.log("train_loss_epoch", self.loss_final / self.number_b)
 
     def on_train_epoch_start(self):
@@ -735,7 +726,8 @@ class ExampleWrapper(L.LightningModule):
                 e_corr = self.validation_step_outputs[0][1]
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
-                shap_vals = None
+                shap_vals=None
+                ec_x = None
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
                     ec_x = self.validation_step_outputs[0][5]
