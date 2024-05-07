@@ -731,6 +731,6 @@ def get_labels_pandora(tracks, dic, device):
     labels_pandora = labels_pandora + 1
     map_from = list(np.unique(labels_pandora.detach().cpu()))
     map_from = CachedIndexList(map_from)
-    cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
+    cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu().numpy())
     labels_pandora = torch.Tensor(list(cluster_id)).long().to(device)
     return labels_pandora
