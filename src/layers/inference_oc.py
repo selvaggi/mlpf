@@ -106,6 +106,9 @@ def create_and_store_graph_output(
         # # if len(row_ind_hdb) < len(dic["part_true"]):
         # print(len(row_ind_hdb), len(dic["part_true"]))
         # print("storing  event", local_rank, step, i)
+        path_graphs_all_comparing = os.path.join(path_save, "graphs_all_comparing")
+        if not os.path.exists(path_graphs_all_comparing):
+            os.makedirs(path_graphs_all_comparing)
         torch.save(
             dic,
             path_save
