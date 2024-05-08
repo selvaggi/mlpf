@@ -60,7 +60,7 @@ all_pids = [int(pid) for pid in all_pids]
 print("Training on PIDs:", all_pids)
 print("CUDA available:", torch.cuda.is_available())  # in case needed
 
-DEVICE = torch.device("cuda:1")
+DEVICE = torch.device("cuda:0")
 #prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_neutral_l1_loss_only/"
 
 wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)

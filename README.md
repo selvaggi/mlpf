@@ -22,8 +22,20 @@ custom_model_kwargs:
 ## Visualization 
 Runs for this project can be found in the following work space: https://wandb.ai/imdea_dolo/mlpf?workspace=user-imdea_dolo
 
-## Envirorment 
+## Environment 
 To set up the env create a conda env following the instructions from [Weaver](https://github.com/hqucms/weaver-core/tree/main) and also install the packages in the requirements.sh script above 
 
 Alternatively, you can try to use a pre-built environment from [this link](https://cernbox.cern.ch/s/Rwz2S35BUePbwG4) - the .tar.gz file was built using conda-pack on fcc-gpu-04v2.cern.ch.
 
+## Energy correction
+
+A bit hacky for now, but the dataset is extracted from the training dataloader by adding `--save-features` to the training command. The dataframes used for training are saved into the `cluster_features` directory.
+Firstly a simple neural network is trained to perform energy correction. We train two models separately for neutral and charged particles.
+
+```python notebooks/13_NNs.py --prefix /eos/user/g/gkrzmanc/2024/EC_basic_model_charged --wandb_name NN_EC_train_charged --loss default --PIDs 211,-211,2212,-2212,11 --dataset-path /eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/cluster_features/ --batch-size 8 --corrected-energy --gnn-features-placeholders 32```
+
+```python notebooks/13_NNs.py --prefix /eos/user/g/gkrzmanc/2024/EC_basic_model_neutral --wandb_name NN_EC_train_neutral --loss default --PIDs 130,2112,22            --dataset-path /eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/cluster_features/ --batch-size 8 --corrected-energy --gnn-features-placeholders 32```
+
+The produced models are then loaded in `src/models/GATr/Gatr_pf_e.py`.
+
+Evaluation / further training: `--ec-model gat-concat` or `--ec-model dnn`.

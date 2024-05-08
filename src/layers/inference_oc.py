@@ -4,7 +4,7 @@ import os
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
-
+from src.dataset.functions_data import CachedIndexList
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
@@ -106,17 +106,20 @@ def create_and_store_graph_output(
         # # if len(row_ind_hdb) < len(dic["part_true"]):
         # print(len(row_ind_hdb), len(dic["part_true"]))
         # print("storing  event", local_rank, step, i)
-        torch.save(
-            dic,
-            path_save
-            + "/graphs_all_comparing/"
-            + str(local_rank)
-            + "_"
-            + str(step)
-            + "_"
-            + str(i)
-            + ".pt",
-        )
+        #path_graphs_all_comparing = os.path.join(path_save, "graphs_all_comparing")
+        #if not os.path.exists(path_graphs_all_comparing):
+        #    os.makedirs(path_graphs_all_comparing)
+        #torch.save(
+        #    dic,
+        #    path_save
+        #    + "/graphs_all_comparing/"
+        ##    + str(local_rank)
+        #    + "_"
+        #    + str(step)
+        #    + "_"
+        #    + str(i)
+        #    + ".pt",
+        #)
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
             #     labels_clustering,
@@ -708,6 +711,17 @@ def dbscan_obtain_labels(X, device):
     labels = torch.Tensor(labels).long().to(device)
     return labels
 
+class CachedIndexList:
+    def __init__(self, lst):
+        self.lst = lst
+        self.cache = {}
+    def index(self, value):
+        if value in self.cache:
+            return self.cache[value]
+        else:
+            idx = self.lst.index(value)
+            self.cache[value] = idx
+            return idx
 
 def get_labels_pandora(tracks, dic, device):
     if tracks:
@@ -716,6 +730,7 @@ def get_labels_pandora(tracks, dic, device):
         labels_pandora = dic["graph"].ndata["pandora_cluster"].long()
     labels_pandora = labels_pandora + 1
     map_from = list(np.unique(labels_pandora.detach().cpu()))
-    cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu())
+    map_from = CachedIndexList(map_from)
+    cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu().numpy())
     labels_pandora = torch.Tensor(list(cluster_id)).long().to(device)
     return labels_pandora
