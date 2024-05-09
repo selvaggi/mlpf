@@ -16,6 +16,7 @@ from src.layers.inference_oc import hfdb_obtain_labels
 def evaluate_efficiency_tracks(
     batch_g,
     model_output,
+    embedded_outputs,
     y,
     local_rank,
     step,
@@ -27,6 +28,7 @@ def evaluate_efficiency_tracks(
     number_of_showers_total = 0
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
+    batch_g.ndata["embedded_outputs"] = embedded_outputs
     graphs = dgl.unbatch(batch_g)
     batch_id = y[:, -1].view(-1)
     df_list = []
@@ -42,7 +44,7 @@ def evaluate_efficiency_tracks(
         if clustering_mode == "clustering_normal":
             clustering = get_clustering(betas, X)
         elif clustering_mode == "dbscan":
-            labels = hfdb_obtain_labels(X, betas.device)
+            labels = hfdb_obtain_labels(X, betas.device, eps=0.05)
 
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
         shower_p_unique = torch.unique(labels)
@@ -56,18 +58,6 @@ def evaluate_efficiency_tracks(
             path_save,
         )
 
-        # print("storing  event", local_rank, step, i)
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs_all/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        # )
         if len(row_ind) > 1:
             df_event, number_of_showers_total = generate_showers_data_frame(
                 labels,
@@ -81,6 +71,19 @@ def evaluate_efficiency_tracks(
                 step=step,
                 number_in_batch=i,
             )
+            # if len(shower_p_unique) < len(particle_ids):
+            #     print("storing  event", local_rank, step, i)
+            #     torch.save(
+            #         dic,
+            #         path_save
+            #         + "/graphs_all_hdb/"
+            #         + str(local_rank)
+            #         + "_"
+            #         + str(step)
+            #         + "_"
+            #         + str(i)
+            #         + ".pt",
+            #     )
             df_list.append(df_event)
     if len(df_list) > 0:
         df_batch = pd.concat(df_list)

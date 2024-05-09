@@ -15,7 +15,9 @@ from src.dataset.functions_data import (
 )
 
 
-def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False):
+def create_inputs_from_table(
+    output, hits_only, prediction=False, hit_chis=False, pos_pxpy=False
+):
     """Used by graph creation to get nodes and edge features
 
     Args:
@@ -31,6 +33,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
 
     (
         pos_xyz_hits,
+        pos_pxpypz,
         p_hits,
         e_hits,
         hit_particle_link,
@@ -46,7 +49,12 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
         connection_list,
         chi_squared_tracks,
     ) = get_hit_features(
-        output, number_hits, prediction, number_part, hit_chis=hit_chis
+        output,
+        number_hits,
+        prediction,
+        number_part,
+        hit_chis=hit_chis,
+        pos_pxpy=pos_pxpy,
     )
 
     # features particles
@@ -62,6 +70,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
     y_data_graph.mask(~mask_particles)
+
     if prediction:
         result = [
             y_data_graph,  # y_data_graph[~mask_particles],
@@ -70,6 +79,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
             cluster_id,
             hit_particle_link[~mask_hits],
             pos_xyz_hits[~mask_hits],
+            pos_pxpypz[~mask_hits],
             pandora_cluster[~mask_hits],
             pandora_cluster_energy[~mask_hits],
             pfo_energy[~mask_hits],
@@ -85,6 +95,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
             cluster_id,
             hit_particle_link[~mask_hits],
             pos_xyz_hits[~mask_hits],
+            pos_pxpypz[~mask_hits],
             pandora_cluster,
             pandora_cluster_energy,
             pfo_energy,
@@ -112,7 +123,7 @@ def create_inputs_from_table(output, hits_only, prediction=False, hit_chis=False
 
     else:
         # if we want the tracks keep only 1 track hit per charged particle.
-        hit_mask = hit_type == 0
+        hit_mask = hit_type == 10
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             if result[i] is not None:
@@ -138,6 +149,7 @@ def create_graph(
     extended_coords = config.graph_config.get("extended_coords", False)
     prediction = config.graph_config.get("prediction", False)
     hit_chis = config.graph_config.get("hit_chis_track", False)
+    pos_pxpy = config.graph_config.get("pos_pxpy", False)
     (
         y_data_graph,
         p_hits,
@@ -145,6 +157,7 @@ def create_graph(
         cluster_id,
         hit_particle_link,
         pos_xyz_hits,
+        pos_pxpypz,
         pandora_cluster,
         pandora_cluster_energy,
         pandora_pfo_energy,
@@ -155,7 +168,11 @@ def create_graph(
         hit_type_one_hot,
         connections_list,
     ) = create_inputs_from_table(
-        output, hits_only=hits_only, prediction=prediction, hit_chis=hit_chis
+        output,
+        hits_only=hits_only,
+        prediction=prediction,
+        hit_chis=hit_chis,
+        pos_pxpy=pos_pxpy,
     )
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
@@ -173,6 +190,7 @@ def create_graph(
 
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
+        g.ndata["pos_pxpypz"] = pos_pxpypz
         g = calculate_distance_to_boundary(g)
         g.ndata["hit_type"] = hit_type
         g.ndata[

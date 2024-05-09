@@ -75,7 +75,7 @@ def create_inputs_from_table(output, get_vtx):
         (1, 0),
     )
     y_data_graph = features_particles
-    hit_particle_link = fix_splitted_tracks(hit_particle_link, y_data_graph)
+    # hit_particle_link = fix_splitted_tracks(hit_particle_link, y_data_graph)
 
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     # # features particles
@@ -155,6 +155,23 @@ def create_graph_tracking(
         graph_empty = True
     # print("graph_empty", graph_empty)
     return [g, y_data_graph], graph_empty
+
+
+def create_weights_for_shower_hits(g):
+    weights = torch.ones_like(g.ndata["particle_number"])
+    for i in torch.unique(g.ndata["particle_number"]):
+        mask = g.ndata["particle_number"] == i
+        mask2 = mask * (g.ndata["hit_type"] == 1)
+        mask3 = mask * (g.ndata["hit_type"] == 0)
+        a = g.ndata["hit_type"][mask]
+        total_hits = len(a)
+        n_vtx_hits = torch.sum(a)
+        n_dch = total_hits - torch.sum(a)
+        if n_dch > 0 and n_vtx_hits > 0:
+            weights[mask3] = total_hits / (2 * n_dch)
+            weights[mask2] = total_hits / (2 * n_vtx_hits)
+    g.ndata["weights"] = weights
+    return g
 
 
 def create_graph_tracking_global(output, get_vtx=False, vector=False):
@@ -266,6 +283,7 @@ def create_graph_tracking_global(output, get_vtx=False, vector=False):
         g.ndata["particle_number_nomap"] = particle_number_nomap
         g.ndata["pos_hits_xyz"] = pos_xyz
         g.ndata["cellid"] = cellid
+        g = create_weights_for_shower_hits(g)
         # uvz = convert_to_conformal_coordinates(pos_xyz)
         # g.ndata["conformal"] = uvz
         if len(y_data_graph) < 2:

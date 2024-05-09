@@ -26,8 +26,14 @@ PATH_store = [
     "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard/showers_df_evaluation/",
     "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard_fullp/showers_df_evaluation/",
     "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard_v/showers_df_evaluation/",
+    "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/180324_Zcard_v_full/showers_df_evaluation/",
 ]
-label_list = ["180324_Zcard", "180324_Zcard_fullp", "180324_Zcard_v"]
+label_list = [
+    "180324_Zcard",
+    "180324_Zcard_fullp",
+    "180324_Zcard_v",
+    "180324_Zcard_v_full",
+]
 PATH_comparison = (
     "/eos/user/m/mgarciam/EVAL_REPOS/Tracking_wcoc/models/plots_comparison/"
 )
