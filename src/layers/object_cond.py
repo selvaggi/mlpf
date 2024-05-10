@@ -210,14 +210,14 @@ def calc_LV_Lbeta(
         )  # *energy_correction[is_sig][index_alpha].view(-1)).view(-1,1)
         ##e_particle_pred_per_particle = e_particles_pred_per_object[
         #    object_index
-        #] * energy_correction.view(-1)
-        #e_true = y.E.clone()  # y[:, 3].clone()
-        #e_true = e_true.to(e_particles_pred_per_object.device)
-        #e_true_particle = e_true[object_index]
-        #L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
+        # ] * energy_correction.view(-1)
+        # e_true = y.E.clone()  # y[:, 3].clone()
+        # e_true = e_true.to(e_particles_pred_per_object.device)
+        # e_true_particle = e_true[object_index]
+        # L_i = (e_particle_pred_per_particle - e_true_particle) ** 2 / e_true_particle
         B_i = (beta[is_sig].arctanh() / 1.01) ** 2 + 1e-3
-        #loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
-        #loss_E = torch.sum(L_i) / len(L_i)
+        # loss_E = torch.sum(L_i * B_i) / torch.sum(B_i)
+        # loss_E = torch.sum(L_i) / len(L_i)
 
         # loss_E = torch.mean(
         #     torch.square(
@@ -432,7 +432,7 @@ def calc_LV_Lbeta(
         else:
             norms_rep = torch.exp(-(norms) / 2) * M_inv
             # norms_rep2 = torch.exp(-(norms) * 10) * M_inv
-            norms_rep2 = torch.exp(-(norms) * 10) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 

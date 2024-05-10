@@ -123,7 +123,7 @@ def create_inputs_from_table(
 
     else:
         # if we want the tracks keep only 1 track hit per charged particle.
-        hit_mask = hit_type == 10
+        hit_mask = hit_type == 0
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             if result[i] is not None:

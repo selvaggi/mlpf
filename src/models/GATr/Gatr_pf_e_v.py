@@ -7,7 +7,13 @@ import sys
 # sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 from time import time
 from gatr import GATr, SelfAttentionConfig, MLPConfig
-from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
+from gatr.interface import (
+    embed_point,
+    extract_scalar,
+    extract_point,
+    embed_scalar,
+    embed_translation,
+)
 from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
@@ -232,7 +238,11 @@ class ExampleWrapper(L.LightningModule):
         inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
-        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)+ embed_translation(g.ndata["pos_pxpypz"])
+        embedded_inputs = (
+            embed_point(inputs)
+            + embed_scalar(inputs_scalar)
+            + embed_translation(g.ndata["pos_pxpypz"])
+        )
         embedded_inputs = embedded_inputs.unsqueeze(
             -2
         )  # (batch_size*num_points, 1, 16)
@@ -245,7 +255,7 @@ class ExampleWrapper(L.LightningModule):
             embedded_inputs, scalars=scalars, attention_mask=mask
         )  # (..., num_points, 1, 16)
         forward_time_end = time()
-        wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
+        #  wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
         points = extract_point(embedded_outputs[:, 0, :])
 
         # Extract scalar and aggregate outputs from point cloud
@@ -289,9 +299,9 @@ class ExampleWrapper(L.LightningModule):
                 use_gt_clusters=self.args.use_gt_clusters,
             )
             time_matching_end = time()
-            wandb.log(
-                {"time_clustering_matching": time_matching_end - time_matching_start}
-            )
+            # wandb.log(
+            #     {"time_clustering_matching": time_matching_end - time_matching_start}
+            # )
             batch_num_nodes = graphs_new.batch_num_nodes()
             batch_idx = []
             for i, n in enumerate(batch_num_nodes):
@@ -351,8 +361,10 @@ class ExampleWrapper(L.LightningModule):
                 == graphs_new.batch_num_nodes().shape[0]
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-            features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
-            #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            features_neutral_no_nan[
+                features_neutral_no_nan != features_neutral_no_nan
+            ] = 0
+            # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
             if True:
                 unbatched = dgl.unbatch(graphs_new)
                 charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
@@ -476,20 +488,10 @@ class ExampleWrapper(L.LightningModule):
         batch_g = batch[0]
         initial_time = time()
         if self.trainer.is_global_zero:
-            result = self(batch_g, y, batch_idx)
+            model_output, e_cor, loss_ll, _ = self(batch_g, y, batch_idx)
         else:
-            result = self(batch_g, y, 1)
-        (
-            model_output,
-            e_cor,
-            e_true,
-            e_sum_hits,
-            new_graphs,
-            batch_id,
-            graph_level_features,
-            pid_true_matched,
-            e_true_corr_daughters,
-        ) = result
+            model_output, e_cor, loss_ll, _ = self(batch_g, y, 1)
+
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -510,13 +512,13 @@ class ExampleWrapper(L.LightningModule):
         # Dummy loss to avoid errors
         loss = loss  # + torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         loss_time_end = time()
-        wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
+        # wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
             loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
-            wandb.log({"loss_EC": loss_EC})
+            # wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
             # loss = loss_EC
             if self.args.save_features:
@@ -551,8 +553,8 @@ class ExampleWrapper(L.LightningModule):
         del e_cor
         del losses
         final_time = time()
-        wandb.log({"misc_time_inside_training": final_time - misc_time_start})
-        wandb.log({"training_step_time": final_time - initial_time})
+        # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
+        # wandb.log({"training_step_time": final_time - initial_time})
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -726,7 +728,7 @@ class ExampleWrapper(L.LightningModule):
                 e_corr = self.validation_step_outputs[0][1]
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
-                shap_vals=None
+                shap_vals = None
                 ec_x = None
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
