@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from src.models.gravnet_3_L import GravnetModel
 from torch_geometric.nn.models import GAT
 from torch_scatter import scatter_mean
+from gatr import GATr
+
 
 class Net(nn.Module):
     def __init__(self, in_features=13, out_features=1):
@@ -69,12 +71,17 @@ class ECNetWrapper(torch.nn.Module):
 
 class ECNetWrapperGNN(torch.nn.Module):
     # use the GNN+NN model for energy correction
-    def __init__(self, device, in_features=13):
+    def __init__(self, device, in_features=13, arch="GAT"):
         super(ECNetWrapperGNN, self).__init__()
         gnn_features = 64
         self.model = Net(in_features=gnn_features, out_features=1)
         # use a GAT
-        self.gnn = GAT(in_features, out_channels=gnn_features, heads=4, concat=True, hidden_channels=64, num_layers=3)
+        if arch == "GAT":
+            self.gnn = GAT(in_features, out_channels=gnn_features, heads=4, concat=True, hidden_channels=64, num_layers=3)
+        #elif arch == "GATr":
+        #    self.gnn = GATr(in_features,
+        else:
+            raise NotImplementedError
         self.model.to(device)
     def predict(self, x_global_features, graphs_new):
         '''
