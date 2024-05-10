@@ -428,11 +428,11 @@ def calc_LV_Lbeta(
         if dis:
             norms = norms / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
             norms_rep = torch.exp(-(norms)) * M_inv
-            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 10) * M_inv
         else:
             norms_rep = torch.exp(-(norms) / 2) * M_inv
             # norms_rep2 = torch.exp(-(norms) * 10) * M_inv
-            norms_rep2 = torch.exp(-(norms) * 5) * M_inv
+            norms_rep2 = torch.exp(-(norms) * 10) * M_inv
     else:
         norms_rep = torch.exp(-4.0 * norms**2) * M_inv
 
