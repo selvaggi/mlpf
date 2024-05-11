@@ -507,8 +507,6 @@ class ExampleWrapper(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
         )
-        # Dummy loss to avoid errors
-        loss = loss  # + torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         loss_time_end = time()
         wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:

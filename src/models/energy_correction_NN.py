@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from src.models.gravnet_3_L import GravnetModel
-from torch_geometric.nn.models import GAT
+from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean
 from gatr import GATr
 
@@ -32,11 +32,11 @@ class Net(nn.Module):
             nn.ReLU(),
             nn.Linear(64, out_features)]
         )
+        self.explainer_mode = False
 
     def forward(self, x):
-        x = torch.tensor(x)
-        # pad with 32 random features | TODO - currently this is hardcoded for the vanilla DNN
-        #x = torch.cat([x, torch.randn(x.size(0), 32).to(x.device)], dim=1)
+        if not isinstance(x, torch.Tensor):
+            x = torch.tensor(x)
         for layer in self.model:
             x = layer(x)
         if self.out_features > 1:
@@ -71,25 +71,28 @@ class ECNetWrapper(torch.nn.Module):
 
 class ECNetWrapperGNN(torch.nn.Module):
     # use the GNN+NN model for energy correction
-    def __init__(self, device, in_features=13, arch="GAT"):
+    def __init__(self, device, in_features=13, arch="vanilla"):
         super(ECNetWrapperGNN, self).__init__()
         gnn_features = 64
         self.model = Net(in_features=gnn_features, out_features=1)
         # use a GAT
         if arch == "GAT":
             self.gnn = GAT(in_features, out_channels=gnn_features, heads=4, concat=True, hidden_channels=64, num_layers=3)
+        elif arch == "vanilla":
+            self.gnn = GraphSAGE(in_features, gnn_features, hidden_channels=64, num_layers=3)
         #elif arch == "GATr":
         #    self.gnn = GATr(in_features,
         else:
             raise NotImplementedError
         self.model.to(device)
-    def predict(self, x_global_features, graphs_new):
+    def predict(self, x_global_features, graphs_new, explain=False):
         '''
         Forward, named 'predict' for compatibility reasons
         :param x_global_features: Global features of the graphs - to be concatenated to each node feature
         :param graphs_new:
         :return:
         '''
+        assert explain is False, "Explain not implemented for this GNN"
         batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
         batch_idx = []
         batch_bounds = []
@@ -116,6 +119,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         # use a GAT
         if gnn:
             self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
+            #self.gnn = GraphSAGE(in_channels=in_features_gnn, out_channels=out_features_gnn, hidden_channels=64, num_layers=3)
         else:
             self.gnn = None
         if ckpt_file is not None:
@@ -147,6 +151,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(x_global_features.device)
         model_x = torch.cat([x_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
         if explain:
+            print("explain")
             # take a selection of 10% or 50 samples to get typical feature values
             print(model_x.shape)
             n_samples = min(50, int(0.2 * model_x.shape[0]))

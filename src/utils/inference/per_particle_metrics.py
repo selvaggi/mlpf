@@ -1244,7 +1244,7 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         fig_distr.savefig(PATH_store + title + reco + label + tracks + "_v1_distributions.pdf", bbox_inches="tight")
 
 
-def plot_histograms(title, photons_dic, fig_distr, ax_distr, plot_pandora, prefix="ML ", color="blue"):
+def plot_histograms(title, photons_dic, fig_distr, ax_distr, plot_pandora, prefix="ML ", color="blue", normalize=True):
     assert title == "Event Energy Resolution" # fix
     #if title == "Event Energy Resolution":
     #    fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions"]), 1, figsize=(14, 10), sharex=True)
@@ -1269,9 +1269,9 @@ def plot_histograms(title, photons_dic, fig_distr, ax_distr, plot_pandora, prefi
     sigma = (photons_dic["variance_om"][0]) * mu
     mu_pandora = photons_dic["mean_p"][0]
     sigma_pandora = (photons_dic["variance_om_p"][0]) * mu
-    ax_distr.hist(distr_model, bins=np.arange(0, 2, 1e-2), color=color, label=prefix + "μ={} σ={}".format(round(mu, 2), round(sigma, 2)), alpha=0.5, histtype="step")
+    ax_distr.hist(distr_model, bins=np.arange(0, 2, 1e-2), color=color, label=prefix + "μ={} σ={}".format(round(mu, 2), round(sigma, 2)), alpha=0.5, histtype="step", density=normalize)
     if plot_pandora:
-        ax_distr.hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora μ={} σ={}".format(round(mu_pandora, 2), round(sigma_pandora, 2)), alpha=0.5, histtype="step")
+        ax_distr.hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora μ={} σ={}".format(round(mu_pandora, 2), round(sigma_pandora, 2)), alpha=0.5, histtype="step", density=normalize)
     # ALSO PLOT MU AND SIGMA #
     ax_distr.axvline(mu, color=color, linestyle="-", ymin=0.95, ymax=1.0)
     ax_distr.axvline(mu + sigma, color=color, linestyle="--", ymin=0.95, ymax=1.0)
