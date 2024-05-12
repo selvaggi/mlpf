@@ -79,7 +79,8 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
     ax[0].set_ylabel("Predicted energy")
     ax[0].set_xlabel("True energy")
     acceptable_loss = 1e-2
-    rages = [[0, 6], [6, 12], [12, 18], [18, 24], [24, 30], [30, 36], [36, 42], [42, 48], [48, 54], [54, 60]]
+    #rages = [[0, 6], [6, 12], [12, 18], [18, 24], [24, 30], [30, 36], [36, 42], [42, 48], [48, 54], [54, 60]]
+    rages = [[0, 5], [5, 15], [15, 35], [35, 50]]
     for i, r in enumerate(rages):
         mask = (ytrue >= r[0]) & (ytrue < r[1])
         # % BELOW ACCEPTABLE LOSS
@@ -166,8 +167,10 @@ def get_dataset(save_ckpt=None):
                               dim=1)
         r["x"] = torch.cat([r["x"], xyz, eta_phi], dim=1)
     key = "e_true"
+    true_e_corr_f = r["true_e_corr"]
     if args.corrected_energy:
         key = "e_true_corrected_daughters"
+        true_e_corr_f = r["true_e_corr_daughters"] / r["e_reco"] - 1
     if "pid_y" in r:
         r["y_particles"] = r["pid_y"]
     if save_ckpt is not None:
@@ -175,7 +178,7 @@ def get_dataset(save_ckpt=None):
         key], r["e_reco"], r["y_particles"]
         pickle.dump(ds, open(save_ckpt, "wb"))
         print("Dumped dataset to file", save_ckpt)
-    return r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
+    return r["x"], x_names + h_names + h1_names, true_e_corr_f, r[
         key], r["e_reco"], r["y_particles"]
 
 
@@ -291,7 +294,7 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
     #    data_for_hist = data_for_hist[
     #        (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
     # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
-    bins_per_binned_E = np.arange(0, 2, 1e-3)
+    bins_per_binned_E = np.arange(0, 2, 1e-2)
     if len(data_for_hist) == 0:
         return 0, 0, 0, 0
     response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
@@ -300,7 +303,7 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
 
 # %%
 def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=False):
-    e_thresholds = [0, 6, 12, 18, 24, 30, 36, 42, 48]  # True E thresholds!
+    e_thresholds = [0, 5, 15, 35, 50]  # True E thresholds!
     mpvs_model, s68s_model = [], []
     mpvs_pandora, s68s_pandora = [], []
     mpvs_sum_hits, s68s_sum_hits = [], []

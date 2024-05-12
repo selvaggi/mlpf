@@ -25,7 +25,7 @@ if all_E:
         "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f"
     )
     #New dr=0.5 dataset
-    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds/eval_EnRes_density"
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds/eval_enRes_moreTraining"
 
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -37,7 +37,7 @@ if all_E:
         #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
         "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
         #"eval_DNNft_100files_0605_Longer_Ckpt/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
         #"eval_dnn_3004_l1_training_eval_2_5__1_clustloadonly-100files/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
 
@@ -45,15 +45,17 @@ if all_E:
     ### New dr=0.5 dataset
     path_list = [
         "eval_dnn_05rdataset/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "eval_dnngnn_05rdataset40files/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_dnngnn_05rdataset40files/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "eval_GNNDNN_dr_05_moretraining/showers_df_evaluation/0_0_None_hdbscan.pt",
     ]
 
     dir_top = "/eos/user/g/gkrzmanc/2024/"
     print(PATH_store)
 
 labels = [
-    "DNN",
-    "GNN+DNN"
+    "DNN ~3 epochs",
+    "GNN+DNN ~3 epochs",
+    "GNN+DNN ~13 epochs",
     #"DNN w/o FT"
 ]
 
