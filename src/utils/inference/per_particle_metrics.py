@@ -464,6 +464,11 @@ def plot_per_energy_resolution2_multiple(
         "GNN+DNN": "purple",
         "DNN w/o FT": "blue"
     }
+    colors = {
+        "DNN ~3 epochs": "green",
+        "GNN+DNN ~3 epochs": "purple",
+        "GNN+DNN ~13 epochs": "blue"
+    }
     plot_pandora, plot_baseline = True, True
     for pid in [22, 11, 130, 211, 2112, 2212]:
         figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
