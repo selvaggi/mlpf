@@ -1,6 +1,7 @@
 graph_config:
    only_hits: false
    k: 40
+   pos_pxpy: true
 
 custom_model_kwargs:
    # add custom model kwargs here
