@@ -281,6 +281,7 @@ class ExampleWrapper(L.LightningModule):
                 sum_e,
                 true_pid,
                 e_true_corr_daughters,
+                true_coords
             ) = obtain_clustering_for_matched_showers(
                 g,
                 x,
@@ -421,7 +422,7 @@ class ExampleWrapper(L.LightningModule):
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e, true_pid, true_new)
+                return (x, pred_energy_corr, true_new, sum_e, true_pid, true_new, true_coords)
             else:
                 if self.args.explain_ec:
                     return (
@@ -447,6 +448,7 @@ class ExampleWrapper(L.LightningModule):
                     graphs_high_level_features,
                     true_pid,
                     e_true_corr_daughters,
+                    true_coords
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -489,6 +491,7 @@ class ExampleWrapper(L.LightningModule):
             graph_level_features,
             pid_true_matched,
             e_true_corr_daughters,
+            part_coords_matched
         ) = result
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
@@ -507,8 +510,6 @@ class ExampleWrapper(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
         )
-        # Dummy loss to avoid errors
-        loss = loss  # + torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
         loss_time_end = time()
         wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
@@ -537,7 +538,7 @@ class ExampleWrapper(L.LightningModule):
                         # "node_features_avg": scatter_mean(
                         #    batch_g.ndata["h"], batch_idx, dim=0
                         # ),  # graph-averaged node features
-                        "y_particles": y,
+                        "coords_y": part_coords_matched,
                         "pid_y": pid_true_matched,
                     },
                 )
@@ -595,6 +596,7 @@ class ExampleWrapper(L.LightningModule):
                     graph_level_features,
                     pid_true_matched,
                     e_true_corr_daughters,
+                    coords_true
                 ) = result
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))

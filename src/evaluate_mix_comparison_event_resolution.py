@@ -22,34 +22,40 @@ log_scale = False
 tracks = True
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_with_13ep"
     )
+    #New dr=0.5 dataset
+    #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds/eval_enRes_moreTraining"
 
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
+
     path_list = [
         #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
         "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
         #"eval_DNNft_100files_0605_Longer_Ckpt/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "eval_GNNDNN_dr_05_moretraining_0204ds/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"eval_dnn_3004_l1_training_eval_2_5__1_clustloadonly-100files/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-
     path_pandora = "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_pandora.pt"
+    #path_pandora = "eval_dnngnn_05rdataset40files/showers_df_evaluation/0_0_None_pandora.pt"
     ### New dr=0.5 dataset
-    path_list = [
-        "eval_DNN_05rdataset",
-        "eval_DNNGNN_05rdataset"
-    ]
+    #path_list = [
+    #    "eval_dnn_05rdataset/showers_df_evaluation/0_0_None_hdbscan.pt",
+    #    "eval_dnngnn_05rdataset40files/showers_df_evaluation/0_0_None_hdbscan.pt",
+    #    "eval_GNNDNN_dr_05_moretraining/showers_df_evaluation/0_0_None_hdbscan.pt",
+    #]
     dir_top = "/eos/user/g/gkrzmanc/2024/"
-    PATH_store = "eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds"
+    print(PATH_store)
 
 labels = [
-    "DNN",
-    "GNN+DNN"
+    "DNN ~3 epochs",
+    "GNN+DNN ~3 epochs",
+    "GNN+DNN ~13 epochs",
     #"DNN w/o FT"
 ]
 
