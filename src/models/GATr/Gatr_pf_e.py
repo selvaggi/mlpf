@@ -133,7 +133,7 @@ class ExampleWrapper(L.LightningModule):
             ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
             ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
-            if self.args.regress_pos or True:
+            if self.args.regress_pos:
                 print("Regressing position as well, changing the hardcoded models to sth else")
                 ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl" #TEMPORARY
                 ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
@@ -159,7 +159,7 @@ class ExampleWrapper(L.LightningModule):
                     in_features_gnn=in_features,
                     ckpt_file=ckpt_charged,
                     gnn=True,
-                    pos_regression=False,
+                    pos_regression=self.args.regress_pos,
                 )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
@@ -167,7 +167,7 @@ class ExampleWrapper(L.LightningModule):
                     in_features_gnn=in_features,
                     ckpt_file=ckpt_neutral,
                     gnn=True,
-                    pos_regression=False,
+                    pos_regression=self.args.regress_pos,
                 )
             else:
                 # only a DNN for energy correction

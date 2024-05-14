@@ -57,12 +57,10 @@ def create_inputs_from_table(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
-
     # features particles
     y_data_graph = get_particle_features(
         unique_list_particles, output, prediction, connection_list
     )
-
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
