@@ -98,18 +98,6 @@ class ExampleWrapper(L.LightningModule):
         self.vector_like_data = False
 
     def forward(self, g, y, step_count, eval=""):
-        """Forward pass.
-
-        Parameters
-        ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
-
-        Returns
-        -------
-        outputs : torch.Tensor with shape (*batch_dimensions, 1)
-            Model prediction: a single scalar for the whole point cloud.
-        """
         inputs = g.ndata["pos_hits_xyz"]
 
         if self.trainer.is_global_zero and step_count % 1000 == 0:
@@ -161,7 +149,7 @@ class ExampleWrapper(L.LightningModule):
                 step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
-        return x
+        return x, embedded_outputs
 
     def build_attention_mask(self, g):
         """Construct attention mask from pytorch geometric batch.
@@ -191,9 +179,9 @@ class ExampleWrapper(L.LightningModule):
         #         self.stat_dict, y, batch_g, pf=False
         #     )
         if self.trainer.is_global_zero:
-            model_output = self(batch_g, y, batch_idx)
+            model_output, embedded_outputs = self(batch_g, y, batch_idx)
         else:
-            model_output = self(batch_g, y, 1)
+            model_output, embedded_outputs = self(batch_g, y, 1)
 
         (loss, losses) = object_condensation_loss_tracking(
             batch_g,
@@ -225,7 +213,7 @@ class ExampleWrapper(L.LightningModule):
 
         batch_g = batch[0]
 
-        model_output = self(batch_g, y, batch_idx, eval="_val")
+        model_output, embedded_outputs = self(batch_g, y, batch_idx, eval="_val")
         preds = model_output.squeeze()
 
         (loss, losses) = object_condensation_loss_tracking(
@@ -248,6 +236,7 @@ class ExampleWrapper(L.LightningModule):
             df_batch = evaluate_efficiency_tracks(
                 batch_g,
                 model_output,
+                embedded_outputs,
                 y,
                 0,
                 batch_idx,

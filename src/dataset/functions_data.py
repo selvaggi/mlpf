@@ -42,7 +42,13 @@ def get_number_of_daughters(hit_type_feature, hit_particle_link, daughters):
 
 
 def find_mask_no_energy(
-    hit_particle_link, hit_type_a, hit_energies, y, daughters, predict=False
+    hit_particle_link,
+    hit_type_a,
+    hit_energies,
+    y,
+    daughters,
+    predict=False,
+    is_Ks=False,
 ):
     """This function remove particles with tracks only and remove particles with low fractions
     # Remove 2212 going to multiple particles without tracks for now
@@ -75,29 +81,30 @@ def find_mask_no_energy(
         energy_cut = 0.01
         filt1 = (torch.where(part_frac >= energy_cut)[0] + 1).long().tolist()
     number_of_tracks = scatter_add(1 * (hit_type_a == 1), hit_particle_link.long())[1:]
-    for index, p in enumerate(list_p):
-        mask = hit_particle_link == p
-        hit_types = np.unique(hit_type_a[mask])
+    if is_Ks == False:
+        for index, p in enumerate(list_p):
+            mask = hit_particle_link == p
+            hit_types = np.unique(hit_type_a[mask])
 
-        if predict:
-            if (
-                np.array_equal(hit_types, [0, 1])
-                or int(p) not in filt1
-                or (number_of_hits[index] < 2)
-                or (y.decayed_in_tracker[index] == 1)
-                or number_of_tracks[index] == 2
-                or number_of_daughters[index] > 1
-            ):
-                list_remove.append(p)
-        else:
-            if (
-                np.array_equal(hit_types, [0, 1])
-                or int(p) not in filt1
-                or (number_of_hits[index] < 2)
-                or number_of_tracks[index] == 2
-                or number_of_daughters[index] > 1
-            ):
-                list_remove.append(p)
+            if predict:
+                if (
+                    np.array_equal(hit_types, [0, 1])
+                    or int(p) not in filt1
+                    or (number_of_hits[index] < 2)
+                    or (y.decayed_in_tracker[index] == 1)
+                    or number_of_tracks[index] == 2
+                    or number_of_daughters[index] > 1
+                ):
+                    list_remove.append(p)
+            else:
+                if (
+                    np.array_equal(hit_types, [0, 1])
+                    or int(p) not in filt1
+                    or (number_of_hits[index] < 2)
+                    or number_of_tracks[index] == 2
+                    or number_of_daughters[index] > 1
+                ):
+                    list_remove.append(p)
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
         for p in list_remove:
@@ -207,7 +214,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
 
 
 def modify_index_link_for_gamma_e(
-    hit_type_feature, hit_particle_link, daughters, output, number_part
+    hit_type_feature, hit_particle_link, daughters, output, number_part, is_Ks=False
 ):
     """Split all particles that have daughters, mostly for brems and conversions but also for protons and neutrons
 
@@ -235,8 +242,10 @@ def modify_index_link_for_gamma_e(
     electron_photon_mask = (
         electron_photon_mask * number_of_p > 1
     )  # electron_photon_mask *
-    index_change = a_u[electron_photon_mask]
-
+    if is_Ks:
+        index_change = a_u  # [electron_photon_mask]
+    else:
+        index_change = a_u[electron_photon_mask]
     for i in index_change:
         mask_n = mask * (hit_particle_link == i)
         hit_particle_link[mask_n] = daughters[mask_n]
@@ -244,7 +253,9 @@ def modify_index_link_for_gamma_e(
     return hit_particle_link, hit_link_modified, connections_list
 
 
-def get_hit_features(output, number_hits, prediction, number_part, hit_chis, pos_pxpy):
+def get_hit_features(
+    output, number_hits, prediction, number_part, hit_chis, pos_pxpy, is_Ks=False
+):
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     if prediction:
         indx_daugthers = 3
@@ -282,7 +293,7 @@ def get_hit_features(output, number_hits, prediction, number_part, hit_chis, pos
         hit_link_modified,
         connection_list,
     ) = modify_index_link_for_gamma_e(
-        hit_type_feature, hit_particle_link, daughters, output, number_part
+        hit_type_feature, hit_particle_link, daughters, output, number_part, is_Ks
     )
 
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)

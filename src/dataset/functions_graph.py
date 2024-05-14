@@ -16,7 +16,7 @@ from src.dataset.functions_data import (
 
 
 def create_inputs_from_table(
-    output, hits_only, prediction=False, hit_chis=False, pos_pxpy=False
+    output, hits_only, prediction=False, hit_chis=False, pos_pxpy=False, is_Ks=False
 ):
     """Used by graph creation to get nodes and edge features
 
@@ -55,6 +55,7 @@ def create_inputs_from_table(
         number_part,
         hit_chis=hit_chis,
         pos_pxpy=pos_pxpy,
+        is_Ks=is_Ks,
     )
 
     # features particles
@@ -65,7 +66,13 @@ def create_inputs_from_table(
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
-        cluster_id, hit_type_feature, e_hits, y_data_graph, daughters, prediction
+        cluster_id,
+        hit_type_feature,
+        e_hits,
+        y_data_graph,
+        daughters,
+        prediction,
+        is_Ks=is_Ks,
     )
     # create mapping from links to number of particles in the event
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
@@ -150,6 +157,7 @@ def create_graph(
     prediction = config.graph_config.get("prediction", False)
     hit_chis = config.graph_config.get("hit_chis_track", False)
     pos_pxpy = config.graph_config.get("pos_pxpy", False)
+    is_Ks = config.graph_config.get("ks", False)
     (
         y_data_graph,
         p_hits,
@@ -173,6 +181,7 @@ def create_graph(
         prediction=prediction,
         hit_chis=hit_chis,
         pos_pxpy=pos_pxpy,
+        is_Ks=is_Ks,
     )
     graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
     if pos_xyz_hits.shape[0] > 0:
@@ -207,8 +216,9 @@ def create_graph(
             g.ndata["pandora_cluster_energy"] = pandora_cluster_energy
             g.ndata["pandora_pfo_energy"] = pandora_pfo_energy
         y_data_graph.calculate_corrected_E(g, connections_list)
-        if len(y_data_graph) < 4:
-            graph_empty = True
+        if is_Ks == False:
+            if len(y_data_graph) < 4:
+                graph_empty = True
     else:
         graph_empty = True
         g = 0
