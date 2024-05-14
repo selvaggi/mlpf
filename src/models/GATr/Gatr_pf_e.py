@@ -132,6 +132,11 @@ class ExampleWrapper(L.LightningModule):
         if self.args.correction:
             ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
             ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
+            # TODO: remove hardcoded models
+            if self.args.regress_pos or True:
+                print("Regressing position as well, changing the hardcoded models to sth else")
+                ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl" #TEMPORARY
+                ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
             if self.args.ec_model == "gat":
                 in_features = 17
                 if self.args.add_track_chis:
@@ -154,6 +159,7 @@ class ExampleWrapper(L.LightningModule):
                     in_features_gnn=in_features,
                     ckpt_file=ckpt_charged,
                     gnn=True,
+                    pos_regression=False,
                 )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
@@ -161,8 +167,10 @@ class ExampleWrapper(L.LightningModule):
                     in_features_gnn=in_features,
                     ckpt_file=ckpt_neutral,
                     gnn=True,
+                    pos_regression=False,
                 )
             else:
+                # only a DNN for energy correction
                 if not self.args.add_track_chis:
                     # self.ec_model_wrapper_charged = NetWrapper(
                     #    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
@@ -185,6 +193,7 @@ class ExampleWrapper(L.LightningModule):
                             in_features_gnn=18,
                             ckpt_file=ckpt_charged,
                             gnn=False,
+                            pos_regression=self.args.regress_pos,
                         )
                     )
                     self.ec_model_wrapper_neutral = (
@@ -194,6 +203,7 @@ class ExampleWrapper(L.LightningModule):
                             in_features_gnn=18,
                             ckpt_file=ckpt_neutral,
                             gnn=False,
+                            pos_regression=self.args.regress_pos,
                         )
                     )
 
@@ -319,8 +329,27 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
                 graphs_new.ndata["h"].device
             )
-            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
-            node_features_avg = node_features_avg[:, 0:3]
+            if self.args.regress_pos:
+                pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
+                    graphs_new.ndata["h"].device
+                )
+            #node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
+            # energy-weighted node_features_avg
+            #node_features_avg = scatter_mean(
+            #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
+            #    batch_idx,
+            #    dim=0,
+            # )
+            #node_features_avg = node_features_avg[:, 0:3]
+            #weights = graphs_new.ndata["h"][:, -2].view(-1, 1) # Energies as the weights
+            #normalizations = scatter_add(weights, batch_idx, dim=0)
+            #normalizations1 = torch.ones_like(weights)
+            #normalizations1 = normalizations[batch_idx]
+            #weights = weights / normalizations1
+            node_features_avg = scatter_mean(
+                graphs_new.ndata["h"] , batch_idx, dim=0
+            )[: , 0:3]
+            # node_features_avg = node_features_avg / normalizations
             eta, phi = calculate_eta(
                 node_features_avg[:, 0],
                 node_features_avg[:, 1],
@@ -354,60 +383,56 @@ class ExampleWrapper(L.LightningModule):
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
             features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
             #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
-            if True:
-                unbatched = dgl.unbatch(graphs_new)
-                charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
-                neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
-                charged_energies = self.ec_model_wrapper_charged.predict(
-                    graphs_high_level_features[charged_idx],
-                    charged_graphs,
-                    explain=self.args.explain_ec,
-                )
-                neutral_energies = self.ec_model_wrapper_neutral.predict(
-                    features_neutral_no_nan,
-                    neutral_graphs,
-                    explain=self.args.explain_ec,
-                )
-                if self.args.explain_ec:
-                    (
-                        charged_energies,
-                        charged_energies_shap_vals,
-                        charged_energies_ec_x,
-                    ) = charged_energies
-                    (
-                        neutral_energies,
-                        neutral_energies_shap_vals,
-                        neutral_energies_ec_x,
-                    ) = neutral_energies
-                    shap_vals = (
-                        torch.ones(
-                            graphs_high_level_features.shape[0],
-                            charged_energies_shap_vals[0].shape[1],
-                        )
-                        .to(graphs_new.ndata["h"].device)
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-                    ec_x = torch.zeros(
+            unbatched = dgl.unbatch(graphs_new)
+            charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+            neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+            charged_energies = self.ec_model_wrapper_charged.predict(
+                graphs_high_level_features[charged_idx],
+                charged_graphs,
+                explain=self.args.explain_ec,
+            )
+            neutral_energies = self.ec_model_wrapper_neutral.predict(
+                features_neutral_no_nan,
+                neutral_graphs,
+                explain=self.args.explain_ec,
+            )
+            if self.args.regress_pos:
+                charged_energies, charged_positions = charged_energies
+                neutral_energies, neutral_positions = neutral_energies
+            if self.args.explain_ec:
+                assert not self.args.regress_pos, "not implemented"
+                (
+                    charged_energies,
+                    charged_energies_shap_vals,
+                    charged_energies_ec_x,
+                ) = charged_energies
+                (
+                    neutral_energies,
+                    neutral_energies_shap_vals,
+                    neutral_energies_ec_x,
+                ) = neutral_energies
+                shap_vals = (
+                    torch.ones(
                         graphs_high_level_features.shape[0],
-                        charged_energies_ec_x.shape[1],
+                        charged_energies_shap_vals[0].shape[1],
                     )
-                    shap_vals[
-                        charged_idx.detach().cpu().numpy()
-                    ] = charged_energies_shap_vals[0]
-                    shap_vals[
-                        neutral_idx.detach().cpu().numpy()
-                    ] = neutral_energies_shap_vals[0]
-                    ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
-                    ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
-            else:
-                charged_energies, charged_pid = self.ec_model_wrapper_charged.predict(
-                    graphs_high_level_features[charged_idx]
+                    .to(graphs_new.ndata["h"].device)
+                    .detach()
+                    .cpu()
+                    .numpy()
                 )
-                neutral_energies, neutral_pid = self.ec_model_wrapper_neutral.predict(
-                    features_neutral_no_nan
+                ec_x = torch.zeros(
+                    graphs_high_level_features.shape[0],
+                    charged_energies_ec_x.shape[1],
                 )
+                shap_vals[
+                    charged_idx.detach().cpu().numpy()
+                ] = charged_energies_shap_vals[0]
+                shap_vals[
+                    neutral_idx.detach().cpu().numpy()
+                ] = neutral_energies_shap_vals[0]
+                ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
+                ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
             neutral_energies = neutral_energies.flatten()
             charged_energies = charged_energies.flatten()
             # dummy loss to make it work without complaining about not using params in loss
@@ -418,6 +443,10 @@ class ExampleWrapper(L.LightningModule):
                 neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
             )
             pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
+            if self.args.regress_pos:
+                pred_pos[charged_idx.flatten()] = charged_positions
+                pred_pos[neutral_idx.flatten()] = neutral_positions
+                pred_energy_corr = {"pred_energy_corr": pred_energy_corr, "pred_pos": pred_pos}
             # print("Pred energy corr:", pred_energy_corr)
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
@@ -493,6 +522,8 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             part_coords_matched
         ) = result
+        if self.args.regress_ec:
+            e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -598,6 +629,8 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     coords_true
                 ) = result
+            if self.args.regress_pos:
+                e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
@@ -666,6 +699,7 @@ class ExampleWrapper(L.LightningModule):
                 shap_vals=shap_vals,
                 ec_x=ec_x,
                 total_number_events=self.total_number_events,
+                pred_pos=pred_pos
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)

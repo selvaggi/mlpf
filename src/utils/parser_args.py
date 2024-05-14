@@ -589,3 +589,9 @@ parser.add_argument(
     action="store_true",
     help="Whether to compute SHAP explations"
 )
+parser.add_argument(
+    "--regress-pos",
+    action="store_true",
+    default=False,
+    help="regress positions as well next to the energy",
+)

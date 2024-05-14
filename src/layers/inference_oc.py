@@ -28,6 +28,7 @@ def create_and_store_graph_output(
     tracks=False,
     store_epoch=False,
     total_number_events=0,
+    pred_pos=None
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -150,6 +151,7 @@ def create_and_store_graph_output(
                 tracks=tracks,
                 ec_x=ec_x,
                 shap_vals=shap_vals,
+                pred_pos=pred_pos
             )
             # if predict and len(df_event) > 1:
             #     df_list.append(df_event)
@@ -287,6 +289,7 @@ def generate_showers_data_frame(
     tracks=False,
     shap_vals=None,
     ec_x=None,
+    pred_pos=None
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -315,6 +318,7 @@ def generate_showers_data_frame(
     energy_t = (
         dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
+    pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
     if shap:
         matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (
@@ -326,6 +330,8 @@ def generate_showers_data_frame(
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
+    matched_positions = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
+    matched_positions = matched_positions.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind] = e_pred_showers[index_matches]
     if pandora:
@@ -353,6 +359,8 @@ def generate_showers_data_frame(
                 ]
                 * e_pred_showers[index_matches]
             )
+            if pred_pos is not None:
+                matched_positions[row_ind] = pred_pos[index_matches]
             if shap:
                 matched_shap_vals[row_ind.cpu()] = shap_vals[index_matches.cpu()]
                 matched_ec_x[row_ind.cpu()] = ec_x[index_matches.cpu()]
@@ -376,8 +384,12 @@ def generate_showers_data_frame(
         fake_showers_e = e_pred_showers[mask]
         if e_corr is None or pandora:
             fake_showers_e_cali = e_pred_showers_cali[mask]
+            #fakes_positions = dic["graph"].ndata["coords"][mask]
         else:
             fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
+            fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
+            fakes_positions = fakes_positions.to(e_pred_showers.device)
+
         if not pandora:
             if e_corr is None:
                 fake_showers_e_cali_factor = corrections_per_shower[mask]
@@ -410,10 +422,16 @@ def generate_showers_data_frame(
             (pid_t.view(-1), fake_showers_showers_e_truw),
             dim=0,
         )
+        if pred_pos is not None:
+            pos_t = torch.cat(
+                (pos_t, fakes_positions),
+                dim=0,
+            )
         e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
-
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
+        if pred_pos is not None:
+            e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
         if pandora:
             e_pred_cali_pfo = torch.cat(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
@@ -481,6 +499,10 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
             }
+            if pred_pos is not None:
+                pred_pos = e_pred_pos.detach().cpu()
+                d["pred_pos_matched"] = pred_pos.tolist() # otherwise it doesn't work nicely with pandas dataframes
+                d["true_pos"] = pos_t.detach().cpu().tolist()
         """if shap:
             print("Adding ec_x and shap_values to the dataframe")
             d["ec_x"] = ec_x_t

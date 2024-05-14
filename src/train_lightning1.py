@@ -197,7 +197,8 @@ def main():
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0
             )
-        #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs_eval_23042024")
+        #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", filename="profiler_eval_0705")
+        #print("USING PROFILER")
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",

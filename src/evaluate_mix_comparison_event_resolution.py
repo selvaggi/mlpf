@@ -20,19 +20,18 @@ all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
+
 if all_E:
     PATH_store = (
         "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_with_13ep"
     )
     #New dr=0.5 dataset
     #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds/eval_enRes_moreTraining"
-
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
-
     path_list = [
         #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
         "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
@@ -82,6 +81,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 def save_dict(di_, filename_):
     with open(filename_, "wb") as f:
         pickle.dump(di_, f)

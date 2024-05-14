@@ -63,10 +63,10 @@ class ECNetWrapper(torch.nn.Module):
         #print("Temporarily not loading the model weights")
         self.model.to(device)
     def predict(self, x):
-        pred = self.model(x)
-        if isinstance(pred, tuple):
-            return (pred[0].flatten(), pred[1])
-        return self.model(x).flatten(), None
+        #if isinstance(pred, tuple):
+        #    return (pred[0].flatten(), pred[1])
+        #return self.model(x).flatten(), None
+        return self.model(x)
 
 
 class ECNetWrapperGNN(torch.nn.Module):
@@ -112,9 +112,13 @@ class ECNetWrapperGNN(torch.nn.Module):
 class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
     # use the GNN+NN model for energy correction
     # This one concatenates GNN features to the global features
-    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True):
+    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True, pos_regression=False):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
-        self.model = Net(in_features=out_features_gnn + in_features_global, out_features=1)
+        out_f = 1
+        self.pos_regression = pos_regression
+        if pos_regression:
+            out_f += 3
+        self.model = Net(in_features=out_features_gnn + in_features_global, out_features=out_f)
         self.model.explainer_mode = False
         # use a GAT
         if gnn:
@@ -164,5 +168,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                 explainer = shap.KernelExplainer(model_exp, model_x[:n_samples].detach().cpu().numpy())
                 shap_vals = explainer.shap_values(model_x.detach().cpu().numpy(), nsamples=200)
             return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()
-        return self.model(model_x).flatten()
-
+        res = self.model(model_x)
+        if self.pos_regression:
+            # normalize res[1] vectors
+            return res[0].flatten(), res[1] / torch.norm(res[1], dim=1).unsqueeze(1)
+        return res.flatten()
