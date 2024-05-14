@@ -384,13 +384,19 @@ class ExampleWrapper(L.LightningModule):
             features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
             #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
             unbatched = dgl.unbatch(graphs_new)
-            charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+            if len(charged_idx) > 0:
+                charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+                charged_energies = self.ec_model_wrapper_charged.predict(
+                    graphs_high_level_features[charged_idx],
+                    charged_graphs,
+                    explain=self.args.explain_ec,
+                )
+            else:
+                if not self.args.regress_pos:
+                    charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+                else:
+                    charged_energies = [torch.tensor([]).to(graphs_new.ndata["h"].device), torch.tensor([]).to(graphs_new.ndata["h"].device)]
             neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
-            charged_energies = self.ec_model_wrapper_charged.predict(
-                graphs_high_level_features[charged_idx],
-                charged_graphs,
-                explain=self.args.explain_ec,
-            )
             neutral_energies = self.ec_model_wrapper_neutral.predict(
                 features_neutral_no_nan,
                 neutral_graphs,
@@ -444,7 +450,8 @@ class ExampleWrapper(L.LightningModule):
             )
             pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
             if self.args.regress_pos:
-                pred_pos[charged_idx.flatten()] = charged_positions
+                if len(charged_idx):
+                    pred_pos[charged_idx.flatten()] = charged_positions
                 pred_pos[neutral_idx.flatten()] = neutral_positions
                 pred_energy_corr = {"pred_energy_corr": pred_energy_corr, "pred_pos": pred_pos}
             # print("Pred energy corr:", pred_energy_corr)

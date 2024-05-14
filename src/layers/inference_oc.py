@@ -528,7 +528,7 @@ def generate_showers_data_frame(
         else:
             return df, number_of_showers_total
     else:
-        return [0], 0
+        return None
 
 
 def get_correction_per_shower(labels, dic):
