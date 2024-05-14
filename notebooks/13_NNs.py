@@ -48,6 +48,8 @@ parser.add_argument("--dataset-path", type=str, default="/afs/cern.ch/work/g/gkr
 parser.add_argument("--batch-size", type=int, default=64)
 parser.add_argument("--corrected-energy", action="store_true", default=False) # whether to use the daughters-corr. energy
 parser.add_argument("--gnn-features-placeholders", type=int, default=0)
+parser.add_argument("--regress-pos", default=False, action="store_true")
+
 # will add some N(0, 1) iid features to the NN to be used as placeholders for GNN features that will come later
 # - first just overfit the simple NN to perform energy regression
 
@@ -73,9 +75,9 @@ os.makedirs(prefix, exist_ok=True)
 def get_eval_fig(ytrue, ypred, step, criterion, p=None):
     # calc losses, and plot loss histogram for  energy (ytrue) ranges [0, 6], [6, 12] etc. You need to filter by ytrue!
     fig, ax = plt.subplots(2, 1, figsize=(10, 10))
-    ax[0].scatter(ytrue, ypred, alpha=0.2)
+    ax[0].scatter(ytrue, ypred, alpha=0.3)
     if p is not None:
-        ax[0].scatter(ytrue, p, color="red", alpha=0.2)
+        ax[0].scatter(ytrue, p, color="red", alpha=0.3)
     ax[0].set_ylabel("Predicted energy")
     ax[0].set_xlabel("True energy")
     acceptable_loss = 1e-2
@@ -110,52 +112,62 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
 import io
 
 def get_dataset(save_ckpt=None):
+    class CPU_Unpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if module == 'torch.storage' and name == '_load_from_bytes':
+                return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+            else:
+                return super().find_class(module, name)
     if save_ckpt is not None:
-        # check if file exists
+        # check if exists
         if os.path.exists(save_ckpt):
             print("Loading dataset from", save_ckpt)
-            return pickle.load(open(save_ckpt, "rb"))
-
-    path = args.dataset_path
-    r = {}
-    n = 0
-    nmax = 10000000000
-    print("Loading dataset (a bit slow, TODO fix)")
-    for file in tqdm.tqdm(os.listdir(path)):
-        n += 1
-        if n > nmax:
-            break
-        #f = pickle.load(open(os.path.join(path, file), "rb"))
-        class CPU_Unpickler(pickle.Unpickler):
-            def find_class(self, module, name):
-                if module == 'torch.storage' and name == '_load_from_bytes':
-                    return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
-                else:
-                    return super().find_class(module, name)
-        f = CPU_Unpickler(open(os.path.join(path, file), "rb")).load()
-        if (len(file) != len("8510eujir6.pkl")):
-            continue
-        #print(f.keys())
-        if (f["e_reco"].flatten() == 1.).all():
-            continue  # some old files, ignore them for now
-        old_dataset = False
-        for key in f:
-            if key == "pid_y":
-                if key not in r:
-                    r[key] = torch.tensor(f[key])
-                else:
-                    r[key] = torch.concatenate([r[key], torch.tensor(f[key])])
-            elif key != "y_particles" or old_dataset:
-                if key not in r:
-                    r[key] = f[key]
-                else:
-                    r[key] = torch.concatenate((r[key], f[key]), axis=0)
-            else:
-                if "pid_y" not in f.keys():
+            #r = pickle.ile exiload(open(save_ckpt, "rb"))
+            r = CPU_Unpickler(open(save_ckpt, "rb")).load()
+            print("len x", len(r["x"]))
+        else:
+            r = None
+    else:
+        r = None
+    old_dataset = False
+    if r is None:
+        path = args.dataset_path
+        r = {}
+        n = 0
+        nmax = 1000000
+        print("Loading dataset (a bit slow way of doing it, TODO fix)")
+        for file in tqdm.tqdm(os.listdir(path)):
+            n += 1
+            if n > nmax:
+                break
+            #f = pickle.load(open(os.path.join(path, file), "rb"))
+            f = CPU_Unpickler(open(os.path.join(path, file), "rb")).load()
+            if (len(file) != len("8510eujir6.pkl")):
+                continue
+            #print(f.keys())
+            if (f["e_reco"].flatten() == 1.).all():
+                continue  # some old files, ignore them for now
+            for key in f:
+                if key == "pid_y":
                     if key not in r:
-                        r[key] = f[key].pid.flatten()
+                        r[key] = torch.tensor(f[key])
                     else:
-                        r[key] = torch.concatenate((r[key], f[key].pid.flatten()), axis=0)
+                        r[key] = torch.concatenate([r[key], torch.tensor(f[key])])
+                elif key != "y_particles" or old_dataset:
+                    if key not in r:
+                        r[key] = f[key]
+                    else:
+                        r[key] = torch.concatenate([torch.tensor(r[key]), torch.tensor(f[key])], axis=0)
+                else:
+                    if "pid_y" not in f.keys():
+                        print(key)
+                        if key not in r:
+                            r[key] = f[key].pid.flatten()
+                            r["part_coord"] = f[key].coord
+                        else:
+                            r[key] = torch.concatenate((r[key], f[key].pid.flatten()), axis=0)
+                            r["part_coord"] = torch.concatenate((r["part_coord"], f[key].coord))
+                            assert len(r["part_coord"]) == len(r[key])
     x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks", "track_p_chis"]
     h_names = ["hit_x_avg", "hit_y_avg", "hit_z_avg"]
     h1_names = ["hit_eta_avg", "hit_phi_avg"]
@@ -163,36 +175,45 @@ def get_dataset(save_ckpt=None):
     if old_dataset:
         r["y_particles"] = r["y_particles"][:, 6]
         xyz = r["node_features_avg"][:, [0, 1, 2]].cpu()
-        eta_phi = torch.stack([calculate_eta(xyz[:, 0], xyz[:, 1], xyz[:, 2]), calculate_phi(xyz[:, 0], xyz[:, 1])],
-                              dim=1)
+        eta_phi = torch.stack([calculate_eta(xyz[:, 0], xyz[:, 1], xyz[:, 2]), calculate_phi(xyz[:, 0], xyz[:, 1])], dim=1)
         r["x"] = torch.cat([r["x"], xyz, eta_phi], dim=1)
     key = "e_true"
     true_e_corr_f = r["true_e_corr"]
     if args.corrected_energy:
         key = "e_true_corrected_daughters"
-        true_e_corr_f = r["true_e_corr_daughters"] / r["e_reco"] - 1
+        true_e_corr_f = r["e_true_corrected_daughters"] / r["e_reco"] - 1
     if "pid_y" in r:
         r["y_particles"] = r["pid_y"]
-    if save_ckpt is not None:
-        ds = r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
-        key], r["e_reco"], r["y_particles"]
-        pickle.dump(ds, open(save_ckpt, "wb"))
-        print("Dumped dataset to file", save_ckpt)
-    return r["x"], x_names + h_names + h1_names, true_e_corr_f, r[
-        key], r["e_reco"], r["y_particles"]
-
-
+        #if args.regress_pos:
+        #    r["eta"] = calculate_eta(r["coords_y"][:, 0],r["coords_y"][:, 1], r["coords_y"][:, 2])
+        #    r["phi"] = calculate_phi(r["coords_y"][:, 0], r["coords_y"][:, 1], r["coords_y"][:, 2])
+        #else:
+        #    r["eta"] = calculate_eta(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2])
+        #    r["phi"] = calculate_phi(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2]) # not regressing positions
+    abs_energy_diff = np.abs(r["e_true_corrected_daughters"] - r["e_true"])
+    electron_brems_mask = (r["pid_y"] == 11) & (abs_energy_diff > 0)
+    if save_ckpt is not None and not os.path.exists(save_ckpt):
+        #ds = r["x"], x_names + h_names + h1_names, r["true_e_corr"], r[
+        #key], r["e_reco"], r["y_particles"],  torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
+        #pickle.dump(ds, open(save_ckpt, "wb"))
+        #print("Dumped dataset to file", save_ckpt)
+        pickle.dump(r, open(save_ckpt, "wb"))
+    return r["x"], x_names + h_names + h1_names, r["e_true"], r[key], r["e_reco"], r["y_particles"], r["coords_y"]#torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
+# the coords vector is normalized!
+# norm of coords vector
+def norm(x):
+    return torch.sqrt(torch.sum(x ** 2, dim=1))
 def get_split(ds, overfit=False):
     from sklearn.model_selection import train_test_split
-    x, _, y, etrue, _, pids = ds
-    xtrain, xtest, ytrain, ytest, energiestrain, energiestest, pid_train, pid_test = train_test_split(
-        x, y, etrue, pids, test_size=0.2, random_state=42
+    x, _, y, etrue, _, pids, positions = ds
+    xtrain, xtest, ytrain, ytest, energiestrain, energiestest, pid_train, pid_test, pos_train, pos_test = train_test_split(
+        x, y, etrue, pids, positions, test_size=0.2, random_state=42
     )
     if overfit:
         return xtrain[:100], xtest[:100], ytrain[:100], ytest[:100], energiestrain[:100], energiestest[:100], pid_train[:100], pid_test[:100]
-    return xtrain, xtest, ytrain, ytest, energiestrain, energiestest, pid_train, pid_test
+    return xtrain, xtest, ytrain, ytest, energiestrain, energiestest, pid_train, pid_test, pos_train, pos_test # 8,9 are pos train and pos test
 
-
+'''
 def get_gb():
     # from sklearn.ensemble import GradientBoostingRegressor
     # model = GradientBoostingRegressor(verbose=1, max_depth=7, n_estimators=1000)
@@ -201,23 +222,19 @@ def get_gb():
     model = xgboost.XGBRegressor(n_estimators=1000, max_depth=7, learning_rate=0.05, verbosity=1,
                                  tree_method="gpu_hist", gpu_id=DEVICE)
     return model
+'''
 
-
-# %%
 
 # %%
 import numpy as np
-
 
 def get_std68(theHist, bin_edges, percentage=0.683, epsilon=0.01):
     # theHist, bin_edges = np.histogram(data_for_hist, bins=bins, density=True)
     wmin = 0.2
     wmax = 1.0
-
     weight = 0.0
     points = []
     sums = []
-
     # fill list of bin centers and the integral up to those point
     for i in range(len(bin_edges) - 1):
         weight += theHist[i] * (bin_edges[i + 1] - bin_edges[i])
@@ -294,7 +311,7 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
     #    data_for_hist = data_for_hist[
     #        (data_for_hist > np.percentile(data_for_hist, 1)) & (data_for_hist < np.percentile(data_for_hist, 99))]
     # bins_per_binned_E = np.linspace(data_for_hist.min(), data_for_hist.max(), 1000)
-    bins_per_binned_E = np.arange(0, 2, 1e-2)
+    bins_per_binned_E = np.arange(0, 2, 1e-3)
     if len(data_for_hist) == 0:
         return 0, 0, 0, 0
     response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
@@ -339,6 +356,7 @@ def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pid
         mpvs_sum_hits.append(mpv)
         s68s_sum_hits.append(s68)
 
+
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True,
                            gridspec_kw={'height_ratios': [2, 1]})  # Height of 2 subplots.
     ax[0].plot(bins_x, np.array(s68s_model) / np.array(mpvs_model), ".--", label="model")
@@ -346,7 +364,7 @@ def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pid
     ax[0].plot(bins_x, np.array(s68s_sum_hits) / np.array(mpvs_sum_hits), ".--", label="sum hits")
     ax[0].legend()
     ax[1].set_xlabel("Energy [GeV]")
-    ax[0].set_ylabel("σ / E")
+    ax[0].set_ylabel("resolution")
     # ax[0].set_ylim([0, 0.4])
     # ax[0].set_ylim([0, 0.4])
     # ax[0].set_ylim([0, 0.4])
@@ -362,11 +380,8 @@ def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pid
     lower_plot = {"ML": mpvs_model, "p": mpvs_pandora, "sum": mpvs_sum_hits}
     return fig, upper_plot, lower_plot, bins_x
 
-
-
-def calculate_phi(x, y):
+def calculate_phi(x, y, z=None):
     return np.arctan2(y, x)
-
 
 def calculate_eta(x, y, z):
     theta = np.arctan2(np.sqrt(x ** 2 + y ** 2), z)
@@ -405,8 +420,8 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                 x = torch.cat([x, torch.randn(x.size(0), self.n_gnn_feat).to(DEVICE)], dim=1)
             for layer in self.model:
                 x = layer(x)
-            if self.out_features > 1:
-                return x[:, 0], x[:, 1:]
+            #if self.out_features > 1:
+            #    return x[:, 0], x[:, 1:]
             return x
 
         def freeze_batchnorm(self):
@@ -418,16 +433,16 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
 
     class NetWrapper():
         def __init__(self):
+            self.bce_pid_loss = not args.regress_pos
             pass
-
         def predict(self, x):
             x = torch.tensor(x).to(DEVICE)
             self.model.eval()
             with torch.no_grad():
-                pred = self.model(x)
-                if isinstance(pred, tuple):
-                    return pred[0].cpu().numpy().flatten()
-                return self.model(x).cpu().numpy().flatten()
+                # pred = self.model(x)
+                #if isinstance(pred, tuple):
+                #    return pred.cpu().numpy()  #, pred[1:].cpu().numpy().flatten()
+                return self.model(x).cpu().numpy()
 
         def fit(self, x, y, pid=None, eval_callback=None):
             # PID: one-hot encoded values of the PID (or some other identification) to additionally use in the loss.
@@ -492,12 +507,16 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         ypred = self.model(xbatch)
                     else:
                         # concat xbatch and pidbatch
-                        ypred, pidpred = self.model(xbatch)
-                    loss_y = criterion(ypred.flatten(), ybatch, total_step)
+                        ypred = self.model(xbatch)
+                        if pid is not None:
+                            ypred, pidpred = ypred[:, 0], ypred[:, 1:]
+                    loss_y = criterion(ypred.flatten(), ybatch.flatten(), total_step)
                     pid_loss = 0.
                     if pid is not None:
-                        pid_loss = torch.nn.BCEWithLogitsLoss()(pidpred.float(), pidbatch.float())
-
+                        if self.bce_pid_loss:
+                            pid_loss = torch.nn.BCEWithLogitsLoss()(pidpred.float(), pidbatch.float())
+                        else:
+                            pid_loss = torch.nn.L1Loss()(pidpred.float(), pidbatch.float())
                     loss = loss_y + pid_loss
                     loss.backward()
                     losses_all.append(loss.item())
@@ -527,7 +546,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                         if patience_counter > patience:
                             print("Early stopping at running mean loss:", np.mean(rolling_loss))
                             break
-                    if total_step % 10000 == 0:
+                    if total_step % 1000 == 0:
                         # make eval plots data
                         print("Evaluating!")
                         if eval_callback is not None:
@@ -569,6 +588,13 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             return losses_all, epoch_losses
     return NetWrapper()
 
+def plot_deltaR_distr(dict):
+    fig, ax = plt.subplots()
+    for key in dict:
+        ax.hist(dict[key], bins=np.linspace(0, 1, 1000), label=key, alpha=0.5)
+    ax.legend()
+    fig.tight_layout()
+    return fig
 
 def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_energy_regression=False,
          train_only_on_PIDs=[], remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None, wandb_log_name=None, load_model_ckpt=None):
@@ -577,13 +603,14 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         pid_channels = len(all_pids)
     else:
         pid_channels = 0
+    if args.regress_pos:
+        pid_channels = 3
     model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels)
     print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
     #    from sklearn.ensemble import GradientBoostingRegressor
     #    model = GradientBoostingRegressor(verbose=1, max_depth=7, n_estimators=1000)
-
     if train_only_on_tracks:
         mask = (split[0][:, 3] > 0) & (split[0][:, 7] == 1)
         split[0] = split[0][mask]
@@ -609,16 +636,21 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         split[5] = split[5][masktest]
         split[6] = split[6][mask]
         split[7] = split[7][masktest]
+        split[8] = split[8][mask]
+        split[9] = split[9][masktest]
     if remove_sum_e:
-        split[0][:, 6] = 0.0  # remove the sum of the hits
+        split[0][:, 6] = 0.0  # Remove the sum of the hits
     if not train_energy_regression:
         print("Fitting")
         if pid_channels > 0:
-            pids = split[6].detach().cpu().numpy()  # todo fix this?
-            pids_onehot = np.zeros((len(pids), pid_channels))
-            for i, pid in enumerate(pids):
-                pids_onehot[i, all_pids.index(pid)] = 1.
-            result = model.fit(split[0].numpy(), split[2].numpy(), pids_onehot)
+            if args.regress_pos:
+                model.fit(split[0].numpy(), split[2].numpy(), split[8].numpy())
+            else:
+                pids = split[6].detach().cpu().numpy()  # todo fix this?
+                pids_onehot = np.zeros((len(pids), pid_channels))
+                for i, pid in enumerate(pids):
+                    pids_onehot[i, all_pids.index(pid)] = 1.
+                result = model.fit(split[0].numpy(), split[2].numpy(), pids_onehot)
         else:
             result = model.fit(split[0].numpy(), split[2].numpy())
         # print("Fitted model:", result)
@@ -633,14 +665,28 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         print("Fitting")
         def eval_callback(self, epoch):
             e_pred = self.predict(split[1].numpy())
+            if args.regress_pos:
+                e_pred, pos_pred = e_pred[:, 0], e_pred[:, 1:]
+                pos_true = split[9]
+                #pos_avg_hits = split[1][:, -2:]
+                #deltar_avg_hits = torch.sum((pos_avg_hits - pos_true) ** 2, dim=1).sqrt()
+                deltar_pred = torch.sum((torch.tensor(pos_pred) - pos_true) ** 2, dim=1).sqrt()
             pids = split[7].detach().cpu()
+
             for _pid in all_pids:
+                if args.regress_pos:
+                    fig = plot_deltaR_distr({"ML": deltar_pred[pids == _pid]})#, "hit average": deltar_avg_hits[pids == _pid]})
+                    fig.suptitle("PID: " + str(_pid) + " / epoch " + str(epoch))
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format='png')
+                    buf.seek(0)
+                    wandb.log({"eval_position_regression" + str(_pid): wandb.Image(Image.open(buf))})
                 # pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track,
                 n_track = split[1][:, 7]
                 e_track = split[1][:, 3]
                 e_sum_hits = split[1][:, 6]
                 e_true = split[5]
-                data = get_charged_response_resol_plot_for_PID(_pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
+                data = get_charged_response_resol_plot_for_PID(_pid, e_true.flatten(), e_pred.flatten(), e_sum_hits, pids, e_track, n_track, neutral=is_pid_neutral(_pid))
                 fig = data[0]
                 plot = [data[1], data[2]]
                 if save_to_folder is not None:
@@ -663,14 +709,15 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 fig = data[0]
                 fig.suptitle("PID: " + str(pid) + " / epoch " + str(epoch) + " (Training data!!)")
                 wandb.log({"eval_fig_train_data_" + str(pid): fig})'''
-
         if pid_channels > 0:
-            pids = split[6].detach().cpu().tolist()
-            pids = [int(x) for x in pids]
-            pids_onehot = np.zeros((len(pids), pid_channels))
-            for i, pid in enumerate(pids):
-                pids_onehot[i, all_pids.index(pid)] = 1.
-            result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot, eval_callback=eval_callback)
+            if args.regress_pos:
+                model.fit(split[0].numpy(), split[4].numpy(), split[8].numpy(), eval_callback=eval_callback)
+            else:
+                pids = split[6].detach().cpu().numpy()  # todo fix this?
+                pids_onehot = np.zeros((len(pids), pid_channels))
+                for i, pid in enumerate(pids):
+                    pids_onehot[i, all_pids.index(pid)] = 1.
+                result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
         else:
             result = model.fit(split[0].numpy(), split[4].numpy(), eval_callback=eval_callback)
         # print("Fitted model:", result)
