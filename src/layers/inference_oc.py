@@ -172,7 +172,7 @@ def create_and_store_graph_output(
                     number_in_batch=total_number_events,
                     tracks=tracks,
                 )
-                if len(df_event_pandora) > 1:
+                if df_event_pandora is not None and type(df_event_pandora) is not tuple:
                     df_list_pandora.append(df_event_pandora)
             total_number_events = total_number_events + 1
         # print("number of showers total", number_of_showers_total)
@@ -528,8 +528,7 @@ def generate_showers_data_frame(
         else:
             return df, number_of_showers_total
     else:
-        return None
-
+        return [], 0
 
 def get_correction_per_shower(labels, dic):
     unique_labels = torch.unique(labels)
