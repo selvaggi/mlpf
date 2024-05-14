@@ -75,9 +75,9 @@ os.makedirs(prefix, exist_ok=True)
 def get_eval_fig(ytrue, ypred, step, criterion, p=None):
     # calc losses, and plot loss histogram for  energy (ytrue) ranges [0, 6], [6, 12] etc. You need to filter by ytrue!
     fig, ax = plt.subplots(2, 1, figsize=(10, 10))
-    ax[0].scatter(ytrue, ypred, alpha=0.2)
+    ax[0].scatter(ytrue, ypred, alpha=0.3)
     if p is not None:
-        ax[0].scatter(ytrue, p, color="red", alpha=0.2)
+        ax[0].scatter(ytrue, p, color="red", alpha=0.3)
     ax[0].set_ylabel("Predicted energy")
     ax[0].set_xlabel("True energy")
     acceptable_loss = 1e-2
@@ -112,7 +112,6 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
 import io
 
 def get_dataset(save_ckpt=None):
-    args.regress_pos = False
     class CPU_Unpickler(pickle.Unpickler):
         def find_class(self, module, name):
             if module == 'torch.storage' and name == '_load_from_bytes':
@@ -185,12 +184,12 @@ def get_dataset(save_ckpt=None):
         true_e_corr_f = r["e_true_corrected_daughters"] / r["e_reco"] - 1
     if "pid_y" in r:
         r["y_particles"] = r["pid_y"]
-        if args.regress_pos:
-            r["eta"] = calculate_eta(r["coords_y"][:, 0],r["coords_y"][:, 1], r["coords_y"][:, 2])
-            r["phi"] = calculate_phi(r["coords_y"][:, 0], r["coords_y"][:, 1], r["coords_y"][:, 2])
-        else:
-            r["eta"] = calculate_eta(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2])
-            r["phi"] = calculate_phi(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2]) # not regressing positions
+        #if args.regress_pos:
+        #    r["eta"] = calculate_eta(r["coords_y"][:, 0],r["coords_y"][:, 1], r["coords_y"][:, 2])
+        #    r["phi"] = calculate_phi(r["coords_y"][:, 0], r["coords_y"][:, 1], r["coords_y"][:, 2])
+        #else:
+        #    r["eta"] = calculate_eta(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2])
+        #    r["phi"] = calculate_phi(r["x"][:, 0], r["x"][:, 1], r["x"][:, 2]) # not regressing positions
     abs_energy_diff = np.abs(r["e_true_corrected_daughters"] - r["e_true"])
     electron_brems_mask = (r["pid_y"] == 11) & (abs_energy_diff > 0)
     if save_ckpt is not None and not os.path.exists(save_ckpt):
@@ -199,9 +198,11 @@ def get_dataset(save_ckpt=None):
         #pickle.dump(ds, open(save_ckpt, "wb"))
         #print("Dumped dataset to file", save_ckpt)
         pickle.dump(r, open(save_ckpt, "wb"))
-    return r["x"], x_names + h_names + h1_names, true_e_corr_f, r[key], r["e_reco"], r["y_particles"], torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
-
-
+    return r["x"], x_names + h_names + h1_names, r["e_true"], r[key], r["e_reco"], r["y_particles"], r["coords_y"]#torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
+# the coords vector is normalized!
+# norm of coords vector
+def norm(x):
+    return torch.sqrt(torch.sum(x ** 2, dim=1))
 def get_split(ds, overfit=False):
     from sklearn.model_selection import train_test_split
     x, _, y, etrue, _, pids, positions = ds
@@ -590,7 +591,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
 def plot_deltaR_distr(dict):
     fig, ax = plt.subplots()
     for key in dict:
-        ax.hist(dict[key], bins=100, label=key, alpha=0.2)
+        ax.hist(dict[key], bins=np.linspace(0, 1, 1000), label=key, alpha=0.5)
     ax.legend()
     fig.tight_layout()
     return fig
@@ -603,7 +604,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
     else:
         pid_channels = 0
     if args.regress_pos:
-        pid_channels = 2
+        pid_channels = 3
     model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels)
     print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":
@@ -667,14 +668,14 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
             if args.regress_pos:
                 e_pred, pos_pred = e_pred[:, 0], e_pred[:, 1:]
                 pos_true = split[9]
-                pos_avg_hits = split[1][:, -2:]
-                deltar_avg_hits = torch.sum((pos_avg_hits - pos_true) ** 2, dim=1).sqrt()
+                #pos_avg_hits = split[1][:, -2:]
+                #deltar_avg_hits = torch.sum((pos_avg_hits - pos_true) ** 2, dim=1).sqrt()
                 deltar_pred = torch.sum((torch.tensor(pos_pred) - pos_true) ** 2, dim=1).sqrt()
             pids = split[7].detach().cpu()
 
             for _pid in all_pids:
                 if args.regress_pos:
-                    fig = plot_deltaR_distr({"ML": deltar_pred[pids == _pid], "hit average": deltar_avg_hits[pids == _pid]})
+                    fig = plot_deltaR_distr({"ML": deltar_pred[pids == _pid]})#, "hit average": deltar_avg_hits[pids == _pid]})
                     fig.suptitle("PID: " + str(_pid) + " / epoch " + str(epoch))
                     buf = io.BytesIO()
                     fig.savefig(buf, format='png')
@@ -710,13 +711,13 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 wandb.log({"eval_fig_train_data_" + str(pid): fig})'''
         if pid_channels > 0:
             if args.regress_pos:
-                model.fit(split[0].numpy(), split[2].numpy(), split[8].numpy(), eval_callback=eval_callback)
+                model.fit(split[0].numpy(), split[4].numpy(), split[8].numpy(), eval_callback=eval_callback)
             else:
                 pids = split[6].detach().cpu().numpy()  # todo fix this?
                 pids_onehot = np.zeros((len(pids), pid_channels))
                 for i, pid in enumerate(pids):
                     pids_onehot[i, all_pids.index(pid)] = 1.
-                result = model.fit(split[0].numpy(), split[2].numpy(), pids_onehot)
+                result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
         else:
             result = model.fit(split[0].numpy(), split[4].numpy(), eval_callback=eval_callback)
         # print("Fitted model:", result)
