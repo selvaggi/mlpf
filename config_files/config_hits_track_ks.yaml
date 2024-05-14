@@ -58,6 +58,16 @@ inputs:
          - [hit_px, null]
          - [hit_py, null]
          - [hit_pz, null]
+   pf_points_pfo:
+      pad_mode: wrap
+      length: 25000
+      vars:
+         - [hit__pandora_px, null]
+         - [hit__pandora_py, null]
+         - [hit__pandora_pz, null]
+         - [hit__pandora_x, null]
+         - [hit__pandora_y, null]
+         - [hit__pandora_z, null]
    pf_features:
       pad_mode: wrap
       length: 25000
