@@ -310,6 +310,11 @@ def plot_per_energy_resolution2(
         tracks_label = ""
     plot_response = True
     if plot_response:
+        event_numbers = [0, 1, 2, 3]
+        for event_number in event_numbers:
+            filename = os.path.join(PATH_store, f"event_{event_number}_pandora.html")
+            # plot_event(matched_, pandora=False, output_dir=filename)
+            plot_event(matched_pandora[matched_pandora.number_batch == event_number], pandora=True, output_dir=filename)
         list_plots = [""] #  "", "_reco"
         photons_dic = get_response_for_id_i(
             [22], matched_pandora, matched_, tracks=tracks
@@ -340,118 +345,118 @@ def plot_per_energy_resolution2(
             tracks="",
             plot_baseline=True
         )
-        for el in list_plots:
-            plot_one_label(
-                "Electromagnetic Resolution",
-                photons_dic,
-                "variance_om",
-                PATH_store,
-                "Photons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Electromagnetic Response",
-                photons_dic,
-                "mean",
-                PATH_store,
-                "Photons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Electromagnetic Response",
-                electrons_dic,
-                "mean",
-                PATH_store,
-                "Electrons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Electromagnetic Resolution",
-                electrons_dic,
-                "variance_om",
-                PATH_store,
-                "Electrons",
-                el,
-                tracks=tracks_label,
-            )
-
-            plot_one_label(
-                "Hadronic Resolution",
-                hadrons_dic,
-                "variance_om",
-                PATH_store,
-                "KL",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Hadronic Response",
-                hadrons_dic,
-                "mean",
-                PATH_store,
-                "KL",
-                el,
-                tracks=tracks_label,
-            )
-
-            plot_one_label(
-                "Hadronic Resolution",
-                hadrons_dic2,
-                "variance_om",
-                PATH_store,
-                "Pions",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Hadronic Response",
-                hadrons_dic2,
-                "mean",
-                PATH_store,
-                "Pions",
-                el,
-                tracks=tracks_label,
-            )
-            # plot the neutrons and protons
-            plot_one_label(
-                "Hadronic Resolution",
-                neutrons,
-                "variance_om",
-                PATH_store,
-                "Neutrons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Hadronic Response",
-                neutrons,
-                "mean",
-                PATH_store,
-                "Neutrons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Hadronic Resolution",
-                protons,
-                "variance_om",
-                PATH_store,
-                "Protons",
-                el,
-                tracks=tracks_label,
-            )
-            plot_one_label(
-                "Hadronic Response",
-                protons,
-                "mean",
-                PATH_store,
-                "Protons",
-                el,
-                tracks=tracks_label,
-            )
+        plot_per_particle = True
+        if plot_per_particle:
+            for el in list_plots:
+                plot_one_label(
+                    "Electromagnetic Resolution",
+                    photons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "Photons",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Electromagnetic Response",
+                    photons_dic,
+                    "mean",
+                    PATH_store,
+                    "Photons",
+                    el,
+                    tracks=tracks_label,
+                )
+                '''plot_one_label(
+                    "Electromagnetic Response",
+                    electrons_dic,
+                    "mean",
+                    PATH_store,
+                    "Electrons",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Electromagnetic Resolution",
+                    electrons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "Electrons",
+                    el,
+                    tracks=tracks_label,
+                )'''
+                '''plot_one_label(
+                    "Hadronic Resolution",
+                    hadrons_dic,
+                    "variance_om",
+                    PATH_store,
+                    "KL",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    hadrons_dic,
+                    "mean",
+                    PATH_store,
+                    "KL",
+                    el,
+                    tracks=tracks_label,
+                )'''
+                plot_one_label(
+                    "Hadronic Resolution",
+                    hadrons_dic2,
+                    "variance_om",
+                    PATH_store,
+                    "Pions",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    hadrons_dic2,
+                    "mean",
+                    PATH_store,
+                    "Pions",
+                    el,
+                    tracks=tracks_label,
+                )
+                '''# plot the neutrons and protons
+                plot_one_label(
+                    "Hadronic Resolution",
+                    neutrons,
+                    "variance_om",
+                    PATH_store,
+                    "Neutrons",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    neutrons,
+                    "mean",
+                    PATH_store,
+                    "Neutrons",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Hadronic Resolution",
+                    protons,
+                    "variance_om",
+                    PATH_store,
+                    "Protons",
+                    el,
+                    tracks=tracks_label,
+                )
+                plot_one_label(
+                    "Hadronic Response",
+                    protons,
+                    "mean",
+                    PATH_store,
+                    "Protons",
+                    el,
+                    tracks=tracks_label,
+                )'''
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False
@@ -848,7 +853,49 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
     )
 
 
-def calculate_event_energy_resolution(df, pandora=False):
+def plot_event(df, pandora=True, output_dir=""):
+    # plot the event with plotly. Compare ML and pandora reconstructed with truth
+    import plotly
+    import plotly.graph_objs as go
+    import plotly.express as px
+    # arrows from 0,0,0 to df.true_pos and the hover text should be the true energy (df.true_showers_E)
+    fig = go.Figure()
+    truepos = np.array(df.true_pos.values.tolist())
+    fig.add_trace(go.Scatter3d(x=truepos[:, 0], y=truepos[:, 1], z=truepos[:, 2], mode='markers', marker=dict(size=4, color='blue'), name='ground truth', hovertext=df.true_showers_E.values, hoverinfo="text"))
+    # add lines from 0,0,0 to these points
+    for i in range(len(truepos)):
+        fig.add_trace(go.Scatter3d(
+            x=[0, truepos[i, 0]], y=[0, truepos[i, 1]], z=[0, truepos[i, 2]],
+            mode='lines', line=dict(color='blue', width=1)
+        ))
+    if pandora:
+        pandorapos = np.array(df.pandora_calibrated_pos.values.tolist())
+        fig.add_trace(go.Scatter3d(x=pandorapos[:, 0], y=pandorapos[:, 1], z=pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text")
+                      )
+        # also add lines here
+        for i in range(len(pandorapos)):
+            fig.add_trace(go.Scatter3d(
+                x=[0, pandorapos[i, 0]], y=[0, pandorapos[i, 1]], z=[0, pandorapos[i, 2]],
+                mode='lines', line=dict(color='green', width=1))
+            )
+    else:
+        predpos = np.array(df.pred_pos_matched.values.tolist())
+        fig.add_trace(
+            go.Scatter3d(x=predpos[:, 0], y=predpos[:, 1], z=predpos[:, 2],
+                         mode='markers', marker=dict(size=4, color='red'), name='ML'))
+    #fig.show()
+    assert output_dir != ""
+    plotly.offline.plot(fig, filename=output_dir + "event.html")
+
+
+def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
+    bins = [0, 700]
+    #if pandora and "pandora_calibrated_pos" in df.columns:
+    #    full_vector = True
+    #else:
+    #    full_vector = False
+    if full_vector and pandora:
+        assert "pandora_calibrated_pos" in df.columns
     bins = [0, 700]
     binsx = []
     mean = []
@@ -863,20 +910,44 @@ def calculate_event_energy_resolution(df, pandora=False):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
         binsx.append(0.5 * (bin_i + bin_i1))
-        true_e = df.true_showers_E
+        true_e = df.true_showers_E.values
         batch_idx = df.number_batch
         if pandora:
-            pred_e = df.pandora_calibrated_E
+            pred_e = df.pandora_calibrated_E.values
+            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
+            if full_vector:
+                pred_vect = np.array(df.pandora_calibrated_pos.values.tolist()) * pred_e1.numpy()
+                true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                pred_vect = torch.tensor(pred_vect)
+                true_vect = torch.tensor(true_vect)
         else:
-            pred_e = df.calibrated_E
+            pred_e = df.calibrated_E.values
+            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
+            if full_vector:
+                pred_vect = np.array(df.pred_pos_matched.values.tolist()) * pred_e1.numpy()
+                true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                pred_vect = torch.tensor(pred_vect)
+                true_vect = torch.tensor(true_vect)
         true_rec = df.reco_showers_E
         # pred_e_nocor = df.pred_showers_E[mask]
-        true_e = torch.tensor(true_e.values)
+        true_e = torch.tensor(true_e)
         batch_idx = torch.tensor(batch_idx.values).long()
-        pred_e = torch.tensor(pred_e.values)
+        pred_e = torch.tensor(pred_e)
         true_rec = torch.tensor(true_rec.values)
-        true_e = scatter_sum(true_e, batch_idx)
-        pred_e = scatter_sum(pred_e, batch_idx)
+        if full_vector:
+            # vector scatter_sum of pred_vect and true_vect
+            #true_e = scatter_sum(true_e, batch_idx)
+            #pred_e = scatter_sum(pred_e, batch_idx)
+            #true_e_1 = scatter_sum(true_vect[:, 0], batch_idx)
+            #true_e_2 = scatter_sum(true_vect[:, 1], batch_idx)
+            #true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doens't work with more axes?
+            true_e = scatter_sum(true_vect, batch_idx, dim=0)
+            pred_e = scatter_sum(pred_vect, batch_idx, dim=0)
+            true_e = torch.norm(true_e, dim=1)
+            pred_e = torch.norm(pred_e, dim=1)
+        else:
+            true_e = scatter_sum(true_e, batch_idx)
+            pred_e = scatter_sum(pred_e, batch_idx)
         true_rec = scatter_sum(true_rec, batch_idx)
         mask_above = true_e <= bin_i1
         mask_below = true_e > bin_i
@@ -904,10 +975,9 @@ def calculate_event_energy_resolution(df, pandora=False):
        mean, variance, distributions, binsx, mean_baseline, variance_baseline, distr_baseline
     )
 
-
 def get_response_for_event_energy(matched_pandora, matched_):
-    mean_p, variance_om_p, distr_p, x_p, _ , _ , _ = calculate_event_energy_resolution(matched_pandora, True)
-    mean, variance_om, distr, x, mean_baseline, variance_om_baseline, _ = calculate_event_energy_resolution(matched_, False)
+    mean_p, variance_om_p, distr_p, x_p, _ , _ , _ = calculate_event_energy_resolution(matched_pandora, True, True)
+    mean, variance_om, distr, x, mean_baseline, variance_om_baseline, _ = calculate_event_energy_resolution(matched_, False, True)
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -920,7 +990,6 @@ def get_response_for_event_energy(matched_pandora, matched_):
     dic["distributions_pandora"] = distr_p
     dic["distributions_model"] = distr
     return dic
-
 
 def calculate_response(matched, pandora, log_scale=False, tracks=False):
     if log_scale:

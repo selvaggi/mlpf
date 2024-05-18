@@ -157,11 +157,14 @@ def create_inputs_from_table(
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             if result[i] is not None:
-                result[i] = result[i][hit_mask]
+               # if len(result[i].shape) == 2 and result[i].shape[0] == 3:
+               #     result[i] = result[i][:, hit_mask]
+               # else:
+               #     result[i] = result[i][hit_mask]
+               result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
             hit_type_feature[~mask_hits][hit_mask] - 1, num_classes=3
         )
-
     result.append(hit_type_one_hot)
     result.append(connection_list)
     return result

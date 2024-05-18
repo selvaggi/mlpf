@@ -304,10 +304,15 @@ def generate_showers_data_frame(
         #py_pred_pfo = scatter_mean(dic["graph"].ndata["hit_py"], labels)
         #pz_pred_pfo = scatter_mean(dic["graph"].ndata["hit_pz"], labels)
         #p_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"], labels) # FIX THIS: the shape of pos_pxpypz is [-1, 3]
-        px_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"][:, 0], labels)
-        py_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"][:, 1], labels)
-        pz_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"][:, 2], labels)
-        pxyz_pred_pfo = torch.stack((px_pred_pfo, py_pred_pfo, pz_pred_pfo), dim=1)
+        calc_pandora_momentum = "pandora_momentum" in dic["graph"].ndata
+        if calc_pandora_momentum:
+            px_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 0], labels)
+            py_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 1], labels)
+            pz_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 2], labels)
+            #p_pred_pandora = scatter_mean(dic["graph"].ndata["pandora_momentum"], labels)
+            p_pred_pandora = torch.stack((px_pred_pfo, py_pred_pfo, pz_pred_pfo), dim=1)
+            p_size_pandora = torch.norm(p_pred_pandora, dim=1)
+            pxyz_pred_pfo = p_pred_pandora / torch.norm(p_pred_pandora, dim=1).view(-1, 1)
     else:
         if e_corr is None:
             corrections_per_shower = get_correction_per_shower(labels, dic)
@@ -349,7 +354,8 @@ def generate_showers_data_frame(
         matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
         matched_es_cali_pfo = matched_es.clone()
         matched_es_cali_pfo[row_ind] = e_pred_showers_pfo[index_matches]
-        matched_positions_pfo[row_ind] = pxyz_pred_pfo[index_matches]
+        if calc_pandora_momentum:
+            matched_positions_pfo[row_ind] = pxyz_pred_pfo[index_matches]
     else:
         if e_corr is None:
             matched_es_cali = matched_es.clone()
@@ -512,8 +518,8 @@ def generate_showers_data_frame(
                 * number_in_batch,
             }
             if pred_pos is not None:
-                pred_pos = e_pred_pos.detach().cpu()
-                d["pred_pos_matched"] = pred_pos.tolist() # otherwise it doesn't work nicely with pandas dataframes
+                pred_pos1 = e_pred_pos.detach().cpu()
+                d["pred_pos_matched"] = pred_pos1.tolist() # otherwise it doesn't work nicely with pandas dataframes
         """if shap:
             print("Adding ec_x and shap_values to the dataframe")
             d["ec_x"] = ec_x_t

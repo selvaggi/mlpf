@@ -13,7 +13,6 @@ import mplhep as hep
 import torch
 import pickle
 
-
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
 all_E = True
