@@ -5,17 +5,17 @@ matplotlib.rc("font", size=35)
 import pandas as pd
 import matplotlib.pyplot as plt
 import multiprocessing
-from utils.inference.inference_metrics import obtain_MPV_and_68
+from src.utils.inference.inference_metrics import obtain_MPV_and_68
 import concurrent.futures
 import time
-from utils.inference.inference_metrics import calculate_eff
+from src.utils.inference.inference_metrics import calculate_eff
 import torch
 
 
 
 # TODO paralellize this script or make the data larger so that the binning needed is larger
 from scipy.optimize import curve_fit
-from utils.inference.inference_metrics import get_sigma_gaussian
+from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum
 
 
@@ -861,6 +861,7 @@ def calculate_eta(x, y, z):
 
 
 def plot_event(df, pandora=True, output_dir="", graph=None):
+    return #### Temporarily
     # plot the event with plotly. Compare ML and pandora reconstructed with truth
     # also plotst the graph is specified
     # also plot eta-phi (a bit easier debugging)

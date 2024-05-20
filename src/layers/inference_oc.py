@@ -158,7 +158,7 @@ def create_and_store_graph_output(
                 ec_x=ec_x,
                 shap_vals=shap_vals,
                 pred_pos=pred_pos,
-                #save_plots_to_folder=path_save + "/evt_plots_debugging"
+                save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging"
             )
             # if predict and len(df_event) > 1:
             #     df_list.append(df_event)
@@ -178,7 +178,7 @@ def create_and_store_graph_output(
                     step=step,
                     number_in_batch=total_number_events,
                     tracks=tracks,
-                    #save_plots_to_folder=path_save + "/evt_plots_debugging"
+                    save_plots_to_folder=path_save + "/Pandora_evt_plots_debugging"
                 )
                 if df_event_pandora is not None and type(df_event_pandora) is not tuple:
                     df_list_pandora.append(df_event_pandora)
@@ -539,7 +539,7 @@ def generate_showers_data_frame(
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
         if save_plots_to_folder:
-            event_numbers = [0, 1]
+            event_numbers = [0]
             for evt in event_numbers:
                 if len(df[df.number_batch == evt]):
                     # random string
