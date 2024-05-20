@@ -780,7 +780,6 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
                     e_corr = None
-
                 create_and_store_graph_output(
                     batch_g,
                     model_output1,
@@ -797,6 +796,7 @@ class ExampleWrapper(L.LightningModule):
                     tracks=self.args.tracks,
                     shap_vals=shap_vals,
                     ec_x=ec_x,
+
                 )
                 del model_output1
                 del batch_g

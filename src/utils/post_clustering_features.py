@@ -1,7 +1,7 @@
 import torch
 from torch_scatter import scatter_sum, scatter_std
 
-def calculate_phi(x, y):
+def calculate_phi(x, y, z=None):
     return torch.arctan2(y, x)
 def calculate_eta(x, y, z):
     theta = torch.arctan2(torch.sqrt(x ** 2 + y ** 2), z)

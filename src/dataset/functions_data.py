@@ -180,8 +180,8 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         (1, 0),
     )  #
     particle_coord = spherical_to_cartesian(
-        features_particles[:, 0],
         features_particles[:, 1],
+        features_particles[:, 0], # theta and phi are mixed!!!
         features_particles[:, 2],
         normalized=True,
     )
