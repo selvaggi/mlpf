@@ -380,12 +380,12 @@ def create_dif_interactions(i, j, pos, number_p):
     return x_interactions_m
 
 
-def spherical_to_cartesian(theta, phi, r, normalized=False):
+def spherical_to_cartesian(phi, theta, r, normalized=False):
     if normalized:
-        r = torch.ones_like(theta)
-    x = r * torch.sin(phi) * torch.cos(theta)
-    y = r * torch.sin(phi) * torch.sin(theta)
-    z = r * torch.cos(phi)
+        r = torch.ones_like(phi)
+    x = r * torch.sin(theta) * torch.cos(phi)
+    y = r * torch.sin(theta) * torch.sin(phi)
+    z = r * torch.cos(theta)
     return torch.cat((x.unsqueeze(1), y.unsqueeze(1), z.unsqueeze(1)), dim=1)
 
 

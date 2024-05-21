@@ -130,8 +130,8 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
-            ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
+            ckpt_charged = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
+            ckpt_neutral = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
             if self.args.regress_pos:
                 print("Regressing position as well, changing the hardcoded models to sth else")
@@ -529,7 +529,7 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             part_coords_matched
         ) = result
-        if self.args.regress_ec:
+        if self.args.regress_pos:
             e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(

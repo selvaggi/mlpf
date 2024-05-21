@@ -108,6 +108,13 @@ class ECNetWrapperGNN(torch.nn.Module):
 
         return self.model(gnn_output).flatten()
 
+import io
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else:
+            return super().find_class(module, name)
 
 class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
     # use the GNN+NN model for energy correction
@@ -127,7 +134,9 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         else:
             self.gnn = None
         if ckpt_file is not None:
-            self.model.model = pickle.load(open(ckpt_file, 'rb'))
+            # self.model.model = pickle.load(open(ckpt_file, 'rb'))
+            with open(ckpt_file, 'rb') as f:
+                self.model.model = CPU_Unpickler(f).load()
             print("Loaded energy correction model weights from", ckpt_file)
         self.model.to(device)
     def predict(self, x_global_features, graphs_new=None, explain=False):

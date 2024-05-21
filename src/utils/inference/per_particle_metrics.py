@@ -10,7 +10,9 @@ import concurrent.futures
 import time
 from src.utils.inference.inference_metrics import calculate_eff
 import torch
-
+import plotly
+import plotly.graph_objs as go
+import plotly.express as px
 
 
 # TODO paralellize this script or make the data larger so that the binning needed is larger
@@ -861,7 +863,6 @@ def calculate_eta(x, y, z):
 
 
 def plot_event(df, pandora=True, output_dir="", graph=None):
-    return #### Temporarily
     # plot the event with plotly. Compare ML and pandora reconstructed with truth
     # also plotst the graph is specified
     # also plot eta-phi (a bit easier debugging)
@@ -875,16 +876,41 @@ def plot_event(df, pandora=True, output_dir="", graph=None):
     # color_list = px.colors.qualitative.Plotly # this is only 10, not enough
     color_list = px.colors.qualitative.Light24
     if graph is not None:
+        sum_hits = scatter_sum(graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long())
         hit_pos = graph.ndata["pos_hits_xyz"].numpy()
         #fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', color=graph.ndata["particle_number"], name='hits'))
         # fix this: color by particle number (it is an array of size [0,0,0,0,1,1,1,2,2,2...]
-        fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', marker=dict(size=4, color=[color_list[int(i.item())] for i in graph.ndata["particle_number"]]), name='hits', hovertext=graph.ndata["particle_number"], hoverinfo="text"))
+        ht = [f"part. {int(i)}, sum_hits={sum_hits[i]:.2f}" for i in graph.ndata["particle_number"].long().tolist()]
+        fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', marker=dict(size=4, color=[color_list[int(i.item())] for i in graph.ndata["particle_number"]]), name='hits', hovertext=ht, hoverinfo="text"))
         # set scale to avg hig_pos
         scale = np.mean(np.linalg.norm(hit_pos, axis=1))
+
+        if "pos_pxpypz" in graph.ndata.keys():
+            vectors = graph.ndata["pos_pxpypz"].numpy()
+            trks = graph.ndata["pos_hits_xyz"].numpy()
+            #filt = (vectors[:, 0] != 0) & (vectors[:, 1] != 0) & (vectors[:, 2] != 0)
+            filt = graph.ndata["h"][:, 7 ] > 0
+            vf = vectors[filt]
+            vectors = vectors[filt]#
+            trks = trks[filt] # track positions
+            # normalize 3-comp vectors / np.linalg.norm(vectors, axis=1) * scale # remove zero vectors
+            vectors = vectors / np.linalg.norm(vectors, axis=1).reshape(-1, 1) * scale
+            track_p = graph.ndata["h"][:, 7].numpy()[filt]
+            # plot these vectors
+            for i in range(len(vectors)):
+                def plot_single_arrow(fig, vec, hovertext="", init_pt=[0,0,0]):
+                    # init_pt: initial point of the vector
+                    fig.add_trace(go.Scatter3d(x=[init_pt[0], vec[0] + init_pt[0]], y=[init_pt[1], init_pt[1] + vec[1]], z=[init_pt[2], init_pt[2] + vec[2]], mode='lines', line=dict(color='black', width=1)))
+                    fig.add_trace(go.Scatter3d(x=[vec[0] + init_pt[0]], y=[vec[1] + init_pt[1]], z=[vec[2] + init_pt[2]], mode='markers', marker=dict(size=4, color='black'), hovertext=hovertext))
+                plot_single_arrow(fig, vectors[i] / 5, hovertext=f"track {track_p[i]} , pxpypz={vf[i]}", init_pt=trks[i])  # a bit smaller
         # color this by graph.ndata["particle_number"]
     truepos = np.array(df.true_pos.values.tolist()) * scale
+    pids = [str(x) for x in df.pid.values]
     col = np.arange(1, len(truepos) + 1)
-    fig.add_trace(go.Scatter3d(x=truepos[:, 0], y=truepos[:, 1], z=truepos[:, 2], mode='markers',  marker=dict(size=4, color=[color_list[c] for c in col]), name='ground truth', hovertext=df.true_showers_E.values, hoverinfo="text"))
+    true_E = df.true_showers_E.values
+    true_P = np.array(df.true_pos.values.tolist()) * true_E.reshape(-1, 1)
+    ht = [f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}" for i in range(len(true_E))]
+    fig.add_trace(go.Scatter3d(x=truepos[:, 0], y=truepos[:, 1], z=truepos[:, 2], mode='markers',  marker=dict(size=4, color=[color_list[c] for c in col]), name='ground truth', hovertext=ht, hoverinfo="text"))
     # add lines from 0,0,0 to these points
     for i in range(len(truepos)):
         fig.add_trace(go.Scatter3d(
@@ -893,6 +919,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None):
         ))
     if pandora:
         pandorapos = np.array(df.pandora_calibrated_pos.values.tolist()) * scale
+
         fig.add_trace(go.Scatter3d(x=pandorapos[:, 0], y=pandorapos[:, 1], z=pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text")
                       )
         # also add lines here
@@ -905,7 +932,13 @@ def plot_event(df, pandora=True, output_dir="", graph=None):
         predpos = np.array(df.pred_pos_matched.values.tolist()) * scale
         fig.add_trace(
             go.Scatter3d(x=predpos[:, 0], y=predpos[:, 1], z=predpos[:, 2],
-                         mode='markers', marker=dict(size=4, color='red'), name='ML'))
+                         mode='markers', marker=dict(size=4, color='red'), name='ML', hovertext=df.calibrated_E.values))
+        # add lines
+        for i in range(len(predpos)):
+            fig.add_trace(go.Scatter3d
+                            (x=[0, predpos[i, 0]], y=[0, predpos[i, 1]], z=[0, predpos[i, 2]],
+                             mode='lines', line=dict(color='red', width=1))
+                            )
     #fig.show()
     assert output_dir != ""
     plotly.offline.plot(fig, filename=output_dir + "event.html")

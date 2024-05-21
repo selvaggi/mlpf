@@ -4,7 +4,7 @@ import os
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
-from src.dataset.functions_data import CachedIndexList
+from src.dataset.functions_data import CachedIndexList, spherical_to_cartesian
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
@@ -12,6 +12,7 @@ import wandb
 from src.utils.inference.per_particle_metrics import plot_event
 import random
 import string
+
 
 def generate_random_string(length):
     letters = string.ascii_letters + string.digits
@@ -142,6 +143,14 @@ def create_and_store_graph_output(
             #     number_in_batch=i,
             #     tracks=tracks,
             # )
+            #if pred_pos is not None:
+            # Apply temporary correction
+            import math
+            #phi = math.atan2(pred_pos[:, 1], pred_pos[:, 0])
+            #phi = torch.atan2(pred_pos[:, 1], pred_pos[:, 0])
+            #theta = torch.acos(pred_pos[:, 2] / torch.norm(pred_pos, dim=1))
+            #pred_pos = spherical_to_cartesian(theta, phi, torch.norm(pred_pos, dim=1), normalized=True)
+            #pred_pos= pred_pos.to(model_output.device)
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -539,12 +548,12 @@ def generate_showers_data_frame(
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
         if save_plots_to_folder:
-            event_numbers = [0]
+            event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
-                    plot_event(df[df.number_batch == evt], pandora, save_plots_to_folder + str(evt) +  rndstr, graph=dic["graph"].to("cpu"))
+                    plot_event(df[df.number_batch == evt], pandora, save_plots_to_folder + str(evt) + rndstr, graph=dic["graph"].to("cpu"))
         if number_of_showers_total is None:
             return df
         else:
