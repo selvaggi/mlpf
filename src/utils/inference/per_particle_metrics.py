@@ -862,7 +862,7 @@ def calculate_eta(x, y, z):
     return -torch.log(torch.tan(theta / 2))
 
 
-def plot_event(df, pandora=True, output_dir="", graph=None):
+def plot_event(df, pandora=True, output_dir="", graph=None, y=None):
     # plot the event with plotly. Compare ML and pandora reconstructed with truth
     # also plotst the graph is specified
     # also plot eta-phi (a bit easier debugging)
@@ -884,14 +884,13 @@ def plot_event(df, pandora=True, output_dir="", graph=None):
         fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', marker=dict(size=4, color=[color_list[int(i.item())] for i in graph.ndata["particle_number"]]), name='hits', hovertext=ht, hoverinfo="text"))
         # set scale to avg hig_pos
         scale = np.mean(np.linalg.norm(hit_pos, axis=1))
-
         if "pos_pxpypz" in graph.ndata.keys():
             vectors = graph.ndata["pos_pxpypz"].numpy()
             trks = graph.ndata["pos_hits_xyz"].numpy()
             #filt = (vectors[:, 0] != 0) & (vectors[:, 1] != 0) & (vectors[:, 2] != 0)
-            filt = graph.ndata["h"][:, 7 ] > 0
+            filt = graph.ndata["h"][:, 7] > 0
             vf = vectors[filt]
-            vectors = vectors[filt]#
+            vectors = vectors[filt]
             trks = trks[filt] # track positions
             # normalize 3-comp vectors / np.linalg.norm(vectors, axis=1) * scale # remove zero vectors
             vectors = vectors / np.linalg.norm(vectors, axis=1).reshape(-1, 1) * scale
@@ -905,27 +904,39 @@ def plot_event(df, pandora=True, output_dir="", graph=None):
                 plot_single_arrow(fig, vectors[i] / 5, hovertext=f"track {track_p[i]} , pxpypz={vf[i]}", init_pt=trks[i])  # a bit smaller
         # color this by graph.ndata["particle_number"]
     truepos = np.array(df.true_pos.values.tolist()) * scale
+    truepos = truepos[~np.isnan(truepos[:, 0])]
+    vertices = np.zeros_like(truepos[~np.isnan(truepos[:, 0])])
+    if y is not None:
+        assert vertices.shape == y.vertex.shape
+        vertices = y.vertex
     pids = [str(x) for x in df.pid.values]
     col = np.arange(1, len(truepos) + 1)
     true_E = df.true_showers_E.values
     true_P = np.array(df.true_pos.values.tolist()) * true_E.reshape(-1, 1)
     ht = [f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}" for i in range(len(true_E))]
-    fig.add_trace(go.Scatter3d(x=truepos[:, 0], y=truepos[:, 1], z=truepos[:, 2], mode='markers',  marker=dict(size=4, color=[color_list[c] for c in col]), name='ground truth', hovertext=ht, hoverinfo="text"))
     # add lines from 0,0,0 to these points
+    fig.add_trace(go.Scatter3d(x=vertices[:, 0] + truepos[:, 0], y=vertices[:, 1] + truepos[:, 1], z=vertices[:, 2] + truepos[:, 2], mode='markers',
+                               marker=dict(size=4, color=[color_list[c] for c in col]), name='ground truth',
+                               hovertext=ht, hoverinfo="text"))
     for i in range(len(truepos)):
+        v = vertices[i]
         fig.add_trace(go.Scatter3d(
-            x=[0, truepos[i, 0]], y=[0, truepos[i, 1]], z=[0, truepos[i, 2]],
+            x=[v[0], v[0]+truepos[i, 0]], y=[v[1], v[1] + truepos[i, 1]], z=[v[2], v[2] + truepos[i, 2]],
             mode='lines', line=dict(color='blue', width=1)
         ))
     if pandora:
         pandorapos = np.array(df.pandora_calibrated_pos.values.tolist()) * scale
+        #fig.add_trace(go.Scatter3d(x=vertices[:, 0] + pandorapos[:, 0], y=vertices[:, 1] + pandorapos[:, 1], z=vertices[:, 2] + pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text"))
+        fig.add_trace(go.Scatter3d(x=pandorapos[:, 0], y=pandorapos[:, 1],
+                                   z=pandorapos[:, 2], mode='markers',
+                                   marker=dict(size=4, color='green'), name='Pandora',
+                                   hovertext=df.pandora_calibrated_E.values, hoverinfo="text"))
 
-        fig.add_trace(go.Scatter3d(x=pandorapos[:, 0], y=pandorapos[:, 1], z=pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text")
-                      )
         # also add lines here
         for i in range(len(pandorapos)):
+            v = [0,0,0] # temporarily. TODO: find the pandora 'vertex'
             fig.add_trace(go.Scatter3d(
-                x=[0, pandorapos[i, 0]], y=[0, pandorapos[i, 1]], z=[0, pandorapos[i, 2]],
+                x=[v[0], v[0]+pandorapos[i, 0]], y=[v[1], v[1]+pandorapos[i, 1]], z=[v[2], v[2]+pandorapos[i, 2]],
                 mode='lines', line=dict(color='green', width=1))
             )
     else:

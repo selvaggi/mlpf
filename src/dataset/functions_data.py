@@ -171,6 +171,8 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         number_particle_features = 12 - 2
     else:
         number_particle_features = 9 - 2
+    if output["pf_features"].shape[0] == 18:
+        number_particle_features += 8  # add vertex information
     features_particles = torch.permute(
         torch.tensor(
             output["pf_features"][
@@ -179,12 +181,27 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         ),
         (1, 0),
     )  #
-    particle_coord = spherical_to_cartesian(
-        features_particles[:, 1],
-        features_particles[:, 0], # theta and phi are mixed!!!
-        features_particles[:, 2],
-        normalized=True,
-    )
+    # particle_coord are just features 10, 11, 12
+    if features_particles.shape[1] == 16:
+        print("Using config with part_pxyz and part_vertex_xyz")
+        particle_coord = features_particles[:, 10:13]
+        vertex_coord = features_particles[:, 13:16]
+        # normalize particle coords
+        particle_coord = particle_coord / np.linalg.norm(particle_coord, axis=1).reshape(-1, 1)
+        #particle_coord, spherical_to_cartesian(
+        #    features_particles[:, 1],
+        #    features_particles[:, 0],  # theta and phi are mixed!!!
+        #    features_particles[:, 2],
+        #    normalized=True,
+        #)
+    else:
+        particle_coord = spherical_to_cartesian(
+            features_particles[:, 1],
+            features_particles[:, 0], # theta and phi are mixed!!!
+            features_particles[:, 2],
+            normalized=True,
+        )
+        vertex_coord = None
     y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
     y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
     y_energy = torch.sqrt(y_mass**2 + y_mom**2)
@@ -199,6 +216,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             features_particles[:, 5].view(-1).unsqueeze(1),
             features_particles[:, 6].view(-1).unsqueeze(1),
             unique_list_particles=unique_list_particles,
+            vertex=vertex_coord
         )
     else:
         y_data_graph = Particles_GT(
@@ -208,8 +226,8 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             y_mass,
             y_pid,
             unique_list_particles=unique_list_particles,
+            vertex=vertex_coord
         )
-
     return y_data_graph
 
 
@@ -425,6 +443,7 @@ class Particles_GT:
         batch_number=None,
         unique_list_particles=None,
         energy_corrected=None,
+        vertex=None
     ):
         self.coord = coordinates
         self.E = energy
@@ -437,6 +456,7 @@ class Particles_GT:
         self.m = momentum
         self.mass = mass
         self.pid = pid
+        self.vertex = vertex
         if unique_list_particles is not None:
             self.unique_list_particles = unique_list_particles
         if decayed_in_calo is not None:
@@ -486,6 +506,7 @@ class Particles_GT:
 
 def concatenate_Particles_GT(list_of_Particles_GT):
     list_coord = [p[1].coord for p in list_of_Particles_GT]
+    list_vertex = [p[1].vertex for p in list_of_Particles_GT]
     list_coord = torch.cat(list_coord, dim=0)
     list_E = [p[1].E for p in list_of_Particles_GT]
     list_E = torch.cat(list_E, dim=0)
@@ -497,6 +518,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_mass = torch.cat(list_mass, dim=0)
     list_pid = [p[1].pid for p in list_of_Particles_GT]
     list_pid = torch.cat(list_pid, dim=0)
+    list_vertex = torch.cat(list_vertex, dim=0)
     if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
         list_dec_calo = [p[1].decayed_in_calo for p in list_of_Particles_GT]
         list_dec_track = [p[1].decayed_in_tracker for p in list_of_Particles_GT]
@@ -516,6 +538,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
         list_dec_track,
         batch_number,
         energy_corrected=list_E_corr,
+        vertex=list_vertex
     )
 
 

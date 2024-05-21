@@ -553,7 +553,7 @@ def generate_showers_data_frame(
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
-                    plot_event(df[df.number_batch == evt], pandora, save_plots_to_folder + str(evt) + rndstr, graph=dic["graph"].to("cpu"))
+                    plot_event(df[df.number_batch == evt], pandora, save_plots_to_folder + str(evt) + rndstr, graph=dic["graph"].to("cpu"), y=dic["part_true"])
         if number_of_showers_total is None:
             return df
         else:
