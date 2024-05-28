@@ -901,6 +901,12 @@ def obtain_clustering_for_matched_showers(
                         ),
                         dim=1,
                     )
+                    if "pos_pxpypz" in graphs[i].ndata:
+                        g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
+                    if "pos_pxpypz_at_vertex" in graphs[i].ndata:
+                        g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
+                            "pos_pxpypz_at_vertex"
+                        ][mask]
                     g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
                     energy_t = dic["part_true"].E.to(model_output.device)
                     energy_t_corr_daughters = dic["part_true"].E_corrected.to(model_output.device)

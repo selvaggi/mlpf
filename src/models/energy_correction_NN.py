@@ -180,5 +180,38 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         res = self.model(model_x)
         if self.pos_regression:
             # normalize res[1] vectors
-            return res[0].flatten(), res[1] / torch.norm(res[1], dim=1).unsqueeze(1)
-        return res.flatten()
+            return torch.clamp(res[0].flatten(), min=0, max=None), res[1] / torch.norm(res[1], dim=1).unsqueeze(1)
+        return torch.clamp(res.flatten(), min=0, max=None)
+
+class PickPAtDCA(torch.nn.Module):
+    # Same layout of the module as the GNN one, but just picks the track
+    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True, pos_regression=False):
+        super(PickPAtDCA, self).__init__()
+    def predict(self, x_global_features, graphs_new=None, explain=False):
+        '''
+        Forward, named 'predict' for compatibility reasons
+        :param x_global_features: Global features of the graphs - to be concatenated to each node feature
+        :param graphs_new:
+        :return:
+        '''
+        assert graphs_new is not None
+        batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
+        batch_idx = []
+        batch_bounds = []
+        for i, n in enumerate(batch_num_nodes):
+            batch_idx.extend([i] * n)
+            batch_bounds.append(n)
+        batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+        #ht = graphs_new.ndata["hit_type"]
+        ht = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
+        filt = (ht == 1) # track
+        #if "pos_pxpypz_at_vertex" in graphs_new.ndata.keys():
+        #    key = "pos_pxpypz_at_vertex"
+        #else:
+        #    key = "pos_pxpypz"
+        p_direction = scatter_mean(graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0)
+        p_tracks = torch.norm(p_direction, dim=1)
+        p_direction = p_direction / torch.norm(p_direction, dim=1).unsqueeze(1)
+        #if self.pos_regression:
+        return p_tracks, p_direction
+        #return p_tracks

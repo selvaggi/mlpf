@@ -153,7 +153,7 @@ def create_inputs_from_table(
 
     else:
         # if we want the tracks keep only 1 track hit per charged particle.
-        hit_mask = hit_type == 0
+        hit_mask = hit_type == 10
         hit_mask = ~hit_mask
         for i in range(1, len(result)):
             if result[i] is not None:
@@ -163,12 +163,26 @@ def create_inputs_from_table(
                #     result[i] = result[i][hit_mask]
                result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
-            hit_type_feature[~mask_hits][hit_mask] - 1, num_classes=3
+            hit_type_feature[~mask_hits][hit_mask], num_classes=4
         )
     result.append(hit_type_one_hot)
     result.append(connection_list)
     return result
 
+def remove_hittype0(graph):
+    filt = graph.ndata["hit_type"] == 0
+    # graph.ndata["hit_type"] -= 1
+    return dgl.remove_nodes(graph, torch.where(filt)[0])
+
+def store_track_at_vertex_at_track_at_calo(graph):
+    # To make it compatible with clustering, remove the 0 hit type nodes and store them as pos_pxpypz_at_vertex
+    tracks_at_calo = graph.ndata["hit_type"] == 1
+    tracks_at_vertex = graph.ndata["hit_type"] == 0
+    part = graph.ndata["particle_number"].long()
+    assert (part[tracks_at_calo] == part[tracks_at_vertex]).all()
+    graph.ndata["pos_pxpypz_at_vertex"] = torch.zeros_like(graph.ndata["pos_pxpypz"])
+    graph.ndata["pos_pxpypz_at_vertex"][tracks_at_calo] = graph.ndata["pos_pxpypz"][tracks_at_vertex]
+    return remove_hittype0(graph)
 
 def create_graph(
     output,
@@ -256,7 +270,7 @@ def create_graph(
         y_data_graph = 0
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
-    return [g, y_data_graph], graph_empty
+    return [store_track_at_vertex_at_track_at_calo(g), y_data_graph], graph_empty
 
 
 def graph_batch_func(list_graphs):

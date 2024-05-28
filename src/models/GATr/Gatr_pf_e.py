@@ -32,6 +32,7 @@ from src.models.energy_correction_NN import (
     ECNetWrapper,
     ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
+    PickPAtDCA
 )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
@@ -134,7 +135,6 @@ class ExampleWrapper(L.LightningModule):
             ckpt_neutral = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
             #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
             #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
-
             # TODO: remove hardcoded models
             if self.args.regress_pos:
                 print("Regressing position as well, changing the hardcoded models to sth else")
@@ -172,7 +172,30 @@ class ExampleWrapper(L.LightningModule):
                     gnn=True,
                     pos_regression=self.args.regress_pos,
                 )
-            else:
+            elif self.args.ec_model == "dnn-neutrals":
+                assert self.args.add_track_chis
+                num_global_features = 14
+                self.ec_model_wrapper_charged = (
+                    PickPAtDCA(    # Pick the p at vertex for charged
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=18,
+                        ckpt_file=ckpt_charged,
+                        gnn=False,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
+                self.ec_model_wrapper_neutral = (
+                    ECNetWrapperGNNGlobalFeaturesSeparate(
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=18,
+                        ckpt_file=ckpt_neutral,
+                        gnn=False,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
+            else: # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
                     # self.ec_model_wrapper_charged = NetWrapper(
@@ -251,7 +274,7 @@ class ExampleWrapper(L.LightningModule):
         )  # (batch_size*num_points, 1, 16)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = g.ndata["h"][:, -2:]  # this corresponds to e,p
+        scalars = g.ndata["h"][:, -2:] # this corresponds to e,p
         # Pass data through GATr
         forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(
@@ -336,22 +359,22 @@ class ExampleWrapper(L.LightningModule):
                 pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
                     graphs_new.ndata["h"].device
                 )
-            #node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
+            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[:, 0:3]
             # energy-weighted node_features_avg
-            #node_features_avg = scatter_mean(
+            #node_features_avg = scatter_sum(
             #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
             #    batch_idx,
             #    dim=0,
             # )
             #node_features_avg = node_features_avg[:, 0:3]
-            #weights = graphs_new.ndata["h"][:, -2].view(-1, 1) # Energies as the weights
-            #normalizations = scatter_add(weights, batch_idx, dim=0)
-            #normalizations1 = torch.ones_like(weights)
-            #normalizations1 = normalizations[batch_idx]
-            #weights = weights / normalizations1
-            node_features_avg = scatter_mean(
-                graphs_new.ndata["h"] , batch_idx, dim=0
-            )[: , 0:3]
+            weights = graphs_new.ndata["h"][:, 7].view(-1, 1) # Energies as the weights
+            normalizations = scatter_add(weights, batch_idx, dim=0)
+            # normalizations1 = torch.ones_like(weights)
+            normalizations1 = normalizations[batch_idx]
+            weights = weights / normalizations1
+            #node_features_avg = scatter_add(
+            #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
+            #)[: , 0:3]
             # node_features_avg = node_features_avg / normalizations
             eta, phi = calculate_eta(
                 node_features_avg[:, 0],
@@ -709,7 +732,8 @@ class ExampleWrapper(L.LightningModule):
                 shap_vals=shap_vals,
                 ec_x=ec_x,
                 total_number_events=self.total_number_events,
-                pred_pos=pred_pos
+                pred_pos=pred_pos,
+                use_gt_clusters=self.args.use_gt_clusters,
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)

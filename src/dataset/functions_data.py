@@ -201,7 +201,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             features_particles[:, 2],
             normalized=True,
         )
-        vertex_coord = None
+        vertex_coord = torch.zeros_like(particle_coord)
     y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
     y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
     y_energy = torch.sqrt(y_mass**2 + y_mom**2)
@@ -471,7 +471,8 @@ class Particles_GT:
 
     def mask(self, mask):
         for k in self.__dict__:
-            setattr(self, k, getattr(self, k)[mask])
+            if getattr(self, k) is not None and getattr(self, k)[0] is not None:
+                setattr(self, k, getattr(self, k)[mask])
 
     def copy(self):
         obj = type(self).__new__(self.__class__)
@@ -518,7 +519,8 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_mass = torch.cat(list_mass, dim=0)
     list_pid = [p[1].pid for p in list_of_Particles_GT]
     list_pid = torch.cat(list_pid, dim=0)
-    list_vertex = torch.cat(list_vertex, dim=0)
+    if list_vertex[0] is not None:
+        list_vertex = torch.cat(list_vertex, dim=0)
     if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
         list_dec_calo = [p[1].decayed_in_calo for p in list_of_Particles_GT]
         list_dec_track = [p[1].decayed_in_tracker for p in list_of_Particles_GT]
