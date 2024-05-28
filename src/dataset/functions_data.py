@@ -182,12 +182,12 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         (1, 0),
     )  #
     # particle_coord are just features 10, 11, 12
-    if features_particles.shape[1] == 16:
-        print("Using config with part_pxyz and part_vertex_xyz")
+    if features_particles.shape[1] == 16: # Using config with part_pxyz and part_vertex_xyz
+        #print("Using config with part_pxyz and part_vertex_xyz")
         particle_coord = features_particles[:, 10:13]
         vertex_coord = features_particles[:, 13:16]
         # normalize particle coords
-        particle_coord = particle_coord / np.linalg.norm(particle_coord, axis=1).reshape(-1, 1)
+        particle_coord = particle_coord# / np.linalg.norm(particle_coord, axis=1).reshape(-1, 1)  # DO NOT NORMALIZE
         #particle_coord, spherical_to_cartesian(
         #    features_particles[:, 1],
         #    features_particles[:, 0],  # theta and phi are mixed!!!

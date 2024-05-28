@@ -195,6 +195,23 @@ class ExampleWrapper(L.LightningModule):
                         pos_regression=self.args.regress_pos,
                     )
                 )
+            elif self.args.ec_model == "gatr-neutrals":
+                assert self.args.add_track_chis
+                num_global_features = 14
+                self.ec_model_wrapper_charged = (
+                    PickPAtDCA()  # Pick the p at vertex for charged
+                )
+                self.ec_model_wrapper_neutral = (
+                    ECNetWrapperGNNGlobalFeaturesSeparate(
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=20,
+                        ckpt_file=ckpt_neutral,
+                        gnn=True,
+                        gatr=True,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
             else: # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
@@ -422,12 +439,18 @@ class ExampleWrapper(L.LightningModule):
                     charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
                 else:
                     charged_energies = [torch.tensor([]).to(graphs_new.ndata["h"].device), torch.tensor([]).to(graphs_new.ndata["h"].device)]
-            neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
-            neutral_energies = self.ec_model_wrapper_neutral.predict(
-                features_neutral_no_nan,
-                neutral_graphs,
-                explain=self.args.explain_ec,
-            )
+            if len(neutral_idx) > 0:
+                neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+                neutral_energies = self.ec_model_wrapper_neutral.predict(
+                    features_neutral_no_nan,
+                    neutral_graphs,
+                    explain=self.args.explain_ec,
+                )
+            else:
+                if not self.args.regress_pos:
+                    neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+                else:
+                    neutral_energies = [torch.tensor([]).to(graphs_new.ndata["h"].device), torch.tensor([]).to(graphs_new.ndata["h"].device)]
             if self.args.regress_pos:
                 charged_energies, charged_positions = charged_energies
                 neutral_energies, neutral_positions = neutral_energies
@@ -478,8 +501,13 @@ class ExampleWrapper(L.LightningModule):
             if self.args.regress_pos:
                 if len(charged_idx):
                     pred_pos[charged_idx.flatten()] = charged_positions
-                pred_pos[neutral_idx.flatten()] = neutral_positions
-                pred_energy_corr = {"pred_energy_corr": pred_energy_corr, "pred_pos": pred_pos}
+                if len(neutral_idx):
+                    pred_pos[neutral_idx.flatten()] = neutral_positions
+                pred_energy_corr = {"pred_energy_corr": pred_energy_corr,
+                                    "pred_pos": pred_pos,
+                                    "neutrals_idx": neutral_idx.flatten(),
+                                    "charged_idx": charged_idx.flatten(),
+                                    }
             # print("Pred energy corr:", pred_energy_corr)
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
@@ -556,7 +584,7 @@ class ExampleWrapper(L.LightningModule):
             part_coords_matched
         ) = result
         if self.args.regress_pos:
-            e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
+            e_cor, pred_pos, neutral_idx = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["neutrals_idx"]
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -580,6 +608,15 @@ class ExampleWrapper(L.LightningModule):
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
             loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
+            if self.args.regress_pos:
+                true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
+                loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+                loss_EC_neutrals = torch.nn.L1Loss()(e_cor[neutral_idx].detach().cpu(), e_true[neutral_idx].cpu())
+                loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx].detach().cpu(), true_pos[neutral_idx].cpu())
+                wandb.log({"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals})
+                wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
+                print("Loss pxyz neutrals", loss_pos_neutrals)
+                loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC

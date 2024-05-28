@@ -261,6 +261,9 @@ def create_graph(
                 g.ndata["pandora_momentum"] = pandora_mom
                 g.ndata["pandora_reference_point"] = pandora_ref_point
         y_data_graph.calculate_corrected_E(g, connections_list)
+        if is_Ks == True:
+            if g.ndata["h"].shape[0] < 10 or (set(g.ndata["hit_type"].unique().tolist()) == set([0, 1]) and g.ndata["hit_type"][g.ndata["hit_type"] == 1].shape[0] < 10):
+                graph_empty = True  # less than 10 hits
         if is_Ks == False:
             if len(y_data_graph) < 4:
                 graph_empty = True
@@ -270,6 +273,8 @@ def create_graph(
         y_data_graph = 0
     if pos_xyz_hits.shape[0] < 10:
         graph_empty = True
+    if graph_empty:
+        return [g, y_data_graph], graph_empty
     return [store_track_at_vertex_at_track_at_calo(g), y_data_graph], graph_empty
 
 
