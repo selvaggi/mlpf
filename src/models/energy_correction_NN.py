@@ -165,6 +165,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         :param graphs_new:
         :return:
         '''
+        use_full_mv = True # whether to use the full multivector to regress E and p or just sth else
         if graphs_new is not None and self.gnn is not None:
             batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
             batch_idx = []
@@ -198,8 +199,12 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                 #if self.pos_regression:
                 #    return energy, p_vectors
                 #return energy
-                padding = torch.randn(x_global_features.shape[0], 16).to(p_vectors_per_batch.device)
-                model_x = torch.cat([x_global_features, embedded_outputs_per_batch, padding], dim=1).to(self.model.model[0].weight.device)
+                if use_full_mv:
+                    padding = torch.randn(x_global_features.shape[0], 16).to(p_vectors_per_batch.device)
+                    model_x = torch.cat([x_global_features, embedded_outputs_per_batch, padding], dim=1).to(self.model.model[0].weight.device)
+                else:
+                    padding = torch.randn(x_global_features.shape[0], 32).to(p_vectors_per_batch.device)
+                    model_x = torch.cat([x_global_features, padding], dim=1).to(self.model.model[0].weight.device)
         else:
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(x_global_features.device)
         if not self.use_gatr:
@@ -222,7 +227,11 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         res = self.model(model_x)
         if self.pos_regression:
             # normalize res[1] vectors
-            return torch.clamp(res[0].flatten(), min=0, max=None), res[1] #/ torch.norm(res[1], dim=1).unsqueeze(1)
+            E = torch.clamp(res[0].flatten(), min=0, max=None)
+            p = res[1] #/ torch.norm(res[1], dim=1).unsqueeze(1)
+            if self.use_gatr and not use_full_mv:
+                p = p_vectors_per_batch
+            return E, p
         return torch.clamp(res.flatten(), min=0, max=None)
 
 
