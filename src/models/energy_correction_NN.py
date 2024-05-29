@@ -147,6 +147,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                 )
                 # self.lin_e = nn.Linear(4, 1)
                 self.gnn = "gatr"
+                # self.lin_final_exp = nn.Linear(16, 4) # e, pxpypz
             else:
                 self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
             #self.gnn = GraphSAGE(in_channels=in_features_gnn, out_channels=out_features_gnn, hidden_channels=64, num_layers=3)

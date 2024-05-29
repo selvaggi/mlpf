@@ -138,6 +138,7 @@ class ExampleWrapper(L.LightningModule):
             # TODO: remove hardcoded models
             if self.args.regress_pos:
                 print("Regressing position as well, changing the hardcoded models to sth else")
+                #ckpt_neutral = "/eos/user/g/gkrzmanc/2024_energy_corr/neutrals_2705_bs128_fig_angles/intermediate_plots/model_step_58000_pid_22.pkl" # Trained with correct angles etc.
                 ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl" #TEMPORARY
                 ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
             if self.args.ec_model == "gat":
@@ -176,14 +177,7 @@ class ExampleWrapper(L.LightningModule):
                 assert self.args.add_track_chis
                 num_global_features = 14
                 self.ec_model_wrapper_charged = (
-                    PickPAtDCA(    # Pick the p at vertex for charged
-                        device=dev,
-                        in_features_global=num_global_features,
-                        in_features_gnn=18,
-                        ckpt_file=ckpt_charged,
-                        gnn=False,
-                        pos_regression=self.args.regress_pos,
-                    )
+                    PickPAtDCA()  #  #  #
                 )
                 self.ec_model_wrapper_neutral = (
                     ECNetWrapperGNNGlobalFeaturesSeparate(
@@ -886,7 +880,6 @@ class ExampleWrapper(L.LightningModule):
             },
         }
 
-
 def obtain_batch_numbers(g):
     graphs_eval = dgl.unbatch(g)
     number_graphs = len(graphs_eval)
@@ -896,6 +889,5 @@ def obtain_batch_numbers(g):
         num_nodes = gj.number_of_nodes()
         batch_numbers.append(index * torch.ones(num_nodes))
         num_nodes = gj.number_of_nodes()
-
     batch = torch.cat(batch_numbers, dim=0)
     return batch

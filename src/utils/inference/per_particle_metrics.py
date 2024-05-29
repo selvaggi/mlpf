@@ -863,6 +863,7 @@ def calculate_eta(x, y, z):
 
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None):
+    # return
     # plot the event with plotly. Compare ML and pandora reconstructed with truth
     # also plotst the graph is specified
     # also plot eta-phi (a bit easier debugging)
@@ -892,8 +893,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
             has_track = scatter_sum(graph.ndata["h"][:, 8], labels.long().cpu())
             #if has_track.sum() == 0.0:
             # return # filter
-            if sum(y.E) < 9:
-                return
+            #if sum(y.E) < 9:
+            #    return
             ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
@@ -1006,6 +1007,33 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
     #fig.show()
     assert output_dir != ""
     plotly.offline.plot(fig, filename=output_dir + "event.html")
+
+def calc_unit_circle_dist(df, pandora=False):
+    # quick histogram of distances between unit vectors of directions - to compare with the light training model
+    if pandora:
+        assert "pandora_calibrated_pos" in df.columns
+    pids = []
+    distances = []
+    true_e = df.true_showers_E.values
+    batch_idx = df.number_batch
+    if pandora:
+        pred_vect = np.array(df.pandora_calibrated_pos.values.tolist())
+        true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        pred_vect = torch.tensor(pred_vect)
+        true_vect = torch.tensor(true_vect)
+        # normalize
+        pred_vect = pred_vect / torch.norm(pred_vect, dim=1).reshape(-1, 1)
+        true_vect = true_vect / torch.norm(true_vect, dim=1).reshape(-1, 1)
+    else:
+        pred_vect = np.array(df.pred_pos_matched.values.tolist())
+        true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        pred_vect = torch.tensor(pred_vect)
+        true_vect = torch.tensor(true_vect)
+        # normalize
+        pred_vect = pred_vect / torch.norm(pred_vect, dim=1).reshape(-1, 1)
+        true_vect = true_vect / torch.norm(true_vect, dim=1).reshape(-1, 1)
+    dist = torch.sqrt(torch.sum((pred_vect - true_vect) ** 2, dim=1))
+    return dist, df.pid.values
 
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
