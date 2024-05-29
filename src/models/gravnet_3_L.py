@@ -40,7 +40,8 @@ from src.layers.obtain_statistics import (
 )
 from copy import copy
 
-class GravnetModel(L.LightningModule): #L.LightningModule
+
+class GravnetModel(L.LightningModule):  # L.LightningModule
     def __init__(
         self,
         args,
@@ -175,7 +176,7 @@ class GravnetModel(L.LightningModule): #L.LightningModule
         #        print("--> param name: ", p.name, " dir: ", dir(p))
         # print("Num of trainable params in the sub NN" , len([param for param in self.GatedGCNNet.parameters() if param.requires_grad]))
         x = g.ndata["h"]
-        
+
         original_coords = x[:, 0:3]
         g.ndata["original_coords"] = original_coords
         device = x.device
@@ -588,7 +589,7 @@ class GravnetModel(L.LightningModule): #L.LightningModule
             self.df_showers_pandora.append(df_batch_pandora)
             self.df_showes_db.append(df_batch1)
         del loss
-        del losses 
+        del losses
         del model_output
 
     def on_train_epoch_end(self):
@@ -699,10 +700,10 @@ class FreezeClustering(BaseFinetuning):
         # Here, we are freezing `feature_extractor`
 
         self.freeze(pl_module.ScaledGooeyBatchNorm2_1)
-        #self.freeze(pl_module.Dense_1)
+        # self.freeze(pl_module.Dense_1)
         self.freeze(pl_module.gatr)
-        #self.freeze(pl_module.postgn_dense)
-        #self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
+        # self.freeze(pl_module.postgn_dense)
+        # self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
         self.freeze(pl_module.clustering)
         self.freeze(pl_module.beta)
 
@@ -828,7 +829,7 @@ def obtain_clustering_for_matched_showers(
         dic = {}
         dic["graph"] = graphs[i]
         y = y_all.copy()
-        #if "unique_list_particles" in y.__dict__:
+        # if "unique_list_particles" in y.__dict__:
         #    del y.unique_list_particles
         y.mask(mask.flatten())
         dic["part_true"] = y
@@ -842,7 +843,7 @@ def obtain_clustering_for_matched_showers(
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
-                #print("Obtained labels in obtain_clustering", labels)
+                # print("Obtained labels in obtain_clustering", labels)
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
             shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
@@ -901,9 +902,13 @@ def obtain_clustering_for_matched_showers(
                         ),
                         dim=1,
                     )
-                    g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
+                    g.ndata["chi_squared_tracks"] = graphs[i].ndata[
+                        "chi_squared_tracks"
+                    ][mask]
                     energy_t = dic["part_true"].E.to(model_output.device)
-                    energy_t_corr_daughters = dic["part_true"].E_corrected.to(model_output.device)
+                    energy_t_corr_daughters = dic["part_true"].E_corrected.to(
+                        model_output.device
+                    )
                     true_energy_shower = energy_t[row_ind[j]]
                     y_pids_matched.append(y.pid[row_ind[j]].item())
                     y_coords_matched.append(y.coord[row_ind[j]].detach().cpu().numpy())
@@ -916,14 +921,22 @@ def obtain_clustering_for_matched_showers(
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
     e_true_corr_daughters = torch.cat(energy_true_daughters, dim=0)
-    return graphs_showers_matched, true_energy_showers, reco_energy_showers, y_pids_matched, e_true_corr_daughters, y_coords_matched
+    return (
+        graphs_showers_matched,
+        true_energy_showers,
+        reco_energy_showers,
+        y_pids_matched,
+        e_true_corr_daughters,
+        y_coords_matched,
+    )
+
 
 def loss_reco_true(e_cor, true_e, sum_e):
     # m = nn.ELU()
     # e_cor = m(e_cor)
-    #print("corection", e_cor[0:5])
-    #print("sum_e", sum_e[0:5])
-    #print("true_e", true_e[0:5])
+    # print("corection", e_cor[0:5])
+    # print("sum_e", sum_e[0:5])
+    # print("true_e", true_e[0:5])
     # true_e = -1 * sum_e  # Temporarily, to debug - so the model would have to learn corr. factor of -1 for each particle...
     loss = torch.square(((e_cor) * sum_e - true_e) / true_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
@@ -936,9 +949,9 @@ def loss_reco_sum_absolute(e_cor, true_e, sum_e):
     # implementation of a loss that regresses the sum of the hits instead of the corr. factor ( just for debugging )
     # m = nn.ELU()
     # e_cor = m(e_cor)
-    #print("corection", e_cor[0:5])
-    #print("sum_e", sum_e[0:5])
-    #print("true_e", true_e[0:5])
+    # print("corection", e_cor[0:5])
+    # print("sum_e", sum_e[0:5])
+    # print("true_e", true_e[0:5])
     # true_e = -1 * sum_e  # Temporarily, to debug - so the model would have to learn corr. factor of -1 for each particle...
     loss = torch.square(e_cor - sum_e)
     loss_abs = torch.mean(torch.abs(e_cor * sum_e - true_e) / true_e)
