@@ -3,7 +3,9 @@
     The model taken from notebooks/13_NNs.py
     At first the model is fixed and the weights are loaded from earlier training
 '''
-
+from xformers.ops.fmha import BlockDiagonalMask
+from gatr.interface import embed_point, extract_point, extract_translation, embed_scalar, extract_scalar
+from gatr import GATr, SelfAttentionConfig, MLPConfig
 import pickle
 from copy import deepcopy
 import shap
@@ -12,9 +14,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from src.models.gravnet_3_L import GravnetModel
+from src.models.GATr.Gatr_pf_e import obtain_batch_numbers as obtain_batch_numbers2
 from torch_geometric.nn.models import GAT, GraphSAGE
-from torch_scatter import scatter_mean
+from torch_scatter import scatter_mean, scatter_sum
 from gatr import GATr
+import dgl
 
 
 class Net(nn.Module):
@@ -105,7 +109,6 @@ class ECNetWrapperGNN(torch.nn.Module):
         edge_index = torch.stack(graphs_new.edges())
         gnn_output = self.gnn(x, edge_index)
         gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
-
         return self.model(gnn_output).flatten()
 
 import io
@@ -119,7 +122,7 @@ class CPU_Unpickler(pickle.Unpickler):
 class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
     # use the GNN+NN model for energy correction
     # This one concatenates GNN features to the global features
-    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True, pos_regression=False):
+    def __init__(self, device, in_features_global=13, in_features_gnn=13, out_features_gnn=32, ckpt_file=None, gnn=True, pos_regression=False, gatr=False):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         out_f = 1
         self.pos_regression = pos_regression
@@ -127,9 +130,25 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             out_f += 3
         self.model = Net(in_features=out_features_gnn + in_features_global, out_features=out_f)
         self.model.explainer_mode = False
+        self.use_gatr = gatr
         # use a GAT
         if gnn:
-            self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
+            if self.use_gatr:
+                self.gatr = GATr(
+                    in_mv_channels=1,
+                    out_mv_channels=1,
+                    hidden_mv_channels=4,
+                    in_s_channels=3,
+                    out_s_channels=None,
+                    hidden_s_channels=4,
+                    num_blocks=3,
+                    attention=SelfAttentionConfig(),  # Use default parameters for attention
+                    mlp=MLPConfig(),  # Use default parameters for MLP
+                )
+                # self.lin_e = nn.Linear(4, 1)
+                self.gnn = "gatr"
+            else:
+                self.gnn = GAT(in_features_gnn, out_channels=out_features_gnn, heads=4, concat=True, hidden_channels=64, num_layers=3)
             #self.gnn = GraphSAGE(in_channels=in_features_gnn, out_channels=out_features_gnn, hidden_channels=64, num_layers=3)
         else:
             self.gnn = None
@@ -146,6 +165,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         :param graphs_new:
         :return:
         '''
+        use_full_mv = True # whether to use the full multivector to regress E and p or just sth else
         if graphs_new is not None and self.gnn is not None:
             batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
             batch_idx = []
@@ -157,13 +177,40 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             node_global_features = x_global_features  #
             x = graphs_new.ndata["h"]
             edge_index = torch.stack(graphs_new.edges())
-            gnn_output = self.gnn(x, edge_index)
-            gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
+            if not self.use_gatr:
+                gnn_output = self.gnn(x, edge_index)
+                gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
+            else:
+                hits_points = graphs_new.ndata["h"][:, 0:3]
+                hit_type = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
+                betas = graphs_new.ndata["h"][:, 9]
+                p = graphs_new.ndata["h"][:, 8]
+                e = graphs_new.ndata["h"][:, 7]
+                embedded_inputs = embed_point(hits_points) + embed_scalar(hit_type.view(-1, 1))
+                extra_scalars = torch.cat([betas.unsqueeze(1), p.unsqueeze(1), e.unsqueeze(1)], dim=1)
+                mask = self.build_attention_mask(graphs_new)
+                embedded_inputs = embedded_inputs.unsqueeze(-2)
+                embedded_outputs, _ = self.gatr(embedded_inputs, scalars=extra_scalars, attention_mask=mask)
+                p_vectors = extract_translation(embedded_outputs)
+                p_vectors = p_vectors[:, 0, :]
+                p_vectors_per_batch = scatter_mean(p_vectors, batch_idx, dim=0)
+                embedded_outputs_per_batch = scatter_sum(embedded_outputs[:, 0, :], batch_idx, dim=0)
+                #energy = torch.clamp(extract_scalar(embedded_outputs), min=0).flatten()
+                #if self.pos_regression:
+                #    return energy, p_vectors
+                #return energy
+                if use_full_mv:
+                    padding = torch.randn(x_global_features.shape[0], 16).to(p_vectors_per_batch.device)
+                    model_x = torch.cat([x_global_features, embedded_outputs_per_batch, padding], dim=1).to(self.model.model[0].weight.device)
+                else:
+                    padding = torch.randn(x_global_features.shape[0], 32).to(p_vectors_per_batch.device)
+                    model_x = torch.cat([x_global_features, padding], dim=1).to(self.model.model[0].weight.device)
         else:
-            # normally distr. 32 features
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(x_global_features.device)
-        model_x = torch.cat([x_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
+        if not self.use_gatr:
+            model_x = torch.cat([x_global_features, gnn_output], dim=1).to(self.model.model[0].weight.device)
         if explain:
+            assert not self.use_gatr
             print("explain")
             # take a selection of 10% or 50 samples to get typical feature values
             print(model_x.shape)
@@ -180,5 +227,61 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         res = self.model(model_x)
         if self.pos_regression:
             # normalize res[1] vectors
-            return res[0].flatten(), res[1] / torch.norm(res[1], dim=1).unsqueeze(1)
-        return res.flatten()
+            E = torch.clamp(res[0].flatten(), min=0, max=None)
+            p = res[1] #/ torch.norm(res[1], dim=1).unsqueeze(1)
+            if self.use_gatr and not use_full_mv:
+                p = p_vectors_per_batch
+            return E, p
+        return torch.clamp(res.flatten(), min=0, max=None)
+
+
+
+    @staticmethod
+    def obtain_batch_numbers(g):
+        graphs_eval = dgl.unbatch(g)
+        number_graphs = len(graphs_eval)
+        batch_numbers = []
+        for index in range(0, number_graphs):
+            gj = graphs_eval[index]
+            num_nodes = gj.number_of_nodes()
+            batch_numbers.append(index * torch.ones(num_nodes))
+            num_nodes = gj.number_of_nodes()
+        batch = torch.cat(batch_numbers, dim=0)
+        return batch
+    def build_attention_mask(self, g):
+        batch_numbers = self.obtain_batch_numbers(g)
+        return BlockDiagonalMask.from_seqlens(
+            torch.bincount(batch_numbers.long()).tolist()
+        )
+class PickPAtDCA(torch.nn.Module):
+    # Same layout of the module as the GNN one, but just picks the track
+    def __init__(self):
+        super(PickPAtDCA, self).__init__()
+    def predict(self, x_global_features, graphs_new=None, explain=False):
+        '''
+        Forward, named 'predict' for compatibility reasons
+        :param x_global_features: Global features of the graphs - to be concatenated to each node feature
+        :param graphs_new:
+        :return:
+        '''
+        assert graphs_new is not None
+        batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
+        batch_idx = []
+        batch_bounds = []
+        for i, n in enumerate(batch_num_nodes):
+            batch_idx.extend([i] * n)
+            batch_bounds.append(n)
+        batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+        #ht = graphs_new.ndata["hit_type"]
+        ht = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
+        filt = (ht == 1) # track
+        #if "pos_pxpypz_at_vertex" in graphs_new.ndata.keys():
+        #    key = "pos_pxpypz_at_vertex"
+        #else:
+        #    key = "pos_pxpypz"
+        p_direction = scatter_mean(graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0)
+        p_tracks = torch.norm(p_direction, dim=1)
+        p_direction = p_direction / torch.norm(p_direction, dim=1).unsqueeze(1)
+        #if self.pos_regression:
+        return p_tracks, p_direction
+        #return p_tracks

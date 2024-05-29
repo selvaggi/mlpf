@@ -37,6 +37,7 @@ def create_and_store_graph_output(
     store_epoch=False,
     total_number_events=0,
     pred_pos=None,
+    use_gt_clusters=False,
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -66,7 +67,10 @@ def create_and_store_graph_output(
             labels_clustering = clustering_obtain_labels(
                 X, dic["graph"].ndata["beta"].view(-1), model_output.device
             )
-        labels_hdb = hfdb_obtain_labels(X, model_output.device)
+        if use_gt_clusters:
+            labels_hdb = dic["graph"].ndata["particle_number"].type(torch.int64)
+        else:
+            labels_hdb = hfdb_obtain_labels(X, model_output.device)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
@@ -405,7 +409,8 @@ def generate_showers_data_frame(
                 * e_pred_showers[index_matches]
             )
             if pred_pos is not None:
-                matched_positions[row_ind] = pred_pos[index_matches]
+                matched_positions[row_ind] = pred_pos[number_of_showers_total : number_of_showers_total
+                    + number_of_showers]
             if shap:
                 matched_shap_vals[row_ind.cpu()] = shap_vals[index_matches.cpu()]
                 matched_ec_x[row_ind.cpu()] = ec_x[index_matches.cpu()]

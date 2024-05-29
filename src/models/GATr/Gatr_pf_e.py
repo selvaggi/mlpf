@@ -32,6 +32,7 @@ from src.models.energy_correction_NN import (
     ECNetWrapper,
     ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
+    PickPAtDCA
 )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
@@ -130,15 +131,10 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = (
-                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
-            )
-            ckpt_neutral = (
-                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
-            )
-            # ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
-            # ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
-
+            ckpt_charged = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
+            ckpt_neutral = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
+            #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
+            #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
             if self.args.regress_pos:
                 print(
@@ -178,7 +174,47 @@ class ExampleWrapper(L.LightningModule):
                     gnn=True,
                     pos_regression=self.args.regress_pos,
                 )
-            else:
+            elif self.args.ec_model == "dnn-neutrals":
+                assert self.args.add_track_chis
+                num_global_features = 14
+                self.ec_model_wrapper_charged = (
+                    PickPAtDCA(    # Pick the p at vertex for charged
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=18,
+                        ckpt_file=ckpt_charged,
+                        gnn=False,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
+                self.ec_model_wrapper_neutral = (
+                    ECNetWrapperGNNGlobalFeaturesSeparate(
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=18,
+                        ckpt_file=ckpt_neutral,
+                        gnn=False,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
+            elif self.args.ec_model == "gatr-neutrals":
+                assert self.args.add_track_chis
+                num_global_features = 14
+                self.ec_model_wrapper_charged = (
+                    PickPAtDCA()  # Pick the p at vertex for charged
+                )
+                self.ec_model_wrapper_neutral = (
+                    ECNetWrapperGNNGlobalFeaturesSeparate(
+                        device=dev,
+                        in_features_global=num_global_features,
+                        in_features_gnn=20,
+                        ckpt_file=ckpt_neutral,
+                        gnn=True,
+                        gatr=True,
+                        pos_regression=self.args.regress_pos,
+                    )
+                )
+            else: # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
                     # self.ec_model_wrapper_charged = NetWrapper(
@@ -257,7 +293,7 @@ class ExampleWrapper(L.LightningModule):
         )  # (batch_size*num_points, 1, 16)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = g.ndata["h"][:, -2:]  # this corresponds to e,p
+        scalars = g.ndata["h"][:, -2:] # this corresponds to e,p
         # Pass data through GATr
         forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(
@@ -342,22 +378,22 @@ class ExampleWrapper(L.LightningModule):
                 pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
                     graphs_new.ndata["h"].device
                 )
-            # node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)
+            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[:, 0:3]
             # energy-weighted node_features_avg
-            # node_features_avg = scatter_mean(
+            #node_features_avg = scatter_sum(
             #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
             #    batch_idx,
             #    dim=0,
             # )
-            # node_features_avg = node_features_avg[:, 0:3]
-            # weights = graphs_new.ndata["h"][:, -2].view(-1, 1) # Energies as the weights
-            # normalizations = scatter_add(weights, batch_idx, dim=0)
+            #node_features_avg = node_features_avg[:, 0:3]
+            weights = graphs_new.ndata["h"][:, 7].view(-1, 1) # Energies as the weights
+            normalizations = scatter_add(weights, batch_idx, dim=0)
             # normalizations1 = torch.ones_like(weights)
-            # normalizations1 = normalizations[batch_idx]
-            # weights = weights / normalizations1
-            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
-                :, 0:3
-            ]
+            normalizations1 = normalizations[batch_idx]
+            weights = weights / normalizations1
+            #node_features_avg = scatter_add(
+            #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
+            #)[: , 0:3]
             # node_features_avg = node_features_avg / normalizations
             eta, phi = calculate_eta(
                 node_features_avg[:, 0],
@@ -406,16 +442,19 @@ class ExampleWrapper(L.LightningModule):
                 if not self.args.regress_pos:
                     charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
                 else:
-                    charged_energies = [
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                    ]
-            neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
-            neutral_energies = self.ec_model_wrapper_neutral.predict(
-                features_neutral_no_nan,
-                neutral_graphs,
-                explain=self.args.explain_ec,
-            )
+                    charged_energies = [torch.tensor([]).to(graphs_new.ndata["h"].device), torch.tensor([]).to(graphs_new.ndata["h"].device)]
+            if len(neutral_idx) > 0:
+                neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+                neutral_energies = self.ec_model_wrapper_neutral.predict(
+                    features_neutral_no_nan,
+                    neutral_graphs,
+                    explain=self.args.explain_ec,
+                )
+            else:
+                if not self.args.regress_pos:
+                    neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+                else:
+                    neutral_energies = [torch.tensor([]).to(graphs_new.ndata["h"].device), torch.tensor([]).to(graphs_new.ndata["h"].device)]
             if self.args.regress_pos:
                 charged_energies, charged_positions = charged_energies
                 neutral_energies, neutral_positions = neutral_energies
@@ -466,11 +505,13 @@ class ExampleWrapper(L.LightningModule):
             if self.args.regress_pos:
                 if len(charged_idx):
                     pred_pos[charged_idx.flatten()] = charged_positions
-                pred_pos[neutral_idx.flatten()] = neutral_positions
-                pred_energy_corr = {
-                    "pred_energy_corr": pred_energy_corr,
-                    "pred_pos": pred_pos,
-                }
+                if len(neutral_idx):
+                    pred_pos[neutral_idx.flatten()] = neutral_positions
+                pred_energy_corr = {"pred_energy_corr": pred_energy_corr,
+                                    "pred_pos": pred_pos,
+                                    "neutrals_idx": neutral_idx.flatten(),
+                                    "charged_idx": charged_idx.flatten(),
+                                    }
             # print("Pred energy corr:", pred_energy_corr)
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
@@ -555,7 +596,7 @@ class ExampleWrapper(L.LightningModule):
             part_coords_matched,
         ) = result
         if self.args.regress_pos:
-            e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
+            e_cor, pred_pos, neutral_idx = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["neutrals_idx"]
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -579,6 +620,15 @@ class ExampleWrapper(L.LightningModule):
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
             loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
+            if self.args.regress_pos:
+                true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
+                loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+                loss_EC_neutrals = torch.nn.L1Loss()(e_cor[neutral_idx].detach().cpu(), e_true[neutral_idx].cpu())
+                loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx].detach().cpu(), true_pos[neutral_idx].cpu())
+                wandb.log({"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals})
+                wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
+                print("Loss pxyz neutrals", loss_pos_neutrals)
+                loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
@@ -734,6 +784,7 @@ class ExampleWrapper(L.LightningModule):
                 ec_x=ec_x,
                 total_number_events=self.total_number_events,
                 pred_pos=pred_pos,
+                use_gt_clusters=self.args.use_gt_clusters,
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)

@@ -43,11 +43,12 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
     #for i in range(len(e_hits_f)):
     #   per_graph_e_hits_hcal_dispersion[batch_idx_f[i]] += (e_hits_f[i] - per_graph_e_hits_hcal_mean[batch_idx_f[i]]) ** 2
     #per_graph_e_hits_hcal_dispersion = per_graph_e_hits_hcal_dispersion / batch_num_nodes
-    # similar as above but with scatter_std  -- !!! TODO: Retrain the base EC models using this definition !!!!!
+    # similar as above but with scatter_std -- !!!!! TODO: Retrain the base EC models using this definition !!!!!
     per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
-    track_p = scatter_sum(graphs_new.ndata["h"][:, 7], batch_idx)
+    # track_nodes =
+    track_p = scatter_sum(graphs_new.ndata["h"][:, 8], batch_idx)
     chis_tracks = scatter_sum(graphs_new.ndata["chi_squared_tracks"], batch_idx)
-    num_tracks = scatter_sum((graphs_new.ndata["h"][:, 7] > 0).type(torch.int), batch_idx)
+    num_tracks = scatter_sum((graphs_new.ndata["h"][:, 8] > 0).type(torch.int), batch_idx)
     track_p = track_p / num_tracks
     chis_tracks = chis_tracks / num_tracks
     num_hits = graphs_new.batch_num_nodes()
@@ -60,7 +61,7 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
                             num_hits, track_p,
                             per_graph_e_hits_ecal_dispersion,
                             per_graph_e_hits_hcal_dispersion,
-                            sum_e, num_tracks, chis_tracks]).T
+                            sum_e, num_tracks, torch.clamp(chis_tracks, -5, 5)]).T
         )
     else:
         return torch.nan_to_num(
