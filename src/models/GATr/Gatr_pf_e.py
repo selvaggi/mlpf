@@ -137,6 +137,10 @@ class ExampleWrapper(L.LightningModule):
             #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
             if self.args.regress_pos:
+                print(
+                    "Regressing position as well, changing the hardcoded models to sth else"
+                )
+                ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
                 print("Regressing position as well, changing the hardcoded models to sth else")
                 #ckpt_neutral = "/eos/user/g/gkrzmanc/2024_energy_corr/neutrals_2705_bs128_fig_angles/intermediate_plots/model_step_58000_pid_22.pkl" # Trained with correct angles etc.
                 ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl" #TEMPORARY
@@ -328,7 +332,7 @@ class ExampleWrapper(L.LightningModule):
                 sum_e,
                 true_pid,
                 e_true_corr_daughters,
-                true_coords
+                true_coords,
             ) = obtain_clustering_for_matched_showers(
                 g,
                 x,
@@ -418,8 +422,10 @@ class ExampleWrapper(L.LightningModule):
                 == graphs_new.batch_num_nodes().shape[0]
             )
             features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-            features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
-            #if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+            features_neutral_no_nan[
+                features_neutral_no_nan != features_neutral_no_nan
+            ] = 0
+            # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
             unbatched = dgl.unbatch(graphs_new)
             if len(charged_idx) > 0:
                 charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
@@ -506,7 +512,15 @@ class ExampleWrapper(L.LightningModule):
             # print("Charged energy corr:", pred_energy_corr[charged_idx])
             # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
             if return_train:
-                return (x, pred_energy_corr, true_new, sum_e, true_pid, true_new, true_coords)
+                return (
+                    x,
+                    pred_energy_corr,
+                    true_new,
+                    sum_e,
+                    true_pid,
+                    true_new,
+                    true_coords,
+                )
             else:
                 if self.args.explain_ec:
                     return (
@@ -532,7 +546,7 @@ class ExampleWrapper(L.LightningModule):
                     graphs_high_level_features,
                     true_pid,
                     e_true_corr_daughters,
-                    true_coords
+                    true_coords,
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -575,7 +589,7 @@ class ExampleWrapper(L.LightningModule):
             graph_level_features,
             pid_true_matched,
             e_true_corr_daughters,
-            part_coords_matched
+            part_coords_matched,
         ) = result
         if self.args.regress_pos:
             e_cor, pred_pos, neutral_idx = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["neutrals_idx"]
@@ -691,10 +705,12 @@ class ExampleWrapper(L.LightningModule):
                     graph_level_features,
                     pid_true_matched,
                     e_true_corr_daughters,
-                    coords_true
+                    coords_true,
                 ) = result
             if self.args.regress_pos:
                 e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
+            else:
+                pred_pos = None
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
@@ -827,7 +843,7 @@ class ExampleWrapper(L.LightningModule):
                 e_corr = self.validation_step_outputs[0][1]
                 batch_g = self.validation_step_outputs[0][2]
                 y = self.validation_step_outputs[0][3]
-                shap_vals=None
+                shap_vals = None
                 ec_x = None
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
@@ -854,7 +870,6 @@ class ExampleWrapper(L.LightningModule):
                     tracks=self.args.tracks,
                     shap_vals=shap_vals,
                     ec_x=ec_x,
-
                 )
                 del model_output1
                 del batch_g

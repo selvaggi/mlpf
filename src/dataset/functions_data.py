@@ -197,7 +197,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
     else:
         particle_coord = spherical_to_cartesian(
             features_particles[:, 1],
-            features_particles[:, 0], # theta and phi are mixed!!!
+            features_particles[:, 0],  # theta and phi are mixed!!!
             features_particles[:, 2],
             normalized=True,
         )
@@ -216,7 +216,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             features_particles[:, 5].view(-1).unsqueeze(1),
             features_particles[:, 6].view(-1).unsqueeze(1),
             unique_list_particles=unique_list_particles,
-            vertex=vertex_coord
+            vertex=vertex_coord,
         )
     else:
         y_data_graph = Particles_GT(
@@ -226,7 +226,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
             y_mass,
             y_pid,
             unique_list_particles=unique_list_particles,
-            vertex=vertex_coord
+            vertex=vertex_coord,
         )
     return y_data_graph
 
@@ -293,7 +293,13 @@ def get_hit_features(
         else:
             pandora_mom = None
             pandora_ref_point = None
-        if hit_chis:
+        if is_Ks:
+            pandora_cluster_energy = torch.tensor(
+                output["pf_features"][9, 0:number_hits]
+            )
+            pfo_energy = torch.tensor(output["pf_features"][10, 0:number_hits])
+            chi_squared_tracks = torch.tensor(output["pf_features"][11, 0:number_hits])
+        elif hit_chis:
             pandora_cluster_energy = torch.tensor(
                 output["pf_features"][-3, 0:number_hits]
             )
@@ -443,7 +449,7 @@ class Particles_GT:
         batch_number=None,
         unique_list_particles=None,
         energy_corrected=None,
-        vertex=None
+        vertex=None,
     ):
         self.coord = coordinates
         self.E = energy
@@ -471,8 +477,12 @@ class Particles_GT:
 
     def mask(self, mask):
         for k in self.__dict__:
-            if getattr(self, k) is not None and getattr(self, k)[0] is not None:
-                setattr(self, k, getattr(self, k)[mask])
+            if getattr(self, k) is not None:
+                if type(getattr(self, k)) == list:
+                    if getattr(self, k)[0] is not None:
+                        setattr(self, k, getattr(self, k)[mask])
+                else:
+                    setattr(self, k, getattr(self, k)[mask])
 
     def copy(self):
         obj = type(self).__new__(self.__class__)
@@ -540,18 +550,8 @@ def concatenate_Particles_GT(list_of_Particles_GT):
         list_dec_track,
         batch_number,
         energy_corrected=list_E_corr,
-        vertex=list_vertex
+        vertex=list_vertex,
     )
-
-
-# def add_batch_number(list_graphs):
-#     list_y = []
-#     for i, el in enumerate(list_graphs):
-#         y = el[1]
-#         batch_id = torch.ones(y.shape[0], 1) * i
-#         y = torch.cat((y, batch_id), dim=1)
-#         list_y.append(y)
-#     return list_y
 
 
 def add_batch_number(list_graphs):

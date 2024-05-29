@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib
 import os
+
 matplotlib.rc("font", size=35)
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -50,7 +51,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         variance_om_baseline,
         e_over_e_distr_pandora,
         mean_errors_p,
-        variance_errors_p
+        variance_errors_p,
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks)
     (
         mean,
@@ -63,7 +64,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         variance_om_baseline,
         e_over_e_distr_model,
         mean_errors,
-        variance_errors
+        variance_errors,
     ) = calculate_response(df_id, False, False, tracks=tracks)
     print(variance_om_p)
     print(variance_om)
@@ -92,6 +93,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
     dic["distributions_pandora"] = e_over_e_distr_pandora
     dic["distributions_model"] = e_over_e_distr_model
     return dic
+
 
 def plot_X(
     title,
@@ -316,8 +318,12 @@ def plot_per_energy_resolution2(
         for event_number in event_numbers:
             filename = os.path.join(PATH_store, f"event_{event_number}_pandora.html")
             # plot_event(matched_, pandora=False, output_dir=filename)
-            plot_event(matched_pandora[matched_pandora.number_batch == event_number], pandora=True, output_dir=filename)
-        list_plots = [""] #  "", "_reco"
+            # plot_event(
+            #     matched_pandora[matched_pandora.number_batch == event_number],
+            #     pandora=True,
+            #     output_dir=filename,
+            # )
+        list_plots = [""]  #  "", "_reco"
         photons_dic = get_response_for_id_i(
             [22], matched_pandora, matched_, tracks=tracks
         )
@@ -345,7 +351,7 @@ def plot_per_energy_resolution2(
             "ML",
             "",
             tracks="",
-            plot_baseline=True
+            plot_baseline=True,
         )
         plot_per_particle = True
         if plot_per_particle:
@@ -368,7 +374,7 @@ def plot_per_energy_resolution2(
                     el,
                     tracks=tracks_label,
                 )
-                '''plot_one_label(
+                """plot_one_label(
                     "Electromagnetic Response",
                     electrons_dic,
                     "mean",
@@ -385,8 +391,8 @@ def plot_per_energy_resolution2(
                     "Electrons",
                     el,
                     tracks=tracks_label,
-                )'''
-                '''plot_one_label(
+                )"""
+                """plot_one_label(
                     "Hadronic Resolution",
                     hadrons_dic,
                     "variance_om",
@@ -403,7 +409,7 @@ def plot_per_energy_resolution2(
                     "KL",
                     el,
                     tracks=tracks_label,
-                )'''
+                )"""
                 plot_one_label(
                     "Hadronic Resolution",
                     hadrons_dic2,
@@ -422,7 +428,7 @@ def plot_per_energy_resolution2(
                     el,
                     tracks=tracks_label,
                 )
-                '''# plot the neutrons and protons
+                """# plot the neutrons and protons
                 plot_one_label(
                     "Hadronic Resolution",
                     neutrons,
@@ -458,23 +464,20 @@ def plot_per_energy_resolution2(
                     "Protons",
                     el,
                     tracks=tracks_label,
-                )'''
+                )"""
+
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False
 ):
     # matched_all: label -> matched df
-    figs, axs = {}, {} # resolution
-    figs_r, axs_r = {}, {} # response
-    colors = {
-        "DNN": "green",
-        "GNN+DNN": "purple",
-        "DNN w/o FT": "blue"
-    }
+    figs, axs = {}, {}  # resolution
+    figs_r, axs_r = {}, {}  # response
+    colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
     colors = {
         "DNN ~3 epochs": "green",
         "GNN+DNN ~3 epochs": "purple",
-        "GNN+DNN ~13 epochs": "blue"
+        "GNN+DNN ~13 epochs": "blue",
     }
     plot_pandora, plot_baseline = True, True
     for pid in [22, 11, 130, 211, 2112, 2212]:
@@ -493,7 +496,9 @@ def plot_per_energy_resolution2_multiple(
         plot_response = True
         if plot_response:
             list_plots = [""]  # "","_reco"
-            event_res_dic[key] = get_response_for_event_energy(matched_pandora, matched_)
+            event_res_dic[key] = get_response_for_event_energy(
+                matched_pandora, matched_
+            )
             photons_dic = get_response_for_id_i(
                 [22], matched_pandora, matched_, tracks=tracks
             )
@@ -512,8 +517,16 @@ def plot_per_energy_resolution2_multiple(
             protons = get_response_for_id_i(
                 [2212], matched_pandora, matched_, tracks=tracks
             )
-            plot_histograms("Event Energy Resolution", event_res_dic[key], fig_event_res, ax_event_res, plot_pandora, prefix=key + " ", color=colors[key])
-            '''plot_one_label(
+            plot_histograms(
+                "Event Energy Resolution",
+                event_res_dic[key],
+                fig_event_res,
+                ax_event_res,
+                plot_pandora,
+                prefix=key + " ",
+                color=colors[key],
+            )
+            """plot_one_label(
                 "Event Energy Resolution",
                 event_res_dic,
                 "variance_om",
@@ -523,7 +536,7 @@ def plot_per_energy_resolution2_multiple(
                 tracks="",
                 plot_baseline=True,
                 fig=fig_event_energy, ax=ax_event_energy, plot_pandora=False, plot_baseline=False
-            )'''
+            )"""
 
             for el in list_plots:
                 plot_one_label(
@@ -534,8 +547,12 @@ def plot_per_energy_resolution2_multiple(
                     "Photons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[22], ax=axs[22], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[22],
+                    ax=axs[22],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Electromagnetic Response",
@@ -545,8 +562,12 @@ def plot_per_energy_resolution2_multiple(
                     "Photons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[22], ax=axs_r[22], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[22],
+                    ax=axs_r[22],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Electromagnetic Response",
@@ -556,8 +577,12 @@ def plot_per_energy_resolution2_multiple(
                     "Electrons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[11], ax=axs_r[11], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[11],
+                    ax=axs_r[11],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Electromagnetic Resolution",
@@ -567,8 +592,12 @@ def plot_per_energy_resolution2_multiple(
                     "Electrons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[11], ax=axs[11], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[11],
+                    ax=axs[11],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Resolution",
@@ -578,8 +607,12 @@ def plot_per_energy_resolution2_multiple(
                     "KL " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[130], ax=axs[130], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[130],
+                    ax=axs[130],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -589,8 +622,12 @@ def plot_per_energy_resolution2_multiple(
                     "KL " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[130], ax=axs_r[130], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[130],
+                    ax=axs_r[130],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Resolution",
@@ -600,8 +637,12 @@ def plot_per_energy_resolution2_multiple(
                     "Pions " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[211], ax=axs[211], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[211],
+                    ax=axs[211],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -611,8 +652,12 @@ def plot_per_energy_resolution2_multiple(
                     "Pions " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[211], ax=axs_r[211], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[211],
+                    ax=axs_r[211],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 # plot the neutrons and protons
                 plot_one_label(
@@ -623,8 +668,12 @@ def plot_per_energy_resolution2_multiple(
                     "Neutrons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[2112], ax=axs[2112], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[2112],
+                    ax=axs[2112],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -634,8 +683,12 @@ def plot_per_energy_resolution2_multiple(
                     "Neutrons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[2112], ax=axs_r[2112], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[2112],
+                    ax=axs_r[2112],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Resolution",
@@ -645,8 +698,12 @@ def plot_per_energy_resolution2_multiple(
                     "Protons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs[2212], ax=axs[2212], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs[2212],
+                    ax=axs[2212],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -656,8 +713,12 @@ def plot_per_energy_resolution2_multiple(
                     "Neutrons " + key,
                     el,
                     tracks=tracks_label,
-                    fig=figs_r[2212], ax=axs_r[2212], save=False,
-                    plot_pandora=plot_pandora, plot_baseline=plot_baseline, color=colors[key]
+                    fig=figs_r[2212],
+                    ax=axs_r[2212],
+                    save=False,
+                    plot_pandora=plot_pandora,
+                    plot_baseline=plot_baseline,
+                    color=colors[key],
                 )
                 plot_pandora = False
                 plot_baseline = False
@@ -667,10 +728,20 @@ def plot_per_energy_resolution2_multiple(
         for a in axs_r[key]:
             a.grid()
         figs[key].tight_layout()
-        figs[key].savefig(os.path.join(PATH_store, f"comparison_resolution_{key}.pdf"), bbox_inches="tight")
+        figs[key].savefig(
+            os.path.join(PATH_store, f"comparison_resolution_{key}.pdf"),
+            bbox_inches="tight",
+        )
         figs_r[key].tight_layout()
-        figs_r[key].savefig(os.path.join(PATH_store, f"comparison_response_{key}.pdf"), bbox_inches="tight")
-    fig_event_res.savefig(os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight")
+        figs_r[key].savefig(
+            os.path.join(PATH_store, f"comparison_response_{key}.pdf"),
+            bbox_inches="tight",
+        )
+    fig_event_res.savefig(
+        os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight"
+    )
+
+
 def plot_per_energy_resolution(
     sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
 ):
@@ -805,6 +876,7 @@ def create_eff_dic_pandora(matched_pandora, id):
     photons_dic["energy_eff_p"] = energy_eff_p
     return photons_dic
 
+
 def create_eff_dic(photons_dic, matched_, id, var_i):
     pids = np.abs(matched_["pid"].values)
     mask_id = pids == id
@@ -857,8 +929,10 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
 
 def calculate_phi(x, y, z=None):
     return torch.arctan2(y, x)
+
+
 def calculate_eta(x, y, z):
-    theta = torch.arctan2(torch.sqrt(x ** 2 + y ** 2), z)
+    theta = torch.arctan2(torch.sqrt(x**2 + y**2), z)
     return -torch.log(torch.tan(theta / 2))
 
 
@@ -870,6 +944,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px
+
     # arrows from 0,0,0 to df.true_pos and the hover text should be the true energy (df.true_showers_E)
     fig = go.Figure()
     #scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
@@ -877,7 +952,9 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
     # color_list = px.colors.qualitative.Plotly # this is only 10, not enough
     color_list = px.colors.qualitative.Light24
     if graph is not None:
-        sum_hits = scatter_sum(graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long())
+        sum_hits = scatter_sum(
+            graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long()
+        )
         hit_pos = graph.ndata["pos_hits_xyz"].numpy()
         scale = np.mean(np.linalg.norm(hit_pos, axis=1))
         truepos = np.array(df.true_pos.values.tolist()) * scale
@@ -951,11 +1028,23 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
     col = np.arange(1, len(truepos) + 1)
     true_E = df.true_showers_E.values
     true_P = np.array(df.true_pos.values.tolist()) * true_E.reshape(-1, 1)
-    ht = [f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}" for i in range(len(true_E))]
+    ht = [
+        f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}"
+        for i in range(len(true_E))
+    ]
     # add lines from 0,0,0 to these points
-    fig.add_trace(go.Scatter3d(x=vertices[:, 0] + truepos[:, 0], y=vertices[:, 1] + truepos[:, 1], z=vertices[:, 2] + truepos[:, 2], mode='markers',
-                               marker=dict(size=4, color=[color_list[c] for c in col]), name='ground truth',
-                               hovertext=ht, hoverinfo="text"))
+    fig.add_trace(
+        go.Scatter3d(
+            x=vertices[:, 0] + truepos[:, 0],
+            y=vertices[:, 1] + truepos[:, 1],
+            z=vertices[:, 2] + truepos[:, 2],
+            mode="markers",
+            marker=dict(size=4, color=[color_list[c] for c in col]),
+            name="ground truth",
+            hovertext=ht,
+            hoverinfo="text",
+        )
+    )
     for i in range(len(truepos)):
         v = vertices[i]
         fig.add_trace(go.Scatter3d(
@@ -981,32 +1070,38 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
                                    hovertext=pandoramomentum.flatten()[1:], hoverinfo="text"))
         # also add lines here
         for i in range(len(pandorapos)):
-            v = pandora_ref_pt[i]
+            v = [0,0,0] # temporarily. TODO: find the pandora 'vertex'
             fig.add_trace(go.Scatter3d(
                 x=[v[0], v[0]+pandorapos[i, 0]], y=[v[1], v[1]+pandorapos[i, 1]], z=[v[2], v[2]+pandorapos[i, 2]],
                 mode='lines', line=dict(color='green', width=1))
             )
-            # plot the same thing without displacement for pandora_ref_pt, with dashed lines
-            # v = [0,0,0]
-            fig.add_trace(go.Scatter3d(
-                x=[v[0], v[0]-pandorapos[i, 0]], y=[v[1], v[1]-pandorapos[i, 1]], z=[v[2], v[2]-pandorapos[i, 2]],
-                mode='lines', line=dict(color='green', width=1, dash='dash'))
-            )
-
     else:
         predpos = np.array(df.pred_pos_matched.values.tolist()) * scale
         fig.add_trace(
-            go.Scatter3d(x=predpos[:, 0], y=predpos[:, 1], z=predpos[:, 2],
-                         mode='markers', marker=dict(size=4, color='red'), name='ML', hovertext=df.calibrated_E.values))
+            go.Scatter3d(
+                x=predpos[:, 0],
+                y=predpos[:, 1],
+                z=predpos[:, 2],
+                mode="markers",
+                marker=dict(size=4, color="red"),
+                name="ML",
+                hovertext=df.calibrated_E.values,
+            )
+        )
         # add lines
         for i in range(len(predpos)):
-            fig.add_trace(go.Scatter3d
-                            (x=[0, predpos[i, 0]], y=[0, predpos[i, 1]], z=[0, predpos[i, 2]],
-                             mode='lines', line=dict(color='red', width=1))
-                            )
-    #fig.show()
-    assert output_dir != ""
-    plotly.offline.plot(fig, filename=output_dir + "event.html")
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[0, predpos[i, 0]],
+                    y=[0, predpos[i, 1]],
+                    z=[0, predpos[i, 2]],
+                    mode="lines",
+                    line=dict(color="red", width=1),
+                )
+            )
+        # fig.show()
+        assert output_dir != ""
+        plotly.offline.plot(fig, filename=output_dir + "event.html")
 
 def calc_unit_circle_dist(df, pandora=False):
     # quick histogram of distances between unit vectors of directions - to compare with the light training model
@@ -1038,9 +1133,9 @@ def calc_unit_circle_dist(df, pandora=False):
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     bins = [0, 700]
-    #if pandora and "pandora_calibrated_pos" in df.columns:
+    # if pandora and "pandora_calibrated_pos" in df.columns:
     #    full_vector = True
-    #else:
+    # else:
     #    full_vector = False
     if full_vector and pandora:
         assert "pandora_calibrated_pos" in df.columns
@@ -1064,16 +1159,27 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             pred_e = df.pandora_calibrated_E.values
             pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
             if full_vector:
-                pred_vect = np.array(df.pandora_calibrated_pos.values.tolist()) * pred_e1.numpy()
-                true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                pred_vect = (
+                    np.array(df.pandora_calibrated_pos.values.tolist())
+                    * pred_e1.numpy()
+                )
+                true_vect = (
+                    np.array(df.true_pos.values.tolist())
+                    * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                )
                 pred_vect = torch.tensor(pred_vect)
                 true_vect = torch.tensor(true_vect)
         else:
             pred_e = df.calibrated_E.values
             pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
             if full_vector:
-                pred_vect = np.array(df.pred_pos_matched.values.tolist()) * pred_e1.numpy()
-                true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                pred_vect = (
+                    np.array(df.pred_pos_matched.values.tolist()) * pred_e1.numpy()
+                )
+                true_vect = (
+                    np.array(df.true_pos.values.tolist())
+                    * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                )
                 pred_vect = torch.tensor(pred_vect)
                 true_vect = torch.tensor(true_vect)
         true_rec = df.reco_showers_E
@@ -1084,11 +1190,11 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         true_rec = torch.tensor(true_rec.values)
         if full_vector:
             # vector scatter_sum of pred_vect and true_vect
-            #true_e = scatter_sum(true_e, batch_idx)
-            #pred_e = scatter_sum(pred_e, batch_idx)
-            #true_e_1 = scatter_sum(true_vect[:, 0], batch_idx)
-            #true_e_2 = scatter_sum(true_vect[:, 1], batch_idx)
-            #true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doens't work with more axes?
+            # true_e = scatter_sum(true_e, batch_idx)
+            # pred_e = scatter_sum(pred_e, batch_idx)
+            # true_e_1 = scatter_sum(true_vect[:, 0], batch_idx)
+            # true_e_2 = scatter_sum(true_vect[:, 1], batch_idx)
+            # true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doens't work with more axes?
             true_e = scatter_sum(true_vect, batch_idx, dim=0)
             pred_e = scatter_sum(pred_vect, batch_idx, dim=0)
             true_e = torch.norm(true_e, dim=1)
@@ -1109,23 +1215,46 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             e_over_reco = true_rec / true_e
             distributions.append(e_over_true)
             distr_baseline.append(e_over_reco)
-            mean_predtotrue, var_predtotrue, err_mean_predtotrue, err_var_predtotrue = get_sigma_gaussian(
-                e_over_true, bins_per_binned_E
-            )
-            mean_reco_true, var_reco_true, err_mean_reco_true, err_var_reco_true = get_sigma_gaussian(
-                e_over_reco, bins_per_binned_E
-            )
+            (
+                mean_predtotrue,
+                var_predtotrue,
+                err_mean_predtotrue,
+                err_var_predtotrue,
+            ) = get_sigma_gaussian(e_over_true, bins_per_binned_E)
+            (
+                mean_reco_true,
+                var_reco_true,
+                err_mean_reco_true,
+                err_var_reco_true,
+            ) = get_sigma_gaussian(e_over_reco, bins_per_binned_E)
             mean.append(mean_predtotrue)
             variance.append(np.abs(var_predtotrue))
             mean_baseline.append(mean_reco_true)
             variance_baseline.append(np.abs(var_reco_true))
     return (
-       mean, variance, distributions, binsx, mean_baseline, variance_baseline, distr_baseline
+        mean,
+        variance,
+        distributions,
+        binsx,
+        mean_baseline,
+        variance_baseline,
+        distr_baseline,
     )
 
+
 def get_response_for_event_energy(matched_pandora, matched_):
-    mean_p, variance_om_p, distr_p, x_p, _ , _ , _ = calculate_event_energy_resolution(matched_pandora, True, True)
-    mean, variance_om, distr, x, mean_baseline, variance_om_baseline, _ = calculate_event_energy_resolution(matched_, False, True)
+    mean_p, variance_om_p, distr_p, x_p, _, _, _ = calculate_event_energy_resolution(
+        matched_pandora, True, False
+    )
+    (
+        mean,
+        variance_om,
+        distr,
+        x,
+        mean_baseline,
+        variance_om_baseline,
+        _,
+    ) = calculate_event_energy_resolution(matched_, False, False)
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -1139,11 +1268,12 @@ def get_response_for_event_energy(matched_pandora, matched_):
     dic["distributions_model"] = distr
     return dic
 
+
 def calculate_response(matched, pandora, log_scale=False, tracks=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        #bins = np.arange(0, 51, 6)
+        # bins = np.arange(0, 51, 6)
         bins = [0, 5, 15, 35, 50]
     mean = []
     variance_om = []
@@ -1155,7 +1285,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
     variance_om_errors = []
     energy_resolutions = []
     energy_resolutions_reco = []
-    distributions = [] # distributions of E/Etrue for plotting later
+    distributions = []  # distributions of E/Etrue for plotting later
     # tic = time.time()
     # vector = range(len(bins) - 1)
     # output_results = parallel_process(vector, bins, matched, pandora, bins_per_binned_E)
@@ -1195,16 +1325,25 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
             #     e_over_true, bins_per_binned_E
             # )
             distributions.append(e_over_true)
-            mean_predtotrue, var_predtotrue, err_mean_predtotrue, err_var_predtotrue = get_sigma_gaussian(
-                e_over_true, bins_per_binned_E
-            )
+            (
+                mean_predtotrue,
+                var_predtotrue,
+                err_mean_predtotrue,
+                err_var_predtotrue,
+            ) = get_sigma_gaussian(e_over_true, bins_per_binned_E)
             print("Pandora", pandora, "err_var", err_var_predtotrue)
-            mean_reco_true, var_reco_true, err_mean_reco_true, err_var_reco_true = get_sigma_gaussian(
-                e_over_reco, bins_per_binned_E
-            )
-            mean_reco_ML, var_reco_ML, err_mean_reco_ML, err_mean_var_reco_ML = get_sigma_gaussian(
-                e_over_reco_ML, bins_per_binned_E
-            )
+            (
+                mean_reco_true,
+                var_reco_true,
+                err_mean_reco_true,
+                err_var_reco_true,
+            ) = get_sigma_gaussian(e_over_reco, bins_per_binned_E)
+            (
+                mean_reco_ML,
+                var_reco_ML,
+                err_mean_reco_ML,
+                err_mean_var_reco_ML,
+            ) = get_sigma_gaussian(e_over_reco_ML, bins_per_binned_E)
             # raise err if mean_reco_ML is nan
             if np.isnan(mean_reco_ML):
                 raise ValueError("mean_reco_ML is nan")
@@ -1280,7 +1419,21 @@ def parallel_process(
     return results1
 
 
-def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks="", fig=None, ax=None, save=True, plot_pandora=True, plot_baseline=True, color=None):
+def plot_one_label(
+    title,
+    photons_dic,
+    y_axis,
+    PATH_store,
+    label1,
+    reco,
+    tracks="",
+    fig=None,
+    ax=None,
+    save=True,
+    plot_pandora=True,
+    plot_baseline=True,
+    color=None,
+):
     if reco == "":
         label_add = " raw"
         label_add_pandora = " corrected"
@@ -1290,9 +1443,16 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
     colors_list = ["#FF0000", "#FF0000", "#0000FF"]
     if color is not None:
         colors_list[1] = color
-    fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions" + reco]), 1, figsize=(14, 18), sharex=True)
+    fig_distr, ax_distr = plt.subplots(
+        len(photons_dic["energy_resolutions" + reco]), 1, figsize=(14, 18), sharex=True
+    )
     if title == "Event Energy Resolution":
-        fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions" + reco]), 1, figsize=(14, 10), sharex=True)
+        fig_distr, ax_distr = plt.subplots(
+            len(photons_dic["energy_resolutions" + reco]),
+            1,
+            figsize=(14, 10),
+            sharex=True,
+        )
     if not type(ax_distr) == list and not type(ax_distr) == np.ndarray:
         ax_distr = [ax_distr]
     for i in range(len(photons_dic["energy_resolutions" + reco])):
@@ -1309,27 +1469,61 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         # remove everything higher than 2.0 and note the fraction of such events
         mask = distr_model < 2.0
         distr_model = distr_model[mask]
-        frac_model_dropped = int((1 - len(distr_model) / len(photons_dic["distributions_model"][i]))*1000)
+        frac_model_dropped = int(
+            (1 - len(distr_model) / len(photons_dic["distributions_model"][i])) * 1000
+        )
         mask = distr_pandora < 2.0
         distr_pandora = distr_pandora[mask]
-        frac_pandora_dropped = int((1 - len(distr_pandora) / len(photons_dic["distributions_pandora"][i]))*1000)
+        frac_pandora_dropped = int(
+            (1 - len(distr_pandora) / len(photons_dic["distributions_pandora"][i]))
+            * 1000
+        )
         mu = photons_dic["mean"][i]
         sigma = (photons_dic["variance_om"][i]) * mu
         mu_pandora = photons_dic["mean_p"][i]
         sigma_pandora = (photons_dic["variance_om_p"][i]) * mu
-        ax_distr[i].hist(distr_model, bins=np.arange(0, 2, 1e-2), color="blue", label="ML μ={} σ={}".format(round(mu, 2), round(sigma, 2)), alpha=0.5, histtype="step")
-        ax_distr[i].hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora μ={} σ={}".format(round(mu_pandora, 2), round(sigma_pandora, 2)), alpha=0.5, histtype="step")
+        ax_distr[i].hist(
+            distr_model,
+            bins=np.arange(0, 2, 1e-2),
+            color="blue",
+            label="ML μ={} σ={}".format(round(mu, 2), round(sigma, 2)),
+            alpha=0.5,
+            histtype="step",
+        )
+        ax_distr[i].hist(
+            distr_pandora,
+            bins=np.arange(0, 2, 1e-2),
+            color="red",
+            label="Pandora μ={} σ={}".format(
+                round(mu_pandora, 2), round(sigma_pandora, 2)
+            ),
+            alpha=0.5,
+            histtype="step",
+        )
         # ALSO PLOT MU AND SIGMA #
         ax_distr[i].axvline(mu, color="blue", linestyle="-", ymin=0.95, ymax=1.0)
-        ax_distr[i].axvline(mu + sigma, color="blue", linestyle="--", ymin=0.95, ymax=1.0)
-        ax_distr[i].axvline(mu - sigma, color="blue", linestyle="--", ymin=0.95, ymax=1.0)
+        ax_distr[i].axvline(
+            mu + sigma, color="blue", linestyle="--", ymin=0.95, ymax=1.0
+        )
+        ax_distr[i].axvline(
+            mu - sigma, color="blue", linestyle="--", ymin=0.95, ymax=1.0
+        )
         ax_distr[i].axvline(mu_pandora, color="red", linestyle="-", ymin=0.95, ymax=1.0)
-        ax_distr[i].axvline(mu_pandora + sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0)
-        ax_distr[i].axvline(mu_pandora - sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0)
+        ax_distr[i].axvline(
+            mu_pandora + sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0
+        )
+        ax_distr[i].axvline(
+            mu_pandora - sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0
+        )
         # variance_om
         ax_distr[i].set_xlabel("E/Etrue")
         ax_distr[i].set_xlim([0, 2])
-        ax_distr[i].set_title(f"{title} {photons_dic['energy_resolutions' + reco][i]:.2f} GeV / max model: " + str(max_distr_model) + " / max pandora: " + str(max_distr_pandora))
+        ax_distr[i].set_title(
+            f"{title} {photons_dic['energy_resolutions' + reco][i]:.2f} GeV / max model: "
+            + str(max_distr_model)
+            + " / max pandora: "
+            + str(max_distr_pandora)
+        )
         ax_distr[i].legend()
         ax_distr[i].set_yscale("log")
     fig_distr.tight_layout()
@@ -1343,20 +1537,20 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
     ax[0].grid()
     ax[1].grid()
     ax[1].set_yscale("log")
-    '''f y_axis == "mean":
+    """f y_axis == "mean":
         # error is the mean error
         errors = photons_dic["mean_errors"]
         pandora_errors = photons_dic["mean_errors_p"]
     else:
         errors = photons_dic["variance_errors"]
-        pandora_errors = photons_dic["variance_errors_p"]'''
+        pandora_errors = photons_dic["variance_errors_p"]"""
     for a in ax:
         a.errorbar(
             photons_dic["energy_resolutions" + reco],
             photons_dic[y_axis + reco],
-            #yerr=errors,
+            # yerr=errors,
             color=colors_list[1],
-            #edgecolors=colors_list[1],
+            # edgecolors=colors_list[1],
             label=label1,
             marker="x",
             markersize=8,
@@ -1369,15 +1563,15 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
             a.errorbar(
                 photons_dic["energy_resolutions_p" + reco],
                 photons_dic[y_axis + "_p" + reco],
-                #yerr=pandora_errors,
+                # yerr=pandora_errors,
                 color=colors_list[2],
-                #edgecolors=colors_list[2],
+                # edgecolors=colors_list[2],
                 label="Pandora",
                 marker="x",
                 markersize=8,
                 capsize=5,
                 ecolor=colors_list[2],
-                linestyle="None"
+                linestyle="None",
             )
 
     if title == "Electromagnetic Resolution" or title == "Hadronic Resolution":
@@ -1406,16 +1600,16 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         )
         if reco == "":
             fits_l1 = [
-                #dic0_fit,
+                # dic0_fit,
                 dic1_fit,
-                #dic1_fit_pandora,
+                # dic1_fit_pandora,
             ]
             color_list_fits_l1 = [
-                #"black",
+                # "black",
                 colors_list[1],
-                #colors_list[2],
+                # colors_list[2],
             ]
-            line_type_fits_l1 = ["-"]#, "-", "-."]
+            line_type_fits_l1 = ["-"]  # , "-", "-."]
             if plot_baseline:
                 fits_l1.append(dic0_fit)
                 color_list_fits_l1.append("black")
@@ -1428,8 +1622,8 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
                 plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1, ax=a)
         else:
             raise NotImplementedError
-            #line_type_fits = ["-", "-."]
-            #for a in ax:
+            # line_type_fits = ["-", "-."]
+            # for a in ax:
             #    plot_fit(fits, line_type_fits, color_list_fits, ax=a)
         if reco == "_reco":
             plt.yscale("log")
@@ -1450,7 +1644,7 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         ax[0].set_ylabel(ylabel, fontsize=30)
         ax[1].set_ylabel(ylabel, fontsize=30)
     # loc="upper right",
-    #plt.tick_params(axis="both", which="major", labelsize=40)
+    # plt.tick_params(axis="both", which="major", labelsize=40)
     ax[0].tick_params(axis="both", which="major", labelsize=30)
     ax[1].tick_params(axis="both", which="major", labelsize=30)
     if title == "Electromagnetic Response" or title == "Hadronic Response":
@@ -1463,14 +1657,26 @@ def plot_one_label(title, photons_dic, y_axis, PATH_store, label1, reco, tracks=
         fig.savefig(
             PATH_store + title + reco + label + tracks + "_v1.pdf", bbox_inches="tight"
         )
-        fig_distr.savefig(PATH_store + title + reco + label + tracks + "_v1_distributions.pdf", bbox_inches="tight")
+        fig_distr.savefig(
+            PATH_store + title + reco + label + tracks + "_v1_distributions.pdf",
+            bbox_inches="tight",
+        )
 
 
-def plot_histograms(title, photons_dic, fig_distr, ax_distr, plot_pandora, prefix="ML ", color="blue", normalize=True):
-    assert title == "Event Energy Resolution" # fix
-    #if title == "Event Energy Resolution":
+def plot_histograms(
+    title,
+    photons_dic,
+    fig_distr,
+    ax_distr,
+    plot_pandora,
+    prefix="ML ",
+    color="blue",
+    normalize=True,
+):
+    assert title == "Event Energy Resolution"  # fix
+    # if title == "Event Energy Resolution":
     #    fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions"]), 1, figsize=(14, 10), sharex=True)
-    #if not type(ax_distr) == list and not type(ax_distr) == np.ndarray:
+    # if not type(ax_distr) == list and not type(ax_distr) == np.ndarray:
     #    ax_distr = [ax_distr]
     distr_model = photons_dic["distributions_model"][0]
     distr_pandora = photons_dic["distributions_pandora"][0]
@@ -1491,16 +1697,38 @@ def plot_histograms(title, photons_dic, fig_distr, ax_distr, plot_pandora, prefi
     sigma = (photons_dic["variance_om"][0]) * mu
     mu_pandora = photons_dic["mean_p"][0]
     sigma_pandora = (photons_dic["variance_om_p"][0]) * mu
-    ax_distr.hist(distr_model, bins=np.arange(0, 2, 1e-2), color=color, label=prefix + "μ={} σ={}".format(round(mu, 2), round(sigma, 2)), alpha=0.5, histtype="step", density=normalize)
+    ax_distr.hist(
+        distr_model,
+        bins=np.arange(0, 2, 1e-2),
+        color=color,
+        label=prefix + "μ={} σ={}".format(round(mu, 2), round(sigma, 2)),
+        alpha=0.5,
+        histtype="step",
+        density=normalize,
+    )
     if plot_pandora:
-        ax_distr.hist(distr_pandora, bins=np.arange(0, 2, 1e-2), color="red", label="Pandora μ={} σ={}".format(round(mu_pandora, 2), round(sigma_pandora, 2)), alpha=0.5, histtype="step", density=normalize)
+        ax_distr.hist(
+            distr_pandora,
+            bins=np.arange(0, 2, 1e-2),
+            color="red",
+            label="Pandora μ={} σ={}".format(
+                round(mu_pandora, 2), round(sigma_pandora, 2)
+            ),
+            alpha=0.5,
+            histtype="step",
+            density=normalize,
+        )
     # ALSO PLOT MU AND SIGMA #
     ax_distr.axvline(mu, color=color, linestyle="-", ymin=0.95, ymax=1.0)
     ax_distr.axvline(mu + sigma, color=color, linestyle="--", ymin=0.95, ymax=1.0)
     ax_distr.axvline(mu - sigma, color=color, linestyle="--", ymin=0.95, ymax=1.0)
     ax_distr.axvline(mu_pandora, color="red", linestyle="-", ymin=0.95, ymax=1.0)
-    ax_distr.axvline(mu_pandora + sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0)
-    ax_distr.axvline(mu_pandora - sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0)
+    ax_distr.axvline(
+        mu_pandora + sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0
+    )
+    ax_distr.axvline(
+        mu_pandora - sigma_pandora, color="red", linestyle="--", ymin=0.95, ymax=1.0
+    )
     # variance_om
     ax_distr.set_xlabel("$E_{reco} / E_{true}$")
     ax_distr.set_xlim([0, 2])

@@ -16,7 +16,8 @@ import string
 
 def generate_random_string(length):
     letters = string.ascii_letters + string.digits
-    return ''.join(random.choice(letters) for i in range(length))
+    return "".join(random.choice(letters) for i in range(length))
+
 
 def create_and_store_graph_output(
     batch_g,
@@ -118,10 +119,10 @@ def create_and_store_graph_output(
         # # if len(row_ind_hdb) < len(dic["part_true"]):
         # print(len(row_ind_hdb), len(dic["part_true"]))
         # print("storing  event", local_rank, step, i)
-        #path_graphs_all_comparing = os.path.join(path_save, "graphs_all_comparing")
-        #if not os.path.exists(path_graphs_all_comparing):
+        # path_graphs_all_comparing = os.path.join(path_save, "graphs_all_comparing")
+        # if not os.path.exists(path_graphs_all_comparing):
         #    os.makedirs(path_graphs_all_comparing)
-        #torch.save(
+        # torch.save(
         #    dic,
         #    path_save
         #    + "/graphs_all_comparing/"
@@ -131,7 +132,7 @@ def create_and_store_graph_output(
         #    + "_"
         #    + str(i)
         #    + ".pt",
-        #)
+        # )
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
             #     labels_clustering,
@@ -147,14 +148,15 @@ def create_and_store_graph_output(
             #     number_in_batch=i,
             #     tracks=tracks,
             # )
-            #if pred_pos is not None:
+            # if pred_pos is not None:
             # Apply temporary correction
             import math
-            #phi = math.atan2(pred_pos[:, 1], pred_pos[:, 0])
-            #phi = torch.atan2(pred_pos[:, 1], pred_pos[:, 0])
-            #theta = torch.acos(pred_pos[:, 2] / torch.norm(pred_pos, dim=1))
-            #pred_pos = spherical_to_cartesian(theta, phi, torch.norm(pred_pos, dim=1), normalized=True)
-            #pred_pos= pred_pos.to(model_output.device)
+
+            # phi = math.atan2(pred_pos[:, 1], pred_pos[:, 0])
+            # phi = torch.atan2(pred_pos[:, 1], pred_pos[:, 0])
+            # theta = torch.acos(pred_pos[:, 2] / torch.norm(pred_pos, dim=1))
+            # pred_pos = spherical_to_cartesian(theta, phi, torch.norm(pred_pos, dim=1), normalized=True)
+            # pred_pos= pred_pos.to(model_output.device)
             df_event1, number_of_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
@@ -171,7 +173,7 @@ def create_and_store_graph_output(
                 ec_x=ec_x,
                 shap_vals=shap_vals,
                 pred_pos=pred_pos,
-                save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging"
+                save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging",
             )
             # if predict and len(df_event) > 1:
             #     df_list.append(df_event)
@@ -191,7 +193,7 @@ def create_and_store_graph_output(
                     step=step,
                     number_in_batch=total_number_events,
                     tracks=tracks,
-                    save_plots_to_folder=path_save + "/Pandora_evt_plots_debugging"
+                    save_plots_to_folder=path_save + "/Pandora_evt_plots_debugging",
                 )
                 if df_event_pandora is not None and type(df_event_pandora) is not tuple:
                     df_list_pandora.append(df_event_pandora)
@@ -311,7 +313,7 @@ def generate_showers_data_frame(
     shap_vals=None,
     ec_x=None,
     pred_pos=None,
-    save_plots_to_folder=""
+    save_plots_to_folder="",
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -322,19 +324,27 @@ def generate_showers_data_frame(
         e_pred_showers_pfo = scatter_mean(
             dic["graph"].ndata["pandora_pfo_energy"].view(-1), labels
         )
-        #px_pred_pfo = scatter_mean(dic["graph"].ndata["hit_px"], labels)
-        #py_pred_pfo = scatter_mean(dic["graph"].ndata["hit_py"], labels)
-        #pz_pred_pfo = scatter_mean(dic["graph"].ndata["hit_pz"], labels)
-        #p_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"], labels) # FIX THIS: the shape of pos_pxpypz is [-1, 3]
+        # px_pred_pfo = scatter_mean(dic["graph"].ndata["hit_px"], labels)
+        # py_pred_pfo = scatter_mean(dic["graph"].ndata["hit_py"], labels)
+        # pz_pred_pfo = scatter_mean(dic["graph"].ndata["hit_pz"], labels)
+        # p_pred_pfo = scatter_mean(dic["graph"].ndata["pos_pxpypz"], labels) # FIX THIS: the shape of pos_pxpypz is [-1, 3]
         calc_pandora_momentum = "pandora_momentum" in dic["graph"].ndata
         if calc_pandora_momentum:
-            px_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 0], labels)
-            py_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 1], labels)
-            pz_pred_pfo = scatter_mean(dic["graph"].ndata["pandora_momentum"][:, 2], labels)
-            #p_pred_pandora = scatter_mean(dic["graph"].ndata["pandora_momentum"], labels)
+            px_pred_pfo = scatter_mean(
+                dic["graph"].ndata["pandora_momentum"][:, 0], labels
+            )
+            py_pred_pfo = scatter_mean(
+                dic["graph"].ndata["pandora_momentum"][:, 1], labels
+            )
+            pz_pred_pfo = scatter_mean(
+                dic["graph"].ndata["pandora_momentum"][:, 2], labels
+            )
+            # p_pred_pandora = scatter_mean(dic["graph"].ndata["pandora_momentum"], labels)
             p_pred_pandora = torch.stack((px_pred_pfo, py_pred_pfo, pz_pred_pfo), dim=1)
             p_size_pandora = torch.norm(p_pred_pandora, dim=1)
-            pxyz_pred_pfo = p_pred_pandora / torch.norm(p_pred_pandora, dim=1).view(-1, 1)
+            pxyz_pred_pfo = (
+                p_pred_pandora  # / torch.norm(p_pred_pandora, dim=1).view(-1, 1)
+            )
     else:
         if e_corr is None:
             corrections_per_shower = get_correction_per_shower(labels, dic)
@@ -424,7 +434,7 @@ def generate_showers_data_frame(
         fake_showers_e = e_pred_showers[mask]
         if e_corr is None or pandora:
             fake_showers_e_cali = e_pred_showers_cali[mask]
-            #fakes_positions = dic["graph"].ndata["coords"][mask]
+            # fakes_positions = dic["graph"].ndata["coords"][mask]
         else:
             fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
         fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
@@ -542,7 +552,11 @@ def generate_showers_data_frame(
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
-                d["pred_pos_matched"] = pred_pos1.tolist() # otherwise it doesn't work nicely with pandas dataframes
+                d[
+                    "pred_pos_matched"
+                ] = (
+                    pred_pos1.tolist()
+                )  # otherwise it doesn't work nicely with pandas dataframes
         """if shap:
             print("Adding ec_x and shap_values to the dataframe")
             d["ec_x"] = ec_x_t
@@ -552,19 +566,27 @@ def generate_showers_data_frame(
             d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
+        save_plots_to_folder = False
         if save_plots_to_folder:
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
-                    plot_event(df[df.number_batch == evt], pandora, save_plots_to_folder + str(evt) + rndstr, graph=dic["graph"].to("cpu"), y=dic["part_true"], labels=labels)
+                    plot_event(
+                        df[df.number_batch == evt],
+                        pandora,
+                        save_plots_to_folder + str(evt) + rndstr,
+                        graph=dic["graph"].to("cpu"),
+                        y=dic["part_true"],
+                    )
         if number_of_showers_total is None:
             return df
         else:
             return df, number_of_showers_total
     else:
         return [], 0
+
 
 def get_correction_per_shower(labels, dic):
     unique_labels = torch.unique(labels)
@@ -780,10 +802,12 @@ def dbscan_obtain_labels(X, device):
     labels = torch.Tensor(labels).long().to(device)
     return labels
 
+
 class CachedIndexList:
     def __init__(self, lst):
         self.lst = lst
         self.cache = {}
+
     def index(self, value):
         if value in self.cache:
             return self.cache[value]
@@ -791,6 +815,7 @@ class CachedIndexList:
             idx = self.lst.index(value)
             self.cache[value] = idx
             return idx
+
 
 def get_labels_pandora(tracks, dic, device):
     if tracks:
