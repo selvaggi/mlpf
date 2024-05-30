@@ -6,7 +6,6 @@ import matplotlib
 matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
 import torch
-from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum, scatter_mean
 
 
@@ -78,7 +77,7 @@ def get_decay_type(sd_hgb1):
     for batch_id in range(0, int(np.max(batch_number))):
         decay_type = determine_decay_type(sd_hgb1, batch_id)
         decay_type_list.append(decay_type)
-    return decay_type_list
+    return torch.cat(decay_type_list)
 
 
 def determine_decay_type(sd_hgb1, i):
@@ -92,7 +91,7 @@ def determine_decay_type(sd_hgb1, i):
     else:
         decay_type = 2
 
-    return torch.Tensor(decay_type)
+    return torch.Tensor([decay_type])
 
 
 def plot_mass_resolution(event_res_dic, PATH_store):
