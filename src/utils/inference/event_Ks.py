@@ -62,9 +62,96 @@ def get_response_for_event_energy(matched_pandora, matched_):
     mass_over_true_pandora = calculate_event_energy_resolution(
         matched_pandora, True, True
     )
+    decay_type = get_decay_type(matched_pandora)
 
     mass_over_true_model = calculate_event_energy_resolution(matched_, False, True)
     dic = {}
     dic["mass_over_true_model"] = mass_over_true_model
     dic["mass_over_true_pandora"] = mass_over_true_pandora
+    dic["decay_type"] = decay_type
     return dic
+
+
+def get_decay_type(sd_hgb1):
+    batch_number = sd_hgb1.number_batch.values
+    decay_type_list = []
+    for batch_id in range(0, int(np.max(batch_number))):
+        decay_type = determine_decay_type(sd_hgb1, batch_id)
+        decay_type_list.append(decay_type)
+    return decay_type_list
+
+
+def determine_decay_type(sd_hgb1, i):
+    pid_values = np.abs(sd_hgb1[sd_hgb1.number_batch == i].pid.values)
+    if len(pid_values) == 2:
+        decay_type = 0
+        charged = np.prod(pid_values == [211.0, 211])
+    elif len(pid_values) == 4:
+        decay_type = 1
+        neutral = np.prod(pid_values == [22.0, 22.0, 22.0, 22.0])
+    else:
+        decay_type = 2
+
+    return torch.Tensor(decay_type)
+
+
+def plot_mass_resolution(event_res_dic, PATH_store):
+    mask_decay_charged = event_res_dic["decay_type"] == 0
+    fig, ax = plt.subplots()
+    ax.set_xlabel("M_pred/M_true")
+    ax.hist(
+        event_res_dic["mass_over_true_model"][mask_decay_charged],
+        bins=100,
+        histtype="step",
+        label="ML",
+        color="red",
+        density=True,
+    )
+
+    ax.hist(
+        event_res_dic["mass_over_true_pandora"][mask_decay_charged],
+        bins=100,
+        histtype="step",
+        label="Pandora",
+        color="blue",
+        density=True,
+    )
+    ax.grid()
+    ax.legend()
+    ax.set_xlim([0, 10])
+    fig.tight_layout()
+
+    fig.savefig(PATH_store + "mass_resolution_charged.pdf", bbox_inches="tight")
+
+    mask_decay_neutral = event_res_dic["decay_type"] == 1
+    fig, ax = plt.subplots()
+    ax.set_xlabel("M_pred/M_true")
+
+    ax.hist(
+        event_res_dic["mass_over_true_model"][mask_decay_neutral],
+        bins=100,
+        histtype="step",
+        label="ML",
+        color="red",
+        density=True,
+    )
+
+    ax.hist(
+        event_res_dic["mass_over_true_pandora"][mask_decay_neutral],
+        bins=100,
+        histtype="step",
+        label="Pandora",
+        color="blue",
+        density=True,
+    )
+    ax.grid()
+    ax.legend()
+    ax.set_xlim([0, 10])
+    fig.tight_layout()
+
+    fig.savefig(PATH_store + "mass_resolution_neutral.pdf", bbox_inches="tight")
+
+
+def mass_Ks(matched_pandora, matched_, PATH_store):
+    event_res_dic = get_response_for_event_energy(matched_pandora, matched_)
+    plot_mass_resolution(event_res_dic, PATH_store)
