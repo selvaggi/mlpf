@@ -14,12 +14,16 @@ import torch
 import plotly
 import plotly.graph_objs as go
 import plotly.express as px
-
+import seaborn as sns
 
 # TODO paralellize this script or make the data larger so that the binning needed is larger
 from scipy.optimize import curve_fit
 from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum, scatter_mean
+from src.utils.inference.event_metrics import (
+    get_response_for_event_energy,
+    plot_mass_resolution,
+)
 
 
 def get_mask_id(id, pids_pandora):
@@ -290,17 +294,6 @@ def plot_fit(fits, line_type_fits, color_list_fits, ax=None):
         )
 
 
-def plot_mass_resolution(event_res_dic, PATH_store):
-    fig, ax  = plt.subplots()
-    ax.set_xlabel("m [GeV]")
-    ax.hist(event_res_dic["mass_over_true_model"], bins=100, histtype="step", label="ML", color="red", density=True)
-    ax.hist(event_res_dic["mass_over_true_pandora"], bins=100, histtype="step", label="Pandora", color="blue", density=True)
-    ax.grid()
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(PATH_store + "mass_resolution.pdf", bbox_inches="tight")
-
-
 def get_fit(energies, errors):
     energies = energies
     errors = errors
@@ -338,21 +331,21 @@ def plot_per_energy_resolution2(
         photons_dic = get_response_for_id_i(
             [22], matched_pandora, matched_, tracks=tracks
         )
-        electrons_dic = get_response_for_id_i(
-            [11], matched_pandora, matched_, tracks=tracks
-        )
-        hadrons_dic = get_response_for_id_i(
-            [130], matched_pandora, matched_, tracks=tracks
-        )
+        # electrons_dic = get_response_for_id_i(
+        #     [11], matched_pandora, matched_, tracks=tracks
+        # )
+        # hadrons_dic = get_response_for_id_i(
+        #     [130], matched_pandora, matched_, tracks=tracks
+        # )
         hadrons_dic2 = get_response_for_id_i(
             [211], matched_pandora, matched_, tracks=tracks
         )
-        neutrons = get_response_for_id_i(
-            [2112], matched_pandora, matched_, tracks=tracks
-        )
-        protons = get_response_for_id_i(
-            [2212], matched_pandora, matched_, tracks=tracks
-        )
+        # neutrons = get_response_for_id_i(
+        #     [2112], matched_pandora, matched_, tracks=tracks
+        # )
+        # protons = get_response_for_id_i(
+        #     [2212], matched_pandora, matched_, tracks=tracks
+        # )
         event_res_dic = get_response_for_event_energy(matched_pandora, matched_)
         plot_one_label(
             "Event Energy Resolution",
@@ -959,7 +952,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
 
     # arrows from 0,0,0 to df.true_pos and the hover text should be the true energy (df.true_showers_E)
     fig = go.Figure()
-    #scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
+    # scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
     # list of 20 random colors
     # color_list = px.colors.qualitative.Plotly # this is only 10, not enough
     color_list = px.colors.qualitative.Light24
@@ -975,22 +968,36 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
         if y is not None:
             assert vertices.shape == y.vertex.shape
             vertices = y.vertex
-        #fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', color=graph.ndata["particle_number"], name='hits'))
+        # fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', color=graph.ndata["particle_number"], name='hits'))
         # fix this: color by particle number (it is an array of size [0,0,0,0,1,1,1,2,2,2...]
-        ht = [f"part. {int(i)}, sum_hits={sum_hits[i]:.2f}" for i in graph.ndata["particle_number"].long().tolist()]
+        ht = [
+            f"part. {int(i)}, sum_hits={sum_hits[i]:.2f}"
+            for i in graph.ndata["particle_number"].long().tolist()
+        ]
         if labels is not None:
             has_track = scatter_sum(graph.ndata["h"][:, 8], labels.long().cpu())
-            #if has_track.sum() == 0.0:
+            # if has_track.sum() == 0.0:
             # return # filter
-            #if sum(y.E) < 9:
+            # if sum(y.E) < 9:
             #    return
             ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
-        c=[color_list[int(i.item())] for i in graph.ndata["particle_number"]]
+        c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]
         if labels is not None:
             c = [color_list[int(i.item())] for i in labels]
-        fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', marker=dict(size=4, color=c), name='hits', hovertext=ht, hoverinfo="text"))
+        fig.add_trace(
+            go.Scatter3d(
+                x=hit_pos[:, 0],
+                y=hit_pos[:, 1],
+                z=hit_pos[:, 2],
+                mode="markers",
+                marker=dict(size=4, color=c),
+                name="hits",
+                hovertext=ht,
+                hoverinfo="text",
+            )
+        )
         # set scale to avg hit_pos
         if "pos_pxpypz" in graph.ndata.keys():
             vectors = graph.ndata["pos_pxpypz"].numpy()
@@ -1001,7 +1008,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
             else:
                 pos_at_vertex = None
             trks = graph.ndata["pos_hits_xyz"].numpy()
-            #filt = (vectors[:, 0] != 0) & (vectors[:, 1] != 0) & (vectors[:, 2] != 0)
+            # filt = (vectors[:, 0] != 0) & (vectors[:, 1] != 0) & (vectors[:, 2] != 0)
             filt = graph.ndata["h"][:, 8] > 0
             hit_type = graph.ndata["hit_type"][filt]
             vf = vectors[filt]
@@ -1009,32 +1016,67 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
             if pos_at_vertex is not None:
                 pos_at_vertex = pos_at_vertex[filt]
                 ps_vertex = ps_vertex[filt]
-            trks = trks[filt] # track positions
+            trks = trks[filt]  # track positions
             # normalize 3-comp vectors / np.linalg.norm(vectors, axis=1) * scale # remove zero vectors
             vectors = vectors / np.linalg.norm(vectors, axis=1).reshape(-1, 1) * scale
             if pos_at_vertex is not None:
-                pos_at_vertex = pos_at_vertex / np.linalg.norm(pos_at_vertex, axis=1).reshape(-1, 1) * scale
+                pos_at_vertex = (
+                    pos_at_vertex
+                    / np.linalg.norm(pos_at_vertex, axis=1).reshape(-1, 1)
+                    * scale
+                )
             track_p = graph.ndata["h"][:, 8].numpy()[filt]
             pnum = graph.ndata["particle_number"].long()[filt]
             # plot these vectors
             for i in range(len(vectors)):
                 if hit_type[i] == 0:
-                    line = dict(color='black', width=1)
+                    line = dict(color="black", width=1)
                 elif hit_type[i] == 1:
-                    line = dict(color='black', width=1, dash="dash")
+                    line = dict(color="black", width=1, dash="dash")
                 else:
                     raise Exception
-                def plot_single_arrow(fig, vec, hovertext="", init_pt=[0,0,0], line=line):
+
+                def plot_single_arrow(
+                    fig, vec, hovertext="", init_pt=[0, 0, 0], line=line
+                ):
                     # init_pt: initial point of the vector
-                    fig.add_trace(go.Scatter3d(x=[init_pt[0], vec[0] + init_pt[0]], y=[init_pt[1], init_pt[1] + vec[1]], z=[init_pt[2], init_pt[2] + vec[2]], mode='lines', line=line))
-                    fig.add_trace(go.Scatter3d(x=[vec[0] + init_pt[0]], y=[vec[1] + init_pt[1]], z=[vec[2] + init_pt[2]], mode='markers', marker=dict(size=4, color='black'), hovertext=hovertext))
-                plot_single_arrow(fig, vectors[i] / 5, hovertext=f"track {track_p[i]} , pxpypz={vf[i]}", init_pt=trks[i])  # a bit smaller
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[init_pt[0], vec[0] + init_pt[0]],
+                            y=[init_pt[1], init_pt[1] + vec[1]],
+                            z=[init_pt[2], init_pt[2] + vec[2]],
+                            mode="lines",
+                            line=line,
+                        )
+                    )
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=[vec[0] + init_pt[0]],
+                            y=[vec[1] + init_pt[1]],
+                            z=[vec[2] + init_pt[2]],
+                            mode="markers",
+                            marker=dict(size=4, color="black"),
+                            hovertext=hovertext,
+                        )
+                    )
+
+                plot_single_arrow(
+                    fig,
+                    vectors[i] / 5,
+                    hovertext=f"track {track_p[i]} , pxpypz={vf[i]}",
+                    init_pt=trks[i],
+                )  # a bit smaller
                 if pos_at_vertex is not None:
-                    plot_single_arrow(fig, pos_at_vertex[i], hovertext=f"track at DCA {ps_vertex[i]}, pxpypz={pos_at_vertex[i]}", init_pt=[0,0,0])
+                    plot_single_arrow(
+                        fig,
+                        pos_at_vertex[i],
+                        hovertext=f"track at DCA {ps_vertex[i]}, pxpypz={pos_at_vertex[i]}",
+                        init_pt=[0, 0, 0],
+                    )
         # color this by graph.ndata["particle_number"]
     # get the norm of vertices
     displacement = np.linalg.norm(vertices, axis=1)
-    #if displacement.max() < 400:
+    # if displacement.max() < 400:
     #    return
     pids = [str(x) for x in df.pid.values]
     col = np.arange(1, len(truepos) + 1)
@@ -1059,33 +1101,55 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
     )
     for i in range(len(truepos)):
         v = vertices[i]
-        fig.add_trace(go.Scatter3d(
-            x=[v[0], v[0]+truepos[i, 0]], y=[v[1], v[1] + truepos[i, 1]], z=[v[2], v[2] + truepos[i, 2]],
-            mode='lines', line=dict(color='blue', width=1)
-        ))
+        fig.add_trace(
+            go.Scatter3d(
+                x=[v[0], v[0] + truepos[i, 0]],
+                y=[v[1], v[1] + truepos[i, 1]],
+                z=[v[2], v[2] + truepos[i, 2]],
+                mode="lines",
+                line=dict(color="blue", width=1),
+            )
+        )
     if pandora:
         pandora_cluster = graph.ndata["pandora_cluster"].long() + 1
         pandorapos = np.array(df.pandora_calibrated_pos.values.tolist()) * scale
         pandorapos = pandorapos[~np.isnan(pandorapos[:, 0])]
-        pandorapos = scatter_mean(graph.ndata["pandora_momentum"], pandora_cluster, dim=0)
-        pandoramomentum =  np.linalg.norm(pandorapos, axis=1).reshape(-1, 1)
+        pandorapos = scatter_mean(
+            graph.ndata["pandora_momentum"], pandora_cluster, dim=0
+        )
+        pandoramomentum = np.linalg.norm(pandorapos, axis=1).reshape(-1, 1)
         pandorapos = pandorapos / np.linalg.norm(pandorapos, axis=1).reshape(-1, 1)
         pandorapos = pandorapos[1:] * scale
         # normalize
-        pandora_ref_pt = scatter_mean(graph.ndata["pandora_reference_point"], pandora_cluster.long(), dim=0)
+        pandora_ref_pt = scatter_mean(
+            graph.ndata["pandora_reference_point"], pandora_cluster.long(), dim=0
+        )
         pandora_ref_pt = pandora_ref_pt[1:]
         assert pandora_ref_pt.shape == pandorapos.shape
-        #fig.add_trace(go.Scatter3d(x=vertices[:, 0] + pandorapos[:, 0], y=vertices[:, 1] + pandorapos[:, 1], z=vertices[:, 2] + pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text"))
-        fig.add_trace(go.Scatter3d(x=pandora_ref_pt[:, 0] + pandorapos[:, 0], y=pandora_ref_pt[:, 1] + pandorapos[:, 1],
-                                   z=pandora_ref_pt[:, 2] + pandorapos[:, 2], mode='markers',
-                                   marker=dict(size=4, color='green'), name='Pandora',
-                                   hovertext=pandoramomentum.flatten()[1:], hoverinfo="text"))
+        # fig.add_trace(go.Scatter3d(x=vertices[:, 0] + pandorapos[:, 0], y=vertices[:, 1] + pandorapos[:, 1], z=vertices[:, 2] + pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text"))
+        fig.add_trace(
+            go.Scatter3d(
+                x=pandora_ref_pt[:, 0] + pandorapos[:, 0],
+                y=pandora_ref_pt[:, 1] + pandorapos[:, 1],
+                z=pandora_ref_pt[:, 2] + pandorapos[:, 2],
+                mode="markers",
+                marker=dict(size=4, color="green"),
+                name="Pandora",
+                hovertext=pandoramomentum.flatten()[1:],
+                hoverinfo="text",
+            )
+        )
         # also add lines here
         for i in range(len(pandorapos)):
-            v = [0,0,0] # temporarily. TODO: find the pandora 'vertex'
-            fig.add_trace(go.Scatter3d(
-                x=[v[0], v[0]+pandorapos[i, 0]], y=[v[1], v[1]+pandorapos[i, 1]], z=[v[2], v[2]+pandorapos[i, 2]],
-                mode='lines', line=dict(color='green', width=1))
+            v = [0, 0, 0]  # temporarily. TODO: find the pandora 'vertex'
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[v[0], v[0] + pandorapos[i, 0]],
+                    y=[v[1], v[1] + pandorapos[i, 1]],
+                    z=[v[2], v[2] + pandorapos[i, 2]],
+                    mode="lines",
+                    line=dict(color="green", width=1),
+                )
             )
     else:
         predpos = np.array(df.pred_pos_matched.values.tolist()) * scale
@@ -1115,6 +1179,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
         assert output_dir != ""
         plotly.offline.plot(fig, filename=output_dir + "event.html")
 
+
 def calc_unit_circle_dist(df, pandora=False):
     # quick histogram of distances between unit vectors of directions - to compare with the light training model
     if pandora:
@@ -1125,7 +1190,10 @@ def calc_unit_circle_dist(df, pandora=False):
     batch_idx = df.number_batch
     if pandora:
         pred_vect = np.array(df.pandora_calibrated_pos.values.tolist())
-        true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        true_vect = (
+            np.array(df.true_pos.values.tolist())
+            * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        )
         pred_vect = torch.tensor(pred_vect)
         true_vect = torch.tensor(true_vect)
         # normalize
@@ -1133,7 +1201,10 @@ def calc_unit_circle_dist(df, pandora=False):
         true_vect = true_vect / torch.norm(true_vect, dim=1).reshape(-1, 1)
     else:
         pred_vect = np.array(df.pred_pos_matched.values.tolist())
-        true_vect = np.array(df.true_pos.values.tolist())*torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        true_vect = (
+            np.array(df.true_pos.values.tolist())
+            * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+        )
         pred_vect = torch.tensor(pred_vect)
         true_vect = torch.tensor(true_vect)
         # normalize
@@ -1141,164 +1212,6 @@ def calc_unit_circle_dist(df, pandora=False):
         true_vect = true_vect / torch.norm(true_vect, dim=1).reshape(-1, 1)
     dist = torch.sqrt(torch.sum((pred_vect - true_vect) ** 2, dim=1))
     return dist, df.pid.values
-
-
-def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
-    bins = [0, 700]
-    # if pandora and "pandora_calibrated_pos" in df.columns:
-    #    full_vector = True
-    # else:
-    #    full_vector = False
-    if full_vector and pandora:
-        assert "pandora_calibrated_pos" in df.columns
-    bins = [0, 700]
-    binsx = []
-    mean = []
-    variance = []
-    distributions = []
-    distr_baseline = []
-    mean_baseline = []
-    variance_baseline = []
-    binning = 1e-2
-    bins_per_binned_E = np.arange(0, 2, binning)
-    for i in range(len(bins) - 1):
-        bin_i = bins[i]
-        bin_i1 = bins[i + 1]
-        binsx.append(0.5 * (bin_i + bin_i1))
-        true_e = df.true_showers_E.values
-        batch_idx = df.number_batch
-        if pandora:
-            pred_e = df.pandora_calibrated_E.values
-            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
-            if full_vector:
-                pred_vect = (
-                    np.array(df.pandora_calibrated_pos.values.tolist())
-                    #* pred_e1.numpy()
-                )
-                true_vect = (
-                    np.array(df.true_pos.values.tolist())
-                    #* torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
-                )
-                pred_vect = torch.tensor(pred_vect)
-                true_vect = torch.tensor(true_vect)
-        else:
-            pred_e = df.calibrated_E.values
-            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
-            if full_vector:
-                pred_vect = (
-                    np.array(df.pred_pos_matched.values.tolist()) * pred_e1.numpy()
-                )
-                true_vect = (
-                    np.array(df.true_pos.values.tolist())
-                    #* torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
-                )
-                pred_vect = torch.tensor(pred_vect)
-                true_vect = torch.tensor(true_vect)
-        true_rec = df.reco_showers_E
-        # pred_e_nocor = df.pred_showers_E[mask]
-        true_e = torch.tensor(true_e)
-        batch_idx = torch.tensor(batch_idx.values).long()
-        pred_e = torch.tensor(pred_e)
-        true_rec = torch.tensor(true_rec.values)
-        if full_vector:
-            # vector scatter_sum of pred_vect and true_vect
-            # true_e = scatter_sum(true_e, batch_idx)
-            # pred_e = scatter_sum(pred_e, batch_idx)
-            # true_e_1 = scatter_sum(true_vect[:, 0], batch_idx)
-            # true_e_2 = scatter_sum(true_vect[:, 1], batch_idx)
-            # true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doesn't work with more axes?
-            true_p_vect = scatter_sum(true_vect, batch_idx, dim=0)
-            pred_p_vect = scatter_sum(pred_vect, batch_idx, dim=0)
-            true_e1 = scatter_sum(torch.tensor(true_e), batch_idx)
-            pred_e1 = scatter_sum(torch.tensor(pred_e), batch_idx)
-            true_e = torch.norm(true_p_vect, dim=1)  # This is actually momentum resolution
-            pred_e = torch.norm(pred_p_vect, dim=1)
-        else:
-            true_e = scatter_sum(true_e, batch_idx)
-            pred_e = scatter_sum(pred_e, batch_idx)
-        true_rec = scatter_sum(true_rec, batch_idx)
-        mask_above = true_e <= bin_i1
-        mask_below = true_e > bin_i
-        mask_check = true_e > 0
-        mask = mask_below * mask_above * mask_check
-        true_e = true_e[mask]
-        true_rec = true_rec[mask]
-        pred_e = pred_e[mask]
-        if torch.sum(mask) > 0:  # if the bin is not empty
-            e_over_true = pred_e / true_e
-            e_over_reco = true_rec / true_e
-            distributions.append(e_over_true)
-            distr_baseline.append(e_over_reco)
-            (
-                mean_predtotrue,
-                var_predtotrue,
-                err_mean_predtotrue,
-                err_var_predtotrue,
-            ) = get_sigma_gaussian(e_over_true, bins_per_binned_E)
-            if full_vector:
-                true_e1
-                mass_true = torch.sqrt(true_e1[mask]**2-true_e**2)
-                mass_pred = torch.sqrt(pred_e1[mask]**2-pred_e**2)
-                print(mass_true, mass_pred)
-                mass_over_true = mass_pred / mass_true
-
-                (
-                    mean_mass,
-                    var_mass,
-                    _,
-                    _,
-                ) = get_sigma_gaussian(mass_over_true, bins_per_binned_E)
-            (
-                mean_reco_true,
-                var_reco_true,
-                err_mean_reco_true,
-                err_var_reco_true,
-            ) = get_sigma_gaussian(e_over_reco, bins_per_binned_E)
-            mean.append(mean_predtotrue)
-            variance.append(np.abs(var_predtotrue))
-            mean_baseline.append(mean_reco_true)
-            variance_baseline.append(np.abs(var_reco_true))
-    ret = [
-        mean,
-        variance,
-        distributions,
-        binsx,
-        mean_baseline,
-        variance_baseline,
-        distr_baseline,
-    ]
-    if full_vector:
-        ret += [mass_over_true]
-    return ret
-
-def get_response_for_event_energy(matched_pandora, matched_):
-    mean_p, variance_om_p, distr_p, x_p, _, _, _, mass_over_true_pandora = calculate_event_energy_resolution(
-        matched_pandora, True, True
-    )
-    (
-        mean,
-        variance_om,
-        distr,
-        x,
-        mean_baseline,
-        variance_om_baseline,
-        _,
-        mass_over_true_model
-    ) = calculate_event_energy_resolution(matched_, False, True)
-    dic = {}
-    dic["mean_p"] = mean_p
-    dic["variance_om_p"] = variance_om_p
-    dic["variance_om"] = variance_om
-    dic["mean"] = mean
-    dic["energy_resolutions"] = x
-    dic["energy_resolutions_p"] = x_p
-    dic["mean_baseline"] = mean_baseline
-    dic["variance_om_baseline"] = variance_om_baseline
-    dic["distributions_pandora"] = distr_p
-    dic["distributions_model"] = distr
-    dic["mass_over_true_model"] = mass_over_true_model
-    dic["mass_over_true_pandora"] = mass_over_true_pandora
-    return dic
 
 
 def calculate_response(matched, pandora, log_scale=False, tracks=False):
@@ -1557,7 +1470,7 @@ def plot_one_label(
             + str(max_distr_pandora)
         )
         ax_distr[i].legend()
-        #ax_distr[i].set_yscale("log")
+        # ax_distr[i].set_yscale("log")
     fig_distr.tight_layout()
     if fig is None or ax is None:
         fig, ax = plt.subplots(2, 1, figsize=(14, 10), sharex=False)

@@ -5,7 +5,8 @@ import matplotlib
 
 matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
-
+import torch
+from src.utils.inference.inference_metrics import get_sigma_gaussian
 
 def plot_per_event_metrics(sd, sd_pandora, PATH_store=None):
     (
@@ -36,20 +37,22 @@ def calculate_energy_per_event(
     for i in range(0, int(np.max(sd.number_batch))):
         mask = sd.number_batch == i
         event_E_total_reco = np.nansum(sd.reco_showers_E[mask])
+        event_E_total_true = np.nansum(sd.true_showers_E[mask])
         event_E_total_reco_corrected = np.nansum(sd.calibrated_E[mask])
         event_ML_total_reco = np.nansum(sd.pred_showers_E[mask])
         mask_p = sd_pandora.number_batch == i
         event_E_total_reco_p = np.nansum(sd_pandora.reco_showers_E[mask_p])
-        event_ML_total_reco_p = np.nansum(sd_pandora.reco_showers_E[mask_p])
+        event_E_total_true_p = np.nansum(sd_pandora.true_showers_E[mask_p])
+        event_ML_total_reco_p = np.nansum(sd_pandora.pred_showers_E[mask_p])
         event_ML_total_reco_p_corrected = np.nansum(
             sd_pandora.pandora_calibrated_pfo[mask_p]
         )
 
         reco_list.append(event_ML_total_reco / event_E_total_reco)
-        corrected_list.append(event_E_total_reco_corrected / event_E_total_reco)
+        corrected_list.append(event_E_total_reco_corrected / event_E_total_true)
         reco_list_pandora.append(event_ML_total_reco_p / event_E_total_reco_p)
         corrected_list_pandora.append(
-            event_ML_total_reco_p_corrected / event_E_total_reco_p
+            event_ML_total_reco_p_corrected / event_E_total_true_p
         )
     return corrected_list, corrected_list_pandora, reco_list, reco_list_pandora
 
@@ -59,28 +62,28 @@ def plot_per_event_energy_distribution(
 ):
     fig = plt.figure(figsize=(8, 8))
     sns.histplot(
-        data=np.array(calibrated_list) + 1 - np.mean(calibrated_list),
+        data=np.array(calibrated_list),  # + 1 - np.mean(calibrated_list)
         stat="percent",
-        binwidth=0.1,
+        binwidth=0.01,
         label="MLPF",
-        element="step",
-        fill=False,
+        # element="step",
+        # fill=False,
         color="red",
-        linewidth=2,
+        # linewidth=2,
     )
     sns.histplot(
         data=calibrated_list_pandora,
         stat="percent",
         color="blue",
-        binwidth=0.1,
+        binwidth=0.01,
         label="Pandora",
-        element="step",
-        fill=False,
-        linewidth=2,
+        # element="step",
+        # fill=False,
+        # linewidth=2,
     )
     plt.ylabel("Percent of events")
     plt.xlabel("$E_{corrected}/E_{total}$")
-    plt.yscale("log")
+    # plt.yscale("log")
     plt.legend()
     plt.xlim([0, 2])
     fig.savefig(
@@ -88,20 +91,214 @@ def plot_per_event_energy_distribution(
         bbox_inches="tight",
     )
     fig = plt.figure(figsize=(8, 8))
-    sns.histplot(data=reco_list, stat="percent", binwidth=0.05, label="MLPF")
+    sns.histplot(data=reco_list, stat="percent", binwidth=0.01, label="MLPF")
     sns.histplot(
         data=reco_list_pandora,
         stat="percent",
         color="orange",
-        binwidth=0.05,
+        binwidth=0.01,
         label="Pandora",
     )
     plt.ylabel("Percent of events")
     plt.xlabel("$E_{recoML}/E_{reco}$")
     plt.legend()
     plt.xlim([0.5, 1.5])
-    plt.yscale("log")
+    # plt.yscale("log")
     fig.savefig(
         PATH_store + "per_event_E_reco.png",
         bbox_inches="tight",
     )
+
+
+
+def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
+    bins = [0, 700]
+    # if pandora and "pandora_calibrated_pos" in df.columns:
+    #    full_vector = True
+    # else:
+    #    full_vector = False
+    if full_vector and pandora:
+        assert "pandora_calibrated_pos" in df.columns
+    bins = [0, 700]
+    binsx = []
+    mean = []
+    variance = []
+    distributions = []
+    distr_baseline = []
+    mean_baseline = []
+    variance_baseline = []
+    mass_list = []
+    binning = 1e-2
+    bins_per_binned_E = np.arange(0, 2, binning)
+    for i in range(len(bins) - 1):
+        bin_i = bins[i]
+        bin_i1 = bins[i + 1]
+        binsx.append(0.5 * (bin_i + bin_i1))
+        true_e = df.true_showers_E.values
+        batch_idx = df.number_batch
+        if pandora:
+            pred_e = df.pandora_calibrated_E.values
+            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
+            if full_vector:
+                pred_vect = (
+                    np.array(df.pandora_calibrated_pos.values.tolist())
+                    # * pred_e1.numpy()
+                )
+                true_vect = (
+                    np.array(df.true_pos.values.tolist())
+                    # * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                )
+                pred_vect = torch.tensor(pred_vect)
+                true_vect = torch.tensor(true_vect)
+        else:
+            pred_e = df.calibrated_E.values
+            pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
+            if full_vector:
+                pred_vect = (
+                    np.array(df.pred_pos_matched.values.tolist()) * pred_e1.numpy()
+                )
+                true_vect = (
+                    np.array(df.true_pos.values.tolist())
+                    # * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                )
+                pred_vect = torch.tensor(pred_vect)
+                true_vect = torch.tensor(true_vect)
+        true_rec = df.reco_showers_E
+        # pred_e_nocor = df.pred_showers_E[mask]
+        true_e = torch.tensor(true_e)
+        batch_idx = torch.tensor(batch_idx.values).long()
+        pred_e = torch.tensor(pred_e)
+        true_rec = torch.tensor(true_rec.values)
+        if full_vector:
+
+            true_p_vect = scatter_sum(true_vect, batch_idx, dim=0)
+            pred_p_vect = scatter_sum(pred_vect, batch_idx, dim=0)
+            true_e1 = scatter_sum(torch.tensor(true_e), batch_idx)
+            pred_e1 = scatter_sum(torch.tensor(pred_e), batch_idx)
+            true_e = torch.norm(
+                true_p_vect, dim=1
+            )  # This is actually momentum resolution
+            pred_e = torch.norm(pred_p_vect, dim=1)
+        else:
+            true_e = scatter_sum(true_e, batch_idx)
+            pred_e = scatter_sum(pred_e, batch_idx)
+        true_rec = scatter_sum(true_rec, batch_idx)
+        mask_above = true_e <= bin_i1
+        mask_below = true_e > bin_i
+        mask_check = true_e > 0
+        mask = mask_below * mask_above * mask_check
+        true_e = true_e[mask]
+        true_rec = true_rec[mask]
+        pred_e = pred_e[mask]
+        if torch.sum(mask) > 0:  # if the bin is not empty
+            e_over_true = pred_e / true_e
+            e_over_reco = true_rec / true_e
+            distributions.append(e_over_true)
+            distr_baseline.append(e_over_reco)
+            (
+                mean_predtotrue,
+                var_predtotrue,
+                err_mean_predtotrue,
+                err_var_predtotrue,
+            ) = get_sigma_gaussian(e_over_true, bins_per_binned_E)
+            if full_vector:
+                mass_true = torch.sqrt(true_e1[mask] ** 2 - true_e**2)
+                mass_pred = torch.sqrt(pred_e1[mask] ** 2 - pred_e**2)
+                print(pandora, len(mass_true), len(mass_pred))
+                mass_over_true = mass_pred / mass_true
+
+                (
+                    mean_mass,
+                    var_mass,
+                    _,
+                    _,
+                ) = get_sigma_gaussian(mass_over_true, bins_per_binned_E)
+                mass_list.append(mass_over_true)
+            (
+                mean_reco_true,
+                var_reco_true,
+                err_mean_reco_true,
+                err_var_reco_true,
+            ) = get_sigma_gaussian(e_over_reco, bins_per_binned_E)
+            mean.append(mean_predtotrue)
+            variance.append(np.abs(var_predtotrue))
+            mean_baseline.append(mean_reco_true)
+            variance_baseline.append(np.abs(var_reco_true))
+    mass_list = torch.cat(mass_list)
+    ret = [
+        mean,
+        variance,
+        distributions,
+        binsx,
+        mean_baseline,
+        variance_baseline,
+        distr_baseline,
+    ]
+    if full_vector:
+        ret += [mass_list]
+    return ret
+
+
+def get_response_for_event_energy(matched_pandora, matched_):
+    (
+        mean_p,
+        variance_om_p,
+        distr_p,
+        x_p,
+        _,
+        _,
+        _,
+        mass_over_true_pandora,
+    ) = calculate_event_energy_resolution(matched_pandora, True, True)
+    (
+        mean,
+        variance_om,
+        distr,
+        x,
+        mean_baseline,
+        variance_om_baseline,
+        _,
+        mass_over_true_model,
+    ) = calculate_event_energy_resolution(matched_, False, True)
+    dic = {}
+    dic["mean_p"] = mean_p
+    dic["variance_om_p"] = variance_om_p
+    dic["variance_om"] = variance_om
+    dic["mean"] = mean
+    dic["energy_resolutions"] = x
+    dic["energy_resolutions_p"] = x_p
+    dic["mean_baseline"] = mean_baseline
+    dic["variance_om_baseline"] = variance_om_baseline
+    dic["distributions_pandora"] = distr_p
+    dic["distributions_model"] = distr
+    dic["mass_over_true_model"] = mass_over_true_model
+    dic["mass_over_true_pandora"] = mass_over_true_pandora
+    return dic
+
+def plot_mass_resolution(event_res_dic, PATH_store):
+    fig, ax = plt.subplots()
+    ax.set_xlabel("M_pred/M_true")
+
+    ax.hist(
+        event_res_dic["mass_over_true_model"],
+        bins=100,
+        histtype="step",
+        label="ML",
+        color="red",
+        density=True,
+    )
+    
+    ax.hist(
+        event_res_dic["mass_over_true_pandora"],
+        bins=100,
+        histtype="step",
+        label="Pandora",
+        color="blue",
+        density=True,
+    )
+    ax.grid()
+    ax.legend()
+    ax.set_xlim([0, 10])
+    fig.tight_layout()
+
+    fig.savefig(PATH_store + "mass_resolution.pdf", bbox_inches="tight")
