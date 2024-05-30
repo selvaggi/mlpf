@@ -293,8 +293,8 @@ def plot_fit(fits, line_type_fits, color_list_fits, ax=None):
 def plot_mass_resolution(event_res_dic, PATH_store):
     fig, ax  = plt.subplots()
     ax.set_xlabel("m [GeV]")
-    ax.hist(event_res_dic["mass_over_true_model"], bins=100, histtype="step", label="ML", color="red")
-    ax.hist(event_res_dic["mass_over_true_pandora"], bins=100, histtype="step", label="Pandora", color="blue")
+    ax.hist(event_res_dic["mass_over_true_model"], bins=100, histtype="step", label="ML", color="red", density=True)
+    ax.hist(event_res_dic["mass_over_true_pandora"], bins=100, histtype="step", label="Pandora", color="blue", density=True)
     ax.grid()
     ax.legend()
     fig.tight_layout()
