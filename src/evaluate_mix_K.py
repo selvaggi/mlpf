@@ -38,15 +38,17 @@ if all_E:
     PATH_store = (
         "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_GT_clustering_1_without_normalization/eval_results_2905_vectors"
     )
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization/results_3005"
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/results3005"
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Ks_GATr_EP_regression_with_GT_clustering_1_without_normalization/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/showers_df_evaluation/0_0_None_hdbscan.pt",
     ]
-    path_pandora = "Ks_GATr_EP_regression_with_GT_clustering_1_without_normalization/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     # path_list = [
     #     "030424_gatr_dr05/showers_df_evaluation/0_0_None_hdbscan.pt",
