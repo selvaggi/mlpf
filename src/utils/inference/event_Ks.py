@@ -74,7 +74,7 @@ def get_response_for_event_energy(matched_pandora, matched_):
 def get_decay_type(sd_hgb1):
     batch_number = sd_hgb1.number_batch.values
     decay_type_list = []
-    for batch_id in range(0, int(np.max(batch_number))):
+    for batch_id in range(0, int(np.max(batch_number)) + 1):
         decay_type = determine_decay_type(sd_hgb1, batch_id)
         decay_type_list.append(decay_type)
     return torch.cat(decay_type_list)
