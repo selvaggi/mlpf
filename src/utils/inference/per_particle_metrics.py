@@ -290,6 +290,17 @@ def plot_fit(fits, line_type_fits, color_list_fits, ax=None):
         )
 
 
+def plot_mass_resolution(event_res_dic, PATH_store):
+    fig, ax  = plt.subplots()
+    ax.set_xlabel("m [GeV]")
+    ax.hist(event_res_dic["mass_over_true_model"], bins=100, histtype="step", label="ML", color="red")
+    ax.hist(event_res_dic["mass_over_true_pandora"], bins=100, histtype="step", label="Pandora", color="blue")
+    ax.grid()
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(PATH_store + "mass_resolution.pdf", bbox_inches="tight")
+
+
 def get_fit(energies, errors):
     energies = energies
     errors = errors
@@ -353,6 +364,7 @@ def plot_per_energy_resolution2(
             tracks="",
             plot_baseline=True,
         )
+        plot_mass_resolution(event_res_dic, PATH_store)
         plot_per_particle = True
         if plot_per_particle:
             for el in list_plots:
@@ -1161,11 +1173,11 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             if full_vector:
                 pred_vect = (
                     np.array(df.pandora_calibrated_pos.values.tolist())
-                    * pred_e1.numpy()
+                    #* pred_e1.numpy()
                 )
                 true_vect = (
                     np.array(df.true_pos.values.tolist())
-                    * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                    #* torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
                 )
                 pred_vect = torch.tensor(pred_vect)
                 true_vect = torch.tensor(true_vect)
@@ -1178,7 +1190,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
                 )
                 true_vect = (
                     np.array(df.true_pos.values.tolist())
-                    * torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
+                    #* torch.tensor(true_e).unsqueeze(1).repeat(1, 3).numpy()
                 )
                 pred_vect = torch.tensor(pred_vect)
                 true_vect = torch.tensor(true_vect)
@@ -1194,11 +1206,13 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             # pred_e = scatter_sum(pred_e, batch_idx)
             # true_e_1 = scatter_sum(true_vect[:, 0], batch_idx)
             # true_e_2 = scatter_sum(true_vect[:, 1], batch_idx)
-            # true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doens't work with more axes?
-            true_e = scatter_sum(true_vect, batch_idx, dim=0)
-            pred_e = scatter_sum(pred_vect, batch_idx, dim=0)
-            true_e = torch.norm(true_e, dim=1)
-            pred_e = torch.norm(pred_e, dim=1)
+            # true_e_3 = scatter_sum(true_vect[:, 2], batch_idx) # for some reason scatter doesn't work with more axes?
+            true_p_vect = scatter_sum(true_vect, batch_idx, dim=0)
+            pred_p_vect = scatter_sum(pred_vect, batch_idx, dim=0)
+            true_e1 = scatter_sum(torch.tensor(true_e), batch_idx)
+            pred_e1 = scatter_sum(torch.tensor(pred_e), batch_idx)
+            true_e = torch.norm(true_p_vect, dim=1)  # This is actually momentum resolution
+            pred_e = torch.norm(pred_p_vect, dim=1)
         else:
             true_e = scatter_sum(true_e, batch_idx)
             pred_e = scatter_sum(pred_e, batch_idx)
@@ -1221,6 +1235,19 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
                 err_mean_predtotrue,
                 err_var_predtotrue,
             ) = get_sigma_gaussian(e_over_true, bins_per_binned_E)
+            if full_vector:
+                true_e1
+                mass_true = torch.sqrt(true_e1[mask]**2-true_e**2)
+                mass_pred = torch.sqrt(pred_e1[mask]**2-pred_e**2)
+                print(mass_true, mass_pred)
+                mass_over_true = mass_pred / mass_true
+
+                (
+                    mean_mass,
+                    var_mass,
+                    _,
+                    _,
+                ) = get_sigma_gaussian(mass_over_true, bins_per_binned_E)
             (
                 mean_reco_true,
                 var_reco_true,
@@ -1231,7 +1258,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             variance.append(np.abs(var_predtotrue))
             mean_baseline.append(mean_reco_true)
             variance_baseline.append(np.abs(var_reco_true))
-    return (
+    ret = [
         mean,
         variance,
         distributions,
@@ -1239,12 +1266,14 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         mean_baseline,
         variance_baseline,
         distr_baseline,
-    )
-
+    ]
+    if full_vector:
+        ret += [mass_over_true]
+    return ret
 
 def get_response_for_event_energy(matched_pandora, matched_):
-    mean_p, variance_om_p, distr_p, x_p, _, _, _ = calculate_event_energy_resolution(
-        matched_pandora, True, False
+    mean_p, variance_om_p, distr_p, x_p, _, _, _, mass_over_true_pandora = calculate_event_energy_resolution(
+        matched_pandora, True, True
     )
     (
         mean,
@@ -1254,7 +1283,8 @@ def get_response_for_event_energy(matched_pandora, matched_):
         mean_baseline,
         variance_om_baseline,
         _,
-    ) = calculate_event_energy_resolution(matched_, False, False)
+        mass_over_true_model
+    ) = calculate_event_energy_resolution(matched_, False, True)
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -1266,6 +1296,8 @@ def get_response_for_event_energy(matched_pandora, matched_):
     dic["variance_om_baseline"] = variance_om_baseline
     dic["distributions_pandora"] = distr_p
     dic["distributions_model"] = distr
+    dic["mass_over_true_model"] = mass_over_true_model
+    dic["mass_over_true_pandora"] = mass_over_true_pandora
     return dic
 
 
@@ -1525,7 +1557,7 @@ def plot_one_label(
             + str(max_distr_pandora)
         )
         ax_distr[i].legend()
-        ax_distr[i].set_yscale("log")
+        #ax_distr[i].set_yscale("log")
     fig_distr.tight_layout()
     if fig is None or ax is None:
         fig, ax = plt.subplots(2, 1, figsize=(14, 10), sharex=False)
