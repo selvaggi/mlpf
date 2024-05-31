@@ -16,8 +16,8 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     true_e[mask_nan_true] = 0
     batch_idx = df.number_batch
     if pandora:
-        pred_E = df.pandora_calibrated_E.values
-        nan_mask = np.isnan(df.pandora_calibrated_E.values)
+        pred_E = df.pandora_calibrated_pfo.values
+        nan_mask = np.isnan(df.pandora_calibrated_pfo.values)
         pred_E[nan_mask] = 0
         pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
         pred_vect = torch.tensor(np.array(df.pandora_calibrated_pos.values.tolist()))
@@ -30,9 +30,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         print(np.sum(nan_mask))
         pred_E[nan_mask] = 0
         pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
-        pred_vect = torch.tensor(
-            np.array(df.pred_pos_matched.values.tolist())
-        )
+        pred_vect = torch.tensor(np.array(df.pred_pos_matched.values.tolist()))
         pred_vect[nan_mask] = 0
         true_vect = torch.tensor(np.array(df.true_pos.values.tolist()))
         true_vect[mask_nan_true] = 0
