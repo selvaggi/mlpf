@@ -131,8 +131,8 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
-            ckpt_neutral = "/afs/cern.ch/work/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
+            ckpt_charged = "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
+            ckpt_neutral = "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
             #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
             #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
