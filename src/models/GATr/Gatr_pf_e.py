@@ -131,10 +131,14 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
-            ckpt_neutral = "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
-            #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
-            #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
+            ckpt_charged = (
+                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
+            )
+            ckpt_neutral = (
+                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
+            )
+            # ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
+            # ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
             if self.args.regress_pos:
                 print(
@@ -251,19 +255,6 @@ class ExampleWrapper(L.LightningModule):
         #    param.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
-        """Forward pass.
-
-        Parameters
-        ----------
-        inputs : torch.Tensor with shape (*batch_dimensions, num_points, 3)
-            Point cloud input data
-
-        Returns
-        -------
-        outputs : torch.Tensor with shape (*batch_dimensions, 1)
-            Model prediction: a single scalar for the whole point cloud.
-        """
-
         inputs = g.ndata["pos_hits_xyz"]
         if self.trainer.is_global_zero and step_count % 500 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
@@ -321,226 +312,107 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
 
         if self.args.correction:
-            time_matching_start = time()
+            result = self.forward_correction(g, x, y, return_train, pred_energy_corr)
+            return result
+        else:
+            pred_energy_corr = torch.ones_like(beta.view(-1, 1))
+            return x, pred_energy_corr, 0, 0
+
+    def forward_correction(self, g, x, y, return_train, pred_energy_corr):
+        time_matching_start = time()
+
+        (
+            graphs_new,
+            graphs_high_level_features,
+            charged_idx,
+            neutral_idx,
+            features_neutral_no_nan,
+            sum_e,
+            pred_pos,
+            true_new,
+            true_pid,
+            true_coords,
+            batch_idx,
+            e_true_corr_daughters,
+        ) = self.clustering_and_global_features(g, x, y)
+
+        charged_energies = self.charged_prediction(
+            graphs_new, charged_idx, graphs_high_level_features
+        )
+        neutral_energies = self.neutral_prediction(
+            graphs_new, neutral_idx, features_neutral_no_nan
+        )
+        if self.args.regress_pos:
+            charged_energies, charged_positions = charged_energies
+            neutral_energies, neutral_positions = neutral_energies
+        if self.args.explain_ec:
+            assert not self.args.regress_pos, "not implemented"
             (
-                graphs_new,
+                charged_energies,
+                charged_energies_shap_vals,
+                charged_energies_ec_x,
+            ) = charged_energies
+            (
+                neutral_energies,
+                neutral_energies_shap_vals,
+                neutral_energies_ec_x,
+            ) = neutral_energies
+            shap_vals = (
+                torch.ones(
+                    graphs_high_level_features.shape[0],
+                    charged_energies_shap_vals[0].shape[1],
+                )
+                .to(graphs_new.ndata["h"].device)
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            ec_x = torch.zeros(
+                graphs_high_level_features.shape[0],
+                charged_energies_ec_x.shape[1],
+            )
+            shap_vals[charged_idx.detach().cpu().numpy()] = charged_energies_shap_vals[
+                0
+            ]
+            shap_vals[neutral_idx.detach().cpu().numpy()] = neutral_energies_shap_vals[
+                0
+            ]
+            ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
+            ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
+        neutral_energies = neutral_energies.flatten()
+        charged_energies = charged_energies.flatten()
+        # dummy loss to make it work without complaining about not using params in loss
+        pred_energy_corr[charged_idx.flatten()] = (
+            charged_energies / sum_e.flatten()[charged_idx.flatten()]
+        )
+        pred_energy_corr[neutral_idx.flatten()] = (
+            neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
+        )
+        pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
+        if self.args.regress_pos:
+            if len(charged_idx):
+                pred_pos[charged_idx.flatten()] = charged_positions
+            if len(neutral_idx):
+                pred_pos[neutral_idx.flatten()] = neutral_positions
+            pred_energy_corr = {
+                "pred_energy_corr": pred_energy_corr,
+                "pred_pos": pred_pos,
+                "neutrals_idx": neutral_idx.flatten(),
+                "charged_idx": charged_idx.flatten(),
+            }
+
+        if return_train:
+            return (
+                x,
+                pred_energy_corr,
                 true_new,
                 sum_e,
                 true_pid,
-                e_true_corr_daughters,
+                true_new,
                 true_coords,
-            ) = obtain_clustering_for_matched_showers(
-                g,
-                x,
-                y,
-                self.trainer.global_rank,
-                use_gt_clusters=self.args.use_gt_clusters,
             )
-            time_matching_end = time()
-            wandb.log(
-                {"time_clustering_matching": time_matching_end - time_matching_start}
-            )
-            batch_num_nodes = graphs_new.batch_num_nodes()
-            batch_idx = []
-            for i, n in enumerate(batch_num_nodes):
-                batch_idx.extend([i] * n)
-            batch_idx = torch.tensor(batch_idx).to(self.device)
-            graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
-            # TODO: add global features to each node here
-            # print("Using global features of the graphs as well")
-            # graphs_num_nodes = graphs_new.batch_num_nodes
-            # add num_nodes for each node
-            graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
-            # now multiply graphs_sum_features so the shapes match
-            graphs_sum_features = graphs_sum_features[batch_idx]
-            # append the new features to "h" (graphs_sum_features)
-            shape0 = graphs_new.ndata["h"].shape
-            graphs_new.ndata["h"] = torch.cat(
-                (graphs_new.ndata["h"], graphs_sum_features), dim=1
-            )
-            assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
-            # print("Also computing graph-level features")
-            graphs_high_level_features = get_post_clustering_features(
-                graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
-            )
-            pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
-                graphs_new.ndata["h"].device
-            )
-            if self.args.regress_pos:
-                pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
-                    graphs_new.ndata["h"].device
-                )
-            node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
-                :, 0:3
-            ]
-            # energy-weighted node_features_avg
-            # node_features_avg = scatter_sum(
-            #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
-            #    batch_idx,
-            #    dim=0,
-            # )
-            # node_features_avg = node_features_avg[:, 0:3]
-            weights = graphs_new.ndata["h"][:, 7].view(-1, 1)  # Energies as the weights
-            normalizations = scatter_add(weights, batch_idx, dim=0)
-            # normalizations1 = torch.ones_like(weights)
-            normalizations1 = normalizations[batch_idx]
-            weights = weights / normalizations1
-            # node_features_avg = scatter_add(
-            #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
-            # )[: , 0:3]
-            # node_features_avg = node_features_avg / normalizations
-            eta, phi = calculate_eta(
-                node_features_avg[:, 0],
-                node_features_avg[:, 1],
-                node_features_avg[:, 2],
-            ), calculate_phi(node_features_avg[:, 0], node_features_avg[:, 1])
-            graphs_high_level_features = torch.cat(
-                (graphs_high_level_features, node_features_avg), dim=1
-            )
-            graphs_high_level_features = torch.cat(
-                (graphs_high_level_features, eta.view(-1, 1)), dim=1
-            )
-            graphs_high_level_features = torch.cat(
-                (graphs_high_level_features, phi.view(-1, 1)), dim=1
-            )
-            # print("Computed graph-level features")
-            # print("Shape", graphs_high_level_features.shape)
-            # pred_energy_corr = self.GatedGCNNet(graphs_high_level_features)
-            num_tracks = graphs_high_level_features[:, 7]
-            charged_idx = torch.where(num_tracks >= 1)[0]
-            neutral_idx = torch.where(num_tracks < 1)[0]
-            # assert their union is the whole set
-            assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
-            # assert (num_tracks > 1).sum() == 0
-            # if (num_tracks > 1).sum() > 0:
-            #    print("! Particles with more than one track !")
-            #    print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
-            assert (
-                graphs_high_level_features.shape[0]
-                == graphs_new.batch_num_nodes().shape[0]
-            )
-            features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-            features_neutral_no_nan[
-                features_neutral_no_nan != features_neutral_no_nan
-            ] = 0
-            # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
-            unbatched = dgl.unbatch(graphs_new)
-            if len(charged_idx) > 0:
-                charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
-                charged_energies = self.ec_model_wrapper_charged.predict(
-                    graphs_high_level_features[charged_idx],
-                    charged_graphs,
-                    explain=self.args.explain_ec,
-                )
-            else:
-                if not self.args.regress_pos:
-                    charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
-                else:
-                    charged_energies = [
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                    ]
-            if len(neutral_idx) > 0:
-                neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
-                neutral_energies = self.ec_model_wrapper_neutral.predict(
-                    features_neutral_no_nan,
-                    neutral_graphs,
-                    explain=self.args.explain_ec,
-                )
-            else:
-                if not self.args.regress_pos:
-                    neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
-                else:
-                    neutral_energies = [
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                        torch.tensor([]).to(graphs_new.ndata["h"].device),
-                    ]
-            if self.args.regress_pos:
-                charged_energies, charged_positions = charged_energies
-                neutral_energies, neutral_positions = neutral_energies
+        else:
             if self.args.explain_ec:
-                assert not self.args.regress_pos, "not implemented"
-                (
-                    charged_energies,
-                    charged_energies_shap_vals,
-                    charged_energies_ec_x,
-                ) = charged_energies
-                (
-                    neutral_energies,
-                    neutral_energies_shap_vals,
-                    neutral_energies_ec_x,
-                ) = neutral_energies
-                shap_vals = (
-                    torch.ones(
-                        graphs_high_level_features.shape[0],
-                        charged_energies_shap_vals[0].shape[1],
-                    )
-                    .to(graphs_new.ndata["h"].device)
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
-                ec_x = torch.zeros(
-                    graphs_high_level_features.shape[0],
-                    charged_energies_ec_x.shape[1],
-                )
-                shap_vals[
-                    charged_idx.detach().cpu().numpy()
-                ] = charged_energies_shap_vals[0]
-                shap_vals[
-                    neutral_idx.detach().cpu().numpy()
-                ] = neutral_energies_shap_vals[0]
-                ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
-                ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
-            neutral_energies = neutral_energies.flatten()
-            charged_energies = charged_energies.flatten()
-            # dummy loss to make it work without complaining about not using params in loss
-            pred_energy_corr[charged_idx.flatten()] = (
-                charged_energies / sum_e.flatten()[charged_idx.flatten()]
-            )
-            pred_energy_corr[neutral_idx.flatten()] = (
-                neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
-            )
-            pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
-            if self.args.regress_pos:
-                if len(charged_idx):
-                    pred_pos[charged_idx.flatten()] = charged_positions
-                if len(neutral_idx):
-                    pred_pos[neutral_idx.flatten()] = neutral_positions
-                pred_energy_corr = {
-                    "pred_energy_corr": pred_energy_corr,
-                    "pred_pos": pred_pos,
-                    "neutrals_idx": neutral_idx.flatten(),
-                    "charged_idx": charged_idx.flatten(),
-                }
-            # print("Pred energy corr:", pred_energy_corr)
-            # print("Charged energy corr:", pred_energy_corr[charged_idx])
-            # print("Neutral energy corr:", pred_energy_corr[neutral_idx])
-            if return_train:
-                return (
-                    x,
-                    pred_energy_corr,
-                    true_new,
-                    sum_e,
-                    true_pid,
-                    true_new,
-                    true_coords,
-                )
-            else:
-                if self.args.explain_ec:
-                    return (
-                        x,
-                        pred_energy_corr,
-                        true_new,
-                        sum_e,
-                        graphs_new,
-                        batch_idx,
-                        graphs_high_level_features,
-                        true_pid,
-                        e_true_corr_daughters,
-                        shap_vals,
-                        ec_x,
-                    )
                 return (
                     x,
                     pred_energy_corr,
@@ -551,11 +423,174 @@ class ExampleWrapper(L.LightningModule):
                     graphs_high_level_features,
                     true_pid,
                     e_true_corr_daughters,
-                    true_coords,
+                    shap_vals,
+                    ec_x,
                 )
+            return (
+                x,
+                pred_energy_corr,
+                true_new,
+                sum_e,
+                graphs_new,
+                batch_idx,
+                graphs_high_level_features,
+                true_pid,
+                e_true_corr_daughters,
+                true_coords,
+            )
+
+    def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
+        # Prediction for chardged particles
+        unbatched = dgl.unbatch(graphs_new)
+        if len(charged_idx) > 0:
+            charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+            charged_energies = self.ec_model_wrapper_charged.predict(
+                graphs_high_level_features[charged_idx],
+                charged_graphs,
+                explain=self.args.explain_ec,
+            )
         else:
-            pred_energy_corr = torch.ones_like(beta.view(-1, 1))
-            return x, pred_energy_corr, 0, 0
+            if not self.args.regress_pos:
+                charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+            else:
+                charged_energies = [
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                ]
+        return charged_energies
+
+    def neutral_prediction(self, graphs_new, neutral_idx, features_neutral_no_nan):
+        unbatched = dgl.unbatch(graphs_new)
+        if len(neutral_idx) > 0:
+            neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+            neutral_energies = self.ec_model_wrapper_neutral.predict(
+                features_neutral_no_nan,
+                neutral_graphs,
+                explain=self.args.explain_ec,
+            )
+        else:
+            if not self.args.regress_pos:
+                neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+            else:
+                neutral_energies = [
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                ]
+        return neutral_energies
+
+    def clustering_and_global_features(self, g, x, y):
+        time_matching_start = time()
+        # Match graphs
+        (
+            graphs_new,
+            true_new,
+            sum_e,
+            true_pid,
+            e_true_corr_daughters,
+            true_coords,
+        ) = obtain_clustering_for_matched_showers(
+            g,
+            x,
+            y,
+            self.trainer.global_rank,
+            use_gt_clusters=self.args.use_gt_clusters,
+        )
+        time_matching_end = time()
+        wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
+        batch_num_nodes = graphs_new.batch_num_nodes()
+        batch_idx = []
+        for i, n in enumerate(batch_num_nodes):
+            batch_idx.extend([i] * n)
+        batch_idx = torch.tensor(batch_idx).to(self.device)
+        graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
+        # TODO: add global features to each node here
+        graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
+        # now multiply graphs_sum_features so the shapes match
+        graphs_sum_features = graphs_sum_features[batch_idx]
+        # append the new features to "h" (graphs_sum_features)
+        shape0 = graphs_new.ndata["h"].shape
+        graphs_new.ndata["h"] = torch.cat(
+            (graphs_new.ndata["h"], graphs_sum_features), dim=1
+        )
+        assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
+        # print("Also computing graph-level features")
+        graphs_high_level_features = get_post_clustering_features(
+            graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
+        )
+        pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
+            graphs_new.ndata["h"].device
+        )
+        if self.args.regress_pos:
+            pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
+                graphs_new.ndata["h"].device
+            )
+        else:
+            pred_pos = None
+        node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
+            :, 0:3
+        ]
+        # energy-weighted node_features_avg
+        # node_features_avg = scatter_sum(
+        #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
+        #    batch_idx,
+        #    dim=0,
+        # )
+        # node_features_avg = node_features_avg[:, 0:3]
+        weights = graphs_new.ndata["h"][:, 7].view(-1, 1)  # Energies as the weights
+        normalizations = scatter_add(weights, batch_idx, dim=0)
+        # normalizations1 = torch.ones_like(weights)
+        normalizations1 = normalizations[batch_idx]
+        weights = weights / normalizations1
+        # node_features_avg = scatter_add(
+        #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
+        # )[: , 0:3]
+        # node_features_avg = node_features_avg / normalizations
+        eta, phi = calculate_eta(
+            node_features_avg[:, 0],
+            node_features_avg[:, 1],
+            node_features_avg[:, 2],
+        ), calculate_phi(node_features_avg[:, 0], node_features_avg[:, 1])
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, node_features_avg), dim=1
+        )
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, eta.view(-1, 1)), dim=1
+        )
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, phi.view(-1, 1)), dim=1
+        )
+        # print("Computed graph-level features")
+        # print("Shape", graphs_high_level_features.shape)
+        # pred_energy_corr = self.GatedGCNNet(graphs_high_level_features)
+        num_tracks = graphs_high_level_features[:, 7]
+        charged_idx = torch.where(num_tracks >= 1)[0]
+        neutral_idx = torch.where(num_tracks < 1)[0]
+        # assert their union is the whole set
+        assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
+        # assert (num_tracks > 1).sum() == 0
+        # if (num_tracks > 1).sum() > 0:
+        #    print("! Particles with more than one track !")
+        #    print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
+        assert (
+            graphs_high_level_features.shape[0] == graphs_new.batch_num_nodes().shape[0]
+        )
+        features_neutral_no_nan = graphs_high_level_features[neutral_idx]
+        features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+        # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+        return (
+            graphs_new,
+            graphs_high_level_features,
+            charged_idx,
+            neutral_idx,
+            features_neutral_no_nan,
+            sum_e,
+            pred_pos,
+            true_new,
+            true_pid,
+            true_coords,
+            batch_idx,
+            e_true_corr_daughters,
+        )
 
     def build_attention_mask(self, g):
         """Construct attention mask from pytorch geometric batch.
