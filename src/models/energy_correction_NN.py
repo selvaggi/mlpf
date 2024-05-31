@@ -282,7 +282,7 @@ class PickPAtDCA(torch.nn.Module):
         #    key = "pos_pxpypz"
         p_direction = scatter_mean(graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0)
         p_tracks = torch.norm(p_direction, dim=1)
-        p_direction = p_direction / torch.norm(p_direction, dim=1).unsqueeze(1)
+        p_direction = p_direction# / torch.norm(p_direction, dim=1).unsqueeze(1)
         #if self.pos_regression:
         return p_tracks, p_direction
         #return p_tracks
