@@ -131,16 +131,17 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = (
-                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
-            )
+            # ckpt_charged = (
+            #     "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
+            # )
+            ckpt_charged = "/eos/user/g/gkrzmanc/2024_energy_corr/charged_2705_bs128_fig_angles_No_Pos_regress/intermediate_plots/model_step_36000_pid_211.pkl"
             ckpt_neutral = (
                 "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
             )
             # ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
             # ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             # TODO: remove hardcoded models
-            if self.args.regress_pos:
+            if self.args.regress_pos and self.args.ec_model != "dnn":
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
@@ -318,13 +319,13 @@ class ExampleWrapper(L.LightningModule):
 
         if self.args.correction:
             # self.args.regress_pos = True
-            result = self.forward_correction(g, x, y, return_train, pred_energy_corr)
+            result = self.forward_correction(g, x, y, return_train)
             return result
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
             return x, pred_energy_corr, 0, 0
 
-    def forward_correction(self, g, x, y, return_train, pred_energy_corr):
+    def forward_correction(self, g, x, y, return_train):
         time_matching_start = time()
 
         (
@@ -340,6 +341,7 @@ class ExampleWrapper(L.LightningModule):
             true_coords,
             batch_idx,
             e_true_corr_daughters,
+            pred_energy_corr,
         ) = self.clustering_and_global_features(g, x, y)
 
         charged_energies = self.charged_prediction(
@@ -392,6 +394,7 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr[charged_idx.flatten()] = (
             charged_energies / sum_e.flatten()[charged_idx.flatten()]
         )
+
         pred_energy_corr[neutral_idx.flatten()] = (
             neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
@@ -597,6 +600,7 @@ class ExampleWrapper(L.LightningModule):
             true_coords,
             batch_idx,
             e_true_corr_daughters,
+            pred_energy_corr,
         )
 
     def build_attention_mask(self, g):
