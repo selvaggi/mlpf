@@ -198,6 +198,7 @@ class ExampleWrapper(L.LightningModule):
             elif self.args.ec_model == "gatr-neutrals":
                 assert self.args.add_track_chis
                 num_global_features = 14
+                print("this is the model for charged")
                 self.ec_model_wrapper_charged = (
                     PickPAtDCA()  # Pick the p at vertex for charged
                 )
@@ -226,6 +227,8 @@ class ExampleWrapper(L.LightningModule):
                         ckpt_file=None, device=dev, in_features=13
                     )
                 else:
+                    print("using the dnn model")
+                    # this is if it's dnn
                     num_global_features = 14
                     self.ec_model_wrapper_charged = (
                         ECNetWrapperGNNGlobalFeaturesSeparate(
@@ -235,8 +238,10 @@ class ExampleWrapper(L.LightningModule):
                             ckpt_file=ckpt_charged,
                             gnn=False,
                             pos_regression=self.args.regress_pos,
+                            charged=True,
                         )
                     )
+                    # self.pos_dca = PickPAtDCA()
                     self.ec_model_wrapper_neutral = (
                         ECNetWrapperGNNGlobalFeaturesSeparate(
                             device=dev,
@@ -256,17 +261,17 @@ class ExampleWrapper(L.LightningModule):
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         inputs = g.ndata["pos_hits_xyz"]
-        if self.trainer.is_global_zero and step_count % 500 == 0:
-            g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
-            PlotCoordinates(
-                g,
-                path="input_coords",
-                outdir=self.args.model_prefix,
-                # features_type="ones",
-                predict=self.args.predict,
-                epoch=str(self.current_epoch) + eval,
-                step_count=step_count,
-            )
+        # if self.trainer.is_global_zero and step_count % 500 == 0:
+        #     g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
+        #     PlotCoordinates(
+        #         g,
+        #         path="input_coords",
+        #         outdir=self.args.model_prefix,
+        #         # features_type="ones",
+        #         predict=self.args.predict,
+        #         epoch=str(self.current_epoch) + eval,
+        #         step_count=step_count,
+        #     )
         inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
@@ -283,7 +288,7 @@ class ExampleWrapper(L.LightningModule):
             embedded_inputs, scalars=scalars, attention_mask=mask
         )  # (..., num_points, 1, 16)
         forward_time_end = time()
-        wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
+        # wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
         points = extract_point(embedded_outputs[:, 0, :])
 
         # Extract scalar and aggregate outputs from point cloud
@@ -299,19 +304,20 @@ class ExampleWrapper(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 500 == 0:
-            PlotCoordinates(
-                g,
-                path="final_clustering",
-                outdir=self.args.model_prefix,
-                predict=self.args.predict,
-                epoch=str(self.current_epoch) + eval,
-                step_count=step_count,
-            )
+        # if self.trainer.is_global_zero and step_count % 500 == 0:
+        #     PlotCoordinates(
+        #         g,
+        #         path="final_clustering",
+        #         outdir=self.args.model_prefix,
+        #         predict=self.args.predict,
+        #         epoch=str(self.current_epoch) + eval,
+        #         step_count=step_count,
+        #     )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
 
         if self.args.correction:
+            # self.args.regress_pos = True
             result = self.forward_correction(g, x, y, return_train, pred_energy_corr)
             return result
         else:
@@ -342,6 +348,7 @@ class ExampleWrapper(L.LightningModule):
         neutral_energies = self.neutral_prediction(
             graphs_new, neutral_idx, features_neutral_no_nan
         )
+
         if self.args.regress_pos:
             charged_energies, charged_positions = charged_energies
             neutral_energies, neutral_positions = neutral_energies
@@ -496,7 +503,7 @@ class ExampleWrapper(L.LightningModule):
             use_gt_clusters=self.args.use_gt_clusters,
         )
         time_matching_end = time()
-        wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
+        # wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
         batch_num_nodes = graphs_new.batch_num_nodes()
         batch_idx = []
         for i, n in enumerate(batch_num_nodes):
@@ -619,18 +626,21 @@ class ExampleWrapper(L.LightningModule):
             result = self(batch_g, y, batch_idx)
         else:
             result = self(batch_g, y, 1)
-        (
-            model_output,
-            e_cor,
-            e_true,
-            e_sum_hits,
-            new_graphs,
-            batch_id,
-            graph_level_features,
-            pid_true_matched,
-            e_true_corr_daughters,
-            part_coords_matched,
-        ) = result
+        if self.args.correction:
+            (
+                model_output,
+                e_cor,
+                e_true,
+                e_sum_hits,
+                new_graphs,
+                batch_id,
+                graph_level_features,
+                pid_true_matched,
+                e_true_corr_daughters,
+                part_coords_matched,
+            ) = result
+        else:
+            (model_output, e_cor, _, _) = result
         if self.args.regress_pos:
             e_cor, pred_pos, neutral_idx = (
                 e_cor["pred_energy_corr"],
@@ -655,7 +665,7 @@ class ExampleWrapper(L.LightningModule):
             loss_type=self.args.losstype,
         )
         loss_time_end = time()
-        wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
+        # wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
@@ -669,14 +679,14 @@ class ExampleWrapper(L.LightningModule):
                 loss_pos_neutrals = torch.nn.L1Loss()(
                     pred_pos[neutral_idx].detach().cpu(), true_pos[neutral_idx].cpu()
                 )
-                wandb.log(
-                    {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
-                )
-                wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
-                print("Loss pxyz neutrals", loss_pos_neutrals)
+                # wandb.log(
+                #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
+                # )
+                # wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
+                # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
-            wandb.log({"loss_EC": loss_EC})
+            # wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
             # loss = loss_EC
             if self.args.save_features:
@@ -711,8 +721,8 @@ class ExampleWrapper(L.LightningModule):
         del e_cor
         del losses
         final_time = time()
-        wandb.log({"misc_time_inside_training": final_time - misc_time_start})
-        wandb.log({"training_step_time": final_time - initial_time})
+        # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
+        # wandb.log({"training_step_time": final_time - initial_time})
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -758,6 +768,7 @@ class ExampleWrapper(L.LightningModule):
                     coords_true,
                 ) = result
             if self.args.regress_pos:
+                print("heeeere pred pos")
                 e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
             else:
                 pred_pos = None
@@ -878,6 +889,7 @@ class ExampleWrapper(L.LightningModule):
                 # self.df_showers = pd.concat(self.df_showers)
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
+                print(self.df_showes_db.keys())
                 store_at_batch_end(
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
