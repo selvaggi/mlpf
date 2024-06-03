@@ -144,13 +144,14 @@ class ExampleWrapper(L.LightningModule):
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
-                ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
+                #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
                 # ckpt_neutral = "/eos/user/g/gkrzmanc/2024_energy_corr/neutrals_2705_bs128_fig_angles/intermediate_plots/model_step_58000_pid_22.pkl" # Trained with correct angles etc.
-                ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
-                ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
+                #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
+                #ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
+                ckpt_charged = "/eos/user/g/gkrzmanc/2024_energy_corr/charged_2705_bs128_fig_angles_No_Pos_regress/intermediate_plots/model_step_36000_pid_211.pkl"
             if self.args.ec_model == "gat":
                 in_features = 17
                 if self.args.add_track_chis:
@@ -451,11 +452,12 @@ class ExampleWrapper(L.LightningModule):
         unbatched = dgl.unbatch(graphs_new)
         if len(charged_idx) > 0:
             charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
-            charged_energies = self.ec_model_wrapper_charged.predict(
+            charged_energies = (self.ec_model_wrapper_charged
+            .predict(
                 graphs_high_level_features[charged_idx],
                 charged_graphs,
                 explain=self.args.explain_ec,
-            )
+            ))
         else:
             if not self.args.regress_pos:
                 charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
