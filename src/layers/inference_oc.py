@@ -356,7 +356,6 @@ def generate_showers_data_frame(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
-    e_reco_showers = e_reco_showers[1:]
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     pred_showers = shower_p_unique
@@ -365,6 +364,8 @@ def generate_showers_data_frame(
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
     pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
+    is_track_per_shower = scatter_add((dic["graph"].ndata["hit_type"] == 1), labels).int()
+    is_track = torch.zeros(energy_t.shape).to(e_pred_showers.device)
     if shap:
         matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (
             torch.nan
@@ -408,6 +409,10 @@ def generate_showers_data_frame(
                 ]
                 * e_pred_showers[index_matches]
             )
+            if len(row_ind) and len(index_matches):
+                assert row_ind.max() < len(is_track)
+                assert index_matches.max() < len(is_track_per_shower)
+            is_track[row_ind] = is_track_per_shower[index_matches].float()
             if pred_pos is not None:
                 matched_positions[row_ind] = pred_pos[number_of_showers_total : number_of_showers_total
                     + number_of_showers]
@@ -448,6 +453,7 @@ def generate_showers_data_frame(
         fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (
             torch.nan
         )
+        fakes_is_track = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
         """if shap:
             fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
                 torch.nan
@@ -476,7 +482,7 @@ def generate_showers_data_frame(
             (pos_t, fakes_positions),
             dim=0,
         )
-        e_reco = torch.cat((e_reco_showers, fake_showers_showers_e_truw), dim=0)
+        e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
@@ -523,6 +529,7 @@ def generate_showers_data_frame(
         #     ),
         #     dim=0,
         # )
+        is_track = torch.cat((is_track, fakes_is_track.to(is_track.device)), dim=0)
         if pandora:
             d = {
                 "true_showers_E": energy_t.detach().cpu(),
@@ -536,6 +543,7 @@ def generate_showers_data_frame(
                 "step": torch.ones_like(energy_t.detach().cpu()) * step,
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
+                "is_track_in_cluster": is_track.detach().cpu(),
             }
         else:
             d = {
@@ -549,6 +557,7 @@ def generate_showers_data_frame(
                 "step": torch.ones_like(energy_t.detach().cpu()) * step,
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
+                "is_track_in_cluster": is_track.detach().cpu(),
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
@@ -566,7 +575,6 @@ def generate_showers_data_frame(
             d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
-        save_plots_to_folder = False
         if save_plots_to_folder:
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
@@ -579,6 +587,7 @@ def generate_showers_data_frame(
                         save_plots_to_folder + str(evt) + rndstr,
                         graph=dic["graph"].to("cpu"),
                         y=dic["part_true"],
+                        labels=dic["graph"].ndata["particle_number"].long()
                     )
         if number_of_showers_total is None:
             return df
