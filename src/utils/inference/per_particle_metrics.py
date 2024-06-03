@@ -1176,8 +1176,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None)
                 )
             )
         # fig.show()
-        assert output_dir != ""
-        plotly.offline.plot(fig, filename=output_dir + "event.html")
+    assert output_dir != ""
+    plotly.offline.plot(fig, filename=output_dir + "event.html")
 
 
 def calc_unit_circle_dist(df, pandora=False):
