@@ -163,8 +163,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         out_f = 1
         self.pos_regression = pos_regression
         print("pos_regression", self.pos_regression)
-        if pos_regression:
-            out_f += 3
+        # if pos_regression:
+        #     out_f += 3
         self.model = Net(
             in_features=out_features_gnn + in_features_global, out_features=out_f
         )
@@ -361,8 +361,14 @@ class PickPAtDCA(torch.nn.Module):
         #    key = "pos_pxpypz_at_vertex"
         # else:
         #    key = "pos_pxpypz"
-        p_direction = scatter_mean(
-            graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0
+        # p_direction = scatter_mean(
+        #     graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0
+        # )
+        # take the min chi squared track if there are multiple
+        p_direction = pick_lowest_chi_squared(
+            graphs_new.ndata["pos_pxpypz_at_vertex"][filt],
+            graphs_new.ndata["chi_squared_tracks"][filt],
+            batch_idx[filt],
         )
         print("p_direction", p_direction)
         p_tracks = torch.norm(p_direction, dim=1)
@@ -370,3 +376,17 @@ class PickPAtDCA(torch.nn.Module):
         # if self.pos_regression:
         return p_tracks, p_direction
         # return p_tracks
+
+
+def pick_lowest_chi_squared(pxpypz, chi_s, batch_idx):
+    unique_batch = torch.unique(batch_idx)
+    p_direction = []
+    for i in range(0, len(unique_batch)):
+        mask = batch_idx == unique_batch[i]
+        if torch.sum(mask) > 1:
+            chis = chi_s[mask]
+            ind_min = torch.argmin(chis)
+            p_direction.append(pxpypz[mask][ind_min].view(-1, 3))
+        else:
+            p_direction.append(pxpypz[mask].view(-1, 3))
+    return torch.concat(p_direction, dim=0)
