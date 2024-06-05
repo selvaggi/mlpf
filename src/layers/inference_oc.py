@@ -389,6 +389,7 @@ def generate_showers_data_frame(
         matched_es_cali_pfo[row_ind] = e_pred_showers_pfo[index_matches]
         if calc_pandora_momentum:
             matched_positions_pfo[row_ind] = pxyz_pred_pfo[index_matches]
+        is_track[row_ind] = is_track_per_shower[index_matches].float()
     else:
         if e_corr is None:
             matched_es_cali = matched_es.clone()
