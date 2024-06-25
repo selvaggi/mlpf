@@ -49,7 +49,7 @@ parser.add_argument("--batch-size", type=int, default=64)
 parser.add_argument("--corrected-energy", action="store_true", default=False) # whether to use the daughters-corr. energy
 parser.add_argument("--gnn-features-placeholders", type=int, default=0)
 parser.add_argument("--regress-pos", default=False, action="store_true")
-
+parser.add_argument("--load-model-weights", type=str, default=None)
 # will add some N(0, 1) iid features to the NN to be used as placeholders for GNN features that will come later
 # - first just overfit the simple NN to perform energy regression
 
@@ -67,7 +67,7 @@ DEVICE = torch.device("cuda:0")
 
 wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)
 # wandb log code
-wandb.run.log_code(".")
+#wandb.run.log_code(".")
 
 # make dir
 os.makedirs(prefix, exist_ok=True)
@@ -136,13 +136,16 @@ def get_dataset(save_ckpt=None):
         n = 0
         nmax = 1000000
         print("Loading dataset (a bit slow way of doing it, TODO fix)")
+        print("Dataset path:", path)
         for file in tqdm.tqdm(os.listdir(path)):
             n += 1
-            if n > nmax:
+            if n > nmax: #or os.path.isdir(os.path.join(path, file)):
                 break
+            if os.path.isdir(os.path.join(path, file)):
+                continue
             #f = pickle.load(open(os.path.join(path, file), "rb"))
             f = CPU_Unpickler(open(os.path.join(path, file), "rb")).load()
-            if (len(file) != len("8510eujir6.pkl")):
+            if (len(file) != len("8510eujir6.pkl")): # in case some temporary files are still stored there
                 continue
             #print(f.keys())
             if (f["e_reco"].flatten() == 1.).all():
@@ -171,6 +174,7 @@ def get_dataset(save_ckpt=None):
     x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks", "track_p_chis"]
     h_names = ["hit_x_avg", "hit_y_avg", "hit_z_avg"]
     h1_names = ["hit_eta_avg", "hit_phi_avg"]
+    print(r.keys())
     print("x shape:", r["x"].shape)
     if old_dataset:
         r["y_particles"] = r["y_particles"][:, 6]
@@ -198,11 +202,8 @@ def get_dataset(save_ckpt=None):
         #pickle.dump(ds, open(save_ckpt, "wb"))
         #print("Dumped dataset to file", save_ckpt)
         pickle.dump(r, open(save_ckpt, "wb"))
-    return r["x"], x_names + h_names + h1_names, r["e_true"], r[key], r["e_reco"], r["y_particles"], r["coords_y"]#torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
-# the coords vector is normalized!
-# norm of coords vector
-def norm(x):
-    return torch.sqrt(torch.sum(x ** 2, dim=1))
+    return r["x"], x_names + h_names + h1_names, r["e_true"], r[key], r["e_reco"], r["y_particles"], r["coords_y"] #torch.concatenate([r["eta"].reshape(1, -1), r["phi"].reshape(1, -1)], axis=0).T
+
 def get_split(ds, overfit=False):
     from sklearn.model_selection import train_test_split
     x, _, y, etrue, _, pids, positions = ds
@@ -456,6 +457,9 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
                 pid = torch.tensor(pid).to(DEVICE)
             total_step = 0
             self.model = Net(out_features = 1+pid_predict_channels)
+            if args.load_model_weights is not None:
+                print("Loading model weights from", args.load_model_weights)
+                self.model.model = pickle.load(open(args.load_model_weights, "rb"))
             self.model.to(DEVICE)
             self.model.train()
             batch_size = args.batch_size
@@ -644,6 +648,8 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         print("Fitting")
         if pid_channels > 0:
             if args.regress_pos:
+                print("p vectors to regress", split[8][:10])
+                print("------------------")
                 model.fit(split[0].numpy(), split[2].numpy(), split[8].numpy())
             else:
                 pids = split[6].detach().cpu().numpy()  # todo fix this?
@@ -668,10 +674,15 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
             if args.regress_pos:
                 e_pred, pos_pred = e_pred[:, 0], e_pred[:, 1:]
                 pos_true = split[9]
+                print("p_true:", pos_true[:10])
+                print("p_pred:", pos_pred[:10])
                 #pos_avg_hits = split[1][:, -2:]
                 #deltar_avg_hits = torch.sum((pos_avg_hits - pos_true) ** 2, dim=1).sqrt()
                 deltar_pred = torch.sum((torch.tensor(pos_pred) - pos_true) ** 2, dim=1).sqrt()
             pids = split[7].detach().cpu()
+            print("etrue", split[5])
+            print("e_pred", e_pred)
+            wandb.log({"validation_energy_loss": torch.nn.L1Loss()(split[5], torch.tensor(e_pred).flatten())})
 
             for _pid in all_pids:
                 if args.regress_pos:
@@ -711,6 +722,8 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 wandb.log({"eval_fig_train_data_" + str(pid): fig})'''
         if pid_channels > 0:
             if args.regress_pos:
+                print("p vectors to regress", split[8][:10])
+                print("------------------")
                 model.fit(split[0].numpy(), split[4].numpy(), split[8].numpy(), eval_callback=eval_callback)
             else:
                 pids = split[6].detach().cpu().numpy()  # todo fix this?
@@ -741,11 +754,8 @@ print("Loaded dataset")
 # yt, yp, en, _, model, split = main(ds=ds, train_energy_regression=False, train_only_on_PIDs=[211], remove_sum_e=False)
 len(ds)
 
-
-
 def is_pid_neutral(pid):
     return pid in [22, 130, 2112]
-
 
 def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="gradboost", patience=1000, save_to_folder=None, wandb_log_name=None):
     if not os.path.exists(save_to_folder):
