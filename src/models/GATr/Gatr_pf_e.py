@@ -669,6 +669,9 @@ class ExampleWrapper(L.LightningModule):
             if self.args.regress_pos:
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
                 loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+                charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
+                #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
+                #loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
                 loss_EC_neutrals = torch.nn.L1Loss()(
                     e_cor[neutral_idx].detach().cpu(), e_true[neutral_idx].cpu()
                 )
@@ -683,7 +686,7 @@ class ExampleWrapper(L.LightningModule):
                 # wandb.log(
                 #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
                 # )
-                wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged, "loss_p_neutrals": loss_pos[neutral_idx], "loss_p_charged": loss_pos[charged_idx]})
+                wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged, "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged})
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
