@@ -125,7 +125,7 @@ ax.set_xlabel("Mean absolute SHAP value (feature importance)")
 ax.set_xscale("log")
 fig.tight_layout()
 fig.show()
-fig.savefig("/eos/user/g/gkrzmanc/2024/eval_dnn_3004_l1_training_longereval/showers_df_evaluation/shap_plots/summary_mean_abs_log.pdf")
+fig.savefig("/eos/user/g/gkrzmanc/2024/eval_dnn_3004_l1_training_longereval/showers_df_evaluation/shap_plots/summary_mean_abs_log_3006.pdf")
 
 ###################
 
@@ -154,7 +154,7 @@ ax.set_xlabel("Mean absolute SHAP value (feature importance)")
 ax.set_xscale("log")
 fig.tight_layout()
 fig.show()
-fig.savefig("/eos/user/g/gkrzmanc/2024/eval_gnn_3004_l1_training/showers_df_evaluation/shap_plots/summary_mean_abs_log.pdf")
+fig.savefig("/eos/user/g/gkrzmanc/2024/eval_gnn_3004_l1_training/showers_df_evaluation/shap_plots/summary_mean_abs_log_062024.pdf")
 
 ###################
 

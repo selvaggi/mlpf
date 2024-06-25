@@ -582,13 +582,15 @@ def generate_showers_data_frame(
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
+                    #print("Plotting")
                     plot_event(
                         df[df.number_batch == evt],
                         pandora,
                         save_plots_to_folder + str(evt) + rndstr,
                         graph=dic["graph"].to("cpu"),
                         y=dic["part_true"],
-                        labels=dic["graph"].ndata["particle_number"].long()
+                        labels=dic["graph"].ndata["particle_number"].long(),
+                        is_track_in_cluster = df.is_track_in_cluster
                     )
         if number_of_showers_total is None:
             return df

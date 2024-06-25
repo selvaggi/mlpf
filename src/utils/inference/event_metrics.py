@@ -7,6 +7,7 @@ matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
 import torch
 from src.utils.inference.inference_metrics import get_sigma_gaussian
+from torch_scatter import scatter_sum
 
 def plot_per_event_metrics(sd, sd_pandora, PATH_store=None):
     (
@@ -170,7 +171,6 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         pred_e = torch.tensor(pred_e)
         true_rec = torch.tensor(true_rec.values)
         if full_vector:
-
             true_p_vect = scatter_sum(true_vect, batch_idx, dim=0)
             pred_p_vect = scatter_sum(pred_vect, batch_idx, dim=0)
             true_e1 = scatter_sum(torch.tensor(true_e), batch_idx)
@@ -224,7 +224,8 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             variance.append(np.abs(var_predtotrue))
             mean_baseline.append(mean_reco_true)
             variance_baseline.append(np.abs(var_reco_true))
-    mass_list = torch.cat(mass_list)
+    if full_vector:
+        mass_list = torch.cat(mass_list)
     ret = [
         mean,
         variance,
@@ -236,6 +237,8 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     ]
     if full_vector:
         ret += [mass_list]
+    else:
+        ret += [None]
     return ret
 
 
@@ -249,7 +252,7 @@ def get_response_for_event_energy(matched_pandora, matched_):
         _,
         _,
         mass_over_true_pandora,
-    ) = calculate_event_energy_resolution(matched_pandora, True, True)
+    ) = calculate_event_energy_resolution(matched_pandora, True, False)
     (
         mean,
         variance_om,
@@ -259,7 +262,7 @@ def get_response_for_event_energy(matched_pandora, matched_):
         variance_om_baseline,
         _,
         mass_over_true_model,
-    ) = calculate_event_energy_resolution(matched_, False, True)
+    ) = calculate_event_energy_resolution(matched_, False, False)
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -278,10 +281,10 @@ def get_response_for_event_energy(matched_pandora, matched_):
 def plot_mass_resolution(event_res_dic, PATH_store):
     fig, ax = plt.subplots()
     ax.set_xlabel("M_pred/M_true")
-
+    bins = np.linspace(0, 3, 100)
     ax.hist(
         event_res_dic["mass_over_true_model"],
-        bins=100,
+        bins=bins,
         histtype="step",
         label="ML",
         color="red",
@@ -290,7 +293,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     
     ax.hist(
         event_res_dic["mass_over_true_pandora"],
-        bins=100,
+        bins=bins,
         histtype="step",
         label="Pandora",
         color="blue",

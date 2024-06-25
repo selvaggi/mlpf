@@ -193,7 +193,7 @@ class GravnetModel(nn.Module):  # L.LightningModule
         loss_regularizing_neig = 0.0
         loss_ll = 0
         if (self.local_rank == 0) and (step_count % 1000 == 0):
-            print("plotting coords")
+            #print("plotting coords")
             PlotCoordinates(
                 g,
                 path="input_coords",
