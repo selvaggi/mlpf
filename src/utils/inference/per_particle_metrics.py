@@ -1023,7 +1023,7 @@ def calculate_eta(x, y, z):
     return -torch.log(torch.tan(theta / 2))
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
-    # return
+    return # no plotting now
     # plot the event with plotly. Compare ML and pandora reconstructed with truth
     # also plotst the graph is specified
     # also plot eta-phi (a bit easier debugging)

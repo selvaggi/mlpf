@@ -303,8 +303,9 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                 p_tracks, pos = self.PickPAtDCA.predict(x_global_features, graphs_new)
                 return torch.clamp(res.flatten(), min=0, max=None), pos
             else:
-                E_pred = torch.clamp(res.flatten(), min=0, max=None)
-            return E_pred, torch.zeros((len(E_pred), 3)).to(E_pred.device)
+                E_pred, p_pred = res[:, 0], res[:, 1:4]
+                E_pred = torch.clamp(E_pred, min=0, max=None)
+                return E_pred, p_pred
         else:
             # # normalize res[1] vectors
             # E = torch.clamp(res[0].flatten(), min=0, max=None)
