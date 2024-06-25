@@ -338,14 +338,13 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             pred_energy_corr,
         ) = self.clustering_and_global_features(g, x, y)
-
+        # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
             graphs_new, charged_idx, graphs_high_level_features
         )
         neutral_energies = self.neutral_prediction(
             graphs_new, neutral_idx, features_neutral_no_nan
         )
-
         if self.args.regress_pos:
             charged_energies, charged_positions = charged_energies
             neutral_energies, neutral_positions = neutral_energies
@@ -383,8 +382,6 @@ class ExampleWrapper(L.LightningModule):
             ]
             ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
             ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
-        neutral_energies = neutral_energies.flatten()
-        charged_energies = charged_energies.flatten()
         # dummy loss to make it work without complaining about not using params in loss
         pred_energy_corr[charged_idx.flatten()] = (
             charged_energies / sum_e.flatten()[charged_idx.flatten()]
@@ -686,7 +683,7 @@ class ExampleWrapper(L.LightningModule):
                 # wandb.log(
                 #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
                 # )
-                wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged})
+                wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged, "loss_p_neutrals": loss_pos[neutral_idx], "loss_p_charged": loss_pos[charged_idx]})
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
@@ -772,7 +769,6 @@ class ExampleWrapper(L.LightningModule):
                     coords_true,
                 ) = result
             if self.args.regress_pos:
-                print("heeeere pred pos")
                 e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
             else:
                 pred_pos = None
