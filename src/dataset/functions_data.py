@@ -142,10 +142,12 @@ class CachedIndexList:
 def find_cluster_id(hit_particle_link):
     unique_list_particles = list(np.unique(hit_particle_link))
     if np.sum(np.array(unique_list_particles) == -1) > 0:
-        non_noise_idx = torch.where(unique_list_particles != -1)[0]
-        noise_idx = torch.where(unique_list_particles == -1)[0]
-        non_noise_particles = unique_list_particles[non_noise_idx]
-        c_non_noise_particles = CachedIndexList(non_noise_particles)
+        unique_list_particles = torch.tensor(unique_list_particles)
+
+        non_noise_idx = torch.where(torch.tensor(unique_list_particles) != -1)[0]
+        noise_idx = torch.where(torch.tensor(unique_list_particles) == -1)[0]
+        non_noise_particles = torch.tensor(unique_list_particles)[non_noise_idx]
+        c_non_noise_particles = CachedIndexList(non_noise_particles.tolist())
         cluster_id = map(
             lambda x: c_non_noise_particles.index(x), hit_particle_link.tolist()
         )

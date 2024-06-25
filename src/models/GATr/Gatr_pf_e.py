@@ -131,28 +131,15 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            # ckpt_charged = (
-            #     "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_211.pkl"
-            # )
-            ckpt_charged = "/eos/user/g/gkrzmanc/2024_energy_corr/charged_2705_bs128_fig_angles_No_Pos_regress/intermediate_plots/model_step_36000_pid_211.pkl"
-            ckpt_neutral = (
-                "/eos/user/g/gkrzmanc/models_200524/model_step_10000_pid_22.pkl"
-            )
-            # ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
-            # ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
-            # TODO: remove hardcoded models
+            ckpt_neutral = self.args.ckpt_neutral
+            ckpt_charged = self.args.ckpt_charged
             if self.args.regress_pos and self.args.ec_model != "dnn":
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
-                #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
-                # ckpt_neutral = "/eos/user/g/gkrzmanc/2024_energy_corr/neutrals_2705_bs128_fig_angles/intermediate_plots/model_step_58000_pid_22.pkl" # Trained with correct angles etc.
-                #ckpt_neutral = "/eos/user/g/gkrzmanc/2024/neutrals_1305_bs128_debug/intermediate_plots/model_step_47000_pid_2112.pkl"  # TEMPORARY
-                #ckpt_charged = "/eos/user/g/gkrzmanc/2024/charged_debug_1405_noEC/intermediate_plots/model_step_47000_pid_11.pkl"
-                ckpt_charged = "/eos/user/g/gkrzmanc/2024_energy_corr/charged_2705_bs128_fig_angles_No_Pos_regress/intermediate_plots/model_step_36000_pid_211.pkl"
             if self.args.ec_model == "gat":
                 in_features = 17
                 if self.args.add_track_chis:
@@ -201,8 +188,15 @@ class ExampleWrapper(L.LightningModule):
                 assert self.args.add_track_chis
                 num_global_features = 14
                 print("this is the model for charged")
-                self.ec_model_wrapper_charged = (
-                    PickPAtDCA()  # Pick the p at vertex for charged
+                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                    device=dev,
+                    in_features_global=num_global_features,
+                    in_features_gnn=20,
+                    ckpt_file=ckpt_charged,
+                    gnn=True,
+                    gatr=True,
+                    pos_regression=self.args.regress_pos,
+                    charged=True
                 )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
@@ -395,7 +389,6 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr[charged_idx.flatten()] = (
             charged_energies / sum_e.flatten()[charged_idx.flatten()]
         )
-
         pred_energy_corr[neutral_idx.flatten()] = (
             neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
@@ -682,13 +675,18 @@ class ExampleWrapper(L.LightningModule):
                 loss_EC_neutrals = torch.nn.L1Loss()(
                     e_cor[neutral_idx].detach().cpu(), e_true[neutral_idx].cpu()
                 )
+                # charged idx is e_cor indices minus neutral idx
+                charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 loss_pos_neutrals = torch.nn.L1Loss()(
                     pred_pos[neutral_idx].detach().cpu(), true_pos[neutral_idx].cpu()
                 )
+                loss_charged = torch.nn.L1Loss()(
+                    pred_pos[charged_idx].detach().cpu(), true_pos[charged_idx].cpu()
+                ) # just for logging
                 # wandb.log(
                 #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
                 # )
-                # wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
+                wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged})
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
@@ -939,6 +937,7 @@ class ExampleWrapper(L.LightningModule):
                     tracks=self.args.tracks,
                     shap_vals=shap_vals,
                     ec_x=ec_x,
+                    use_gt_clusters=self.args.use_gt_clusters,
                 )
                 del model_output1
                 del batch_g

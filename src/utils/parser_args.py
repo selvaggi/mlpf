@@ -593,5 +593,17 @@ parser.add_argument(
     "--regress-pos",
     action="store_true",
     default=False,
-    help="regress positions as well next to the energy",
+    help="regress p vectors as well next to the energy",
+)
+
+parser.add_argument(
+    "--ckpt-neutral",
+    default="",
+    help="Path to a DNN model regressing neutral energy and p",
+)
+
+parser.add_argument(
+    "--ckpt-charged",
+    default="",
+    help="Path to a DNN model regressing charged energy and p",
 )
