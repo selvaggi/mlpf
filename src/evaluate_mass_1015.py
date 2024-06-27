@@ -14,38 +14,36 @@ import torch
 import pickle
 
 hep.style.use("CMS")
-colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
+colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
-neutrals_only = False
+neutrals_only = True
 log_scale = False
 tracks = True
+
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/pandora_pred_with_tracks_info_in_df/eval1"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/Neutrals_Only_eval_FT_Ep_10_15_dataset_260624"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
-
     path_list = [
-        #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_hdbscan.pt",
-        #"eval_DNNft_100files_0605_Longer_Ckpt/showers_df_evaluation/0_0_None_hdbscan.pt",
-        #"pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_hdbscan.pt"
-        #"eval_dnn_3004_l1_training_eval_2_5__1_clustloadonly-100files/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_1015/debug_eval_FT_Ep_reg_1015/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_pandora.pt"
-
-    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
+    path_pandora = "eval_1015/debug_eval_FT_Ep_reg_1015/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/2024/"
+    print(PATH_store)
 
 labels = [
-    "GNN+DNN",
-    #"DNN"
-    #"DNN w/o FT"
+    "ML"
 ]
 
+def filter_df(df):
+    # quick filter to exclude problematic particles
+    df = df[(df.pid != 11) & (df.pid != 22) ]
+    return df
 def main():
     df_list = []
     matched_all = {}
@@ -61,14 +59,15 @@ def main():
     print("finished collection of data and started plotting")
     #plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_per_energy_resolution2_multiple(
-        matched_pandora,
-        matched_all,
+        sd_pandora,
+        {"ML": sd_hgb},
         os.path.join(PATH_store, "plots"),
         tracks=tracks,
     )
 
 if __name__ == "__main__":
     main()
+
 def save_dict(di_, filename_):
     with open(filename_, "wb") as f:
         pickle.dump(di_, f)

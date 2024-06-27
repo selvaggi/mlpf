@@ -14,6 +14,7 @@ import torch
 import plotly
 import plotly.graph_objs as go
 import plotly.express as px
+from pathlib import Path
 import seaborn as sns
 
 # TODO paralellize this script or make the data larger so that the binning needed is larger
@@ -56,6 +57,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         e_over_e_distr_pandora,
         mean_errors_p,
         variance_errors_p,
+        mean_pxyz_pandora, variance_om_pxyz_pandora,
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks)
     (
         mean,
@@ -69,6 +71,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
         e_over_e_distr_model,
         mean_errors,
         variance_errors,
+        mean_pxyz, variance_om_pxyz
     ) = calculate_response(df_id, False, False, tracks=tracks)
     print(variance_om_p)
     print(variance_om)
@@ -96,6 +99,10 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False):
     dic["variance_om_baseline"] = variance_om_baseline
     dic["distributions_pandora"] = e_over_e_distr_pandora
     dic["distributions_model"] = e_over_e_distr_model
+    dic["mean_pxyz"] = mean_pxyz
+    dic["variance_om_pxyz"] = variance_om_pxyz
+    dic["mean_pxyz_pandora"] = mean_pxyz_pandora
+    dic["variance_om_pxyz_pandora"] = variance_om_pxyz_pandora
     return dic
 
 
@@ -331,12 +338,6 @@ def plot_per_energy_resolution2(
         photons_dic = get_response_for_id_i(
             [22], matched_pandora, matched_, tracks=tracks
         )
-        # electrons_dic = get_response_for_id_i(
-        #     [11], matched_pandora, matched_, tracks=tracks
-        # )
-        # hadrons_dic = get_response_for_id_i(
-        #     [130], matched_pandora, matched_, tracks=tracks
-        # )
         hadrons_dic2 = get_response_for_id_i(
             [211], matched_pandora, matched_, tracks=tracks
         )
@@ -347,17 +348,6 @@ def plot_per_energy_resolution2(
         #     [2212], matched_pandora, matched_, tracks=tracks
         # )
         #event_res_dic = get_response_for_event_energy(matched_pandora, matched_)
-        #plot_one_label(
-        #    "Event Energy Resolution",
-        #    event_res_dic,
-        #    "variance_om",
-        # #   PATH_store,
-        # #   "ML",
-        #    "",
-        #    tracks="",
-        #    plot_baseline=True,
-        #)
-        #plot_mass_resolution(event_res_dic, PATH_store)
         plot_per_particle = True
         if plot_per_particle:
             for el in list_plots:
@@ -379,43 +369,6 @@ def plot_per_energy_resolution2(
                     el,
                     tracks=tracks_label,
                 )
-                """plot_one_label(
-                    "Electromagnetic Response",
-                    electrons_dic,
-                    "mean",
-                    PATH_store,
-                    "Electrons",
-                    el,
-                    tracks=tracks_label,
-                )
-                plot_one_label(
-                    "Electromagnetic Resolution",
-                    electrons_dic,
-                    "variance_om",
-                    PATH_store,
-                    "Electrons",
-                    el,
-                    tracks=tracks_label,
-                )"""
-                """plot_one_label(
-                    "Hadronic Resolution",
-                    hadrons_dic,
-                    "variance_om",
-                    PATH_store,
-                    "KL",
-                    el,
-                    
-                    tracks=tracks_label,
-                )
-                plot_one_label(
-                    "Hadronic Response",
-                    hadrons_dic,
-                    "mean",
-                    PATH_store,
-                    "KL",
-                    el,
-                    tracks=tracks_label,
-                )"""
                 plot_one_label(
                     "Hadronic Resolution",
                     hadrons_dic2,
@@ -434,48 +387,33 @@ def plot_per_energy_resolution2(
                     el,
                     tracks=tracks_label,
                 )
-                """# plot the neutrons and protons
-                plot_one_label(
-                    "Hadronic Resolution",
-                    neutrons,
-                    "variance_om",
-                    PATH_store,
-                    "Neutrons",
-                    el,
-                    tracks=tracks_label,
-                )
-                plot_one_label(
-                    "Hadronic Response",
-                    neutrons,
-                    "mean",
-                    PATH_store,
-                    "Neutrons",
-                    el,
-                    tracks=tracks_label,
-                )
-                plot_one_label(
-                    "Hadronic Resolution",
-                    protons,
-                    "variance_om",
-                    PATH_store,
-                    "Protons",
-                    el,
-                    tracks=tracks_label,
-                )
-                plot_one_label(
-                    "Hadronic Response",
-                    protons,
-                    "mean",
-                    PATH_store,
-                    "Protons",
-                    el,
-                    tracks=tracks_label,
-                )"""
-
 
 def plot_hist_distr(values, label, ax, color, bins = np.linspace(0, 3, 50)):
     ax.hist(values, bins=bins, histtype="step", label=label, color=color, density=True)
 
+
+def plot_pxyz_resolution(x, resolutions_pxyz_pandora, resolutions_pxyz_model, axs, key):
+    for i in [0, 1, 2]:
+        axs[i].scatter(
+            x,
+            resolutions_pxyz_model[:, i],
+            facecolors="red",
+            edgecolors="red",
+            label=key,
+            marker="x",
+            s=50,
+        )
+        axs[i].scatter(
+            x,
+            resolutions_pxyz_pandora[:, i],
+            facecolors="blue",
+            edgecolors="blue",
+            label="Pandora",
+            marker="x",
+            s=50,
+        )
+        axs[i].grid(1)
+        axs[i].legend()
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False
@@ -485,11 +423,11 @@ def plot_per_energy_resolution2_multiple(
     figs_r, axs_r = {}, {}
     figs_distr, axs_distr = {}, {}  # response
     figs_distr_HE, axs_distr_HE = {}, {}  # response high energy
+    figs_resolution_pxyz, axs_resolution_pxyz = {}, {} # px, py, pz resolution
+    figs_response_pxyz, axs_response_pxyz = {}, {} # px, py, pz response
     # distribution at some energy slice for each particle (the little histogram plots)
-    colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
+    # colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
     colors = {
-        #"DNN ~3 epochs": "green",
-        #"GNN+DNN ~3 epochs": "purple",
         "ML": "red",
     }
     plot_pandora, plot_baseline = True, True
@@ -498,12 +436,25 @@ def plot_per_energy_resolution2_multiple(
         figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
         figs_distr[pid], axs_distr[pid] = plt.subplots(1, 1, figsize=(7, 7))
         figs_distr_HE[pid], axs_distr_HE[pid] = plt.subplots(1, 1, figsize=(7, 7))
-    event_res_dic = {}
-    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(15, 10), sharex=False)
+        figs_resolution_pxyz[pid], axs_resolution_pxyz[pid] = plt.subplots(3, 1, figsize=(8, 15), sharex=True)
+        figs_response_pxyz[pid], axs_response_pxyz[pid] = plt.subplots(3, 1, figsize=(8, 15), sharex=True)
+        axs_resolution_pxyz[pid][0].set_title(f"{pid} px resolution")
+        axs_resolution_pxyz[pid][1].set_title(f"{pid} py resolution")
+        axs_resolution_pxyz[pid][2].set_title(f"{pid} pz resolution")
+        axs_resolution_pxyz[pid][2].set_xlabel("Energy [GeV]")
+        axs_response_pxyz[pid][0].set_title(f"{pid} px response")
+        axs_response_pxyz[pid][1].set_title(f"{pid} py response")
+        axs_response_pxyz[pid][2].set_title(f"{pid} pz response")
+        axs_response_pxyz[pid][2].set_xlabel("Energy [GeV]")
+    event_res_dic = {} # event energy resolution
+    event_res_dic_p = {} # event p resolution
+    event_res_dic_mass = {} # event mass resolution
+    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(15, 10))
+    fig_mass_res, ax_mass_res = plt.subplots(1, 1, figsize=(15, 10))
     for key in matched_all:
         matched_ = matched_all[key]
-        mask = matched_["calibration_factor"] > 0
-        matched_ = matched_[mask]
+        ##mask = matched_["calibration_factor"] > 0
+        #matched_ = matched_[mask]
         if tracks:
             tracks_label = "tracks"
         else:
@@ -540,23 +491,25 @@ def plot_per_energy_resolution2_multiple(
                 # for pions 211
                 plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
                 # same for 2212
-                plot_hist_distr(protons["distributions_pandora"][0], "Pandora", axs_distr[2212], "blue", bins=np.linspace(0.5, 1.1, 200))
-                plot_hist_distr(protons["distributions_pandora"][-1], "Pandora", axs_distr_HE[2212], "blue",
-                                bins=np.linspace(0.9, 1.1, 100))
-
-                # for 22
-                plot_hist_distr(photons_dic["distributions_pandora"][0], "Pandora", axs_distr[22], "blue")
+                if len(protons["distributions_pandora"]) > 0:
+                    plot_hist_distr(protons["distributions_pandora"][0], "Pandora", axs_distr[2212], "blue", bins=np.linspace(0.5, 1.1, 200))
+                    plot_hist_distr(protons["distributions_pandora"][-1], "Pandora", axs_distr_HE[2212], "blue",
+                                    bins=np.linspace(0.9, 1.1, 100))
+                if len(photons_dic["distributions_pandora"]) > 0:
+                    plot_hist_distr(photons_dic["distributions_pandora"][0], "Pandora", axs_distr[22], "blue")
             plot_hist_distr(neutrons["distributions_model"][0], key, axs_distr[2112], colors[key])
+
             axs_distr[2112].set_title("Neutrons [0, 5] GeV")
             axs_distr[2112].set_xlabel("$E_{pred.} / E_{true}$")
             # y label density
             axs_distr[2112].set_ylabel("Density")
             axs_distr[2112].legend()
-            plot_hist_distr(protons["distributions_model"][0], key, axs_distr[2212], colors[key], bins=np.linspace(0.5, 1.1, 200))
-            axs_distr[2212].set_title("Protons [0, 5] GeV")
-            axs_distr[2212].set_xlabel("$E_{pred.} / E_{true}$")
-            axs_distr[2212].set_ylabel("Density")
-            axs_distr[2212].legend()
+            if len(protons["distributions_model"]) > 0:
+                plot_hist_distr(protons["distributions_model"][0], key, axs_distr[2212], colors[key], bins=np.linspace(0.5, 1.1, 200))
+                axs_distr[2212].set_title("Protons [0, 5] GeV")
+                axs_distr[2212].set_xlabel("$E_{pred.} / E_{true}$")
+                axs_distr[2212].set_ylabel("Density")
+                axs_distr[2212].legend()
             plot_hist_distr(hadrons_dic["distributions_model"][0], key, axs_distr[130], colors[key])
             axs_distr[130].set_ylabel("Density")
             axs_distr[130].set_title("$K_L$ [0, 5] GeV")
@@ -567,12 +520,12 @@ def plot_per_energy_resolution2_multiple(
             axs_distr[211].set_title("Pions [0, 5] GeV")
             axs_distr[211].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[211].legend()
-            plot_hist_distr(photons_dic["distributions_model"][0], key, axs_distr[22], colors[key])
+            if len(photons_dic["distributions_model"]) > 0:
+                plot_hist_distr(photons_dic["distributions_model"][0], key, axs_distr[22], colors[key])
             axs_distr[22].set_title("Photons [0, 5] GeV")
             axs_distr[22].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[22].set_ylabel("Density")
             axs_distr[22].legend()
-
             plot_hist_distr(neutrons["distributions_model"][-1], key, axs_distr_HE[2212], colors[key], bins=np.linspace(0.9, 1.1, 100))
             axs_distr_HE[2112].set_title("Protons [35, 50] GeV")
             axs_distr_HE[2112].set_xlabel("$E_{pred.} / E_{true}$")
@@ -587,83 +540,90 @@ def plot_per_energy_resolution2_multiple(
                 prefix=key + " ",
                 color=colors[key],
             )
-            """plot_one_label(
-                "Event Energy Resolution",
-                event_res_dic,
-                "variance_om",
-                PATH_store,
-                "ML",
-                "",
-                tracks="",
-                plot_baseline=True,
-                fig=fig_event_energy, ax=ax_event_energy, plot_pandora=False, plot_baseline=False
-            )"""
-
+            plot_mass_resolution(event_res_dic[key], PATH_store)
             for el in list_plots:
-                plot_one_label(
-                    "Electromagnetic Resolution",
-                    photons_dic,
-                    "variance_om",
-                    PATH_store,
-                    "Photons " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs[22],
-                    ax=axs[22],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
-                )
-                plot_one_label(
-                    "Electromagnetic Response",
-                    photons_dic,
-                    "mean",
-                    PATH_store,
-                    "Photons " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs_r[22],
-                    ax=axs_r[22],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
-                )
-                plot_one_label(
-                    "Electromagnetic Response",
-                    electrons_dic,
-                    "mean",
-                    PATH_store,
-                    "Electrons " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs_r[11],
-                    ax=axs_r[11],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
-                )
-                plot_one_label(
-                    "Electromagnetic Resolution",
-                    electrons_dic,
-                    "variance_om",
-                    PATH_store,
-                    "Electrons " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs[11],
-                    ax=axs[11],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
-                )
+                if len(photons_dic["energy_resolutions"]) > 0:
+                    plot_pxyz_resolution(photons_dic["energy_resolutions"], photons_dic["variance_om_pxyz_pandora"], photons_dic["variance_om_pxyz"], axs_resolution_pxyz[22], key)
+                    plot_pxyz_resolution(photons_dic["energy_resolutions"], photons_dic["mean_pxyz_pandora"],
+                                         photons_dic["mean_pxyz"], axs_response_pxyz[22], key)
+                plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["variance_om_pxyz_pandora"], neutrons["variance_om_pxyz"], axs_resolution_pxyz[2112], key)
+                plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["variance_om_pxyz_pandora"], hadrons_dic["variance_om_pxyz"], axs_resolution_pxyz[130], key)
+                if len(hadrons_dic2["energy_resolutions"]) > 0:
+                    plot_pxyz_resolution(hadrons_dic2["energy_resolutions"], hadrons_dic2["variance_om_pxyz_pandora"], hadrons_dic2["variance_om_pxyz"], axs_resolution_pxyz[211], key)
+                    plot_pxyz_resolution(hadrons_dic2["energy_resolutions"], hadrons_dic2["mean_pxyz_pandora"],
+                                         hadrons_dic2["mean_pxyz"], axs_response_pxyz[211], key)
+
+                #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["variance_om_pxyz_pandora"], protons["variance_om_pxyz_pandora"], axs_resolution_pxyz[2212], key)
+                # same but for response instead of resolution. use "mean_pxyz" instead of "variance_om_pxyz"
+                plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
+                plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["mean_pxyz_pandora"], hadrons_dic["mean_pxyz"], axs_response_pxyz[130], key)
+                #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
+                if len(photons_dic["energy_resolutions"]) > 0:
+                    plot_one_label(
+                        "Electromagnetic Resolution",
+                        photons_dic,
+                        "variance_om",
+                        PATH_store,
+                        "Photons " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs[22],
+                        ax=axs[22],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
+                    plot_one_label(
+                        "Electromagnetic Response",
+                        photons_dic,
+                        "mean",
+                        PATH_store,
+                        "Photons " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs_r[22],
+                        ax=axs_r[22],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
+                if len(electrons_dic["energy_resolutions"]) > 0:
+                    plot_one_label(
+                        "Electromagnetic Response",
+                        electrons_dic,
+                        "mean",
+                        PATH_store,
+                        "Electrons " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs_r[11],
+                        ax=axs_r[11],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
+                    plot_one_label(
+                        "Electromagnetic Resolution",
+                        electrons_dic,
+                        "variance_om",
+                        PATH_store,
+                        "Electrons " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs[11],
+                        ax=axs[11],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
                 plot_one_label(
                     "Hadronic Resolution",
                     hadrons_dic,
@@ -698,38 +658,39 @@ def plot_per_energy_resolution2_multiple(
                     pandora_label="Pandora"
 
                 )
-                plot_one_label(
-                    "Hadronic Resolution",
-                    hadrons_dic2,
-                    "variance_om",
-                    PATH_store,
-                    "Pions " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs[211],
-                    ax=axs[211],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pions Pandora"
-                )
-                plot_one_label(
-                    "Hadronic Response",
-                    hadrons_dic2,
-                    "mean",
-                    PATH_store,
-                    "Pions " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs_r[211],
-                    ax=axs_r[211],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pions Pandora"
-                )
+                if len(hadrons_dic2["mean_baseline"]) > 0: # if there are pions in dataset
+                    plot_one_label(
+                        "Hadronic Resolution",
+                        hadrons_dic2,
+                        "variance_om",
+                        PATH_store,
+                        "Pions " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs[211],
+                        ax=axs[211],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
+                    plot_one_label(
+                        "Hadronic Response",
+                        hadrons_dic2,
+                        "mean",
+                        PATH_store,
+                        "Pions " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs_r[211],
+                        ax=axs_r[211],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
                 # plot the neutrons and protons
                 plot_one_label(
                     "Hadronic Resolution",
@@ -745,7 +706,7 @@ def plot_per_energy_resolution2_multiple(
                     plot_pandora=plot_pandora,
                     plot_baseline=plot_baseline,
                     color=colors[key],
-                    pandora_label="Neutrons Pandora"
+                    pandora_label="Pandora"
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -761,23 +722,24 @@ def plot_per_energy_resolution2_multiple(
                     plot_pandora=plot_pandora,
                     plot_baseline=plot_baseline,
                     color=colors[key],
-                    pandora_label="Neutrons Pandora"
-                )
-                plot_one_label(
-                    "Hadronic Resolution",
-                    protons,
-                    "variance_om",
-                    PATH_store,
-                    "Protons " + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs[2212],
-                    ax=axs[2212],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
                     pandora_label="Pandora"
+                )
+                if len(protons["mean_baseline"]) > 0: # if there are protons in dataset
+                    plot_one_label(
+                        "Hadronic Resolution",
+                        protons,
+                        "variance_om",
+                        PATH_store,
+                        "Protons " + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs[2212],
+                        ax=axs[2212],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
                 )
                 plot_one_label(
                     "Hadronic Response",
@@ -804,6 +766,18 @@ def plot_per_energy_resolution2_multiple(
             a.grid(1)
         axs_distr[key].grid(1)
         figs[key].tight_layout()
+        figs_resolution_pxyz[key].tight_layout()
+        Path(os.path.join(PATH_store, "p_resolutions")).mkdir(parents=True, exist_ok=True)
+        figs_resolution_pxyz[key].savefig(
+            os.path.join(PATH_store, "p_resolutions", f"resolution_pxyz_{key}.pdf"),
+            bbox_inches="tight",
+        )
+        figs_response_pxyz[key].tight_layout()
+        Path(os.path.join(PATH_store, "p_response")).mkdir(parents=True, exist_ok=True)
+        figs_response_pxyz[key].savefig(
+            os.path.join(PATH_store, "p_response", f"response_pxyz_{key}.pdf"),
+            bbox_inches="tight",
+        )
         figs[key].savefig(
             os.path.join(PATH_store, f"comparison_resolution_{key}.pdf"),
             bbox_inches="tight",
@@ -827,6 +801,9 @@ def plot_per_energy_resolution2_multiple(
     fig_event_res.savefig(
         os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight"
     )
+    #fig_mass_res.savefig(
+    #    os.path.join(PATH_store, "event_mass_resolution.pdf"), bbox_inches="tight"
+    #)
 
 
 def plot_per_energy_resolution(
@@ -1319,6 +1296,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
     energy_resolutions = []
     energy_resolutions_reco = []
     distributions = []  # distributions of E/Etrue for plotting later
+    mean_pxyz = []
+    variance_pxyz = []
     #distribution_slice_5_6_GeV = []
     # tic = time.time()
     # vector = range(len(bins) - 1)
@@ -1348,13 +1327,17 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
                 pred_e = matched.pandora_calibrated_pfo[mask]
             else:
                 pred_e = matched.pandora_calibrated_E[mask]
+            pred_pxyz = np.array(matched.pandora_calibrated_pos[mask].tolist())
         else:
             pred_e = matched.calibrated_E[mask]
+            pred_pxyz = np.array(matched.pred_pos_matched[mask].tolist())
         pred_e_nocor = matched.pred_showers_E[mask]
+        true_pxyz = np.array(matched.true_pos[mask].tolist())
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
             e_over_reco = true_rec / true_e
             e_over_reco_ML = pred_e_nocor / true_rec
+            pxyz_over_true = pred_pxyz / true_pxyz
             # mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
             #     e_over_true, bins_per_binned_E
             # )
@@ -1378,14 +1361,21 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
                 err_mean_reco_ML,
                 err_mean_var_reco_ML,
             ) = get_sigma_gaussian(e_over_reco_ML, bins_per_binned_E)
+            mean_pxyz_, var_pxyz_ = [], []
+            for i in [0, 1, 2]: # x, y, z
+                (
+                    mean_px,
+                    var_px,
+                    _,
+                    _,
+                ) = get_sigma_gaussian(pxyz_over_true[:, i], bins_per_binned_E)
+                mean_pxyz_.append(mean_px)
+                var_pxyz_.append(var_px)
+            #mean_pxyz_ = np.array(mean_pxyz_)
+            #var_pxyz_ = np.array(var_pxyz_)
             # raise err if mean_reco_ML is nan
             if np.isnan(mean_reco_ML):
                 raise ValueError("mean_reco_ML is nan")
-            # mean_reco_true, var_reco_true = obtain_MPV_and_68(
-            #     e_over_reco, bins_per_binned_E
-            # )
-            # mean_predtotrue = np.mean(e_over_true)
-            # var_predtotrue = np.var(e_over_true) / mean_predtotrue
             mean_true_rec.append(mean_reco_ML)
             variance_om_true_rec.append(np.abs(var_reco_ML))
             mean_baseline.append(mean_reco_true)
@@ -1396,6 +1386,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
             energy_resolutions_reco.append((bin_i1 + bin_i) / 2)
             mean_errors.append(err_mean_predtotrue)
             variance_om_errors.append(err_var_predtotrue)
+            mean_pxyz.append(mean_pxyz_)
+            variance_pxyz.append(var_pxyz_)
 
     return (
         mean,
@@ -1409,6 +1401,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False):
         distributions,
         mean_errors,
         variance_om_errors,
+        np.array(mean_pxyz),
+        np.array(variance_pxyz),
     )
 
 

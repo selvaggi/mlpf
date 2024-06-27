@@ -371,7 +371,6 @@ class PickPAtDCA(torch.nn.Module):
             graphs_new.ndata["chi_squared_tracks"][filt],
             batch_idx[filt],
         )
-        print("p_direction", p_direction)
         p_tracks = torch.norm(p_direction, dim=1)
         p_direction = p_direction  # / torch.norm(p_direction, dim=1).unsqueeze(1)
         # if self.pos_regression:

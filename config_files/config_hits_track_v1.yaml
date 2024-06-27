@@ -6,7 +6,7 @@ graph_config:
    prediction: true
    hit_chis_track: true
    pos_pxpy: true
-   ks: false
+   ks: true
 custom_model_kwargs:
    # add custom model kwargs here
    n_postgn_dense_blocks: 4
