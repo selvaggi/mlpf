@@ -515,7 +515,7 @@ class Particles_GT:
                 self.E_corrected[index_parent] = (
                     self.E_corrected[index_parent] - energy_daugthers
                 )
-
+                self.coord[index_parent] *= (1 - energy_daugthers / torch.norm(self.coord[index_parent]))
 
 def concatenate_Particles_GT(list_of_Particles_GT):
     list_coord = [p[1].coord for p in list_of_Particles_GT]

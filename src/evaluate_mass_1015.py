@@ -6,6 +6,7 @@ import os
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple,
+
     plot_efficiency_all,
 )
 import matplotlib.pyplot as plt
@@ -16,13 +17,15 @@ import pickle
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
-neutrals_only = True
+neutrals_only = False
 log_scale = False
 tracks = True
+perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = True # set the mass to zero for all particles
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/Neutrals_Only_eval_FT_Ep_10_15_dataset_260624"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_Ep_10_15_dataset_260624_masses_set_mass_0"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -63,6 +66,8 @@ def main():
         {"ML": sd_hgb},
         os.path.join(PATH_store, "plots"),
         tracks=tracks,
+        perfect_pid=perfect_pid,
+        mass_zero=mass_zero,
     )
 
 if __name__ == "__main__":

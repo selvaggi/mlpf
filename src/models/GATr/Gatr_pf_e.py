@@ -668,6 +668,8 @@ class ExampleWrapper(L.LightningModule):
             loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
             if self.args.regress_pos:
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
+                if self.args.regress_unit_p:
+                    true_pos = true_pos / torch.norm(true_pos, dim=1).view(-1, 1)
                 loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])

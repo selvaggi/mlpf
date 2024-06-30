@@ -157,11 +157,13 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         pos_regression=False,
         gatr=False,
         charged=False,
+        unit_p=False
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
         out_f = 1
         self.pos_regression = pos_regression
+        self.unit_p = unit_p
         print("pos_regression", self.pos_regression)
         # if pos_regression:
         #     out_f += 3
@@ -301,10 +303,14 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos = self.PickPAtDCA.predict(x_global_features, graphs_new)
+                if self.unit_p:
+                    pos /= torch.norm(pos, dim=1).unsqueeze(1)
                 return torch.clamp(res.flatten(), min=0, max=None), pos
             else:
                 E_pred, p_pred = res[:, 0], res[:, 1:4]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
+                if self.unit_p:
+                    p_pred /= torch.norm(p_pred, dim=1).unsqueeze(1)
                 return E_pred, p_pred
         else:
             # # normalize res[1] vectors

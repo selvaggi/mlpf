@@ -110,7 +110,12 @@ def plot_per_event_energy_distribution(
         bbox_inches="tight",
     )
 
-def calculate_event_mass_resolution(df, pandora):
+particle_masses = {0: 0, 22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
+def safeint(x):
+    if np.isnan(x):
+        return 0
+    return int(x)
+def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False):
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
@@ -140,17 +145,22 @@ def calculate_event_mass_resolution(df, pandora):
             np.array(df.true_pos.values.tolist())
         )
         true_vect[mask_nan_true] = 0
-
+    if perfect_pid or mass_zero:
+        pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
+        pred_vect[np.isnan(pred_vect)] = 0
+        m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+        if mass_zero:
+            m = np.array([0 for _ in m])
+        p_squared = (pred_E ** 2 - m ** 2)
+        pred_vect = np.sqrt(p_squared).reshape(-1, 1) * np.array(pred_vect)
     batch_idx = torch.tensor(batch_idx.values).long()
     pred_E = torch.tensor(pred_E)
-
     true_jet_vect = scatter_sum(true_vect, batch_idx, dim=0)
-    pred_jet_vect = scatter_sum(pred_vect, batch_idx, dim=0)
+    pred_jet_vect = scatter_sum(torch.tensor(pred_vect), batch_idx, dim=0)
     true_E_jet = scatter_sum(torch.tensor(true_e), batch_idx)
     pred_E_jet = scatter_sum(torch.tensor(pred_E), batch_idx)
     true_jet_p = torch.norm(true_jet_vect, dim=1)  # This is actually momentum resolution
     pred_jet_p = torch.norm(pred_jet_vect, dim=1)
-
     mass_true = torch.sqrt(torch.abs(true_E_jet ** 2) - true_jet_p ** 2)
     mass_pred_p = torch.sqrt(
         torch.abs(pred_E_jet ** 2) - pred_jet_p ** 2)  ## TODO: fix the nan values in pred_jet_p!!!!!
@@ -295,7 +305,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     return ret
 
 
-def get_response_for_event_energy(matched_pandora, matched_):
+def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False):
     (
         mean_p,
         variance_om_p,
@@ -317,8 +327,8 @@ def get_response_for_event_energy(matched_pandora, matched_):
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
 
-    mean_mass_p, var_mass_p, distr_mass_p, _, _, _ = calculate_event_mass_resolution(matched_pandora, True)
-    mean_mass, var_mass, distr_mass, _, _, _ = calculate_event_mass_resolution(matched_, False)
+    mean_mass_p, var_mass_p, distr_mass_p, _, _, _ = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    mean_mass, var_mass, distr_mass, _, _, _ = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero)
 
     dic = {}
     dic["mean_p"] = mean_p
@@ -347,7 +357,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["mass_over_true_model"],
         bins=bins,
         histtype="step",
-        label="ML μ={} σ={}".format(
+        label="ML μ={} σ/μ={}".format(
             round((event_res_dic["mean_mass_model"]), 2),
             round((event_res_dic["var_mass_model"]), 2),
 
@@ -359,7 +369,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
-        label="Pandora μ={} σ={}".format(
+        label="Pandora μ={} σ/μ={}".format(
             round((event_res_dic["mean_mass_pandora"]), 2),
             round((event_res_dic["var_mass_pandora"]), 2),
         ),

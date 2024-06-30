@@ -607,3 +607,10 @@ parser.add_argument(
     default="",
     help="Path to a DNN model regressing charged energy and p",
 )
+
+parser.add_argument(
+    "--regress-unit-p",
+    default=False,
+    action="store_true",
+    help="Whether to regress a unit vector for the momentum instead of the full vector",
+)
