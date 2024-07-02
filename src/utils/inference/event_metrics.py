@@ -115,6 +115,8 @@ def safeint(x):
     if np.isnan(x):
         return 0
     return int(x)
+
+
 def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False):
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
@@ -168,7 +170,6 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
     mass_over_true_p = mass_pred_p / mass_true
     E_over_true = pred_E_jet / true_E_jet
     p_over_true = pred_jet_p / true_jet_p
-    E_jet_pandora = pred_E_jet
     p_jet_pandora = pred_jet_p
     (
         mean_mass,
@@ -176,11 +177,10 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         _,
         _,
     ) = get_sigma_gaussian(mass_over_true_p, np.linspace(0, 4, 300))
-    return mean_mass, var_mass, mass_over_true_p, mass_true, p_over_true, true_jet_p
+    return mean_mass, var_mass, mass_over_true_p, mass_true, p_over_true, true_jet_p, E_over_true
 
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
-    bins = [0, 700]
     if full_vector and pandora:
         assert "pandora_calibrated_pos" in df.columns
     bins = [0, 700]
@@ -201,7 +201,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         true_e = df.true_showers_E.values
         batch_idx = df.number_batch
         if pandora:
-            pred_e = df.pandora_calibrated_E.values
+            pred_e = df.pandora_calibrated_pfo.values
             pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
             if full_vector:
                 pred_vect = (
@@ -327,8 +327,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
 
-    mean_mass_p, var_mass_p, distr_mass_p, _, _, _ = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero)
-    mean_mass, var_mass, distr_mass, _, _, _ = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    mean_mass_p, var_mass_p, distr_mass_p, _, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    mean_mass, var_mass, distr_mass, _, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero)
 
     dic = {}
     dic["mean_p"] = mean_p
@@ -347,6 +347,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["mean_mass_pandora"] = mean_mass_p
     dic["var_mass_model"] = var_mass
     dic["var_mass_pandora"] = var_mass_p
+    dic["energy_over_true"] = E_over_true
+    dic["energy_over_true_pandora"] = E_over_true_pandora
     return dic
 
 def plot_mass_resolution(event_res_dic, PATH_store):

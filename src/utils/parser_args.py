@@ -614,3 +614,21 @@ parser.add_argument(
     action="store_true",
     help="Whether to regress a unit vector for the momentum instead of the full vector",
 )
+
+parser.add_argument(
+    "--classify-pid-charged",
+    default="",
+    type=str,
+    help="Comma-separated list of possible PIDs to regress. Others will be put into a separate class.",
+)
+
+parser.add_argument(
+    "--classify-pid-neutral",
+    default="",
+    type=str,
+    help="Comma-separated list of possible PIDs to regress. Others will be put into a separate class.",
+)
+
+
+# --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211
+

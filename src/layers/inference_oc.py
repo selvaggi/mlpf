@@ -38,6 +38,8 @@ def create_and_store_graph_output(
     total_number_events=0,
     pred_pos=None,
     use_gt_clusters=False,
+    pids_neutral=None,
+    pids_charged=None,
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0

@@ -40,7 +40,6 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
     pids_pandora = np.abs(matched_pandora["pid"].values)
     mask_id = get_mask_id(id, pids_pandora)
     df_id_pandora = matched_pandora[mask_id]
-
     pids = np.abs(matched_["pid"].values)
     mask_id = get_mask_id(id, pids)
     df_id = matched_[mask_id]
@@ -57,7 +56,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         e_over_e_distr_pandora,
         mean_errors_p,
         variance_errors_p,
-        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora
+        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero)
     (
         mean,
@@ -71,7 +70,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         e_over_e_distr_model,
         mean_errors,
         variance_errors,
-        mean_pxyz, variance_om_pxyz, masses
+        mean_pxyz, variance_om_pxyz, masses, pxyz_true, pxyz_pred
     ) = calculate_response(df_id, False, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero)
     print(variance_om_p)
     print(variance_om)
@@ -105,6 +104,10 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
     dic["variance_om_pxyz_pandora"] = variance_om_pxyz_pandora
     dic["mass_histogram"] = masses
     dic["mass_histogram_pandora"] = masses_pandora
+    dic["pxyz_true_p"] = pxyz_true_p
+    dic["pxyz_pred_p"] = pxyz_pred_p
+    dic["pxyz_true"] = pxyz_true
+    dic["pxyz_pred"] = pxyz_pred
     return dic
 
 
@@ -396,7 +399,7 @@ def plot_hist_distr(values, label, ax, color, bins=np.linspace(0, 3, 50)):
     ax.grid(1)
 
 def plot_pxyz_resolution(x, resolutions_pxyz_pandora, resolutions_pxyz_model, axs, key):
-    for i in [0, 1, 2]:
+    for i in [0, 1, 2, 3]:
         axs[i].scatter(
             x,
             resolutions_pxyz_model[:, i],
@@ -418,16 +421,21 @@ def plot_pxyz_resolution(x, resolutions_pxyz_pandora, resolutions_pxyz_model, ax
         axs[i].grid(1)
         axs[i].legend()
 
-def plot_mass_hist(masses, masses_pandora, axs, bars=[], energy_ranges=[[0, 5], [5, 15], [15, 35], [35, 50]]):
+def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[[0, 5], [5, 15], [15, 35], [35, 50]]):
     # bars: list of energies at which to plot a vertical line
+    masses = masses_lst[0]
+    masses_pandora = masses_pandora_lst[0]
+    is_trk_in_clust_pandora = [x.values for x in masses_pandora_lst[1]]
     for i in range(4):
         # percentage of nans
         perc_nan_model = int(torch.sum(torch.isnan(masses[i])) / len(masses[i]) * 100)
         perc_nan_pandora = int(torch.sum(torch.isnan(masses_pandora[i])) / len(masses_pandora[i]) * 100)
         #bins = np.linspace(-1, 1, 50)
         bins = 100
-        axs[i].hist(masses[i], bins=bins, histtype="step", label="ML (nan {} %)".format(perc_nan_model), color="red", density=True)
-        axs[i].hist(masses_pandora[i], bins=bins, histtype="step", label="Pandora (nan {}%)".format(perc_nan_pandora), color="blue", density=True)
+        #axs[i].hist(masses[i], bins=bins, histtype="step", label="ML (nan {} %)".format(perc_nan_model), color="red", density=True)
+        filt = is_trk_in_clust_pandora[i]
+        axs[i].hist(masses_pandora[i][filt==1], bins=bins, histtype="step", label="Pandora (nan {}%), track in cluster".format(perc_nan_pandora), color="blue", density=True)
+        axs[i].hist(masses_pandora[i][filt==0], bins=bins, histtype="step", label="Pandora (nan {}%), track not in cluster".format(perc_nan_pandora), color="green", density=True)
         #max_mass = max(masses_pandora[i].max(), masses[i].max())
         axs[i].set_title(f"[{energy_ranges[i][0]}, {energy_ranges[i][1]}] GeV")
         axs[i].legend()
@@ -435,9 +443,10 @@ def plot_mass_hist(masses, masses_pandora, axs, bars=[], energy_ranges=[[0, 5], 
         axs[i].set_yscale("log")
         mean_mass = masses[i][torch.isnan(masses[i])].mean()
         mean_mass_pandora = masses_pandora[i][torch.isnan(masses_pandora[i])].mean()
-        for bar in bars:
-            if bar * 0.95 < mean_mass:
-                axs[i].axvline(bar, color="black", linestyle="--")
+
+        #for bar in bars:
+        #    if bar * 0.95 < mean_mass:
+        #        axs[i].axvline(bar, color="black", linestyle="--")
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False
@@ -461,16 +470,18 @@ def plot_per_energy_resolution2_multiple(
         figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
         figs_distr[pid], axs_distr[pid] = plt.subplots(1, 1, figsize=(7, 7))
         figs_distr_HE[pid], axs_distr_HE[pid] = plt.subplots(1, 1, figsize=(7, 7))
-        figs_resolution_pxyz[pid], axs_resolution_pxyz[pid] = plt.subplots(3, 1, figsize=(8, 15), sharex=True)
-        figs_response_pxyz[pid], axs_response_pxyz[pid] = plt.subplots(3, 1, figsize=(8, 15), sharex=True)
+        figs_resolution_pxyz[pid], axs_resolution_pxyz[pid] = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
+        figs_response_pxyz[pid], axs_response_pxyz[pid] = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
         figs_mass_hist[pid], axs_mass_hist[pid] = plt.subplots(4, 1, figsize=(8, 20), sharex=False)
         axs_resolution_pxyz[pid][0].set_title(f"{pid} px resolution")
         axs_resolution_pxyz[pid][1].set_title(f"{pid} py resolution")
         axs_resolution_pxyz[pid][2].set_title(f"{pid} pz resolution")
+        axs_resolution_pxyz[pid][3].set_title("p norm resolution [GeV]")
         axs_resolution_pxyz[pid][2].set_xlabel("Energy [GeV]")
         axs_response_pxyz[pid][0].set_title(f"{pid} px response")
         axs_response_pxyz[pid][1].set_title(f"{pid} py response")
         axs_response_pxyz[pid][2].set_title(f"{pid} pz response")
+        axs_response_pxyz[pid][3].set_title("p norm response [GeV]")
         axs_response_pxyz[pid][2].set_xlabel("Energy [GeV]")
         axs_mass_hist[pid][-1].set_xlabel("Mass [GeV]")
     event_res_dic = {} # event energy resolution
@@ -513,8 +524,38 @@ def plot_per_energy_resolution2_multiple(
             # for neutrons
             if plot_pandora:
                 plot_hist_distr(neutrons["distributions_pandora"][0], "Pandora", axs_distr[2112], "blue")
+                '''
+                i = 0
+                neutrons_normalized_pxyz_true = neutrons["pxyz_true_p"][i] / np.linalg.norm(neutrons["pxyz_true_p"][i], axis=1).reshape(-1, 1)
+                neutrons_normalized_pxyz_pred = neutrons["pxyz_pred_p"][i] / np.linalg.norm(neutrons["pxyz_pred_p"][i], axis=1).reshape(-1, 1)
+                distance= np.linalg.norm(neutrons_normalized_pxyz_true - neutrons_normalized_pxyz_pred, axis=1)
+                fig, ax = plt.subplots()
+                ax.hist(distance, bins=100, label='pandora',  histtype="step")
+                neutrons_normalized_pxyz_true = neutrons["pxyz_true"][i] / np.linalg.norm(neutrons["pxyz_true"][i], axis=1).reshape(-1, 1)
+                neutrons_normalized_pxyz_pred = neutrons["pxyz_pred"][i] / np.linalg.norm(neutrons["pxyz_pred"][i], axis=1).reshape(-1, 1)
+                ax.hist(np.linalg.norm(neutrons_normalized_pxyz_true - neutrons_normalized_pxyz_pred, axis=1), bins=100, label='ML', histtype="step")
+                ax.legend()
+                ax.grid(1)
+                ax.set_yscale("log")
+                ax.set_title("Neutrons p distance from truth [0,5] GeV")
+                
+                bins = np.linspace(0, 40, 100)
+                distances_p = np.linalg.norm(neutrons["pxyz_true_p"][-1] - neutrons["pxyz_pred_p"][-1], axis=1)
+                distances = np.linalg.norm(neutrons["pxyz_true"][-1] - neutrons["pxyz_pred"][-1], axis=1)
+                fig, ax = plt.subplots()
+                ax.hist(distances_p, bins=bins, histtype="step", label="Pandora", color="blue", density=True)
+                ax.hist(distances, bins=bins, histtype="step", label="ML", color="red", density=True)
+                ax.legend()
+                ax.grid(1)
+                ax.set_yscale("log")
+                ax.set_title("Neutrons p distance from truth [35,50] GeV")
+                fig.tight_layout()
+                fig.savefig(PATH_store + "/Neutrons_p_distance_high_energy.pdf", bbox_inches="tight")
+                '''
                 # same for 130
                 plot_hist_distr(hadrons_dic["distributions_pandora"][0], "Pandora", axs_distr[130], "blue")
+                ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step", label="Pandora", color="blue")
+                ax_event_res.hist(event_res_dic["ML"]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step", label="ML", color="red")
                 # for pions 211
                 plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
                 # same for 2212
@@ -523,7 +564,19 @@ def plot_per_energy_resolution2_multiple(
                     plot_hist_distr(protons["distributions_pandora"][-1], "Pandora", axs_distr_HE[2212], "blue",
                                     bins=np.linspace(0.9, 1.1, 100))
                 if len(photons_dic["distributions_pandora"]) > 0:
+                    bins=np.linspace(0, 5, 100)
                     plot_hist_distr(photons_dic["distributions_pandora"][0], "Pandora", axs_distr[22], "blue")
+                    distances_p = np.linalg.norm(photons_dic["pxyz_true_p"][0] - photons_dic["pxyz_pred_p"][0], axis=1)
+                    distances = np.linalg.norm(photons_dic["pxyz_true"][0] - photons_dic["pxyz_pred"][0], axis=1)
+                    fig, ax = plt.subplots()
+                    ax.hist(distances_p, bins=bins, histtype="step", label="Pandora", color="blue", density=True)
+                    ax.hist(distances, bins=bins, histtype="step", label="ML", color="red", density=True)
+                    ax.legend()
+                    ax.grid(1)
+                    ax.set_yscale("log")
+                    ax.set_title("Photons p distance from truth [0,5] GeV")
+                    fig.tight_layout()
+                    fig.savefig(PATH_store + "/Photons_p_distance.pdf", bbox_inches="tight")
             plot_hist_distr(neutrons["distributions_model"][0], key, axs_distr[2112], colors[key])
             axs_distr[2112].set_title("Neutrons [0, 5] GeV")
             axs_distr[2112].set_xlabel("$E_{pred.} / E_{true}$")
@@ -557,7 +610,7 @@ def plot_per_energy_resolution2_multiple(
             axs_distr_HE[2112].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr_HE[2112].set_ylabel("Density")
             axs_distr_HE[2112].legend()
-            plot_histograms(
+            '''plot_histograms(
                 "Event Energy Resolution",
                 event_res_dic[key],
                 fig_event_res,
@@ -565,7 +618,7 @@ def plot_per_energy_resolution2_multiple(
                 plot_pandora,
                 prefix=key + " ",
                 color=colors[key],
-            )
+            )'''
             plot_mass_resolution(event_res_dic[key], PATH_store)
             neutral_masses = [0.0, 497.611/1000, 0.939565]
             charged_masses = [0.139570, 0.511/1000]
@@ -842,6 +895,7 @@ def plot_per_energy_resolution2_multiple(
             os.path.join(PATH_store, "mass_hist", f"mass_hist_{key}.pdf"),
             bbox_inches="tight",
         )
+    ax_event_res.legend()
 
     fig_event_res.savefig(
         os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight"
@@ -1346,6 +1400,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
     mean_pxyz = []
     variance_pxyz = []
     masses = []
+    is_track_in_cluster = []
+    pxyz_true, pxyz_pred = [], []
     #distribution_slice_5_6_GeV = []
     # tic = time.time()
     # vector = range(len(bins) - 1)
@@ -1379,12 +1435,13 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         else:
             pred_e = matched.calibrated_E[mask]
             pred_pxyz = np.array(matched.pred_pos_matched[mask].tolist())
+        trk_in_clust = matched.is_track_in_cluster[mask]
         if perfect_pid or mass_zero:
             if len(pred_pxyz):
                 pred_pxyz /= np.linalg.norm(pred_pxyz, axis=1).reshape(-1, 1)
             m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
             if mass_zero:
-                m = np.array([0 for i in m])
+                m = np.array([0 for _ in m])
             p_squared = (pred_e**2 - m**2).values
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
         pred_e_nocor = matched.pred_showers_E[mask]
@@ -1394,6 +1451,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             e_over_reco = true_rec / true_e
             e_over_reco_ML = pred_e_nocor / true_rec
             pxyz_over_true = pred_pxyz / true_pxyz
+            p_size_over_true = np.linalg.norm(pred_pxyz, axis=1) / np.linalg.norm(true_pxyz, axis=1)
             # mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
             #     e_over_true, bins_per_binned_E
             # )
@@ -1419,6 +1477,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
                 err_mean_var_reco_ML,
             ) = get_sigma_gaussian(e_over_reco_ML, bins_per_binned_E)
             mean_pxyz_, var_pxyz_ = [], []
+            pxyz_true.append(true_pxyz)
+            pxyz_pred.append(pred_pxyz)
             for i in [0, 1, 2]: # x, y, z
                 (
                     mean_px,
@@ -1428,6 +1488,14 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
                 ) = get_sigma_gaussian(pxyz_over_true[:, i], bins_per_binned_E)
                 mean_pxyz_.append(mean_px)
                 var_pxyz_.append(var_px)
+            (
+                mean_px,
+                var_px,
+                _,
+                _,
+            ) = get_sigma_gaussian(p_size_over_true, bins_per_binned_E)
+            mean_pxyz_.append(mean_px)
+            var_pxyz_.append(var_px)
             #mean_pxyz_ = np.array(mean_pxyz_)
             #var_pxyz_ = np.array(var_pxyz_)
             # raise err if mean_reco_ML is nan
@@ -1445,6 +1513,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             variance_om_errors.append(err_var_predtotrue)
             mean_pxyz.append(mean_pxyz_)
             variance_pxyz.append(var_pxyz_)
+            is_track_in_cluster.append(trk_in_clust)
 
     return (
         mean,
@@ -1460,7 +1529,9 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         variance_om_errors,
         np.array(mean_pxyz),
         np.array(variance_pxyz),
-        masses
+        [masses, is_track_in_cluster],
+        pxyz_true,
+        pxyz_pred
     )
 
 

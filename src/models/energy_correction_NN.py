@@ -157,7 +157,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         pos_regression=False,
         gatr=False,
         charged=False,
-        unit_p=False
+        unit_p=False,
+        pid_channels=0, # PID: list of possilbe PID values to classify using an additional head. If empty, don't do PID.
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
@@ -201,6 +202,10 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             # self.gnn = GraphSAGE(in_channels=in_features_gnn, out_channels=out_features_gnn, hidden_channels=64, num_layers=3)
         else:
             self.gnn = None
+        self.pid_channels = pid_channels
+        if pid_channels > 1: # 1 is just the 'other' category
+            self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels) # additional head for PID classification
+            self.PID_head.to(device)
         if ckpt_file is not None:
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
             with open(ckpt_file, "rb") as f:
@@ -273,6 +278,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                         self.model.model[0].weight.device
                     )
         else:
+            # not using GATr features
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(
                 x_global_features.device
             )
@@ -280,38 +286,42 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             model_x = torch.cat([x_global_features, gnn_output], dim=1).to(
                 self.model.model[0].weight.device
             )
-        if explain:
-            assert not self.use_gatr
-            print("explain")
-            # take a selection of 10% or 50 samples to get typical feature values
-            print(model_x.shape)
-            n_samples = min(50, int(0.2 * model_x.shape[0]))
-            model_exp = deepcopy(self.model)
-            model_exp.to("cpu")
-            model_exp.explainer_mode = True
-            with torch.no_grad():
-                for parameter in model_exp.model.parameters():
-                    parameter.requires_grad = False
-                explainer = shap.KernelExplainer(
-                    model_exp, model_x[:n_samples].detach().cpu().numpy()
-                )
-                shap_vals = explainer.shap_values(
-                    model_x.detach().cpu().numpy(), nsamples=200
-                )
-            return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()
+            ''' if explain:
+                assert not self.use_gatr
+                print("explain")
+                # take a selection of 10% or 50 samples to get typical feature values
+                print(model_x.shape)
+                n_samples = min(50, int(0.2 * model_x.shape[0]))
+                model_exp = deepcopy(self.model)
+                model_exp.to("cpu")
+                model_exp.explainer_mode = True
+                with torch.no_grad():
+                    for parameter in model_exp.model.parameters():
+                        parameter.requires_grad = False
+                    explainer = shap.KernelExplainer(
+                        model_exp, model_x[:n_samples].detach().cpu().numpy()
+                    )
+                    shap_vals = explainer.shap_values(
+                        model_x.detach().cpu().numpy(), nsamples=200
+            )
+            return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()'''
         res = self.model(model_x)
+        if self.pid_channels > 1:
+            pid_pred = self.PID_head(model_x)
+        else:
+            pid_pred = None
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos = self.PickPAtDCA.predict(x_global_features, graphs_new)
                 if self.unit_p:
                     pos /= torch.norm(pos, dim=1).unsqueeze(1)
-                return torch.clamp(res.flatten(), min=0, max=None), pos
+                return torch.clamp(res.flatten(), min=0, max=None), pos, pid_pred
             else:
                 E_pred, p_pred = res[:, 0], res[:, 1:4]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
                 if self.unit_p:
                     p_pred /= torch.norm(p_pred, dim=1).unsqueeze(1)
-                return E_pred, p_pred
+                return E_pred, p_pred, pid_pred
         else:
             # # normalize res[1] vectors
             # E = torch.clamp(res[0].flatten(), min=0, max=None)
