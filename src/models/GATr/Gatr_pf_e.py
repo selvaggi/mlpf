@@ -189,17 +189,24 @@ class ExampleWrapper(L.LightningModule):
                 num_global_features = 14
                 print("this is the model for charged")
                 if len(self.args.classify_pid_charged):
-                    self.pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")]
+                    self.pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")] + [0]
                 else:
                     self.pids_charged = []
                 if len(self.args.classify_pid_neutral):
-                    self.pids_neutral = [int(x) for x in self.args.classify_pid_neutral.split(",")]
+                    self.pids_neutral = [int(x) for x in self.args.classify_pid_neutral.split(",")] + [0]
                 else:
                     self.pids_neutral = []
                 if len(self.pids_charged):
                     print("Also running classification for charged particles", self.pids_charged)
                 if len(self.pids_neutral):
                     print("Also running classification for neutral particles", self.pids_neutral)
+                if self.args.PID_4_class:
+                    self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
+                    self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
+                    self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                out_f = 1
+                if self.args.regress_pos:
+                    out_f += 3
                 self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
@@ -209,8 +216,9 @@ class ExampleWrapper(L.LightningModule):
                     gatr=True,
                     pos_regression=self.args.regress_pos,
                     charged=True,
-                    pid_channels=len(self.pids_charged)+1,
-                    unit_p=self.args.regress_unit_p
+                    pid_channels=len(self.pids_charged),
+                    unit_p=self.args.regress_unit_p,
+                    out_f=1
                 )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
@@ -220,8 +228,9 @@ class ExampleWrapper(L.LightningModule):
                     gnn=True,
                     gatr=True,
                     pos_regression=self.args.regress_pos,
-                    pid_channels=len(self.pids_neutral)+1,
-                    unit_p=self.args.regress_unit_p
+                    pid_channels=len(self.pids_neutral),
+                    unit_p=self.args.regress_unit_p,
+                    out_f=out_f
                 )
             else:  # DNN
                 # only a DNN for energy correction
@@ -327,7 +336,6 @@ class ExampleWrapper(L.LightningModule):
         #     )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
-
         if self.args.correction:
             # self.args.regress_pos = True
             result = self.forward_correction(g, x, y, return_train)
@@ -357,6 +365,7 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
+            pred_pid
         ) = self.clustering_and_global_features(g, x, y)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
@@ -415,6 +424,12 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr[neutral_idx.flatten()] = (
             neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
+        if len(self.pids_charged):
+            charged_PID_pred = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu(), axis=1)]
+            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred).to(charged_idx.device)
+        if len(self.pids_neutral):
+            neutral_PID_pred = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu(), axis=1)]
+            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred).to(neutral_idx.device)
         pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
         if self.args.regress_pos:
             if len(charged_idx):
@@ -425,14 +440,20 @@ class ExampleWrapper(L.LightningModule):
                 "pred_energy_corr": pred_energy_corr,
                 "pred_pos": pred_pos,
                 "neutrals_idx": neutral_idx.flatten(),
-                "charged_idx": charged_idx.flatten(),
+                "charged_idx": charged_idx.flatten()
             }
+            if len(self.pids_charged) or len(self.pids_neutral):
+                pred_energy_corr["pred_PID"] = pred_pid
+                pred_energy_corr["charged_PID_pred"] = charged_PID_pred
+                pred_energy_corr["neutral_PID_pred"] = neutral_PID_pred
+                #if self.args.PID_4_class:
+                #    true_pid = np.array([self.pid_conversion_dict.get(x, 3) for x in true_pid])
             #"charged_PID_pred": charged_PID_pred,
             #"neutral_PID_pred": neutral_PID_pred,
-            if len(self.pids_charged):
-                pred_energy_corr["charged_PID_pred"] = charged_PID_pred
-            if len(self.pids_neutral):
-                pred_energy_corr["neutral_PID_pred"] = neutral_PID_pred
+            #if len(self.pids_charged):
+            #    pred_energy_corr["charged_PID_pred"] = charged_PID_pred
+            #if len(self.pids_neutral):
+            #    pred_energy_corr["neutral_PID_pred"] = neutral_PID_pred
 
         if return_train:
             return (
@@ -562,6 +583,9 @@ class ExampleWrapper(L.LightningModule):
             pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
                 graphs_new.ndata["h"].device
             )
+            pred_pid = torch.ones((graphs_high_level_features.shape[0])).to(
+                graphs_new.ndata["h"].device
+            ).long()
         else:
             pred_pos = None
         node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
@@ -629,6 +653,7 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
+            pred_pid
         )
 
     def build_attention_mask(self, g):
@@ -686,25 +711,35 @@ class ExampleWrapper(L.LightningModule):
                 charged_PID_true = np.array(pid_true_matched)[dic["charged_idx"].cpu()]
                 # one-hot encoded
                 charged_PID_true_onehot = torch.zeros(
-                    len(charged_PID_true), len(self.pids_charged) + 1
-                ).to(dic["charged_idx"].device)
-                for i in range(len(charged_PID_true)):
-                    if charged_PID_true[i] in self.pids_charged:
-                        charged_PID_true_onehot[i, self.pids_charged.index(charged_PID_true[i])] = 1
-                    else:
-                        charged_PID_true_onehot[i, -1] = 1
+                    len(charged_PID_true), len(self.pids_charged)
+                )
+                if not self.args.PID_4_class:
+                    for i in range(len(charged_PID_true)):
+                        if charged_PID_true[i] in self.pids_charged:
+                            charged_PID_true_onehot[i, self.pids_charged.index(charged_PID_true[i])] = 1
+                        else:
+                            charged_PID_true_onehot[i, -1] = 1
+                else:
+                    for i in range(len(charged_PID_true)):
+                        charged_PID_true_onehot[i, self.pid_conversion_dict.get(charged_PID_true[i], 3)] = 1
+                charged_PID_true_onehot = charged_PID_true_onehot.clone().to(dic["charged_idx"].device)
             if len(self.pids_neutral):
                 neutral_PID_pred = dic["neutral_PID_pred"]
                 neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
                 # one-hot encoded
                 neutral_PID_true_onehot = torch.zeros(
-                    len(neutral_PID_true), len(self.pids_neutral) + 1
-                ).to(neutral_idx.device)
-                for i in range(len(neutral_PID_true)):
-                    if neutral_PID_true[i] in self.pids_neutral:
-                        neutral_PID_true_onehot[i, self.pids_neutral.index(neutral_PID_true[i])] = 1
-                    else:
-                        neutral_PID_true_onehot[i, -1] = 1
+                    len(neutral_PID_true), len(self.pids_neutral)
+                )
+                if not self.args.PID_4_class:
+                    for i in range(len(neutral_PID_true)):
+                        if neutral_PID_true[i] in self.pids_neutral:
+                            neutral_PID_true_onehot[i, self.pids_neutral.index(neutral_PID_true[i])] = 1
+                        else:
+                            neutral_PID_true_onehot[i, -1] = 1
+                else:
+                    for i in range(len(neutral_PID_true)):
+                        neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
+                neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
         loss_time_start = time()
         (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
             batch_g,
@@ -731,7 +766,7 @@ class ExampleWrapper(L.LightningModule):
             if self.args.regress_pos:
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
                 if self.args.regress_unit_p:
-                    true_pos = true_pos / torch.norm(true_pos, dim=1).view(-1, 1)
+                    true_pos = (true_pos / torch.norm(true_pos, dim=1).view(-1, 1)).clone()
                 loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
@@ -848,13 +883,22 @@ class ExampleWrapper(L.LightningModule):
                     coords_true,
                 ) = result
             if self.args.regress_pos:
-                '''if len(self.pids_charged):
+                if len(self.pids_charged):
                     charged_PID_pred = e_cor["charged_PID_pred"]
-                    charged_PID_true = pid_true_matched[charged_idx]
+                    #charged_PID_pred =  np.array(self.pids_charged + [0])[np.argmax(charged_PID_pred.cpu(), axis=1)]
+                    charged_idx = e_cor["charged_idx"]
+                    #charged_PID_true = np.array(pid_true_matched)[charged_idx.cpu()]
+                    #if self.args.PID_4_class:
+                    #    charged_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in charged_PID_true])
                     #pid_list[charged_idx] = charged_PID_pred
                 if len(self.pids_neutral):
-                    neutral_PID_pred = e_cor["neutral_PID_pred"]
-                    neutral_PID_true = pid_true_matched["neutral_idx"]'''
+                    neutral_idx = e_cor["neutrals_idx"]
+                    #neutral_PID_pred = e_cor["neutral_PID_pred"]
+                    #neutral_PID_pred = np.array(self.pids_neutral + [0])[np.argmax(neutral_PID_pred.cpu(), axis=1)]
+                    #neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
+                    #if self.args.PID_4_class:
+                    #    neutral_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in neutral_PID_true])
+                pred_pid = e_cor["pred_PID"]
                 e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
                 #pid_list = np.zeros_like(e_cor)
             else:
@@ -929,6 +973,7 @@ class ExampleWrapper(L.LightningModule):
                 ec_x=ec_x,
                 total_number_events=self.total_number_events,
                 pred_pos=pred_pos,
+                pred_pid=pred_pid,
                 use_gt_clusters=self.args.use_gt_clusters,
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,

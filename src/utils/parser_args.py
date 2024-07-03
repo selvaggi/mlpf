@@ -629,6 +629,12 @@ parser.add_argument(
     help="Comma-separated list of possible PIDs to regress. Others will be put into a separate class.",
 )
 
+parser.add_argument(
+    "--PID-4-class",
+    default=False,
+    action="store_true",
+    help="Classify into electron, CH, NH, gamma - both for charged and neutral.",
+)
 
 # --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211
 

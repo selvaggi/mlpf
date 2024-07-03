@@ -158,11 +158,11 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         gatr=False,
         charged=False,
         unit_p=False,
-        pid_channels=0, # PID: list of possilbe PID values to classify using an additional head. If empty, don't do PID.
+        pid_channels=0, # PID: list of possible PID values to classify using an additional head. If empty, don't do PID.
+        out_f=1
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
-        out_f = 1
         self.pos_regression = pos_regression
         self.unit_p = unit_p
         print("pos_regression", self.pos_regression)
@@ -206,11 +206,13 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         if pid_channels > 1: # 1 is just the 'other' category
             self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels) # additional head for PID classification
             self.PID_head.to(device)
-        if ckpt_file is not None:
+        if ckpt_file is not None and ckpt_file != "":
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
             with open(ckpt_file, "rb") as f:
                 self.model.model = CPU_Unpickler(f).load()
             print("Loaded energy correction model weights from", ckpt_file)
+        else:
+            print("Not loading energy correction model weights")
         self.model.to(device)
         self.PickPAtDCA = PickPAtDCA()
 
@@ -314,16 +316,16 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             if self.charged:
                 p_tracks, pos = self.PickPAtDCA.predict(x_global_features, graphs_new)
                 if self.unit_p:
-                    pos /= torch.norm(pos, dim=1).unsqueeze(1)
+                    pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
                 return torch.clamp(res.flatten(), min=0, max=None), pos, pid_pred
             else:
-                E_pred, p_pred = res[:, 0], res[:, 1:4]
+                E_pred, p_pred = res[0], res[1]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
                 if self.unit_p:
-                    p_pred /= torch.norm(p_pred, dim=1).unsqueeze(1)
+                    p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
                 return E_pred, p_pred, pid_pred
         else:
-            # # normalize res[1] vectors
+            # # normalize recctors
             # E = torch.clamp(res[0].flatten(), min=0, max=None)
             # p = res[1]  # / torch.norm(res[1], dim=1).unsqueeze(1)
             # if self.use_gatr and not use_full_mv:

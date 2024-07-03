@@ -36,7 +36,7 @@ def get_mask_id(id, pids_pandora):
     return mask_id
 
 
-def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_pid=False, mass_zero=False):
+def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False):
     pids_pandora = np.abs(matched_pandora["pid"].values)
     mask_id = get_mask_id(id, pids_pandora)
     df_id_pandora = matched_pandora[mask_id]
@@ -57,7 +57,8 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         mean_errors_p,
         variance_errors_p,
         mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p
-    ) = calculate_response(df_id_pandora, True, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    ) = calculate_response(df_id_pandora, True, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    # Pandora: TODO: do some sort of PID for Pandora
     (
         mean,
         variance_om,
@@ -71,7 +72,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         mean_errors,
         variance_errors,
         mean_pxyz, variance_om_pxyz, masses, pxyz_true, pxyz_pred
-    ) = calculate_response(df_id, False, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    ) = calculate_response(df_id, False, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     print(variance_om_p)
     print(variance_om)
     print("recoooo")
@@ -432,10 +433,11 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         perc_nan_pandora = int(torch.sum(torch.isnan(masses_pandora[i])) / len(masses_pandora[i]) * 100)
         #bins = np.linspace(-1, 1, 50)
         bins = 100
-        #axs[i].hist(masses[i], bins=bins, histtype="step", label="ML (nan {} %)".format(perc_nan_model), color="red", density=True)
+        axs[i].hist(masses[i], bins=bins, histtype="step", label="ML (nan {} %)".format(perc_nan_model), color="red", density=True)
         filt = is_trk_in_clust_pandora[i]
-        axs[i].hist(masses_pandora[i][filt==1], bins=bins, histtype="step", label="Pandora (nan {}%), track in cluster".format(perc_nan_pandora), color="blue", density=True)
-        axs[i].hist(masses_pandora[i][filt==0], bins=bins, histtype="step", label="Pandora (nan {}%), track not in cluster".format(perc_nan_pandora), color="green", density=True)
+        #axs[i].hist(masses_pandora[i][filt==1], bins=bins, histtype="step", label="Pandora (nan {}%), track in cluster".format(perc_nan_pandora), color="blue", density=True)
+        #axs[i].hist(masses_pandora[i][filt==0], bins=bins, histtype="step", label="Pandora (nan {}%), track not in cluster".format(perc_nan_pandora), color="green", density=True)
+        axs[i].hist(masses_pandora[i], bins=bins, histtype="step", label="Pandora (nan {}%)".format(perc_nan_pandora), color="blue", density=True)
         #max_mass = max(masses_pandora[i].max(), masses[i].max())
         axs[i].set_title(f"[{energy_ranges[i][0]}, {energy_ranges[i][1]}] GeV")
         axs[i].legend()
@@ -443,13 +445,33 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         axs[i].set_yscale("log")
         mean_mass = masses[i][torch.isnan(masses[i])].mean()
         mean_mass_pandora = masses_pandora[i][torch.isnan(masses_pandora[i])].mean()
-
         #for bar in bars:
         #    if bar * 0.95 < mean_mass:
         #        axs[i].axvline(bar, color="black", linestyle="--")
 
+def plot_confusion_matrix(sd_hgb1, save_dir):
+    pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+    #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
+    # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
+    #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
+    class_true = sd_hgb1["pid_4_class_true"].values
+    class_pred = sd_hgb1["pred_pid_matched"].values
+    no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
+    # plot cm
+    class_names = ["e", "CH", "NH", "gamma"]
+    import seaborn as sns
+    plt.figure()
+    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    # axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
+    plt.savefig(os.path.join(save_dir, "confusion_matrix_PID.pdf"), bbox_inches="tight")
+
 def plot_per_energy_resolution2_multiple(
-    matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False
+    matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False
 ):
     # matched_all: label -> matched df
     figs, axs = {}, {}  # resolution
@@ -501,25 +523,25 @@ def plot_per_energy_resolution2_multiple(
         if plot_response:
             list_plots = [""]  # "","_reco"
             event_res_dic[key] = get_response_for_event_energy(
-                matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero
+                matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             photons_dic = get_response_for_id_i(
-                [22], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero
+                [22], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             electrons_dic = get_response_for_id_i(
-                [11], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid , mass_zero=mass_zero
+                [11], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid , mass_zero=mass_zero, ML_pid=ML_pid
             )
             hadrons_dic = get_response_for_id_i(
-                [130], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero
+                [130], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             hadrons_dic2 = get_response_for_id_i(
-                [211], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero
+                [211], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             neutrons = get_response_for_id_i(
-                [2112], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero
+                [2112], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             protons = get_response_for_id_i(
-                [2212], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero
+                [2212], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             # for neutrons
             if plot_pandora:
@@ -988,7 +1010,6 @@ def plot_per_energy_resolution(
 
 
 def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
-
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
@@ -1378,9 +1399,9 @@ def calc_unit_circle_dist(df, pandora=False):
     return dist, df.pid.values
 
 particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
+particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # electron, CH, NH, photon
 
-
-def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_pid=False, mass_zero=False):
+def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
@@ -1436,12 +1457,20 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             pred_e = matched.calibrated_E[mask]
             pred_pxyz = np.array(matched.pred_pos_matched[mask].tolist())
         trk_in_clust = matched.is_track_in_cluster[mask]
-        if perfect_pid or mass_zero:
+        if perfect_pid or mass_zero or ML_pid:
             if len(pred_pxyz):
                 pred_pxyz /= np.linalg.norm(pred_pxyz, axis=1).reshape(-1, 1)
-            m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
+            if perfect_pid:
+                m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
+            elif ML_pid:
+                #assert not pandora
+                if pandora:
+                    print("Perf.PID for pandora")
+                    m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
+                else:
+                    m = np.array([particle_masses_4_class[int(i)] for i in matched.pred_pid_matched[mask]])
             if mass_zero:
-                m = np.array([0 for _ in m])
+                m = np.array([0 for _ in range(len(matched.pid[mask]))])
             p_squared = (pred_e**2 - m**2).values
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
         pred_e_nocor = matched.pred_showers_E[mask]

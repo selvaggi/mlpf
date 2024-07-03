@@ -41,7 +41,6 @@ from src.models.gravnet_3_L import FreezeClustering
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ["TORCH_USE_CUDA_DSA"] = "1"
 
-
 def get_samples_steps_per_epoch(args):
     if args.samples_per_epoch is not None:
         if args.steps_per_epoch is None:
@@ -180,7 +179,7 @@ def main():
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
-
+        #
         trainer.fit(
             model=model,
             train_dataloaders=train_loader,

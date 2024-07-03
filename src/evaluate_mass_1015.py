@@ -5,8 +5,7 @@ import os
 
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
-    plot_per_energy_resolution2_multiple,
-
+    plot_per_energy_resolution2_multiple, plot_confusion_matrix,
     plot_efficiency_all,
 )
 import matplotlib.pyplot as plt
@@ -21,22 +20,25 @@ neutrals_only = False
 log_scale = False
 tracks = True
 perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = True # set the mass to zero for all particles
+mass_zero = False # set the mass to zero for all particles
+ML_pid = True # use the PID from the ML classification head (electron/CH/NH/gamma)
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_Ep_10_15_dataset_260624_masses_set_mass_0"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_ML_mass_debugging_Pandora_Perfect_PID"
     )
+
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "eval_1015/debug_eval_FT_Ep_reg_1015/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "results/PID_4class_df/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "eval_1015/debug_eval_FT_Ep_reg_1015/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "results/PID_4class_df/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/"
+
     print(PATH_store)
 
 labels = [
@@ -61,6 +63,7 @@ def main():
     )
     print("finished collection of data and started plotting")
     #plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
+    plot_confusion_matrix(sd_hgb, PATH_store)
     plot_per_energy_resolution2_multiple(
         sd_pandora,
         {"ML": sd_hgb},
@@ -68,7 +71,9 @@ def main():
         tracks=tracks,
         perfect_pid=perfect_pid,
         mass_zero=mass_zero,
+        ML_pid=ML_pid,
     )
+
 
 if __name__ == "__main__":
     main()
