@@ -12,15 +12,15 @@ import seaborn as sns
 
 
 def main():
-    image_path = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_Ks/evaluation_mass/"
-    path_hgcal = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_Ks/test_mass/showers_df_evaluation/0_0_None_hdbscan.pt"
-    path_pandora = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_Ks/test_mass/showers_df_evaluation/0_0_None_pandora.pt"
-    
+    image_path="/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/showers_df_evaluation/eval.pdf"
+    path_hgcal = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_hdbscan.pt"
+    path_pandora = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_pandora.pt"
+
     sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, False)
     sd_hgb1, matched_hgbq1 = open_mlpf_dataframe(path_pandora, False)
 
     mass_ks_true, mass_ks_p, mass_rel_pandora = calculate_mass(sd_hgb1)
-    plot_ks_rel_mass(mass_rel_pandora)
+    plot_ks_rel_mass(mass_rel_pandora, image_path=image_path)
 
 
 def plot_ks_rel_mass(mass_rel_pandora, image_path):
@@ -49,7 +49,6 @@ def calculate_mass(sd_hgb1):
             pyj = np.nansum(p_v_true_[:, 1])
             pzj = np.nansum(p_v_true_[:, 2])
             mj = (np.abs(energy_ks**2 - (pxj**2 + pyj**2 + pzj**2))) ** (1 / 2)
-
             energy_ks_p = np.nansum(E_pandora[mask])
             p_v_p = [p_v_pandora[mask][i] for i in range(0, len(p_v_pandora[mask]))]
             p_v_p = np.array(p_v_p)

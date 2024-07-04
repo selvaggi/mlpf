@@ -12,7 +12,7 @@ from utils.inference.inference_metrics import obtain_metrics
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.event_Ks import mass_Ks
 from utils.inference.per_particle_metrics import (
-    calc_unit_circle_dist,
+    calc_unit_circle_dist, plot_per_energy_resolution2
 )
 import matplotlib.pyplot as plt
 import mplhep as hep
@@ -27,25 +27,24 @@ log_scale = False
 tracks = True
 
 if all_E:
-    PATH_store = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_Ks/evaluation_mass/"
-
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/eval_plots_2"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization/results_3005"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/results3005"
+    #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_eval_3105_E_p_regression_fixbug/eval_3105_old_fn"
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Ks_GATr_EP_regression_with_GT_clustering/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_hdbscan.pt",
     ]
-    path_pandora = "Ks_GATr_EP_regression_with_GT_clustering/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
 
 labels = [
     "gatr1_250324_E_cont",
 ]
-
 
 def main():
     df_list = []
@@ -59,7 +58,7 @@ def main():
     )
 
     print("finished collection of data and started plotting")
-    mass_Ks(sd_pandora, sd_hgb, PATH_store)
+    #mass_Ks(sd_pandora, sd_hgb, PATH_store)
     # plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     # plot_per_energy_resolution2(
     #     sd_pandora,
@@ -67,8 +66,15 @@ def main():
     #     matched_pandora,
     #     matched_hgb,
     #     os.path.join(PATH_store, "plots"),
-    #     tracks=tracks,
-    # )
+    #     tracks=trackscy_all(sd_pandora, df_list, PATH_store, labels)
+    plot_per_energy_resolution2(
+         sd_pandora,
+         sd_hgb,
+         matched_pandora,
+         matched_hgb,
+         os.path.join(PATH_store, "plots"),
+         tracks=tracks,
+     )
     dist_pandora, pids = calc_unit_circle_dist(matched_pandora, pandora=True)
     dist_ml, pids_ml = calc_unit_circle_dist(matched_hgb, pandora=False)
     for pid in [22, -211, 211]:

@@ -7,6 +7,7 @@ matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
 import torch
 from src.utils.inference.inference_metrics import get_sigma_gaussian
+from torch_scatter import scatter_sum, scatter_mean
 
 def plot_per_event_metrics(sd, sd_pandora, PATH_store=None):
     (
@@ -109,14 +110,89 @@ def plot_per_event_energy_distribution(
         bbox_inches="tight",
     )
 
+particle_masses = {0: 0, 22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
+particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # electron, CH, NH, photon
+
+
+def safeint(x, default_val=0):
+    if np.isnan(x):
+        return default_val
+    return int(x)
+
+
+def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
+    true_e = torch.Tensor(df.true_showers_E.values)
+    mask_nan_true = np.isnan(df.true_showers_E.values)
+    true_e[mask_nan_true] = 0
+    batch_idx = df.number_batch
+    if pandora:
+        pred_E = df.pandora_calibrated_pfo.values
+        nan_mask = np.isnan(df.pandora_calibrated_pfo.values)
+        pred_E[nan_mask] = 0
+        pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
+        pred_vect = torch.tensor(np.array(df.pandora_calibrated_pos.values.tolist()))
+        nan_mask_p = torch.isnan(pred_vect).any(dim=1)
+        pred_vect[nan_mask_p] = 0
+        true_vect = torch.tensor(np.array(df.true_pos.values.tolist()))
+        mask_nan_p = torch.isnan(true_vect).any(dim=1)
+        true_vect[mask_nan_true] = 0
+    else:
+        pred_E = df.calibrated_E.values
+        nan_mask = np.isnan(df.calibrated_E.values)
+        print(np.sum(nan_mask))
+        pred_E[nan_mask] = 0
+        pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
+        pred_vect = torch.tensor(
+            np.array(df.pred_pos_matched.values.tolist())
+        )
+        pred_vect[nan_mask] = 0
+        true_vect = torch.tensor(
+            np.array(df.true_pos.values.tolist())
+        )
+        true_vect[mask_nan_true] = 0
+    if perfect_pid or mass_zero or ML_pid:
+        pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
+        pred_vect[np.isnan(pred_vect)] = 0
+        if ML_pid:
+            #assert pandora is False
+            if pandora:
+                print("perfect PID for pandora")
+                m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+            else:
+                m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
+        else:
+            m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+        if mass_zero:
+            m = np.array([0 for _ in m])
+        p_squared = (pred_E ** 2 - m ** 2)
+        p_squared[p_squared < 0] = 0 # they are always like of order -1e-8
+        pred_vect = np.sqrt(p_squared).reshape(-1, 1) * np.array(pred_vect)
+    batch_idx = torch.tensor(batch_idx.values).long()
+    pred_E = torch.tensor(pred_E)
+    true_jet_vect = scatter_sum(true_vect, batch_idx, dim=0)
+    pred_jet_vect = scatter_sum(torch.tensor(pred_vect), batch_idx, dim=0)
+    true_E_jet = scatter_sum(torch.tensor(true_e), batch_idx)
+    pred_E_jet = scatter_sum(torch.tensor(pred_E), batch_idx)
+    true_jet_p = torch.norm(true_jet_vect, dim=1)  # This is actually momentum resolution
+    pred_jet_p = torch.norm(pred_jet_vect, dim=1)
+    mass_true = torch.sqrt(torch.abs(true_E_jet ** 2) - true_jet_p ** 2)
+    mass_pred_p = torch.sqrt(
+        torch.abs(pred_E_jet ** 2) - pred_jet_p ** 2)  ## TODO: fix the nan values in pred_jet_p!!!!!
+    # replace nans in these with 0
+    mass_over_true_p = mass_pred_p / mass_true
+    E_over_true = pred_E_jet / true_E_jet
+    p_over_true = pred_jet_p / true_jet_p
+    p_jet_pandora = pred_jet_p
+    (
+        mean_mass,
+        var_mass,
+        _,
+        _,
+    ) = get_sigma_gaussian(mass_over_true_p, np.linspace(0, 4, 300))
+    return mean_mass, var_mass, mass_over_true_p, mass_true, p_over_true, true_jet_p, E_over_true
 
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
-    bins = [0, 700]
-    # if pandora and "pandora_calibrated_pos" in df.columns:
-    #    full_vector = True
-    # else:
-    #    full_vector = False
     if full_vector and pandora:
         assert "pandora_calibrated_pos" in df.columns
     bins = [0, 700]
@@ -137,7 +213,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         true_e = df.true_showers_E.values
         batch_idx = df.number_batch
         if pandora:
-            pred_e = df.pandora_calibrated_E.values
+            pred_e = df.pandora_calibrated_pfo.values
             pred_e1 = torch.tensor(pred_e).unsqueeze(1).repeat(1, 3)
             if full_vector:
                 pred_vect = (
@@ -170,7 +246,6 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         pred_e = torch.tensor(pred_e)
         true_rec = torch.tensor(true_rec.values)
         if full_vector:
-
             true_p_vect = scatter_sum(true_vect, batch_idx, dim=0)
             pred_p_vect = scatter_sum(pred_vect, batch_idx, dim=0)
             true_e1 = scatter_sum(torch.tensor(true_e), batch_idx)
@@ -224,7 +299,8 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
             variance.append(np.abs(var_predtotrue))
             mean_baseline.append(mean_reco_true)
             variance_baseline.append(np.abs(var_reco_true))
-    mass_list = torch.cat(mass_list)
+    if full_vector:
+        mass_list = torch.cat(mass_list)
     ret = [
         mean,
         variance,
@@ -236,10 +312,12 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     ]
     if full_vector:
         ret += [mass_list]
+    else:
+        ret += [None]
     return ret
 
 
-def get_response_for_event_energy(matched_pandora, matched_):
+def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False):
     (
         mean_p,
         variance_om_p,
@@ -249,7 +327,7 @@ def get_response_for_event_energy(matched_pandora, matched_):
         _,
         _,
         mass_over_true_pandora,
-    ) = calculate_event_energy_resolution(matched_pandora, True, True)
+    ) = calculate_event_energy_resolution(matched_pandora, True, False)
     (
         mean,
         variance_om,
@@ -259,7 +337,11 @@ def get_response_for_event_energy(matched_pandora, matched_):
         variance_om_baseline,
         _,
         mass_over_true_model,
-    ) = calculate_event_energy_resolution(matched_, False, True)
+    ) = calculate_event_energy_resolution(matched_, False, False)
+
+    mean_mass_p, var_mass_p, distr_mass_p, _, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    mean_mass, var_mass, distr_mass, _, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -271,34 +353,47 @@ def get_response_for_event_energy(matched_pandora, matched_):
     dic["variance_om_baseline"] = variance_om_baseline
     dic["distributions_pandora"] = distr_p
     dic["distributions_model"] = distr
-    dic["mass_over_true_model"] = mass_over_true_model
-    dic["mass_over_true_pandora"] = mass_over_true_pandora
+    dic["mass_over_true_model"] = distr_mass
+    dic["mass_over_true_pandora"] = distr_mass_p
+    dic["mean_mass_model"] = mean_mass
+    dic["mean_mass_pandora"] = mean_mass_p
+    dic["var_mass_model"] = var_mass
+    dic["var_mass_pandora"] = var_mass_p
+    dic["energy_over_true"] = E_over_true
+    dic["energy_over_true_pandora"] = E_over_true_pandora
     return dic
 
 def plot_mass_resolution(event_res_dic, PATH_store):
-    fig, ax = plt.subplots()
-    ax.set_xlabel("M_pred/M_true")
-
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_xlabel(r"$M_{pred}/M_{true}$")
+    bins = np.linspace(0, 3, 100)
     ax.hist(
         event_res_dic["mass_over_true_model"],
-        bins=100,
+        bins=bins,
         histtype="step",
-        label="ML",
+        label="ML μ={} σ/μ={}".format(
+            round((event_res_dic["mean_mass_model"]), 2),
+            round((event_res_dic["var_mass_model"]), 2),
+
+        ),
         color="red",
         density=True,
     )
-    
     ax.hist(
         event_res_dic["mass_over_true_pandora"],
-        bins=100,
+        bins=bins,
         histtype="step",
-        label="Pandora",
+        label="Pandora μ={} σ/μ={}".format(
+            round((event_res_dic["mean_mass_pandora"]), 2),
+            round((event_res_dic["var_mass_pandora"]), 2),
+        ),
         color="blue",
         density=True,
     )
     ax.grid()
     ax.legend()
-    ax.set_xlim([0, 10])
+    #ax.set_xlim([0, 10])
     fig.tight_layout()
-
-    fig.savefig(PATH_store + "mass_resolution.pdf", bbox_inches="tight")
+    print("Saving mass resolution")
+    import os
+    fig.savefig(os.path.join(PATH_store, "mass_resolution.pdf"), bbox_inches="tight")

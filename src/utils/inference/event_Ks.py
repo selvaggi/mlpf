@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib
-
 matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
 import torch
@@ -10,7 +9,6 @@ from torch_scatter import scatter_sum, scatter_mean
 
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
-
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
@@ -27,7 +25,7 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
     else:
         pred_E = df.calibrated_E.values
         nan_mask = np.isnan(df.calibrated_E.values)
-        print(np.sum(nan_mask))
+        # print(np.sum(nan_mask))
         pred_E[nan_mask] = 0
         pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
         pred_vect = torch.tensor(np.array(df.pred_pos_matched.values.tolist()))

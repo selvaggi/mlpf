@@ -593,5 +593,48 @@ parser.add_argument(
     "--regress-pos",
     action="store_true",
     default=False,
-    help="regress positions as well next to the energy",
+    help="regress p vectors as well next to the energy",
 )
+
+parser.add_argument(
+    "--ckpt-neutral",
+    default="",
+    help="Path to a DNN model regressing neutral energy and p",
+)
+
+parser.add_argument(
+    "--ckpt-charged",
+    default="",
+    help="Path to a DNN model regressing charged energy and p",
+)
+
+parser.add_argument(
+    "--regress-unit-p",
+    default=False,
+    action="store_true",
+    help="Whether to regress a unit vector for the momentum instead of the full vector",
+)
+
+parser.add_argument(
+    "--classify-pid-charged",
+    default="",
+    type=str,
+    help="Comma-separated list of possible PIDs to regress. Others will be put into a separate class.",
+)
+
+parser.add_argument(
+    "--classify-pid-neutral",
+    default="",
+    type=str,
+    help="Comma-separated list of possible PIDs to regress. Others will be put into a separate class.",
+)
+
+parser.add_argument(
+    "--PID-4-class",
+    default=False,
+    action="store_true",
+    help="Classify into electron, CH, NH, gamma - both for charged and neutral.",
+)
+
+# --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211
+

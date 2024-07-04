@@ -15,7 +15,7 @@ import pickle
 
 
 hep.style.use("CMS")
-colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
+colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
 neutrals_only = False
 log_scale = False
@@ -23,7 +23,7 @@ tracks = True
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_with_13ep"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_with_13ep_june"
     )
     #New dr=0.5 dataset
     #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_event_res_comparison_100f_05ds/eval_enRes_moreTraining"
@@ -34,9 +34,9 @@ if all_E:
         os.makedirs(plots_path)
     path_list = [
         #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
+        #   "eval_DNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",    ------ DNN
         #"eval_DNNft_100files_0605_Longer_Ckpt/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt",
+        #     "eval_DNNGNNft_100files_0605_with_event_idx/showers_df_evaluation/0_0_None_hdbscan.pt", -----3epochs DNN+GNN
         "eval_GNNDNN_dr_05_moretraining_0204ds/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"eval_dnn_3004_l1_training_eval_2_5__1_clustloadonly-100files/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
@@ -52,9 +52,9 @@ if all_E:
     print(PATH_store)
 
 labels = [
-    "DNN ~3 epochs",
-    "GNN+DNN ~3 epochs",
-    "GNN+DNN ~13 epochs",
+    #"DNN ~3 epochs",
+    #"GNN+DNN ~3 epochs",
+    "ML" #"GNN+DNN ~13 epochs",
     #"DNN w/o FT"
 ]
 
@@ -70,6 +70,13 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )
+
+    # sqrt(E^2-p^2) for debugging only!!
+    import numpy as np
+    pandora_momentum = matched_pandora.pandora_matched_pos
+    np.sqrt(matched_pandora.pandora_calibrated_pfo**2 - matched_pandora.pandora_calibrated_pfo**2)
+
+
     print("finished collection of data and started plotting")
     #plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_per_energy_resolution2_multiple(

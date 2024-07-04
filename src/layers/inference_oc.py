@@ -38,6 +38,9 @@ def create_and_store_graph_output(
     total_number_events=0,
     pred_pos=None,
     use_gt_clusters=False,
+    pids_neutral=None,
+    pids_charged=None,
+    pred_pid=None
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -173,6 +176,7 @@ def create_and_store_graph_output(
                 ec_x=ec_x,
                 shap_vals=shap_vals,
                 pred_pos=pred_pos,
+                pred_pid=pred_pid,
                 save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging",
             )
             # if predict and len(df_event) > 1:
@@ -313,6 +317,7 @@ def generate_showers_data_frame(
     shap_vals=None,
     ec_x=None,
     pred_pos=None,
+    pred_pid=None,
     save_plots_to_folder="",
 ):
     shap = shap_vals is not None
@@ -378,6 +383,8 @@ def generate_showers_data_frame(
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
     matched_positions = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_positions = matched_positions.to(e_pred_showers.device)
+    matched_pid = torch.zeros_like(energy_t) * (torch.nan)
+    matched_pid = matched_pid.to(e_pred_showers.device).long()
     matched_positions_pfo = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_positions_pfo = matched_positions_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
@@ -389,6 +396,7 @@ def generate_showers_data_frame(
         matched_es_cali_pfo[row_ind] = e_pred_showers_pfo[index_matches]
         if calc_pandora_momentum:
             matched_positions_pfo[row_ind] = pxyz_pred_pfo[index_matches]
+        is_track[row_ind] = is_track_per_shower[index_matches].float()
     else:
         if e_corr is None:
             matched_es_cali = matched_es.clone()
@@ -416,6 +424,7 @@ def generate_showers_data_frame(
             if pred_pos is not None:
                 matched_positions[row_ind] = pred_pos[number_of_showers_total : number_of_showers_total
                     + number_of_showers]
+                matched_pid[row_ind] = pred_pid[number_of_showers_total : number_of_showers_total + number_of_showers]
             if shap:
                 matched_shap_vals[row_ind.cpu()] = shap_vals[index_matches.cpu()]
                 matched_ec_x[row_ind.cpu()] = ec_x[index_matches.cpu()]
@@ -487,6 +496,7 @@ def generate_showers_data_frame(
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
             e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
+            e_pred_pid = torch.cat((matched_pid, fake_showers_showers_e_truw), dim=0)
         if pandora:
             e_pred_cali_pfo = torch.cat(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
@@ -561,11 +571,11 @@ def generate_showers_data_frame(
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
-                d[
-                    "pred_pos_matched"
-                ] = (
+                pred_pid1  = e_pred_pid.detach().cpu()
+                d["pred_pos_matched"] = (
                     pred_pos1.tolist()
                 )  # otherwise it doesn't work nicely with pandas dataframes
+                d["pred_pid_matched"] = pred_pid1.tolist()
         """if shap:
             print("Adding ec_x and shap_values to the dataframe")
             d["ec_x"] = ec_x_t
@@ -581,13 +591,15 @@ def generate_showers_data_frame(
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
+                    #print("Plotting")
                     plot_event(
                         df[df.number_batch == evt],
                         pandora,
                         save_plots_to_folder + str(evt) + rndstr,
                         graph=dic["graph"].to("cpu"),
                         y=dic["part_true"],
-                        labels=dic["graph"].ndata["particle_number"].long()
+                        labels=dic["graph"].ndata["particle_number"].long(),
+                        is_track_in_cluster = df.is_track_in_cluster
                     )
         if number_of_showers_total is None:
             return df

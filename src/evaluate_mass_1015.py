@@ -5,7 +5,7 @@ import os
 
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
-    plot_per_energy_resolution2_multiple,
+    plot_per_energy_resolution2_multiple, plot_confusion_matrix,
     plot_efficiency_all,
 )
 import matplotlib.pyplot as plt
@@ -14,38 +14,41 @@ import torch
 import pickle
 
 hep.style.use("CMS")
-colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
+colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
+perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = False # set the mass to zero for all particles
+ML_pid = True # use the PID from the ML classification head (electron/CH/NH/gamma)
+
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/pandora_pred_with_tracks_info_in_df/eval1"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_ML_mass_debugging_Pandora_Perfect_PID"
     )
+
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
-
     path_list = [
-        #"eval_gnn_3004_l1_training/showers_df_evaluation/0_0_None_hdbscan.pt",
-        "pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_hdbscan.pt",
-        #"eval_DNNft_100files_0605_Longer_Ckpt/showers_df_evaluation/0_0_None_hdbscan.pt",
-        #"pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_hdbscan.pt"
-        #"eval_dnn_3004_l1_training_eval_2_5__1_clustloadonly-100files/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "results/PID_4class_df/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "pandora_pred_with_tracks_info_in_df/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "results/PID_4class_df/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/2024/"
 
-    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
+    print(PATH_store)
 
 labels = [
-    "GNN+DNN",
-    #"DNN"
-    #"DNN w/o FT"
+    "ML"
 ]
 
+def filter_df(df):
+    # quick filter to exclude problematic particles
+    df = df[(df.pid != 11) & (df.pid != 22) ]
+    return df
 def main():
     df_list = []
     matched_all = {}
@@ -60,15 +63,21 @@ def main():
     )
     print("finished collection of data and started plotting")
     #plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
+    plot_confusion_matrix(sd_hgb, PATH_store)
     plot_per_energy_resolution2_multiple(
-        matched_pandora,
-        matched_all,
+        sd_pandora,
+        {"ML": sd_hgb},
         os.path.join(PATH_store, "plots"),
         tracks=tracks,
+        perfect_pid=perfect_pid,
+        mass_zero=mass_zero,
+        ML_pid=ML_pid,
     )
+
 
 if __name__ == "__main__":
     main()
+
 def save_dict(di_, filename_):
     with open(filename_, "wb") as f:
         pickle.dump(di_, f)
