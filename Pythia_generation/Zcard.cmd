@@ -1,6 +1,6 @@
 Main:numberOfEvents = 100         ! number of events to generate
 Main:timesAllowErrors = 5          ! how many aborts before run stops
-
+Random:setSeed = on
 
 ! 2) Settings related to output in init(), next() and stat().
 Init:showChangedSettings = on      ! list changed settings

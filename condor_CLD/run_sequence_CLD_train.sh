@@ -5,28 +5,39 @@ GUNCARD=${2}
 NEV=${3}
 SEED=${4}
 OUTPUTDIR=${5}
-
-DIR="/eos/experiment/fcc/ee/datasets/mlpf/condor/train/210224_1/"
+DIR=${6}
 mkdir ${DIR}
-mkdir ${DIR}${SEED}
-cd ${DIR}${SEED}
+mkdir ${DIR}/${SEED}
+cd ${DIR}/${SEED}
+
+SAMPLE="Zcard" #main card
 
 
-cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
-cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
-# cp -r ${HOMEDIR}/gun/gun.cpp .
-# cp -r ${HOMEDIR}/gun/compile_gun.x .
+# cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
+# cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
+if [[ "${SAMPLE}" == "gun" ]] 
+    cp -r ${HOMEDIR}/gun/gun.cpp .
+    cp -r ${HOMEDIR}/gun/CMakeLists.txt . 
+fi 
+
+
+if [[ "${SAMPLE}" == "Zcard" ]]
+then 
+      cp ${HOMEDIR}/Pythia_generation/${SAMPLE}.cmd card.cmd
+      echo "Random:seed=${SEED}" >> card.cmd
+      cat card.cmd
+      cp ${HOMEDIR}/Pythia_generation/pythia.py ./
+fi
+
 cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
 cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
-mkdir ${DIR}${SEED}/PandoraSettingsCLD
+mkdir ${DIR}/${SEED}/PandoraSettingsCLD
 cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
 cp -r ${HOMEDIR}/condor/make_pftree_clic_bindings.py .
 cp -r ${HOMEDIR}/condor/tree_tools.py .
 cp -r ${HOMEDIR}/gun/${GUNCARD} .
-echo ${HOMEDIR}/gun/${GUNCARD}
-# echo ${INPUTFILE}
 
-#first recompile gun locally 
+
 echo "  "
 echo " ================================================================================ "
 echo "  "
@@ -35,35 +46,31 @@ echo "  "
 echo " ===============================================================================  "
 echo "  "
 
-source compile_gun_RA.x
-# source compile_gun.x
-
-#produce hepmc event file 
-
-echo 'nevents '${NEV} >> ${GUNCARD}
-
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "running gun"
-echo "  "
-echo " ===============================================================================  "
-echo "  "
-./gun ${GUNCARD} 
-
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "gun complete ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
-
 wrapperfunction() {
-    source /cvmfs/sw.hsf.org/key4hep/setup.sh
+    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh -r 2024-03-07
 }
 wrapperfunction
-# #When you want to revert the changes:
+
+# source compile_gun.x
+
+# Build gun 
+if [[ "${SAMPLE}" == "gun" ]] 
+then 
+    mkdir build install
+    cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=../install
+    make install -j 8
+    cd ..
+    ./build/gun ${GUNCARD} 
+fi
+
+if [[ "${SAMPLE}" == "Zcard" ]]
+then
+    k4run pythia.py -n $NEV --Dumper.Filename out.hepmc --Pythia8.PythiaInterface.pythiacard card.cmd
+    cp out.hepmc events.hepmc
+fi
+
+
 
 
 echo "  "
