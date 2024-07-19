@@ -456,11 +456,13 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
     class_true = sd_hgb1["pid_4_class_true"].values
     class_pred = sd_hgb1["pred_pid_matched"].values
+    is_trk = sd_hgb1.is_track_in_cluster.values
     no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
     from sklearn.metrics import confusion_matrix
     cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
     # plot cm
     class_names = ["e", "CH", "NH", "gamma"]
+
     import seaborn as sns
     plt.figure()
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
@@ -469,6 +471,34 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     plt.ylabel("True")
     plt.title("Confusion Matrix")
     plt.savefig(os.path.join(save_dir, "confusion_matrix_PID.pdf"), bbox_inches="tight")
+    plt.clf()
+
+    f = no_nan_filter & (is_trk == 1)
+    f1 = no_nan_filter & (is_trk == 0)
+    cm = confusion_matrix(class_true[f], class_pred[f])
+    cm1 = confusion_matrix(class_true[f1], class_pred[f1])
+    # plot cm
+    class_names = ["e", "CH", "NH", "gamma"]
+    import seaborn as sns
+    plt.figure()
+    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    # axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix (track in cluster)")
+    plt.savefig(os.path.join(save_dir, "confusion_matrix_PID_track_in_cluster.pdf"), bbox_inches="tight")
+    plt.clf()
+
+    plt.figure()
+    sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    # axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix (no track in cluster)")
+    plt.savefig(os.path.join(save_dir, "confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
+    plt.clf()
+
+
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False
@@ -509,7 +539,7 @@ def plot_per_energy_resolution2_multiple(
     event_res_dic = {} # event energy resolution
     event_res_dic_p = {} # event p resolution
     event_res_dic_mass = {} # event mass resolution
-    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(15, 10))
+    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(8, 6))
     fig_mass_res, ax_mass_res = plt.subplots(1, 1, figsize=(15, 10))
     for key in matched_all:
         matched_ = matched_all[key]
@@ -576,8 +606,15 @@ def plot_per_energy_resolution2_multiple(
                 '''
                 # same for 130
                 plot_hist_distr(hadrons_dic["distributions_pandora"][0], "Pandora", axs_distr[130], "blue")
-                ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step", label="Pandora", color="blue")
-                ax_event_res.hist(event_res_dic["ML"]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step", label="ML", color="red")
+                mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["ML"]["mean_energy_over_true_pandora"], 2), round(event_res_dic["ML"]["var_energy_over_true_pandora"], 2)
+                mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 2), round(event_res_dic["ML"]["var_energy_over_true"], 2)
+                ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
+                                  label="Pandora μ={} σ/μ={}".format(mean_e_over_true_pandora, sigma_e_over_true_pandora), color="blue")
+                ax_event_res.hist(event_res_dic["ML"]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
+                                  label="ML μ={} σ/μ={}".format(mean_e_over_true, sigma_e_over_true), color="red")
+                ax_event_res.grid(1)
+                ax_event_res.set_ylabel("Count")
+                ax_event_res.set_xlabel("E_{vis,reco} / E_{vis,true}")
                 # for pions 211
                 plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
                 # same for 2212

@@ -342,6 +342,18 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     mean_mass_p, var_mass_p, distr_mass_p, _, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     mean_mass, var_mass, distr_mass, _, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
 
+    (
+        mean_energy_over_true,
+        var_energy_over_true,
+        _,
+        _,
+    ) = get_sigma_gaussian(E_over_true, np.linspace(0, 4, 300))
+    (
+        mean_energy_over_true_pandora,
+        var_energy_over_true_pandora,
+        _,
+        _,
+    ) = get_sigma_gaussian(E_over_true_pandora, np.linspace(0, 4, 300))
     dic = {}
     dic["mean_p"] = mean_p
     dic["variance_om_p"] = variance_om_p
@@ -361,7 +373,12 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["var_mass_pandora"] = var_mass_p
     dic["energy_over_true"] = E_over_true
     dic["energy_over_true_pandora"] = E_over_true_pandora
+    dic["mean_energy_over_true"] = mean_energy_over_true
+    dic["mean_energy_over_true_pandora"] = mean_energy_over_true_pandora
+    dic["var_energy_over_true"] = var_energy_over_true
+    dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
     return dic
+
 
 def plot_mass_resolution(event_res_dic, PATH_store):
     fig, ax = plt.subplots(figsize=(7, 7))

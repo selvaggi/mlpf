@@ -20,14 +20,14 @@ neutrals_only = False
 log_scale = False
 tracks = True
 perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = False # set the mass to zero for all particles
-ML_pid = True # use the PID from the ML classification head (electron/CH/NH/gamma)
+mass_zero = False   # set the mass to zero for all particles
+ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_ML_mass_debugging_Pandora_Perfect_PID"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_perfPID_pandora_1"
     )
-
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
@@ -38,7 +38,6 @@ if all_E:
     ]
     path_pandora = "results/PID_4class_df/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/"
-
     print(PATH_store)
 
 labels = [
@@ -49,6 +48,7 @@ def filter_df(df):
     # quick filter to exclude problematic particles
     df = df[(df.pid != 11) & (df.pid != 22) ]
     return df
+
 def main():
     df_list = []
     matched_all = {}
