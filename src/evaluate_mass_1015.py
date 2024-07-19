@@ -1,6 +1,22 @@
 # Similar to evaluate_mix, but plots a comparison between different ML methods on the same plot
+
 import matplotlib
-matplotlib.rc("font", size=35)
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
+
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+
+plt.rc("text", usetex=True)
+plt.rc("font", family="serif")
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.size'] = 20
+plt.rcParams['axes.labelsize'] = 20
+#matplotlib.rc("font", size=35)
+
+plt.rcParams['xtick.labelsize'] = 20
+plt.rcParams['ytick.labelsize'] = 20
+plt.rcParams['legend.fontsize'] = 20
+
 import os
 
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
@@ -26,7 +42,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_perfPID_pandora_1"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_FT_E_p_PID_4_class_0307_50files_perfPID_pandora_1_tex_graphics"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)

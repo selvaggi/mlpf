@@ -388,7 +388,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["mass_over_true_model"],
         bins=bins,
         histtype="step",
-        label="ML μ={} σ/μ={}".format(
+        label="ML $\mu$={} $\sigma/\mu$={}".format(
             round((event_res_dic["mean_mass_model"]), 2),
             round((event_res_dic["var_mass_model"]), 2),
 
@@ -400,7 +400,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
-        label="Pandora μ={} σ/μ={}".format(
+        label="Pandora $\mu$={} $\sigma/\mu$={}".format(
             round((event_res_dic["mean_mass_pandora"]), 2),
             round((event_res_dic["var_mass_pandora"]), 2),
         ),
