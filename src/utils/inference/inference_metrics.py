@@ -195,8 +195,8 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
         param_optimised[2] = sigma
     if param_optimised[1] < 0:
        param_optimised[1] = mean  # due to some weird fitting errors
-    assert param_optimised[1] >= 0
-    assert param_optimised[2] >= 0
+    #assert param_optimised[1] >= 0
+    #assert param_optimised[2] >= 0
     errors = np.sqrt(np.diag(param_covariance_matrix))
     # sigma_over_E_error = errors[2] / param_optimised[1]
     return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]

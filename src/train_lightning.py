@@ -119,7 +119,6 @@ def main():
         name=args.wandb_displayname,
     )
     if training_mode:
-
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         print("args.load_model_weights", args.load_model_weights)

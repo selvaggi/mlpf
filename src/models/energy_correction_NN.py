@@ -28,9 +28,10 @@ import dgl
 
 
 class Net(nn.Module):
-    def __init__(self, in_features=13, out_features=1):
+    def __init__(self, in_features=13, out_features=1, return_raw=False):
         super(Net, self).__init__()
         self.out_features = out_features
+        self.return_raw = return_raw
         self.model = nn.ModuleList(
             [
                 # nn.BatchNorm1d(13),
@@ -51,7 +52,7 @@ class Net(nn.Module):
             x = torch.tensor(x)
         for layer in self.model:
             x = layer(x)
-        if self.out_features > 1:
+        if self.out_features > 1 and not self.return_raw:
             return x[:, 0], x[:, 1:]
         if self.explainer_mode:
             return x.numpy()
@@ -159,7 +160,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         charged=False,
         unit_p=False,
         pid_channels=0, # PID: list of possible PID values to classify using an additional head. If empty, don't do PID.
-        out_f=1
+        out_f=1,
+        ignore_global_features_for_p=True, # whether to ignore the high-level features for the momentum regression and just use the GATr outputs
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
@@ -168,6 +170,22 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         print("pos_regression", self.pos_regression)
         # if pos_regression:
         #     out_f += 3
+        self.ignore_global_features_for_p = ignore_global_features_for_p
+        if self.charged:
+            self.ignore_global_features_for_p = False
+        if self.ignore_global_features_for_p:
+            self.gatr_p = GATr(
+                in_mv_channels=1,
+                out_mv_channels=1,
+                hidden_mv_channels=4,
+                in_s_channels=3,
+                out_s_channels=None,
+                hidden_s_channels=4,
+                num_blocks=3,
+                attention=SelfAttentionConfig(),  # Use default parameters for attention
+                mlp=MLPConfig(),  # Use default parameters for MLP
+            )
+            self.model_p = Net(16, 3, return_raw=True)
         self.model = Net(
             in_features=out_features_gnn + in_features_global, out_features=out_f
         )
@@ -232,7 +250,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                 batch_idx.extend([i] * n)
                 batch_bounds.append(n)
             batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
-            node_global_features = x_global_features  #
+            node_global_features = x_global_features
             x = graphs_new.ndata["h"]
             edge_index = torch.stack(graphs_new.edges())
             if not self.use_gatr:
@@ -272,6 +290,14 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                     model_x = torch.cat(
                         [x_global_features, embedded_outputs_per_batch, padding], dim=1
                     ).to(self.model.model[0].weight.device)
+                    if self.ignore_global_features_for_p:
+                        embedded_outputs_p, _ = self.gatr_p(
+                            embedded_inputs, scalars=extra_scalars, attention_mask=mask
+                        )
+                        embedded_outputs_per_batch_p = scatter_sum(
+                            embedded_outputs_p[:, 0, :], batch_idx, dim=0
+                        )
+                        res_pxyz = self.model_p(embedded_outputs_per_batch_p)
                 else:
                     padding = torch.randn(x_global_features.shape[0], 32).to(
                         p_vectors_per_batch.device
@@ -321,6 +347,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             else:
                 E_pred, p_pred = res[0], res[1]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
+                if self.ignore_global_features_for_p:
+                    p_pred = res_pxyz # temporarily discard the pxyz output of the E prediction head
                 if self.unit_p:
                     p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
                 return E_pred, p_pred, pid_pred
@@ -332,7 +360,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             #     p = p_vectors_per_batch
             # return E, p
             return torch.clamp(res.flatten(), min=0, max=None)
-
     @staticmethod
     def obtain_batch_numbers(g):
         graphs_eval = dgl.unbatch(g)

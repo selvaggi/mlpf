@@ -425,12 +425,12 @@ class ExampleWrapper(L.LightningModule):
             neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
         if len(self.pids_charged):
-            charged_PID_pred = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu(), axis=1)]
-            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred).to(charged_idx.device)
+            charged_PID_pred1 = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu().detach(), axis=1)]
+            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred1).to(charged_idx.device)
         if len(self.pids_neutral):
-            neutral_PID_pred = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu(), axis=1)]
-            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred).to(neutral_idx.device)
-        pred_energy_corr[pred_energy_corr < 0] = 0.0  # Temporary fix
+            neutral_PID_pred1 = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu().detach(), axis=1)]
+            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred1).to(neutral_idx.device)
+        pred_energy_corr[pred_energy_corr < 0] = 0.0
         if self.args.regress_pos:
             if len(charged_idx):
                 pred_pos[charged_idx.flatten()] = charged_positions
@@ -772,15 +772,15 @@ class ExampleWrapper(L.LightningModule):
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
                 #loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
                 loss_EC_neutrals = torch.nn.L1Loss()(
-                    e_cor[neutral_idx].detach().cpu(), e_true[neutral_idx].cpu()
+                    e_cor[neutral_idx], e_true[neutral_idx]
                 )
                 # charged idx is e_cor indices minus neutral idx
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 loss_pos_neutrals = torch.nn.L1Loss()(
-                    pred_pos[neutral_idx].detach().cpu(), true_pos[neutral_idx].cpu()
+                    pred_pos[neutral_idx], true_pos[neutral_idx]
                 )
                 loss_charged = torch.nn.L1Loss()(
-                    pred_pos[charged_idx].detach().cpu(), true_pos[charged_idx].cpu()
+                    pred_pos[charged_idx], true_pos[charged_idx]
                 ) # just for logging
                 # wandb.log(
                 #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}

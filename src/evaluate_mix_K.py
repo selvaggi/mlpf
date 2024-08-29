@@ -95,7 +95,7 @@ def main():
             label="Model",
             color="red",
         )
-        ax.set_xlabel("Distance to unit circle")
+        ax.set_xlabel("Distance on unit circle")
         ax.set_yscale("log")
         ax.legend()
         fig.savefig(os.path.join(PATH_store, f"unit_circle_dist_{pid}.pdf"))

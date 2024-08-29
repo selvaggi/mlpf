@@ -260,7 +260,6 @@ def plot_X(
         plt.xlim([0, 55])
         ylabel = r"$\frac{\sigma_{E_{reco}}}{\langle E_{reco} \rangle}$"
         plt.ylabel(ylabel, fontsize=30)
-
     else:
         ylabel = r"$\langle E_{reco} \rangle / E_{true}$"
         plt.ylabel(ylabel, fontsize=30)
@@ -508,6 +507,7 @@ def plot_per_energy_resolution2_multiple(
     figs_r, axs_r = {}, {}
     figs_distr, axs_distr = {}, {}  # response
     figs_distr_HE, axs_distr_HE = {}, {}  # response high energy
+    figs_theta_res, axs_theta_res = {}, {} # theta resolution
     figs_resolution_pxyz, axs_resolution_pxyz = {}, {} # px, py, pz resolution
     figs_response_pxyz, axs_response_pxyz = {}, {} # px, py, pz response
     figs_mass_hist, axs_mass_hist = {}, {}
@@ -518,6 +518,7 @@ def plot_per_energy_resolution2_multiple(
     }
     plot_pandora, plot_baseline = True, True
     for pid in [22, 11, 130, 211, 2112, 2212]:
+        figs_theta_res[pid], axs_theta_res[pid] = plt.subplots(1, 1, figsize=(7, 7))
         figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
         figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
         figs_distr[pid], axs_distr[pid] = plt.subplots(1, 1, figsize=(7, 7))
@@ -539,7 +540,7 @@ def plot_per_energy_resolution2_multiple(
     event_res_dic = {} # event energy resolution
     event_res_dic_p = {} # event p resolution
     event_res_dic_mass = {} # event mass resolution
-    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(8, 6))
+    fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(10, 6))
     fig_mass_res, ax_mass_res = plt.subplots(1, 1, figsize=(15, 10))
     for key in matched_all:
         matched_ = matched_all[key]
@@ -609,14 +610,16 @@ def plot_per_energy_resolution2_multiple(
                 mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["ML"]["mean_energy_over_true_pandora"], 2), round(event_res_dic["ML"]["var_energy_over_true_pandora"], 2)
                 mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 2), round(event_res_dic["ML"]["var_energy_over_true"], 2)
                 ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
-                                  label="Pandora μ={} σ/μ={}".format(mean_e_over_true_pandora, sigma_e_over_true_pandora), color="blue")
+                                  label="Pandora", color="blue")
                 ax_event_res.hist(event_res_dic["ML"]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
-                                  label="ML μ={} σ/μ={}".format(mean_e_over_true, sigma_e_over_true), color="red")
+                                  label="ML", color="red")
                 ax_event_res.grid(1)
                 ax_event_res.set_ylabel("Count")
-                ax_event_res.set_xlabel("E_{vis,reco} / E_{vis,true}")
+                ax_event_res.set_xlabel(r"$E_{vis,reco} / E_{vis,true}$")
                 # for pions 211
                 plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
+                # same for 11
+                plot_hist_distr(electrons_dic["distributions_pandora"][0], "Pandora", axs_distr[11], "blue")
                 # same for 2212
                 if len(protons["distributions_pandora"]) > 0:
                     plot_hist_distr(protons["distributions_pandora"][0], "Pandora", axs_distr[2212], "blue", bins=np.linspace(0.5, 1.1, 200))
@@ -658,6 +661,14 @@ def plot_per_energy_resolution2_multiple(
             axs_distr[211].set_title("Pions [0, 5] GeV")
             axs_distr[211].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[211].legend()
+            axs_distr[211].set_yscale("log")
+            plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[11], colors[key])
+            axs_distr[11].set_ylabel("Density")
+            axs_distr[11].set_title("Electrons [0, 5] GeV")
+            axs_distr[11].set_xlabel("$E_{pred.} / E_{true}$")
+            axs_distr[11].legend()
+            axs_distr[11].set_yscale("log")
+
             if len(photons_dic["distributions_model"]) > 0:
                 plot_hist_distr(photons_dic["distributions_model"][0], key, axs_distr[22], colors[key])
             axs_distr[22].set_title("Photons [0, 5] GeV")
@@ -954,8 +965,89 @@ def plot_per_energy_resolution2_multiple(
             os.path.join(PATH_store, "mass_hist", f"mass_hist_{key}.pdf"),
             bbox_inches="tight",
         )
+        dist_pandora, pids, phi_dist_pandora, eta_dist_pandora = calc_unit_circle_dist(matched_pandora, pandora=True)
+        dist_ml, pids_ml, phi_dist_ml, eta_dist_ml = calc_unit_circle_dist(matched_, pandora=False)
+        for pid in [22, -211, 211, 2112, 130, 11]:
+            # plot histogram
+            fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+            figphi, axphi = plt.subplots(1, 1, figsize=(10, 10))
+            figeta, axeta = plt.subplots(1, 1, figsize=(10, 10))
+            bins = np.linspace(0, 1, 100)
+            bins_phi = np.linspace(-3.15, 3.15, 200)
+            mu, var, _ , _ = get_sigma_gaussian((dist_pandora[np.where(pids == pid)]), bins)
+            ax.hist(
+                dist_pandora[np.where(pids == pid)],
+                bins=bins,
+                histtype="step",
+                label="Pandora $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2),
+                      round(var, 2)),
+                color="blue",
+            )
+            mu, var, _ , _  = get_sigma_gaussian((dist_ml[np.where(pids_ml == pid)]), bins_phi  )
+            ax.hist(
+                dist_ml[np.where(pids_ml == pid)],
+                bins=bins,
+                histtype="step",
+                label="Model $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2),
+                round(var, 2)),
+                color="red",
+            )
+            mu, var, _ , _  = get_sigma_gaussian((phi_dist_pandora[np.where(pids == pid)]), bins_phi)
+            axphi.hist(
+                phi_dist_pandora[np.where(pids == pid)],
+                bins=bins_phi,
+                histtype="step",
+                label="Pandora $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2), round(var, 2)),
+                color="blue",
+            )
+            mu, var, _ , _  = get_sigma_gaussian((phi_dist_ml[np.where(pids_ml == pid)]), bins_phi)
+            axphi.hist(
+                phi_dist_ml[np.where(pids_ml == pid)],
+                bins=bins_phi,
+                histtype="step",
+                label="Model $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2), round(var, 2))
+                ,
+                color="red",
+            )
+            ax.set_xlabel("Distance on unit circle")
+            ax.set_yscale("log")
+            ax.legend()
+            ax.grid(True)
+            fig.savefig(os.path.join(PATH_store, f"unit_circle_dist_{pid}.pdf"))
+            axphi.set_xlabel(r"$\Delta \Phi$")
+            axphi.set_yscale("log")
+            axphi.legend()
+            axphi.grid(True)
+            figphi.savefig(os.path.join(PATH_store, f"phi_dist_{pid}.pdf"))
+            mu, var, _ ,_ = get_sigma_gaussian((eta_dist_pandora[np.where(pids == pid)]), bins_phi)
+            # also for eta dist
+            axeta.hist(
+                eta_dist_pandora[np.where(pids == pid)],
+                bins=bins_phi,
+                histtype="step",
+                label="Pandora $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2), round(var, 2)),
+                color="blue",
+            )
+            axeta.hist(
+                eta_dist_ml[np.where(pids_ml == pid)],
+                bins=bins_phi,
+                histtype="step",
+                label="Model $\mu$={} $\sigma/\mu$={}".format(
+                round(mu, 2), round(var, 2))
+                ,
+                color="red",
+            )
+            axeta.set_xlabel(r"$\Delta \eta$")
+            axeta.set_yscale("log")
+            axeta.legend()
+            axeta.grid(True)
+            figeta.savefig(os.path.join(PATH_store, f"eta_dist_{pid}.pdf"))
     ax_event_res.legend()
-
     fig_event_res.savefig(
         os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight"
     )
@@ -1143,7 +1235,7 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
     else:
         plt.ylim([0.5, 1.1])
     fig.savefig(
-        PATH_store + title + label1 + ".png",
+        PATH_store + title + label1 + ".pdf",
         bbox_inches="tight",
     )
 
@@ -1401,6 +1493,13 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     assert output_dir != ""
     plotly.offline.plot(fig, filename=output_dir + "event.html")
 
+def phi_dist(phi_pred, phi_true):
+    # if the difference is larger than pi, take the smaller angle
+    diff = phi_pred - phi_true
+    # diff has to be a Gaussian centered around zero
+    diff = np.where(diff > np.pi, 2 * np.pi - diff, diff)
+    diff = np.where(diff < -np.pi, 2 * np.pi + diff, diff)
+    return diff
 
 def calc_unit_circle_dist(df, pandora=False):
     # quick histogram of distances between unit vectors of directions - to compare with the light training model
@@ -1432,8 +1531,16 @@ def calc_unit_circle_dist(df, pandora=False):
         # normalize
         pred_vect = pred_vect / torch.norm(pred_vect, dim=1).reshape(-1, 1)
         true_vect = true_vect / torch.norm(true_vect, dim=1).reshape(-1, 1)
+    phi_pred, phi_true = calculate_phi(pred_vect[:, 0], pred_vect[:, 1]), calculate_phi(
+        true_vect[:, 0], true_vect[:, 1]
+    )
+    eta_pred, eta_true = calculate_eta(
+        pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2]
+    ), calculate_eta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
     dist = torch.sqrt(torch.sum((pred_vect - true_vect) ** 2, dim=1))
-    return dist, df.pid.values
+    phidist = phi_dist(phi_pred, phi_true)
+    etadist = eta_pred - eta_true
+    return dist, df.pid.values, phidist, etadist
 
 particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
 particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # electron, CH, NH, photon
@@ -1710,7 +1817,7 @@ def plot_one_label(
             distr_model,
             bins=np.arange(0, 2, 1e-2),
             color="blue",
-            label="ML μ={} σ={}".format(round(mu, 2), round(sigma, 2)),
+            label=r"ML $\mu={} \sigma / \mu={}$".format(round(mu, 2), round(sigma, 2)),
             alpha=0.5,
             histtype="step",
         )
@@ -1718,7 +1825,7 @@ def plot_one_label(
             distr_pandora,
             bins=np.arange(0, 2, 1e-2),
             color="red",
-            label="Pandora μ={} σ={}".format(
+            label=r"Pandora $\mu={} \sigma / \mu={}$".format(
                 round(mu_pandora, 2), round(sigma_pandora, 2)
             ),
             alpha=0.5,
@@ -1874,7 +1981,7 @@ def plot_one_label(
     if title == "Electromagnetic Response" or title == "Hadronic Response":
         ax[0].set_ylim([0.6, 1.4])
         ax[1].set_ylim([0.6, 1.4])
-    ax[0].legend(fontsize=20, bbox_to_anchor=(1.05, 1), loc="upper left")
+    ax[0].legend(fontsize=20) #, bbox_to_anchor=(1.05, 1), loc="upper left")
     label = label1
     if save:
         fig.tight_layout()
@@ -1897,7 +2004,7 @@ def plot_histograms(
     color="blue",
     normalize=True,
 ):
-    assert title == "Event Energy Resolution"  # fix
+    assert title == "Event Energy Resolution" # Fix
     # if title == "Event Energy Resolution":
     #    fig_distr, ax_distr = plt.subplots(len(photons_dic["energy_resolutions"]), 1, figsize=(14, 10), sharex=True)
     # if not type(ax_distr) == list and not type(ax_distr) == np.ndarray:
@@ -1925,7 +2032,7 @@ def plot_histograms(
         distr_model,
         bins=np.arange(0, 2, 1e-2),
         color=color,
-        label=prefix + "μ={} σ={}".format(round(mu, 2), round(sigma, 2)),
+        label=prefix + r"$\mu={} \sigma/\mu={}$".format(round(mu, 2), round(sigma, 2)),
         alpha=0.5,
         histtype="step",
         density=normalize,
@@ -1935,7 +2042,7 @@ def plot_histograms(
             distr_pandora,
             bins=np.arange(0, 2, 1e-2),
             color="red",
-            label="Pandora μ={} σ={}".format(
+            label=r"Pandora $\mu={} \sigma/\mu={}$".format(
                 round(mu_pandora, 2), round(sigma_pandora, 2)
             ),
             alpha=0.5,

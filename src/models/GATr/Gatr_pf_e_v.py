@@ -136,7 +136,8 @@ class ExampleWrapper(L.LightningModule):
         self.beta = nn.Linear(2, 1)
         # Load the energy correction module
         if self.args.correction:
-            ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
+            #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
+            ckpt_charged = "/eos/user/g/gkrzmanc/2024/Ks_EC_features_export_BS128/models_trained_EC_charged_pi/intermediate_plots/model_step_2000_pid_211.pkl "
             ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
             if self.args.ec_model == "gat":
                 in_features = 17
@@ -191,6 +192,7 @@ class ExampleWrapper(L.LightningModule):
                             in_features_gnn=18,
                             ckpt_file=ckpt_charged,
                             gnn=False,
+                            unit_p=self.args.regress_unit_p
                         )
                     )
                     self.ec_model_wrapper_neutral = (
@@ -200,6 +202,7 @@ class ExampleWrapper(L.LightningModule):
                             in_features_gnn=18,
                             ckpt_file=ckpt_neutral,
                             gnn=False,
+                            unit_p=self.args.regress_unit_p
                         )
                     )
 

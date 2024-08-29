@@ -5,6 +5,9 @@ matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import numpy as np
+import pandas as pd
+
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
@@ -22,7 +25,7 @@ import os
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix,
-    plot_efficiency_all,
+    plot_efficiency_all, calc_unit_circle_dist
 )
 import matplotlib.pyplot as plt
 import mplhep as hep
@@ -78,7 +81,7 @@ def main():
         dir_top + path_pandora, neutrals_only
     )
     print("finished collection of data and started plotting")
-    #plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
+    plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_confusion_matrix(sd_hgb, PATH_store)
     plot_per_energy_resolution2_multiple(
         sd_pandora,
@@ -89,6 +92,9 @@ def main():
         mass_zero=mass_zero,
         ML_pid=ML_pid,
     )
+
+
+    print("Done")
 
 
 if __name__ == "__main__":

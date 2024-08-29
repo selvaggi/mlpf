@@ -22,6 +22,7 @@ import lightning as L
 from src.utils.parser_args import parser
 from lightning.pytorch.loggers import WandbLogger
 
+torch.autograd.set_detect_anomaly(True)
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from src.utils.train_utils import (
     train_load,
