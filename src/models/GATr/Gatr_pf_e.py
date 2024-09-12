@@ -708,7 +708,7 @@ class ExampleWrapper(L.LightningModule):
             )
             if len(self.pids_charged):
                 charged_PID_pred = dic["charged_PID_pred"]
-                charged_PID_true = np.array(pid_true_matched)[dic["charged_idx"].cpu()]
+                charged_PID_true = np.array(pid_true_matched)[dic["charged_idx"].cpu().tolist()]
                 # one-hot encoded
                 charged_PID_true_onehot = torch.zeros(
                     len(charged_PID_true), len(self.pids_charged)

@@ -16,7 +16,7 @@ import os
 import pickle
 from src.models.gravnet_calibration import object_condensation_loss2
 from src.layers.inference_oc import create_and_store_graph_output
-from src.layers.object_cond import onehot_particles_arr
+#from src.layers.object_cond import onehot_particles_arr
 from src.utils.logger_wandb import plot_clust
 from src.utils.nn.tools import (
     lst_nonzero,

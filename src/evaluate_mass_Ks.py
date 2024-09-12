@@ -8,7 +8,6 @@ from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 
-
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rcParams['text.usetex'] = True
@@ -42,10 +41,9 @@ perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors 
 mass_zero = False   # set the mass to zero for all particles
 ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
-
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_plots_Test_Set"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_Ks_10_09_"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -53,15 +51,16 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "results/eval_10_09_testset/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_Ks_10_09_/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "results/eval_10_09_testset/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/2024/"
+    path_pandora = "eval_Ks_10_09_/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
 labels = [
     "ML"
 ]
+
 
 def filter_df(df):
     # quick filter to exclude problematic particles
