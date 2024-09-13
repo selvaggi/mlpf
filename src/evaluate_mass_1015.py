@@ -38,14 +38,13 @@ all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
-perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = False   # set the mass to zero for all particles
+perfect_pid = False # Pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = False   # Set the mass to zero for all particles
 ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
-
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_plots_Test_Set"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_plots_Test_Set_300_files"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -53,9 +52,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "results/eval_10_09_testset/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "results/eval_10_09_testset_300_files/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "results/eval_10_09_testset/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "results/eval_10_09_testset_300_files/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/"
     print(PATH_store)
 

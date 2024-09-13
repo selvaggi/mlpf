@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib
 import os
 
+from src.layers.obtain_statistics import plot_distributions, stacked_hist_plot
+
 matplotlib.rc("font", size=35)
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -56,7 +58,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         e_over_e_distr_pandora,
         mean_errors_p,
         variance_errors_p,
-        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p
+        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p, sigma_phi_pandora, sigma_theta_pandora, distr_phi_pandora, distr_theta_pandora
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     # Pandora: TODO: do some sort of PID for Pandora
     (
@@ -71,7 +73,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         e_over_e_distr_model,
         mean_errors,
         variance_errors,
-        mean_pxyz, variance_om_pxyz, masses, pxyz_true, pxyz_pred
+        mean_pxyz, variance_om_pxyz, masses, pxyz_true, pxyz_pred, sigma_phi, sigma_theta, distr_phi, distr_theta
     ) = calculate_response(df_id, False, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     print(variance_om_p)
     print(variance_om)
@@ -109,8 +111,15 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
     dic["pxyz_pred_p"] = pxyz_pred_p
     dic["pxyz_true"] = pxyz_true
     dic["pxyz_pred"] = pxyz_pred
+    dic["sigma_phi_pandora"] = sigma_phi_pandora
+    dic["sigma_theta_pandora"] = sigma_theta_pandora
+    dic["sigma_phi"] = sigma_phi
+    dic["sigma_theta"] = sigma_theta
+    dic["distr_phi"] = distr_phi
+    dic["distr_theta"] = distr_theta
+    dic["distr_phi_pandora"] = distr_phi_pandora
+    dic["distr_theta_pandora"] = distr_theta_pandora
     return dic
-
 
 def plot_X(
     title,
@@ -541,6 +550,8 @@ def plot_per_energy_resolution2_multiple(
     event_res_dic_p = {} # event p resolution
     event_res_dic_mass = {} # event mass resolution
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(10, 6))
+    fig_event_res_hadronic, ax_event_res_hadronic = plt.subplots(1, 1, figsize=(10, 6))
+    fig_event_res_electromagnetic, ax_event_res_electromagnetic = plt.subplots(1, 1, figsize=(10, 6))
     fig_mass_res, ax_mass_res = plt.subplots(1, 1, figsize=(15, 10))
     for key in matched_all:
         matched_ = matched_all[key]
@@ -721,6 +732,22 @@ def plot_per_energy_resolution2_multiple(
                     plot_mass_hist(neutrons["mass_histogram"], neutrons["mass_histogram_pandora"], axs_mass_hist[2112], bars=neutral_masses)
                 plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["mean_pxyz_pandora"], hadrons_dic["mean_pxyz"], axs_response_pxyz[130], key)
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
+                for angle in ["theta", "phi"]:
+                    stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, "Photons_Phi")
+                    stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, "Photons_Theta")
+                    stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons_Phi")
+                    stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons_Theta")
+                    stacked_hist_plot(hadrons_dic["distr_phi"], hadrons_dic["distr_phi_pandora"], PATH_store, "KL_Phi")
+                    stacked_hist_plot(hadrons_dic["distr_theta"], hadrons_dic["distr_theta_pandora"], PATH_store, "KL_Theta")
+                    stacked_hist_plot(hadrons_dic2["distr_phi"], hadrons_dic2["distr_phi_pandora"], PATH_store, "Pions_Phi")
+                    stacked_hist_plot(hadrons_dic2["distr_theta"], hadrons_dic2["distr_theta_pandora"], PATH_store, "Pions_Theta")
+                    stacked_hist_plot(electrons_dic["distr_phi"], electrons_dic["distr_phi_pandora"], PATH_store, "Electrons_Phi")
+                    stacked_hist_plot(electrons_dic["distr_theta"], electrons_dic["distr_theta_pandora"], PATH_store, "Electrons_Theta")
+                    plot_sigma_angle_vs_energy(photons_dic, PATH_store, "photons", angle, "Photons")
+                    plot_sigma_angle_vs_energy(neutrons, PATH_store, "neutrons", angle, "Neutrons")
+                    plot_sigma_angle_vs_energy(hadrons_dic, PATH_store, "KL", angle, "$K_L$")
+                    plot_sigma_angle_vs_energy(hadrons_dic2, PATH_store, "Pions", angle, "Pions")
+                    plot_sigma_angle_vs_energy(electrons_dic, PATH_store,"electrons",  angle, "Electrons")
                 if len(photons_dic["energy_resolutions"]) > 0:
                     plot_one_label(
                         "Electromagnetic Resolution",
@@ -812,7 +839,6 @@ def plot_per_energy_resolution2_multiple(
                     el,
                     tracks=tracks_label,
                     fig=figs_r[130],
-
                     ax=axs_r[130],
                     save=False,
                     plot_pandora=plot_pandora,
@@ -855,7 +881,7 @@ def plot_per_energy_resolution2_multiple(
                         pandora_label="Pandora"
                     )
                 # plot the neutrons and protons
-                if len(neutrons["mean_baseline"]) > 0: # if there are neutrons in dataset
+                if len(neutrons["mean_baseline"]) > 2: # if there are neutrons in dataset
                     plot_one_label(
                         "Hadronic Resolution",
                         neutrons,
@@ -904,7 +930,7 @@ def plot_per_energy_resolution2_multiple(
                         color=colors[key],
                         pandora_label="Pandora"
                     )
-                if len(protons["mean_baseline"]) > 0: # if there are protons in dataset
+                if len(protons["mean_baseline"]) > 2: # if there are protons in dataset
                     plot_one_label(
                         "Hadronic Resolution",
                         protons,
@@ -920,8 +946,7 @@ def plot_per_energy_resolution2_multiple(
                         plot_baseline=plot_baseline,
                         color=colors[key],
                         pandora_label="Pandora"
-                )
-
+                    )
                 plot_pandora = False
                 plot_baseline = False
     for key in figs:
@@ -976,7 +1001,7 @@ def plot_per_energy_resolution2_multiple(
             figphi, axphi = plt.subplots(1, 1, figsize=(10, 10))
             figeta, axeta = plt.subplots(1, 1, figsize=(10, 10))
             bins = np.linspace(0, 1, 100)
-            bins_phi = np.linspace(-3.15, 3.15, 200)
+            bins_phi = np.linspace(-0.1, 0.1, 200)
             mu, var, _ , _ = get_sigma_gaussian((dist_pandora[np.where(pids == pid)]), bins)
             ax.hist(
                 dist_pandora[np.where(pids == pid)],
@@ -998,25 +1023,26 @@ def plot_per_energy_resolution2_multiple(
                 color="red",
             )
             mu, var, _ , _  = get_sigma_gaussian((phi_dist_pandora[np.where(pids == pid)]), bins_phi)
+            var *= mu
             axphi.hist(
                 phi_dist_pandora[np.where(pids == pid)],
                 bins=bins_phi,
                 histtype="step",
-                label="Pandora $\mu$={} $\sigma/\mu$={}".format(
-                round(mu, 2), round(var, 2)),
+                label="Pandora $\sigma={}$".format(
+                round(var, 4)),
                 color="blue",
             )
             mu, var, _ , _  = get_sigma_gaussian((phi_dist_ml[np.where(pids_ml == pid)]), bins_phi)
+            var_phi_model = var * mu
             axphi.hist(
                 phi_dist_ml[np.where(pids_ml == pid)],
                 bins=bins_phi,
                 histtype="step",
-                label="Model $\mu$={} $\sigma/\mu$={}".format(
-                round(mu, 2), round(var, 2))
-                ,
+                label=r"Model $\sigma={}$".format(
+                round(var_phi_model, 4)),
                 color="red",
             )
-            ax.set_xlabel("Distance on unit circle")
+            ax.set_xlabel("|$n-n_{pred}$|")
             ax.set_yscale("log")
             ax.legend()
             ax.grid(True)
@@ -1028,21 +1054,24 @@ def plot_per_energy_resolution2_multiple(
             figphi.savefig(os.path.join(PATH_store, f"phi_dist_{pid}.pdf"))
             mu, var, _ ,_ = get_sigma_gaussian((eta_dist_pandora[np.where(pids == pid)]), bins_phi)
             # also for eta dist
+            var_eta_pandora = var*mu
+            mu, var, _, _ = get_sigma_gaussian((eta_dist_ml[np.where(pids == pid)]), bins_phi)
+            # also for eta dist
+            var_eta_model = var * mu
             axeta.hist(
                 eta_dist_pandora[np.where(pids == pid)],
                 bins=bins_phi,
                 histtype="step",
-                label="Pandora $\mu$={} $\sigma/\mu$={}".format(
-                round(mu, 2), round(var, 2)),
+                label="Pandora $\sigma$={}".format(
+                 round(var_eta_pandora, 4)),
                 color="blue",
             )
             axeta.hist(
                 eta_dist_ml[np.where(pids_ml == pid)],
                 bins=bins_phi,
                 histtype="step",
-                label="Model $\mu$={} $\sigma/\mu$={}".format(
-                round(mu, 2), round(var, 2))
-                ,
+                label="Model $\sigma$={}".format(
+                 round(var_eta_model, 4)),
                 color="red",
             )
             axeta.set_xlabel(r"$\Delta \theta$")
@@ -1066,7 +1095,7 @@ def plot_per_energy_resolution(
     if plot_response:
         list_plots = ["_reco"]  # "","_reco"
         for el in list_plots:
-            colors_list = ["#fde0dd", "#c994c7", "#dd1c77"]  # color list poster neurips
+            colors_list = ["#fde0dd", "#c994c7", "#dd1c77"]  # Color list poster Neurips
             marker_size = 15
             log_scale = True
             photons_dic = get_response_for_id_i(22, matched_pandora, matched_)
@@ -1496,6 +1525,9 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     assert output_dir != ""
     plotly.offline.plot(fig, filename=output_dir + "event.html")
 
+def calculate_theta(x, y, z):
+    return torch.acos(z / torch.sqrt(x ** 2 + y ** 2 + z ** 2))
+
 def phi_dist(phi_pred, phi_true):
     # if the difference is larger than pi, take the smaller angle
     diff = phi_pred - phi_true
@@ -1506,7 +1538,7 @@ def phi_dist(phi_pred, phi_true):
 
 def calc_unit_circle_dist(df, pandora=False):
     # quick histogram of distances between unit vectors of directions - to compare with the light training model
-    # Also returns the
+    # Also returns the delta phi and delta theta
     if pandora:
         assert "pandora_calibrated_pos" in df.columns
     pids = []
@@ -1541,9 +1573,11 @@ def calc_unit_circle_dist(df, pandora=False):
     eta_pred, eta_true = calculate_eta(
         pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2]
     ), calculate_eta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
+    theta_pred = calculate_theta(pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2])
+    theta_true = calculate_theta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
     dist = torch.sqrt(torch.sum((pred_vect - true_vect) ** 2, dim=1))
     phidist = phi_dist(phi_pred, phi_true)
-    etadist = eta_pred - eta_true
+    etadist = theta_pred - theta_true # formely eta
     return dist, df.pid.values, phidist, etadist
 
 particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
@@ -1571,6 +1605,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
     masses = []
     is_track_in_cluster = []
     pxyz_true, pxyz_pred = [], []
+    sigma_phi, sigma_theta = [], [] # for the angular resolution vs. energy
+    distr_phi, distr_theta = [], []
     #distribution_slice_5_6_GeV = []
     # tic = time.time()
     # vector = range(len(bins) - 1)
@@ -1613,7 +1649,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             elif ML_pid:
                 #assert not pandora
                 if pandora:
-                    print("Perf.PID for pandora")
+                    print("Perf. PID for Pandora")
                     m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
                 else:
                     m = np.array([particle_masses_4_class[int(i)] for i in matched.pred_pid_matched[mask]])
@@ -1623,15 +1659,22 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
         pred_e_nocor = matched.pred_showers_E[mask]
         true_pxyz = np.array(matched.true_pos[mask].tolist())
+        bins_angle = np.linspace(-0.1, +0.1, 200)
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
             e_over_reco = true_rec / true_e
             e_over_reco_ML = pred_e_nocor / true_rec
             pxyz_over_true = pred_pxyz / true_pxyz
+            dist, _, phi_dist, eta_dist = calc_unit_circle_dist(matched[mask], pandora=pandora)
             p_size_over_true = np.linalg.norm(pred_pxyz, axis=1) / np.linalg.norm(true_pxyz, axis=1)
-            # mean_predtotrue, var_predtotrue = obtain_MPV_and_68(
-            #     e_over_true, bins_per_binned_E
-            # )
+            mu, var, _, _ = get_sigma_gaussian(phi_dist, bins_angle)
+            var_phi = var*mu
+            mu, var, _, _ = get_sigma_gaussian(eta_dist, bins_angle)
+            var_theta = var*mu
+            sigma_phi.append(var_phi)
+            sigma_theta.append(var_theta)
+            distr_theta.append(eta_dist)
+            distr_phi.append(phi_dist)
             distributions.append(e_over_true)
             (
                 mean_predtotrue,
@@ -1708,7 +1751,11 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         np.array(variance_pxyz),
         [masses, is_track_in_cluster],
         pxyz_true,
-        pxyz_pred
+        pxyz_pred,
+        sigma_phi,
+        sigma_theta,
+        distr_phi,
+        distr_theta
     )
 
 
@@ -1749,9 +1796,31 @@ def parallel_process(
                 [fixed_arg4] * len(vector),
             )
         )
-
     return results1
 
+def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title=""):
+    assert angle in ['theta', 'phi']
+    fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+    E = np.array(dic["energy_resolutions"])
+    if angle == 'theta':
+        sigma = np.array(dic["sigma_theta"])
+        sigma_pandora = np.array(dic["sigma_theta_pandora"])
+    else:
+        sigma = np.array(dic["sigma_phi"])
+        sigma_pandora = np.array(dic["sigma_phi_pandora"])
+    ax.plot(E, sigma, "--", marker=".", label="ML", color="red")
+    ax.plot(E, sigma_pandora, "--", marker=".", label="Pandora", color="blue")
+    ax.set_xlabel("Energy [GeV]")
+    if angle == "theta":
+        ax.set_ylabel(r"$\theta$ resolution")
+    else:
+        ax.set_ylabel(r"$\phi$ resolution")
+    ax.set_title(title)
+    ax.legend()
+    fig.savefig(
+        os.path.join(PATH_store, "angles_" + title + label + "-" + angle + ".pdf"),
+        bbox_inches="tight",
+    )
 
 def plot_one_label(
     title,
@@ -1775,7 +1844,7 @@ def plot_one_label(
     else:
         label_add = " raw"
         label_add_pandora = " raw"
-    colors_list = ["#FF0000", "#FF0000", "#0000FF"]
+    colors_list = ["#FF0000", "#00FF00", "#0000FF"]
     if color is not None:
         colors_list[1] = color
     fig_distr, ax_distr = plt.subplots(

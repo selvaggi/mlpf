@@ -3,6 +3,7 @@ from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
 import dgl
 import matplotlib.pyplot as plt
+import os
 
 
 def obtain_statistics_graph(stat_dict, y_all, g_all, pf=True):
@@ -65,7 +66,6 @@ def obtain_statistics_graph(stat_dict, y_all, g_all, pf=True):
 
 
 def create_stats_dict(device):
-
     bins_number_of_particles_event = torch.arange(0, 200, 1).to(device)
     freq_count_particles = torch.zeros_like(bins_number_of_particles_event)
     # the reason to not do log is that the histc only takes min, max, numbins and the other hist with bins is not supported in cuda
@@ -75,7 +75,6 @@ def create_stats_dict(device):
     freq_count_energy = torch.zeros(len(energy_event)).to(device)
     angle_distribution = torch.arange(0, 4 + 0.1, 0.1).to(device)
     freq_count_angle = torch.zeros(len(angle_distribution) - 1).to(device)
-
     stat_dict = {}
     stat_dict["bins_number_of_particles_event"] = bins_number_of_particles_event
     stat_dict["freq_count_particles"] = freq_count_particles
@@ -90,6 +89,19 @@ def save_stat_dict(stat_dict, path):
     path = path + "/stat_dict.pt"
     torch.save(stat_dict, path)
 
+def stacked_hist_plot(lst, lst_pandora, path_store, title):
+    # lst is a list of arrays. plot them in a stacked histogram with the same x-axis
+    fig, ax = plt.subplots(len(lst), 1, sharex=True)
+    bins = np.linspace(-0.1, 0.1, 200)
+    for i in range(len(lst)):
+        ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red")
+        ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue")
+        ax[i].legend()
+        ax[i].grid()
+        ax[i].set_yscale("log")
+    ax[-1].set_xlabel("angle difference")
+    fig.suptitle(title)
+    fig.savefig(os.path.join(path_store, title + "_angle_distributions.pdf"))
 
 def plot_distributions(stat_dict, PATH_store, pf=False):
     # energy per event

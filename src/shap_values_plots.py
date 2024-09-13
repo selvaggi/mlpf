@@ -14,15 +14,11 @@ from PIL import Image
 def pdf_to_pil(pdf_path, page=0):
     # Convert the PDF to a list of PIL images
     images = convert_from_path(pdf_path, first_page=page + 1, last_page=page + 1)
-
     # Return the first image (assuming only one page)
     return images[0]
 
-
-
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#3182bd"]  # color list Jan
-
 
 '''input_filename = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_EC_shap_testing/shap_vals.pkl"
 shap_vals = torch.load(open(input_filename, "rb"))
@@ -38,6 +34,8 @@ ax.set_xlabel("SHAP value")
 ax.set_ylabel("Feature")
 fig.show()'''
 
+###     feature_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e",
+###                      "num_tracks", "track_p_chis", "hit_x_avg", "hit_y_avg", "hit_z_avg", "eta", "phi"]
 #path = "/eos/user/g/gkrzmanc/eval_plots_EC/eval_EC_shap_df/showers_df_evaluation/0_0_None_hdbscan.pt"
 path = "/eos/user/g/gkrzmanc/2024/eval_dnn_3004_l1_training_longereval/showers_df_evaluation/0_0_None_hdbscan.pt" # clusters 30.4., eval. of the 29.4. GNN GAT run, with 40 eval files
 df = pickle.load(open(path, "rb"))
