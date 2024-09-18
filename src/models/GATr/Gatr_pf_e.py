@@ -33,6 +33,7 @@ from src.models.energy_correction_NN import (
     ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
     PickPAtDCA,
+    AverageHitsP
 )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
@@ -176,14 +177,15 @@ class ExampleWrapper(L.LightningModule):
                 assert self.args.add_track_chis
                 num_global_features = 14
                 self.ec_model_wrapper_charged = PickPAtDCA()  #  #  #
-                self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
-                    device=dev,
-                    in_features_global=num_global_features,
-                    in_features_gnn=18,
-                    ckpt_file=ckpt_neutral,
-                    gnn=False,
-                    pos_regression=self.args.regress_pos,
-                )
+                #self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
+                #    device=dev,
+                #    in_features_global=num_global_features,
+                #    in_features_gnn=18,
+                #    ckpt_file=ckpt_neutral,
+                #    gnn=False,
+                #    pos_regression=self.args.regress_pos,
+                #)
+                self.ec_model_wrapper_neutral = AverageHitsP()
             elif self.args.ec_model == "gatr-neutrals":
                 assert self.args.add_track_chis
                 num_global_features = 14
@@ -230,7 +232,8 @@ class ExampleWrapper(L.LightningModule):
                     pos_regression=self.args.regress_pos,
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
-                    out_f=out_f
+                    out_f=out_f,
+                    neutral_avg=False
                 )
             else:  # DNN
                 # only a DNN for energy correction
@@ -1012,7 +1015,6 @@ class ExampleWrapper(L.LightningModule):
             if self.args.predict:
                 from src.layers.inference_oc import store_at_batch_end
                 import pandas as pd
-
                 if self.args.explain_ec:
                     shap_vals = self.validation_step_outputs[0][4]
                     path_shap_vals = os.path.join(

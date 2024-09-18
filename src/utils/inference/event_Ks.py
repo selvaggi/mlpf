@@ -58,7 +58,6 @@ def get_response_for_event_energy(matched_pandora, matched_):
         matched_pandora, True, True
     )
     decay_type = get_decay_type(matched_pandora)
-
     mass_over_true_model = calculate_event_energy_resolution(matched_, False, True)
     dic = {}
     dic["mass_over_true_model"] = mass_over_true_model

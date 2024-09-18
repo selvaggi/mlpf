@@ -587,37 +587,11 @@ def plot_per_energy_resolution2_multiple(
             )
             # for neutrons
             if plot_pandora:
-                plot_hist_distr(neutrons["distributions_pandora"][0], "Pandora", axs_distr[2112], "blue")
-                '''
-                i = 0
-                neutrons_normalized_pxyz_true = neutrons["pxyz_true_p"][i] / np.linalg.norm(neutrons["pxyz_true_p"][i], axis=1).reshape(-1, 1)
-                neutrons_normalized_pxyz_pred = neutrons["pxyz_pred_p"][i] / np.linalg.norm(neutrons["pxyz_pred_p"][i], axis=1).reshape(-1, 1)
-                distance= np.linalg.norm(neutrons_normalized_pxyz_true - neutrons_normalized_pxyz_pred, axis=1)
-                fig, ax = plt.subplots()
-                ax.hist(distance, bins=100, label='pandora',  histtype="step")
-                neutrons_normalized_pxyz_true = neutrons["pxyz_true"][i] / np.linalg.norm(neutrons["pxyz_true"][i], axis=1).reshape(-1, 1)
-                neutrons_normalized_pxyz_pred = neutrons["pxyz_pred"][i] / np.linalg.norm(neutrons["pxyz_pred"][i], axis=1).reshape(-1, 1)
-                ax.hist(np.linalg.norm(neutrons_normalized_pxyz_true - neutrons_normalized_pxyz_pred, axis=1), bins=100, label='ML', histtype="step")
-                ax.legend()
-                ax.grid(1)
-                ax.set_yscale("log")
-                ax.set_title("Neutrons p distance from truth [0,5] GeV")
-                
-                bins = np.linspace(0, 40, 100)
-                distances_p = np.linalg.norm(neutrons["pxyz_true_p"][-1] - neutrons["pxyz_pred_p"][-1], axis=1)
-                distances = np.linalg.norm(neutrons["pxyz_true"][-1] - neutrons["pxyz_pred"][-1], axis=1)
-                fig, ax = plt.subplots()
-                ax.hist(distances_p, bins=bins, histtype="step", label="Pandora", color="blue", density=True)
-                ax.hist(distances, bins=bins, histtype="step", label="ML", color="red", density=True)
-                ax.legend()
-                ax.grid(1)
-                ax.set_yscale("log")
-                ax.set_title("Neutrons p distance from truth [35,50] GeV")
-                fig.tight_layout()
-                fig.savefig(PATH_store + "/Neutrons_p_distance_high_energy.pdf", bbox_inches="tight")
-                '''
-                # same for 130
-                plot_hist_distr(hadrons_dic["distributions_pandora"][0], "Pandora", axs_distr[130], "blue")
+                if len(neutrons["distributions_pandora"]) :
+                    plot_hist_distr(neutrons["distributions_pandora"][0], "Pandora", axs_distr[2112], "blue")
+                if len(hadrons_dic["distributions_pandora"]):
+                    # same for 130
+                    plot_hist_distr(hadrons_dic["distributions_pandora"][0], "Pandora", axs_distr[130], "blue")
                 mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["ML"]["mean_energy_over_true_pandora"], 2), round(event_res_dic["ML"]["var_energy_over_true_pandora"], 2)
                 mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 2), round(event_res_dic["ML"]["var_energy_over_true"], 2)
                 ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
@@ -628,9 +602,11 @@ def plot_per_energy_resolution2_multiple(
                 ax_event_res.set_ylabel("Count")
                 ax_event_res.set_xlabel(r"$E_{vis,reco} / E_{vis,true}$")
                 # for pions 211
-                plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
+                if len(hadrons_dic2["distributions_pandora"]):
+                    plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
                 # same for 11
-                plot_hist_distr(electrons_dic["distributions_pandora"][0], "Pandora", axs_distr[11], "blue")
+                if len(electrons_dic["distributions_pandora"]):
+                    plot_hist_distr(electrons_dic["distributions_pandora"][0], "Pandora", axs_distr[11], "blue")
                 # same for 2212
                 if len(protons["distributions_pandora"]) > 0:
                     plot_hist_distr(protons["distributions_pandora"][0], "Pandora", axs_distr[2212], "blue", bins=np.linspace(0.5, 1.1, 200))
@@ -650,7 +626,8 @@ def plot_per_energy_resolution2_multiple(
                     ax.set_title("Photons p distance from truth [0,5] GeV")
                     fig.tight_layout()
                     fig.savefig(PATH_store + "/Photons_p_distance.pdf", bbox_inches="tight")
-            plot_hist_distr(neutrons["distributions_model"][0], key, axs_distr[2112], colors[key])
+            if len(neutrons["distributions_model"]) > 0:
+                plot_hist_distr(neutrons["distributions_model"][0], key, axs_distr[2112], colors[key])
             axs_distr[2112].set_title("Neutrons [0, 5] GeV")
             axs_distr[2112].set_xlabel("$E_{pred.} / E_{true}$")
             # y label density
@@ -662,7 +639,8 @@ def plot_per_energy_resolution2_multiple(
                 axs_distr[2212].set_xlabel("$E_{pred.} / E_{true}$")
                 axs_distr[2212].set_ylabel("Density")
                 axs_distr[2212].legend()
-            plot_hist_distr(hadrons_dic["distributions_model"][0], key, axs_distr[130], colors[key])
+            if len(hadrons_dic["distributions_model"]) > 0:
+                plot_hist_distr(hadrons_dic["distributions_model"][0], key, axs_distr[130], colors[key])
             axs_distr[130].set_ylabel("Density")
             axs_distr[130].set_title("$K_L$ [0, 5] GeV")
             axs_distr[130].set_xlabel("$E_{pred.} / E_{true}$")
@@ -679,14 +657,14 @@ def plot_per_energy_resolution2_multiple(
             axs_distr[11].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[11].legend()
             axs_distr[11].set_yscale("log")
-
             if len(photons_dic["distributions_model"]) > 0:
                 plot_hist_distr(photons_dic["distributions_model"][0], key, axs_distr[22], colors[key])
             axs_distr[22].set_title("Photons [0, 5] GeV")
             axs_distr[22].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[22].set_ylabel("Density")
             axs_distr[22].legend()
-            plot_hist_distr(neutrons["distributions_model"][-1], key, axs_distr_HE[2212], colors[key], bins=np.linspace(0.9, 1.1, 100))
+            if len(neutrons["distributions_model"]) > 0:
+                plot_hist_distr(neutrons["distributions_model"][-1], key, axs_distr_HE[2212], colors[key], bins=np.linspace(0.9, 1.1, 100))
             axs_distr_HE[2112].set_title("Protons [35, 50] GeV")
             axs_distr_HE[2112].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr_HE[2112].set_ylabel("Density")
@@ -706,49 +684,60 @@ def plot_per_energy_resolution2_multiple(
             neutral_masses = [x**2 for x in neutral_masses]
             charged_masses = [x**2 for x in charged_masses]
             for el in list_plots:
-                if len(photons_dic["energy_resolutions"]) > 0:
+                if len(photons_dic["mass_histogram"]) > 2:
                     plot_pxyz_resolution(photons_dic["energy_resolutions"], photons_dic["variance_om_pxyz_pandora"], photons_dic["variance_om_pxyz"], axs_resolution_pxyz[22], key)
                     plot_pxyz_resolution(photons_dic["energy_resolutions"], photons_dic["mean_pxyz_pandora"],
                                          photons_dic["mean_pxyz"], axs_response_pxyz[22], key)
                     plot_mass_hist(photons_dic["mass_histogram"], photons_dic["mass_histogram_pandora"], axs_mass_hist[22], bars=neutral_masses)
-                plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["variance_om_pxyz_pandora"], neutrons["variance_om_pxyz"], axs_resolution_pxyz[2112], key)
-                plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["variance_om_pxyz_pandora"], hadrons_dic["variance_om_pxyz"], axs_resolution_pxyz[130], key)
-                plot_mass_hist(hadrons_dic["mass_histogram"], hadrons_dic["mass_histogram_pandora"], axs_mass_hist[130], bars=neutral_masses)
-                if len(hadrons_dic2["energy_resolutions"]) > 0:
+                if len(neutrons["mass_histogram"]) > 2:
+                    plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["variance_om_pxyz_pandora"], neutrons["variance_om_pxyz"], axs_resolution_pxyz[2112], key)
+                if len(hadrons_dic["mass_histogram"]) > 2:
+                    plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["variance_om_pxyz_pandora"], hadrons_dic["variance_om_pxyz"], axs_resolution_pxyz[130], key)
+                if len(hadrons_dic2["mass_histogram"]) > 2:
+                    plot_mass_hist(hadrons_dic["mass_histogram"], hadrons_dic["mass_histogram_pandora"], axs_mass_hist[130], bars=neutral_masses)
+                if len(hadrons_dic2["energy_resolutions"]) > 1:
                     plot_pxyz_resolution(hadrons_dic2["energy_resolutions"], hadrons_dic2["variance_om_pxyz_pandora"], hadrons_dic2["variance_om_pxyz"], axs_resolution_pxyz[211], key)
                     plot_pxyz_resolution(hadrons_dic2["energy_resolutions"], hadrons_dic2["mean_pxyz_pandora"],
                                          hadrons_dic2["mean_pxyz"], axs_response_pxyz[211], key)
                     plot_mass_hist(hadrons_dic2["mass_histogram"], hadrons_dic2["mass_histogram_pandora"], axs_mass_hist[211], bars=charged_masses)
-                if len(electrons_dic["energy_resolutions"]) > 0 and len(electrons_dic["mass_histogram"]) > 2:
+                if len(electrons_dic["energy_resolutions"]) > 1 and len(electrons_dic["mass_histogram"]) > 2:
                     plot_pxyz_resolution(electrons_dic["energy_resolutions"], electrons_dic["variance_om_pxyz_pandora"], electrons_dic["variance_om_pxyz"], axs_resolution_pxyz[11], key)
                     plot_pxyz_resolution(electrons_dic["energy_resolutions"], electrons_dic["mean_pxyz_pandora"],
                                          electrons_dic["mean_pxyz"], axs_response_pxyz[11], key)
                     plot_mass_hist(electrons_dic["mass_histogram"], electrons_dic["mass_histogram_pandora"], axs_mass_hist[11], bars=charged_masses)
-                plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
+                if len(neutrons["energy_resolutions"]) > 1:
+                    plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["variance_om_pxyz_pandora"], protons["variance_om_pxyz_pandora"], axs_resolution_pxyz[2212], key)
                 # same but for response instead of resolution. use "mean_pxyz" instead of "variance_om_pxyz"
-                plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
+                if len(neutrons["energy_resolutions"]) > 0:
+                    plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
                 if len(neutrons["mass_histogram"]) > 2:
                     plot_mass_hist(neutrons["mass_histogram"], neutrons["mass_histogram_pandora"], axs_mass_hist[2112], bars=neutral_masses)
-                plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["mean_pxyz_pandora"], hadrons_dic["mean_pxyz"], axs_response_pxyz[130], key)
+                if len(hadrons_dic["energy_resolutions"]) > 0:
+                    plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["mean_pxyz_pandora"], hadrons_dic["mean_pxyz"], axs_response_pxyz[130], key)
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
                 for angle in ["theta", "phi"]:
-                    stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, "Photons_Phi")
-                    stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, "Photons_Theta")
-                    stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons_Phi")
-                    stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons_Theta")
-                    stacked_hist_plot(hadrons_dic["distr_phi"], hadrons_dic["distr_phi_pandora"], PATH_store, "KL_Phi")
-                    stacked_hist_plot(hadrons_dic["distr_theta"], hadrons_dic["distr_theta_pandora"], PATH_store, "KL_Theta")
-                    stacked_hist_plot(hadrons_dic2["distr_phi"], hadrons_dic2["distr_phi_pandora"], PATH_store, "Pions_Phi")
-                    stacked_hist_plot(hadrons_dic2["distr_theta"], hadrons_dic2["distr_theta_pandora"], PATH_store, "Pions_Theta")
-                    stacked_hist_plot(electrons_dic["distr_phi"], electrons_dic["distr_phi_pandora"], PATH_store, "Electrons_Phi")
-                    stacked_hist_plot(electrons_dic["distr_theta"], electrons_dic["distr_theta_pandora"], PATH_store, "Electrons_Theta")
-                    plot_sigma_angle_vs_energy(photons_dic, PATH_store, "photons", angle, "Photons")
-                    plot_sigma_angle_vs_energy(neutrons, PATH_store, "neutrons", angle, "Neutrons")
-                    plot_sigma_angle_vs_energy(hadrons_dic, PATH_store, "KL", angle, "$K_L$")
-                    plot_sigma_angle_vs_energy(hadrons_dic2, PATH_store, "Pions", angle, "Pions")
-                    plot_sigma_angle_vs_energy(electrons_dic, PATH_store,"electrons",  angle, "Electrons")
-                if len(photons_dic["energy_resolutions"]) > 0:
+                    if len(photons_dic["distr_phi"]) > 0:
+                        stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, "Photons_Phi")
+                        stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, "Photons_Theta")
+                        plot_sigma_angle_vs_energy(photons_dic, PATH_store, "photons", angle, "Photons")
+                    if len(neutrons["distr_phi"]) > 0:
+                        stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons_Phi")
+                        stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons_Theta")
+                        plot_sigma_angle_vs_energy(neutrons, PATH_store, "neutrons", angle, "Neutrons")
+                    if len(hadrons_dic["distr_phi"]) > 0:
+                        stacked_hist_plot(hadrons_dic["distr_phi"], hadrons_dic["distr_phi_pandora"], PATH_store, "KL_Phi")
+                        stacked_hist_plot(hadrons_dic["distr_theta"], hadrons_dic["distr_theta_pandora"], PATH_store, "KL_Theta")
+                        plot_sigma_angle_vs_energy(hadrons_dic, PATH_store, "KL", angle, "$K_L$")
+                    if len(hadrons_dic2["distr_phi"]) > 0:
+                        stacked_hist_plot(hadrons_dic2["distr_phi"], hadrons_dic2["distr_phi_pandora"], PATH_store, "Pions_Phi")
+                        stacked_hist_plot(hadrons_dic2["distr_theta"], hadrons_dic2["distr_theta_pandora"], PATH_store, "Pions_Theta")
+                        plot_sigma_angle_vs_energy(hadrons_dic2, PATH_store, "Pions", angle, "Pions")
+                    if len(electrons_dic["distr_phi"]) > 0:
+                        stacked_hist_plot(electrons_dic["distr_phi"], electrons_dic["distr_phi_pandora"], PATH_store, "Electrons_Phi")
+                        stacked_hist_plot(electrons_dic["distr_theta"], electrons_dic["distr_theta_pandora"], PATH_store, "Electrons_Theta")
+                        plot_sigma_angle_vs_energy(electrons_dic, PATH_store, "electrons", angle, "Electrons")
+                if len(photons_dic["energy_resolutions"]) > 1:
                     plot_one_label(
                         "Electromagnetic Resolution",
                         photons_dic,
@@ -781,7 +770,7 @@ def plot_per_energy_resolution2_multiple(
                         color=colors[key],
                         pandora_label="Pandora"
                     )
-                if len(electrons_dic["energy_resolutions"]) > 0:
+                if len(electrons_dic["energy_resolutions"]) > 1:
                     plot_one_label(
                         "Electromagnetic Response",
                         electrons_dic,
@@ -814,40 +803,41 @@ def plot_per_energy_resolution2_multiple(
                         color=colors[key],
                         pandora_label="Pandora"
                     )
-                plot_one_label(
-                    "Hadronic Resolution",
-                    hadrons_dic,
-                    "variance_om",
-                    PATH_store,
-                    "" + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs[130],
-                    ax=axs[130],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
-                )
-                plot_one_label(
-                    "Hadronic Response",
-                    hadrons_dic,
-                    "mean",
-                    PATH_store,
-                    "" + key,
-                    el,
-                    tracks=tracks_label,
-                    fig=figs_r[130],
-                    ax=axs_r[130],
-                    save=False,
-                    plot_pandora=plot_pandora,
-                    plot_baseline=plot_baseline,
-                    color=colors[key],
-                    pandora_label="Pandora"
+                if len(hadrons_dic["energy_resolutions"]) > 1:
+                    plot_one_label(
+                        "Hadronic Resolution",
+                        hadrons_dic,
+                        "variance_om",
+                        PATH_store,
+                        "" + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs[130],
+                        ax=axs[130],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
+                    )
+                    plot_one_label(
+                        "Hadronic Response",
+                        hadrons_dic,
+                        "mean",
+                        PATH_store,
+                        "" + key,
+                        el,
+                        tracks=tracks_label,
+                        fig=figs_r[130],
+                        ax=axs_r[130],
+                        save=False,
+                        plot_pandora=plot_pandora,
+                        plot_baseline=plot_baseline,
+                        color=colors[key],
+                        pandora_label="Pandora"
 
-                )
-                if len(hadrons_dic2["mean_baseline"]) > 0: # if there are pions in dataset
+                    )
+                if len(hadrons_dic2["mean_baseline"]) > 1: # if there are pions in dataset
                     plot_one_label(
                         "Hadronic Resolution",
                         hadrons_dic2,
@@ -881,7 +871,7 @@ def plot_per_energy_resolution2_multiple(
                         pandora_label="Pandora"
                     )
                 # plot the neutrons and protons
-                if len(neutrons["mean_baseline"]) > 2: # if there are neutrons in dataset
+                if len(neutrons["mean_baseline"]) > 2: # If there are neutrons in dataset
                     plot_one_label(
                         "Hadronic Resolution",
                         neutrons,
@@ -1001,21 +991,22 @@ def plot_per_energy_resolution2_multiple(
             figphi, axphi = plt.subplots(1, 1, figsize=(10, 10))
             figeta, axeta = plt.subplots(1, 1, figsize=(10, 10))
             bins = np.linspace(0, 1, 100)
+            bins_log = np.linspace(-5, 0, 100)
             bins_phi = np.linspace(-0.1, 0.1, 200)
             mu, var, _ , _ = get_sigma_gaussian((dist_pandora[np.where(pids == pid)]), bins)
             ax.hist(
-                dist_pandora[np.where(pids == pid)],
-                bins=bins,
+                np.log10(dist_pandora[np.where(pids == pid)]),
+                bins=bins_log,
                 histtype="step",
                 label="Pandora $\mu$={} $\sigma/\mu$={}".format(
                 round(mu, 2),
                       round(var, 2)),
                 color="blue",
             )
-            mu, var, _ , _  = get_sigma_gaussian((dist_ml[np.where(pids_ml == pid)]), bins_phi  )
+            mu, var, _ , _  = get_sigma_gaussian((dist_ml[np.where(pids_ml == pid)]), bins_phi)
             ax.hist(
-                dist_ml[np.where(pids_ml == pid)],
-                bins=bins,
+                np.log10(dist_ml[np.where(pids_ml == pid)]),
+                bins=bins_log,
                 histtype="step",
                 label="Model $\mu$={} $\sigma/\mu$={}".format(
                 round(mu, 2),
@@ -1042,7 +1033,7 @@ def plot_per_energy_resolution2_multiple(
                 round(var_phi_model, 4)),
                 color="red",
             )
-            ax.set_xlabel("|$n-n_{pred}$|")
+            ax.set_xlabel("log norm $n-n_{pred}$")
             ax.set_yscale("log")
             ax.legend()
             ax.grid(True)
@@ -1055,7 +1046,7 @@ def plot_per_energy_resolution2_multiple(
             mu, var, _ ,_ = get_sigma_gaussian((eta_dist_pandora[np.where(pids == pid)]), bins_phi)
             # also for eta dist
             var_eta_pandora = var*mu
-            mu, var, _, _ = get_sigma_gaussian((eta_dist_ml[np.where(pids == pid)]), bins_phi)
+            mu, var, _, _ = get_sigma_gaussian((eta_dist_ml[np.where(pids_ml == pid)[0]]), bins_phi)
             # also for eta dist
             var_eta_model = var * mu
             axeta.hist(
@@ -1281,11 +1272,18 @@ def calculate_eta(x, y, z):
     theta = torch.arctan2(torch.sqrt(x**2 + y**2), z)
     return -torch.log(torch.tan(theta / 2))
 
+from copy import copy
+
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
-    return # no plotting now
-    # plot the event with plotly. Compare ML and Pandora reconstructed with truth
+    # plot the event with Plotly. Compare ML and Pandora reconstructed with truth
     # also plotst the graph is specified
-    # also plot eta-phi (a bit easier debugging)
+    # also plot Eta-Phi (a bit easier debugging)
+    #df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!!!
+    #y_filt = np.where((y.pid.flatten() == 2112.0)+(y.pid.flatten() == 130.0))[0]
+    #y = copy(y)
+    #y.mask(y_filt)
+    #if len(df) == 0:
+    #    return
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px
@@ -1293,8 +1291,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     fig = go.Figure()
     # scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
     # list of 20 random colors
-    # color_list = px.colors.qualitative.Plotly # this is only 10, not enough
-    color_list = px.colors.qualitative.Light24 + px.colors.qualitative.Dark24
+    # color_list = px.colors.qualitative.Plotly # This is only 10, not enough
+    color_list = px.colors.qualitative.Light24 + px.colors.qualitative.Dark24 + px.colors.qualitative.Plotly
     if graph is not None:
         sum_hits = scatter_sum(
             graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long()
@@ -1318,11 +1316,6 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
             #if has_track.sum() == 0.0:
             #    return # filter ! only plot those with tracks
             pids = df.pid.values
-            print(pids)
-            if [-211.0] not in pids:
-                return
-            # if sum(y.E) < 9:
-            #    return
             ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
@@ -1405,7 +1398,6 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                             hovertext=hovertext,
                         )
                     )
-
                 plot_single_arrow(
                     fig,
                     vectors[i] / 5,
@@ -1432,7 +1424,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}"
         for i in range(len(true_E))
     ]
-    # add lines from 0,0,0 to these points
+    # add lines from (0,0,0) to these points
     fig.add_trace(
         go.Scatter3d(
             x=vertices[:, 0] + truepos[:, 0],
@@ -1485,9 +1477,10 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                 hoverinfo="text",
             )
         )
-        # also add lines here
+        # Also add the lines here
         for i in range(len(pandorapos)):
-            v = [0, 0, 0]  # temporarily. TODO: find the pandora 'vertex'
+            #v = [0, 0, 0]  # temporarily. TODO: find the pandora 'vertex'
+            v = pandora_ref_pt[i]
             fig.add_trace(
                 go.Scatter3d(
                     x=[v[0], v[0] + pandorapos[i, 0]],
@@ -1570,9 +1563,9 @@ def calc_unit_circle_dist(df, pandora=False):
     phi_pred, phi_true = calculate_phi(pred_vect[:, 0], pred_vect[:, 1]), calculate_phi(
         true_vect[:, 0], true_vect[:, 1]
     )
-    eta_pred, eta_true = calculate_eta(
-        pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2]
-    ), calculate_eta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
+    #eta_pred, eta_true = calculate_eta(
+    #    pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2]
+    #), calculate_eta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
     theta_pred = calculate_theta(pred_vect[:, 0], pred_vect[:, 1], pred_vect[:, 2])
     theta_true = calculate_theta(true_vect[:, 0], true_vect[:, 1], true_vect[:, 2])
     dist = torch.sqrt(torch.sum((pred_vect - true_vect) ** 2, dim=1))
@@ -1581,7 +1574,7 @@ def calc_unit_circle_dist(df, pandora=False):
     return dist, df.pid.values, phidist, etadist
 
 particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
-particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # electron, CH, NH, photon
+particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # Electron, CH, NH, photon
 
 def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False):
     if log_scale:

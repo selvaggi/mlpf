@@ -56,7 +56,6 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )
-
     print("finished collection of data and started plotting")
     #mass_Ks(sd_pandora, sd_hgb, PATH_store)
     # plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
@@ -99,6 +98,7 @@ def main():
         ax.set_yscale("log")
         ax.legend()
         fig.savefig(os.path.join(PATH_store, f"unit_circle_dist_{pid}.pdf"))
+
     print("Done")
 
 

@@ -391,7 +391,6 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         label="ML $\mu$={} $\sigma/\mu$={}".format(
             round((event_res_dic["mean_mass_model"]), 2),
             round((event_res_dic["var_mass_model"]), 2),
-
         ),
         color="red",
         density=True,

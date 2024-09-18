@@ -162,9 +162,11 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         pid_channels=0, # PID: list of possible PID values to classify using an additional head. If empty, don't do PID.
         out_f=1,
         ignore_global_features_for_p=True, # whether to ignore the high-level features for the momentum regression and just use the GATr outputs
+        neutral_avg=False
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
+        self.neutral_avg = neutral_avg
         self.pos_regression = pos_regression
         self.unit_p = unit_p
         print("pos_regression", self.pos_regression)
@@ -233,6 +235,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             print("Not loading energy correction model weights")
         self.model.to(device)
         self.PickPAtDCA = PickPAtDCA()
+        self.AvgHits = AverageHitsP()
 
     def predict(self, x_global_features, graphs_new=None, explain=False):
         """
@@ -241,7 +244,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         :param graphs_new:
         :return:
         """
-        use_full_mv = True  # whether to use the full multivector to regress E and p or just sth else
+        use_full_mv = True  # Whether to use the full multivector to regress E and p or just sth else
         if graphs_new is not None and self.gnn is not None:
             batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
             batch_idx = []
@@ -347,13 +350,16 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             else:
                 E_pred, p_pred = res[0], res[1]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
-                if self.ignore_global_features_for_p:
-                    p_pred = res_pxyz # temporarily discard the pxyz output of the E prediction head
+                if self.neutral_avg:
+                    _, p_pred = self.AvgHits.predict(x_global_features, graphs_new)
+                else:
+                    if self.ignore_global_features_for_p:
+                        p_pred = res_pxyz # temporarily discard the pxyz output of the E prediction head
                 if self.unit_p:
                     p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
                 return E_pred, p_pred, pid_pred
         else:
-            # # normalize recctors
+            # normalize the vectors
             # E = torch.clamp(res[0].flatten(), min=0, max=None)
             # p = res[1]  # / torch.norm(res[1], dim=1).unsqueeze(1)
             # if self.use_gatr and not use_full_mv:
@@ -379,7 +385,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             torch.bincount(batch_numbers.long()).tolist()
         )
 
-
 class PickPAtDCA(torch.nn.Module):
     # Same layout of the module as the GNN one, but just picks the track
     def __init__(self):
@@ -393,7 +398,7 @@ class PickPAtDCA(torch.nn.Module):
         :return:
         """
         assert graphs_new is not None
-        batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
+        batch_num_nodes = graphs_new.batch_num_nodes()  # Num. hits in each graph
         batch_idx = []
         batch_bounds = []
         for i, n in enumerate(batch_num_nodes):
@@ -418,6 +423,38 @@ class PickPAtDCA(torch.nn.Module):
         )
         p_tracks = torch.norm(p_direction, dim=1)
         p_direction = p_direction  # / torch.norm(p_direction, dim=1).unsqueeze(1)
+        # if self.pos_regression:
+        return p_tracks, p_direction
+        # return p_tracks
+
+
+class AverageHitsP(torch.nn.Module):
+    # Same layout of the module as the GNN one, but just computes the average of the hits. Try to compare this + ML clustering with Pandora
+    def __init__(self):
+        super(AverageHitsP, self).__init__()
+
+    def predict(self, x_global_features, graphs_new=None, explain=False):
+        """
+        Forward, named 'predict' for compatibility reasons
+        :param x_global_features: Global features of the graphs - to be concatenated to each node feature
+        :param graphs_new:
+        :return:
+        """
+        assert graphs_new is not None
+        batch_num_nodes = graphs_new.batch_num_nodes()  # num hits in each graph
+        batch_idx = []
+        batch_bounds = []
+        for i, n in enumerate(batch_num_nodes):
+            batch_idx.extend([i] * n)
+            batch_bounds.append(n)
+        batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+        xyz_hits = graphs_new.ndata["h"][:, :3]
+        E_hits = graphs_new.ndata["h"][:, 7]
+        weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
+        E_total = scatter_sum(E_hits, batch_idx, dim=0)
+        p_direction = weighted_avg_hits / E_total.unsqueeze(1)
+        p_tracks = torch.norm(p_direction, dim=1)
+        p_direction = p_direction  / torch.norm(p_direction, dim=1).unsqueeze(1)
         # if self.pos_regression:
         return p_tracks, p_direction
         # return p_tracks

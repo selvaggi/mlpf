@@ -44,7 +44,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_plots_Test_Set_300_files"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_testset_300_files_avg_pos"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -52,9 +52,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "results/eval_10_09_testset_300_files/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "results/eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "results/eval_10_09_testset_300_files/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "results/eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/"
     print(PATH_store)
 
@@ -75,11 +75,14 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
-
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )
     print("finished collection of data and started plotting")
+    # filter out photons with tracks in cluster
+    #sd_pandora = sd_pandora[~((sd_pandora["pid"] == 22) & (sd_pandora["is_track_in_cluster"] == 1.0))]
+    #sd_hgb = sd_hgb
+    # _hgb["pid"] == 22) & (sd_hgb["is_track_in_cluster"] == 1.0))]
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_confusion_matrix(sd_hgb, PATH_store)
     plot_per_energy_resolution2_multiple(
@@ -91,8 +94,6 @@ def main():
         mass_zero=mass_zero,
         ML_pid=ML_pid,
     )
-
-
     print("Done")
 
 

@@ -7,7 +7,6 @@ import os
 
 
 def obtain_statistics_graph(stat_dict, y_all, g_all, pf=True):
-
     graphs = dgl.unbatch(g_all)
     batch_id = y_all[:, -1].view(-1)
     for i in range(0, len(graphs)):
@@ -93,6 +92,8 @@ def stacked_hist_plot(lst, lst_pandora, path_store, title):
     # lst is a list of arrays. plot them in a stacked histogram with the same x-axis
     fig, ax = plt.subplots(len(lst), 1, sharex=True)
     bins = np.linspace(-0.1, 0.1, 200)
+    if len(lst) == 1:
+        ax = [ax]
     for i in range(len(lst)):
         ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red")
         ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue")

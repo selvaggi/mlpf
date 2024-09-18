@@ -356,7 +356,6 @@ def generate_showers_data_frame(
             e_pred_showers_cali = e_pred_showers * corrections_per_shower
         else:
             corrections_per_shower = e_corr.view(-1)
-
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
@@ -367,6 +366,7 @@ def generate_showers_data_frame(
     energy_t = (
         dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
     )  # dic["part_true"][:, 3].to(e_pred_showers.device)
+    vertex = dic["part_true"].vertex.to(e_pred_showers.device)
     pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
     is_track_per_shower = scatter_add((dic["graph"].ndata["hit_type"] == 1), labels).int()
@@ -462,6 +462,7 @@ def generate_showers_data_frame(
         fake_showers_showers_e_truw = torch.zeros((fake_showers_e.shape[0])) * (
             torch.nan
         )
+        fake_showers_vertex = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_is_track = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
         """if shap:
             fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
@@ -474,15 +475,16 @@ def generate_showers_data_frame(
             #fake_showers_ec_x_t = fake_showers_ec_x_t.to(e_pred_showers.device)
             shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
             ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
-"""
+        """
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
-
+        fake_showers_vertex = fake_showers_vertex.to(e_pred_showers.device)
         energy_t = torch.cat(
             (energy_t, fake_showers_showers_e_truw),
             dim=0,
         )
+        vertex = torch.cat((vertex, fake_showers_vertex), dim=0)
         pid_t = torch.cat(
             (pid_t.view(-1), fake_showers_showers_e_truw),
             dim=0,
@@ -554,6 +556,7 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
+                "vertex": vertex.detach().cpu().tolist()
             }
         else:
             d = {
@@ -568,16 +571,17 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
+                "vertex": vertex.detach().cpu().tolist()
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
                 pred_pid1  = e_pred_pid.detach().cpu()
                 d["pred_pos_matched"] = (
                     pred_pos1.tolist()
-                )  # otherwise it doesn't work nicely with pandas dataframes
+                )  # Otherwise it doesn't work nicely with Pandas dataframes
                 d["pred_pid_matched"] = pred_pid1.tolist()
         """if shap:
-            print("Adding ec_x and shap_values to the dataframe")
+            print("Adding ec_x and shap_values to the DataFrame")
             d["ec_x"] = ec_x_t
             d["shap_values"] = shap_vals_t"""
         if shap:
@@ -591,7 +595,6 @@ def generate_showers_data_frame(
                 if len(df[df.number_batch == evt]):
                     # random string
                     rndstr = generate_random_string(5)
-                    #print("Plotting")
                     plot_event(
                         df[df.number_batch == evt],
                         pandora,
