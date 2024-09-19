@@ -428,11 +428,17 @@ class ExampleWrapper(L.LightningModule):
             neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
         if len(self.pids_charged):
-            charged_PID_pred1 = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu().detach(), axis=1)]
-            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred1).to(charged_idx.device)
+            if len(charged_idx):
+                charged_PID_pred1 = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu().detach(), axis=1)]
+            else:
+                charged_PID_pred1 = []
+            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred1).long().to(charged_idx.device)
         if len(self.pids_neutral):
-            neutral_PID_pred1 = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu().detach(), axis=1)]
-            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred1).to(neutral_idx.device)
+            if len(neutral_idx):
+                neutral_PID_pred1 = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu().detach(), axis=1)]
+            else:
+                neutral_PID_pred1 = []
+            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred1).long().to(neutral_idx.device)
         pred_energy_corr[pred_energy_corr < 0] = 0.0
         if self.args.regress_pos:
             if len(charged_idx):

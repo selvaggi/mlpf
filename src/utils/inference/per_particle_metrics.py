@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib
 import os
 
-from src.layers.obtain_statistics import plot_distributions, stacked_hist_plot
+from src.layers.obtain_statistics import stacked_hist_plot
 
 matplotlib.rc("font", size=35)
 import pandas as pd
@@ -645,13 +645,14 @@ def plot_per_energy_resolution2_multiple(
             axs_distr[130].set_title("$K_L$ [0, 5] GeV")
             axs_distr[130].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[130].legend()
-            plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[211], colors[key])
-            axs_distr[211].set_ylabel("Density")
-            axs_distr[211].set_title("Pions [0, 5] GeV")
-            axs_distr[211].set_xlabel("$E_{pred.} / E_{true}$")
-            axs_distr[211].legend()
-            axs_distr[211].set_yscale("log")
-            plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[11], colors[key])
+            if len(hadrons_dic2["distributions_model"]) > 0:
+                plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[211], colors[key])
+                axs_distr[211].set_ylabel("Density")
+                axs_distr[211].set_title("Pions [0, 5] GeV")
+                axs_distr[211].set_xlabel("$E_{pred.} / E_{true}$")
+                axs_distr[211].legend()
+                axs_distr[211].set_yscale("log")
+                plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[11], colors[key])
             axs_distr[11].set_ylabel("Density")
             axs_distr[11].set_title("Electrons [0, 5] GeV")
             axs_distr[11].set_xlabel("$E_{pred.} / E_{true}$")
@@ -705,11 +706,11 @@ def plot_per_energy_resolution2_multiple(
                     plot_pxyz_resolution(electrons_dic["energy_resolutions"], electrons_dic["mean_pxyz_pandora"],
                                          electrons_dic["mean_pxyz"], axs_response_pxyz[11], key)
                     plot_mass_hist(electrons_dic["mass_histogram"], electrons_dic["mass_histogram_pandora"], axs_mass_hist[11], bars=charged_masses)
-                if len(neutrons["energy_resolutions"]) > 1:
+                if len(neutrons["energy_resolutions"]) > 2:
                     plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["variance_om_pxyz_pandora"], protons["variance_om_pxyz_pandora"], axs_resolution_pxyz[2212], key)
                 # same but for response instead of resolution. use "mean_pxyz" instead of "variance_om_pxyz"
-                if len(neutrons["energy_resolutions"]) > 0:
+                if len(neutrons["energy_resolutions"]) > 2:
                     plot_pxyz_resolution(neutrons["energy_resolutions"], neutrons["mean_pxyz_pandora"], neutrons["mean_pxyz"], axs_response_pxyz[2112], key)
                 if len(neutrons["mass_histogram"]) > 2:
                     plot_mass_hist(neutrons["mass_histogram"], neutrons["mass_histogram_pandora"], axs_mass_hist[2112], bars=neutral_masses)
@@ -721,7 +722,7 @@ def plot_per_energy_resolution2_multiple(
                         stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, "Photons_Phi")
                         stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, "Photons_Theta")
                         plot_sigma_angle_vs_energy(photons_dic, PATH_store, "photons", angle, "Photons")
-                    if len(neutrons["distr_phi"]) > 0:
+                    if len(neutrons["distr_phi"]) > 3:
                         stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons_Phi")
                         stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons_Theta")
                         plot_sigma_angle_vs_energy(neutrons, PATH_store, "neutrons", angle, "Neutrons")
@@ -770,7 +771,7 @@ def plot_per_energy_resolution2_multiple(
                         color=colors[key],
                         pandora_label="Pandora"
                     )
-                if len(electrons_dic["energy_resolutions"]) > 1:
+                if len(electrons_dic["energy_resolutions"]) > 2:
                     plot_one_label(
                         "Electromagnetic Response",
                         electrons_dic,
@@ -1276,6 +1277,7 @@ from copy import copy
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
     # plot the event with Plotly. Compare ML and Pandora reconstructed with truth
+    return
     # also plotst the graph is specified
     # also plot Eta-Phi (a bit easier debugging)
     #df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!!!
@@ -1283,7 +1285,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     #y = copy(y)
     #y.mask(y_filt)
     #if len(df) == 0:
-    #    return
+    #    returnr
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px

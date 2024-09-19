@@ -113,7 +113,6 @@ def plot_per_event_energy_distribution(
 particle_masses = {0: 0, 22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
 particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # electron, CH, NH, photon
 
-
 def safeint(x, default_val=0):
     if np.isnan(x):
         return default_val
@@ -156,7 +155,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         if ML_pid:
             #assert pandora is False
             if pandora:
-                print("perfect PID for pandora")
+                print("perfect PID for Pandora")
                 m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
             else:
                 m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
@@ -339,8 +338,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
 
-    mean_mass_p, var_mass_p, distr_mass_p, _, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
-    mean_mass, var_mass, distr_mass, _, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
 
     (
         mean_energy_over_true,
@@ -367,6 +366,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["distributions_model"] = distr
     dic["mass_over_true_model"] = distr_mass
     dic["mass_over_true_pandora"] = distr_mass_p
+    dic["mass_model"] = distr_mass * mass_true
+    dic["mass_pandora"] = distr_mass_p * mass_true_p
     dic["mean_mass_model"] = mean_mass
     dic["mean_mass_pandora"] = mean_mass_p
     dic["var_mass_model"] = var_mass
@@ -413,3 +414,28 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     print("Saving mass resolution")
     import os
     fig.savefig(os.path.join(PATH_store, "mass_resolution.pdf"), bbox_inches="tight")
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_xlabel(r"$M_{reco}$")
+    bins = np.linspace(0, 3, 100)
+    ax.hist(
+        event_res_dic["mass_model"],
+        bins=bins,
+        histtype="step",
+        label="ML",
+        color="red",
+        density=True,
+    )
+    ax.hist(
+        event_res_dic["mass_pandora"],
+        bins=bins,
+        histtype="step",
+        label="Pandora",
+        color="blue",
+        density=True,
+    )
+    ax.grid()
+    ax.legend()
+    #ax.set_xlim([0, 10])
+    fig.tight_layout()
+    fig.savefig(os.path.join(PATH_store, "mass_reco_absolute.pdf"), bbox_inches="tight")
+

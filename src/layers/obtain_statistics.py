@@ -96,7 +96,8 @@ def stacked_hist_plot(lst, lst_pandora, path_store, title):
         ax = [ax]
     for i in range(len(lst)):
         ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red")
-        ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue")
+        if i < len(lst_pandora):
+            ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue")
         ax[i].legend()
         ax[i].grid()
         ax[i].set_yscale("log")

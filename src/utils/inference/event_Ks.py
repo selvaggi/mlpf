@@ -80,12 +80,11 @@ def determine_decay_type(sd_hgb1, i):
     if len(pid_values) == 2:
         decay_type = 0
         charged = np.prod(pid_values == [211.0, 211])
-    elif len(pid_values) == 4:
+    elif len(pid_values) == 4 and np.count_nonzero(pid_values == 22.0) == 4:
         decay_type = 1
         neutral = np.prod(pid_values == [22.0, 22.0, 22.0, 22.0])
     else:
         decay_type = 2
-
     return torch.Tensor([decay_type])
 
 
