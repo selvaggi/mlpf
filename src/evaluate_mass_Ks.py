@@ -45,7 +45,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/FixAvg_with_vertex_info_eval_Ks_13_09_FT_on_Ks/eval_Close_decays_oonly"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/eval_Close_decays_oonly"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -53,9 +53,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "FixAvg_with_vertex_info_eval_Ks_13_09_FT_on_Ks/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "FixAvg_with_vertex_info_eval_Ks_13_09_FT_on_Ks/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
@@ -132,6 +132,7 @@ def main():
     print("finished collection of data and started plotting")
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     #plot_confusion_matrix(sd_hgb, PATH_store)
+
     plot_per_energy_resolution2_multiple(
         sd_pandora,
         {"ML": sd_hgb},

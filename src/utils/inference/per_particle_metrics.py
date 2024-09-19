@@ -480,7 +480,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     plt.title("Confusion Matrix")
     plt.savefig(os.path.join(save_dir, "confusion_matrix_PID.pdf"), bbox_inches="tight")
     plt.clf()
-
     f = no_nan_filter & (is_trk == 1)
     f1 = no_nan_filter & (is_trk == 0)
     cm = confusion_matrix(class_true[f], class_pred[f])
@@ -496,7 +495,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     plt.title("Confusion Matrix (track in cluster)")
     plt.savefig(os.path.join(save_dir, "confusion_matrix_PID_track_in_cluster.pdf"), bbox_inches="tight")
     plt.clf()
-
     plt.figure()
     sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
     # axes
@@ -505,7 +503,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     plt.title("Confusion Matrix (no track in cluster)")
     plt.savefig(os.path.join(save_dir, "confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
     plt.clf()
-
 
 
 def plot_per_energy_resolution2_multiple(

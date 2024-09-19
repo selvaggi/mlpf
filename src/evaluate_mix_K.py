@@ -1,7 +1,6 @@
 import gzip
 import pickle
 import matplotlib
-
 matplotlib.rc("font", size=35)
 import numpy as np
 import pandas as pd
@@ -27,7 +26,7 @@ log_scale = False
 tracks = True
 
 if all_E:
-    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/eval_plots_2"
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/eval_plots_"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization/results_3005"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/results3005"
     #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_eval_3105_E_p_regression_fixbug/eval_3105_old_fn"
