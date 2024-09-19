@@ -1175,27 +1175,31 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
         PATH_store,
         labels,
     )
-    plot_eff(
-        "Electromagnetic",
-        electrons_dic,
-        "Electrons",
-        PATH_store,
-        labels,
-    )
-    plot_eff(
-        "Hadronic",
-        pions_dic,
-        "Pions",
-        PATH_store,
-        labels,
-    )
-    plot_eff(
-        "Hadronic",
-        kaons_dic,
-        "Kaons",
-        PATH_store,
-        labels,
-    )
+    if len(electrons_dic["eff_p"]) > 0:
+        plot_eff(
+            "Electromagnetic",
+            electrons_dic,
+            "Electrons",
+            PATH_store,
+            labels,
+        )
+    if len(pions_dic["eff_p"]) > 0:
+        plot_eff(
+            "Hadronic",
+            pions_dic,
+            "Pions",
+            PATH_store,
+            labels,
+        )
+
+    if len(kaons_dic["eff_p"]) > 0:
+        plot_eff(
+            "Hadronic",
+            kaons_dic,
+            "Kaons",
+            PATH_store,
+            labels,
+        )
 
 def create_eff_dic_pandora(matched_pandora, id):
     pids_pandora = np.abs(matched_pandora["pid"].values)

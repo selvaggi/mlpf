@@ -798,15 +798,21 @@ class ExampleWrapper(L.LightningModule):
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
                 if len(self.pids_charged):
-                    loss_charged_pid = torch.nn.CrossEntropyLoss()(
-                        charged_PID_pred, charged_PID_true_onehot
-                    )
+                    if len(charged_PID_pred):
+                        loss_charged_pid = torch.nn.CrossEntropyLoss()(
+                            charged_PID_pred, charged_PID_true_onehot
+                        )
+                    else:
+                        loss_charged_pid = 0
                     loss = loss + loss_charged_pid
                     wandb.log({"loss_charged_pid": loss_charged_pid})
                 if len(self.pids_neutral):
-                    loss_neutral_pid = torch.nn.CrossEntropyLoss()(
-                        neutral_PID_pred, neutral_PID_true_onehot
-                    )
+                    if len(neutral_PID_pred):
+                        loss_neutral_pid = torch.nn.CrossEntropyLoss()(
+                            neutral_PID_pred, neutral_PID_true_onehot
+                        )
+                    else:
+                        loss_neutral_pid = 0
                     loss = loss + loss_neutral_pid
                     wandb.log({"loss_neutral_pid": loss_neutral_pid})
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)

@@ -12,6 +12,7 @@ plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rcParams['text.usetex'] = True
 plt.rcParams['font.size'] = 20
+
 plt.rcParams['axes.labelsize'] = 20
 #matplotlib.rc("font", size=35)
 
@@ -45,7 +46,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/eval_Close_decays_oonly"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/eval_Close_decays_oonly"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -53,9 +54,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
@@ -109,11 +110,10 @@ def main():
     displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)
     #sd_pandora = sd_pandora[decay_type_pandora == 1]
     #sd_hgb = sd_hgb[decay_type == 1]
-    allowed_batch_idx = np.where(decay_type_pandora == 1)[0]
-    allowed_batch_idx_pandora = np.where(decay_type == 1)[0]
-    sd_pandora = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx)]
-    sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx_pandora)]
-
+    #allowed_batch_idx = np.where(decay_type_pandora == 1)[0]
+    #allowed_batch_idx_pandora = np.where(decay_type == 1)[0]
+    #sd_pandora = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx)]
+    #sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx_pandora)]
     # filter the df based on where decay type is 0
     #allowed_batch_idx = np.where(displacement_hgb < 200)[0]
     #sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx)]
@@ -132,7 +132,6 @@ def main():
     print("finished collection of data and started plotting")
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     #plot_confusion_matrix(sd_hgb, PATH_store)
-
     plot_per_energy_resolution2_multiple(
         sd_pandora,
         {"ML": sd_hgb},
@@ -143,7 +142,6 @@ def main():
         ML_pid=ML_pid,
     )
     print("Done")
-
 
 if __name__ == "__main__":
     main()
