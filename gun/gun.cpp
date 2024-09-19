@@ -56,33 +56,11 @@ double get_mass_G4(int pid) {
     G4ParticleDefinition* particle = G4ParticleTable::GetParticleTable()->FindParticle(particle_name);
     G4double particle_mass = particle->GetPDGMass();
     particle_mass = particle_mass / 1e3;
+    // std::cout << "particle_mass: " << particle_mass << std::endl;
     return particle_mass;
 }
 
 
-// double get_mass(int pid) {
-//     // PDG mass values
-//     std::map<int, double> masses = {
-//         {211, 0.139570},   // charged pion
-//         {-211, 0.139570},   // charged pion
-//         {2212, 0.93827},  // proton
-//         {-2212, 0.93827},  // proton
-//         {2112, 0.93957},  // neutron
-//         {111, 0.13498},   // pi0
-//         {130, 0.49767},    // Klong
-//         {310, 0.49767},    // K_S^0
-//         {11, 0.00051}, 
-//         {-11, 0.00051}, 
-//         {22, 0.00000},
-//         {13, 0.10566},
-//         {-13, 0.10566},
-//         {213, 0.76690}, //rho(770)^+ 
-//         {-213,0.76690 }, //rho(770)^-
-
-//     };
-//     // Return the mass if found, 0 otherwise
-//     return masses.count(pid) ? masses[pid] : 0;
-// }
 
 void generate_event(WriterAscii& writer, const std::vector<int>& pid_list, 
                     const std::vector<int>& npart_range, const std::vector<float>& eta_range, 

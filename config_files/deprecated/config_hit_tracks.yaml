@@ -48,9 +48,11 @@ inputs:
       pad_mode: wrap
       length: 25000
       vars:
-         - [hit_x, null]
-         - [hit_y, null]
-         - [hit_z, null]
+         - [hit_x, null] # used
+         - [hit_y, null] # used
+         - [hit_z, null] # used
+         - [hit_phi, null]
+         - [hit_theta , null]
 
    pf_features:
       pad_mode: wrap
@@ -63,30 +65,28 @@ inputs:
       ###              clip_min(optional, default=-5),
       ###              clip_max(optional, default=5),
       ###              pad_value(optional, default=0)]
-         - [hit_p, null]
-         - [hit_e, null]
-         - [part_theta , null]
-         - [part_phi , null]
-         - [part_p , null]
-         - [part_m, null]
-         - [part_pid, null]
+         - [hit_p, null] # used
+         - [hit_e, null] # used
+         - [part_theta , null] # used
+         - [part_phi , null] # used
+         - [part_p , null] # used
+         - [part_m, null] # used
+         - [part_pid, null] # used
 
    pf_vectors:
       length: 25000
       pad_mode: wrap
       vars:
-         - [hit_type_nn, null] #0
+         - [hit_type_nn, null] # used
          - [hit_e_nn, null] #1
 
    pf_vectoronly:
       length: 25000
       pad_mode: wrap
       vars:
-      - [hit_genlink0, null] #2
-      - [hit_genlink1, null] #2
-      - [hit_genlink2, null] #2
-      - [hit_genlink3, null] #2
-      - [hit_genlink4, null] #2
+      - [hit_genlink0, null] #used
+      - [hit_genlink3, null] #used
+      # - [hit_genlink4, null] #2
 
 
    pf_mask:

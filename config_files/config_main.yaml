@@ -1,8 +1,12 @@
+# This one uses px, py, pz instead of theta, phi, to avoid possible errors
+
 graph_config:
    only_hits: false
    k: 40
    prediction: true
    hit_chis_track: true
+   pos_pxpy: true
+   ks: true
 custom_model_kwargs:
    # add custom model kwargs here
    n_postgn_dense_blocks: 4
@@ -53,6 +57,19 @@ inputs:
          - [hit_x, null]
          - [hit_y, null]
          - [hit_z, null]
+         - [hit_px, null]
+         - [hit_py, null]
+         - [hit_pz, null]
+   pf_points_pfo:
+      pad_mode: wrap
+      length: 25000
+      vars:
+         - [hit__pandora_px, null]
+         - [hit__pandora_py, null]
+         - [hit__pandora_pz, null]
+         - [hit__pandora_x, null]
+         - [hit__pandora_y, null]
+         - [hit__pandora_z, null]
    pf_features:
       pad_mode: wrap
       length: 25000
@@ -78,6 +95,12 @@ inputs:
          - [hit_pandora_cluster_energy, null]
          - [hit_pandora_pfo_energy, null]
          - [hit_chis, null]
+         - [part_px , null]
+         - [part_py , null]
+         - [part_pz , null]
+         - [part_vertex_x, null]
+         - [part_vertex_y, null]
+         - [part_vertex_z, null]
 
 
    pf_vectors:
@@ -109,6 +132,7 @@ inputs:
       vars:
          - [hit_mask, null]
          - [part_mask, null]
+         - [part_ks_dataset, null]
 
 
 labels:
