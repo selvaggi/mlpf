@@ -263,6 +263,8 @@ def create_graph(
         y_data_graph.calculate_corrected_E(g, connections_list)
         if is_Ks == True:
             if y_data_graph.pid.flatten().shape[0] == 4 and np.count_nonzero(y_data_graph.pid.flatten() == 22) == 4:
+                graph_empty = False
+            else:
                 graph_empty = True
             if g.ndata["h"].shape[0] < 10 or (set(g.ndata["hit_type"].unique().tolist()) == set([0, 1]) and g.ndata["hit_type"][g.ndata["hit_type"] == 1].shape[0] < 10):
                 graph_empty = True  # less than 10 hits
