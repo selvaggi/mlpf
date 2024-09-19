@@ -1,7 +1,7 @@
 #!/bin/bash
 
-HOMEDIR=${1}
-GUNCARD=${2}
+HOMEDIR=${1} # path to where it's ran from
+GUNCARD=${2} # 
 NEV=${3}
 SEED=${4}
 OUTPUTDIR=${5}
@@ -10,12 +10,13 @@ mkdir ${DIR}
 mkdir ${DIR}/${SEED}
 cd ${DIR}/${SEED}
 
-SAMPLE="Zcard" #main card
+SAMPLE="gun" #main card
 
 
 # cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
 # cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
 if [[ "${SAMPLE}" == "gun" ]] 
+then
     cp -r ${HOMEDIR}/gun/gun.cpp .
     cp -r ${HOMEDIR}/gun/CMakeLists.txt . 
 fi 
@@ -29,10 +30,11 @@ then
       cp ${HOMEDIR}/Pythia_generation/pythia.py ./
 fi
 
-cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
-cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
-mkdir ${DIR}/${SEED}/PandoraSettingsCLD
-cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
+# cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
+# cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
+# mkdir ${DIR}/${SEED}/PandoraSettingsCLD
+# cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
+cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig_2207/CLDConfig/* .
 cp -r ${HOMEDIR}/condor/make_pftree_clic_bindings.py .
 cp -r ${HOMEDIR}/condor/tree_tools.py .
 cp -r ${HOMEDIR}/gun/${GUNCARD} .
@@ -47,7 +49,7 @@ echo " =========================================================================
 echo "  "
 
 wrapperfunction() {
-    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh -r 2024-03-07
+    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh  #-r 2024-03-07
 }
 wrapperfunction
 
@@ -80,7 +82,7 @@ echo "run simulation ..."
 echo "  "
 echo " ================================================================================ "
 echo "  "
-ddsim --compactFile $K4GEO/FCCee/CLD/compact/CLD_o2_v05/CLD_o2_v05.xml --outputFile out_sim_edm4hep.root --steeringFile cld_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
+ddsim --compactFile $K4GEO/FCCee/CLD/compact/CLD_o2_v06/CLD_o2_v06.xml --outputFile out_sim_edm4hep.root --steeringFile cld_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
 
 echo "  "
 echo " ================================================================================ "
