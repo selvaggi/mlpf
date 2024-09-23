@@ -209,7 +209,7 @@ class ExampleWrapper(L.LightningModule):
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
-                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                '''self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=20,
@@ -221,7 +221,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_charged),
                     unit_p=self.args.regress_unit_p,
                     out_f=1
-                )
+                )'''
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
@@ -233,8 +233,11 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=False
+                    neutral_avg=False,
+                    neutral_PCA=False
                 )
+                self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
+                print(" !! Using the same model for charged and neutral !! ")
             else:  # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
@@ -263,6 +266,7 @@ class ExampleWrapper(L.LightningModule):
                             gnn=False,
                             pos_regression=self.args.regress_pos,
                             charged=True,
+                            no_trainable_params=False
                         )
                     )
                     # self.pos_dca = PickPAtDCA()
@@ -444,7 +448,7 @@ class ExampleWrapper(L.LightningModule):
             if len(charged_idx):
                 pred_pos[charged_idx.flatten()] = charged_positions
             if len(neutral_idx):
-                pred_pos[neutral_idx.flatten()] = neutral_positions
+                pred_pos[neutral_idx.flatten()] = neutral_positions.to(neutral_idx.device)
             pred_energy_corr = {
                 "pred_energy_corr": pred_energy_corr,
                 "pred_pos": pred_pos,
@@ -503,7 +507,7 @@ class ExampleWrapper(L.LightningModule):
             )
 
     def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
-        # Prediction for chardged particles
+        # Prediction for charged particles
         unbatched = dgl.unbatch(graphs_new)
         if len(charged_idx) > 0:
             charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
@@ -776,7 +780,9 @@ class ExampleWrapper(L.LightningModule):
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
                 if self.args.regress_unit_p:
                     true_pos = (true_pos / torch.norm(true_pos, dim=1).view(-1, 1)).clone()
-                loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+                    pred_pos = (pred_pos / torch.norm(pred_pos, dim=1).view(-1, 1)).clone()
+                #loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+                loss_pos = 1 - ((torch.nn.CosineSimilarity()(pred_pos, true_pos)).mean())
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
                 #loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
