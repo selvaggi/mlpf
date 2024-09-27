@@ -843,7 +843,8 @@ def obtain_clustering_for_matched_showers(
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
-                # print("Obtained labels in obtain_clustering", labels)
+                #if labels.min() == 0 and labels.sum() == 0:
+                #    labels += 1  # Quick hack
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
             shower_p_unique = torch.unique(labels)
             shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(

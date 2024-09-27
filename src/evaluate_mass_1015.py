@@ -44,7 +44,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/eval_10_09_testset_300_files_avg_pos"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -52,11 +52,12 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "results/eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "results/eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/2024/"
+    path_pandora = "GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
+
 
 labels = [
     "ML"

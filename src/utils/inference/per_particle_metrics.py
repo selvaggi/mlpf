@@ -1278,15 +1278,14 @@ from copy import copy
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
     # plot the event with Plotly. Compare ML and Pandora reconstructed with truth
+    # Also plot Eta-Phi (a bit easier debugging)
+    # df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!
+    # y_filt = np.where((y.pid.flatten() == 2112.0) + (y.pid.flatten() == 130.0))[0]
+    # y = copy(y)
+    # y.mask(y_filt)
+    # if len(df) == 0:
+    #     return
     return
-    # also plotst the graph is specified
-    # also plot Eta-Phi (a bit easier debugging)
-    #df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!!!
-    #y_filt = np.where((y.pid.flatten() == 2112.0)+(y.pid.flatten() == 130.0))[0]
-    #y = copy(y)
-    #y.mask(y_filt)
-    #if len(df) == 0:
-    #    returnr
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px
@@ -1296,6 +1295,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     # list of 20 random colors
     # color_list = px.colors.qualitative.Plotly # This is only 10, not enough
     color_list = px.colors.qualitative.Light24 + px.colors.qualitative.Dark24 + px.colors.qualitative.Plotly
+    #ref_pt = np.array(df.vertex.values.tolist())
+
     if graph is not None:
         sum_hits = scatter_sum(
             graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long()
@@ -1303,11 +1304,12 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         hit_pos = graph.ndata["pos_hits_xyz"].numpy()
         scale = np.mean(np.linalg.norm(hit_pos, axis=1))
         truepos = np.array(df.true_pos.values.tolist()) * scale
-        truepos = truepos[~np.isnan(truepos[:, 0])]
-        vertices = np.zeros_like(truepos[~np.isnan(truepos[:, 0])])
-        if y is not None:
-            assert vertices.shape == y.vertex.shape
-            vertices = y.vertex
+        #truepos = truepos[~np.isnan(truepos[:, 0])]
+        #vertices = np.zeros_like(truepos[~np.isnan(truepos[:, 0])])
+        vertices = np.stack(df.vertex.values)
+        #if y is not None:
+        #    assert vertices.shape == y.vertex.shape
+        #    vertices = y.vertex
         # fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', color=graph.ndata["particle_number"], name='hits'))
         # fix this: color by particle number (it is an array of size [0,0,0,0,1,1,1,2,2,2...]
         ht = [
@@ -1317,7 +1319,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         if labels is not None:
             has_track = scatter_sum(graph.ndata["h"][:, 8], labels.long().cpu())
             #if has_track.sum() == 0.0:
-            #    return # filter ! only plot those with tracks
+            #    return   # filter ! ! ! Only plot those with tracks
             pids = df.pid.values
             ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
@@ -1325,6 +1327,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]
         if labels is not None:
             c = [color_list[int(i.item())] for i in labels]
+        if pandora:
+            c = [color_list[int(i.item())] for i in graph.ndata["pandora_cluster"]]
         fig.add_trace(
             go.Scatter3d(
                 x=hit_pos[:, 0],
@@ -1339,6 +1343,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         )
         if is_track_in_cluster is not None:
             plt.title(f"Track in cluster {is_track_in_cluster}")
+            fig.update_layout(title_text=f"Track in cluster {is_track_in_cluster}")
             fig.update_layout(title_text=f"Track in cluster {is_track_in_cluster}")
         # set scale to avg hit_pos
         if "pos_pxpypz" in graph.ndata.keys():
@@ -1377,7 +1382,6 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                     line = dict(color="black", width=1, dash="dash")
                 else:
                     raise Exception
-
                 def plot_single_arrow(
                     fig, vec, hovertext="", init_pt=[0, 0, 0], line=line
                 ):
@@ -1411,79 +1415,64 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                     plot_single_arrow(
                         fig,
                         pos_at_vertex[i],
-                        hovertext=f"track at DCA {ps_vertex[i]}, pxpypz={pos_at_vertex[i]}",
+                        hovertext=f"track at DCA {ps_vertex[i]}, px,py,pz={pos_at_vertex[i]}",
                         init_pt=[0, 0, 0],
                     )
-        # color this by graph.ndata["particle_number"]
-    # get the norm of vertices
+        # Color this by graph.ndata["particle_number"]
+    # Get the norm of vertices
     displacement = np.linalg.norm(vertices, axis=1)
-    # if displacement.max() < 400:
-    #    return
+    if displacement.max() < 400:
+        return
+    else:
+        print("Displaced")
     pids = [str(x) for x in df.pid.values]
     col = np.arange(1, len(truepos) + 1)
     true_E = df.true_showers_E.values
-    true_P = np.array(df.true_pos.values.tolist()) * true_E.reshape(-1, 1)
+    true_P = np.array(df.true_pos.values.tolist())
+    true_P /= np.linalg.norm(true_P, axis=1).reshape(-1, 1)
+    true_P *= scale
     ht = [
-        f"GT E={true_E[i]:.2f}, PID={pids[i]} , p={true_P[i]}"
+        f"GT E={true_E[i]:.2f}, PID={pids[i]}, p={true_P[i]}"
         for i in range(len(true_E))
     ]
-    # add lines from (0,0,0) to these points
-    fig.add_trace(
-        go.Scatter3d(
-            x=vertices[:, 0] + truepos[:, 0],
-            y=vertices[:, 1] + truepos[:, 1],
-            z=vertices[:, 2] + truepos[:, 2],
-            mode="markers",
-            marker=dict(size=4, color=[color_list[c] for c in col]),
-            name="ground truth",
-            hovertext=ht,
-            hoverinfo="text",
-        )
-    )
-    for i in range(len(truepos)):
-        v = vertices[i]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[v[0], v[0] + truepos[i, 0]],
-                y=[v[1], v[1] + truepos[i, 1]],
-                z=[v[2], v[2] + truepos[i, 2]],
-                mode="lines",
-                line=dict(color="blue", width=1),
-            )
-        )
     if pandora:
         pandora_cluster = graph.ndata["pandora_cluster"].long() + 1
-        pandorapos = np.array(df.pandora_calibrated_pos.values.tolist()) * scale
-        pandorapos = pandorapos[~np.isnan(pandorapos[:, 0])]
-        pandorapos = scatter_mean(
-            graph.ndata["pandora_momentum"], pandora_cluster, dim=0
-        )
-        pandoramomentum = np.linalg.norm(pandorapos, axis=1).reshape(-1, 1)
+        pandorapos = np.array(df.pandora_calibrated_pos.values.tolist())
+        mask = ~np.isnan(df.pandora_calibrated_E.values)
+        pandoramomentum = np.linalg.norm(pandorapos, axis=1)
         pandorapos = pandorapos / np.linalg.norm(pandorapos, axis=1).reshape(-1, 1)
-        pandorapos = pandorapos[1:] * scale
+        #pandorapos = pandorapos[1:]
         # normalize
-        pandora_ref_pt = scatter_mean(
-            graph.ndata["pandora_reference_point"], pandora_cluster.long(), dim=0
-        )
-        pandora_ref_pt = pandora_ref_pt[1:]
+        #pandora_ref_pt = scatter_mean(
+        #    graph.ndata["pandora_reference_point"], pandora_cluster.long(), dim=0
+        #)
+        #pandora_ref_pt = pandora_ref_pt[1:]
+        pandora_ref_pt = torch.tensor(np.stack(df.pandora_ref_pt.values.tolist()))
+        #pandora_ref_pt #/= np.linalg.norm(pandora_ref_pt, axis=1).reshape(-1, 1)
         assert pandora_ref_pt.shape == pandorapos.shape
+        ref_pt = pandora_ref_pt
+        pandora_ref_pt_diff =  pandora_ref_pt[mask] - vertices[mask]
+        pandora_ref_pt_diff_norm = pandora_ref_pt_diff / np.linalg.norm(pandora_ref_pt_diff, axis=1).reshape(-1, 1)
+        GT_translation = pandora_ref_pt_diff_norm.numpy()
+        assert pandora_ref_pt.shape == pandorapos.shape
+        pandorapos *= scale
         # fig.add_trace(go.Scatter3d(x=vertices[:, 0] + pandorapos[:, 0], y=vertices[:, 1] + pandorapos[:, 1], z=vertices[:, 2] + pandorapos[:, 2], mode='markers', marker=dict(size=4, color='green'), name='Pandora', hovertext=df.pandora_calibrated_E.values, hoverinfo="text"))
         fig.add_trace(
             go.Scatter3d(
-                x=pandora_ref_pt[:, 0] + pandorapos[:, 0],
-                y=pandora_ref_pt[:, 1] + pandorapos[:, 1],
-                z=pandora_ref_pt[:, 2] + pandorapos[:, 2],
+                x=torch.tensor(pandora_ref_pt[:, 0]) + pandorapos[:, 0],
+                y=torch.tensor(pandora_ref_pt[:, 1]) + pandorapos[:, 1],
+                z=torch.tensor(pandora_ref_pt[:, 2]) + pandorapos[:, 2],
                 mode="markers",
                 marker=dict(size=4, color="green"),
                 name="Pandora",
                 hovertext=pandoramomentum.flatten()[1:],
                 hoverinfo="text",
-            )
-        )
-        # Also add the lines here
+            ))
+        # Also add the lines herepandora_ref_pt.shape == pandorapos.shape
         for i in range(len(pandorapos)):
-            #v = [0, 0, 0]  # temporarily. TODO: find the pandora 'vertex'
+            #v = [0, 0, 0]  # Temporarily. TODO: find the Pandora 'vertex'
             v = pandora_ref_pt[i]
+            #v = [0,0,0]
             fig.add_trace(
                 go.Scatter3d(
                     x=[v[0], v[0] + pandorapos[i, 0]],
@@ -1494,32 +1483,97 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                 )
             )
     else:
-        predpos = np.array(df.pred_pos_matched.values.tolist()) * scale
+        predpos = np.array(df.pred_pos_matched.values.tolist())
+        mask = ~np.isnan(np.stack(df.pred_pos_matched.values)[:, 0])
+        predpos = predpos[mask]
+        predpos /= np.linalg.norm(predpos, axis=1).reshape(-1, 1)
+        predpos *= scale
+        pred_ref_pt = np.array(df.pred_ref_pt_matched.values.tolist())
+        ref_pt = pred_ref_pt[mask]
+        pred_ref_pt_diff = pred_ref_pt[mask] - vertices[mask]
+        pred_ref_pt_diff_norm = pred_ref_pt_diff / np.linalg.norm(pred_ref_pt_diff, axis=1).reshape(-1, 1)
+        #GT_translation = pred_ref_pt_diff_norm[mask]
+        #pred_ref_pt /= np.linalg.norm(pred_ref_pt, axis=1).reshape(-1, 1)
+        #v = [0, 0, 0]  # Do an average of the hits for plotting this
+        #v = vertices[i]
+        # ... Add lines ...
         fig.add_trace(
             go.Scatter3d(
-                x=predpos[:, 0],
-                y=predpos[:, 1],
-                z=predpos[:, 2],
+                x=ref_pt[:, 0] + predpos[:, 0],
+                y=ref_pt[:, 1] + predpos[:, 1],
+                z=ref_pt[:, 2] + predpos[:, 2],
                 mode="markers",
                 marker=dict(size=4, color="red"),
                 name="ML",
                 hovertext=df.calibrated_E.values,
             )
         )
-        # add lines
         for i in range(len(predpos)):
+            v = ref_pt[i]
             fig.add_trace(
                 go.Scatter3d(
-                    x=[0, predpos[i, 0]],
-                    y=[0, predpos[i, 1]],
-                    z=[0, predpos[i, 2]],
+                    x=[v[0], v[0] + predpos[i, 0]],
+                    y=[v[1], v[1] + predpos[i, 1]],
+                    z=[v[2], v[2] + predpos[i, 2]],
                     mode="lines",
                     line=dict(color="red", width=1),
                 )
+    )
+    # Plot GT (but translate it according to the Pandora or ML reference pt)
+    # Add lines from (0, 0, 0) to these points...
+    truepos_norm = truepos / np.linalg.norm(truepos, axis=1).reshape(-1, 1)  # From vertex!
+    truepos_norm_from_ref_pt = truepos_norm# - GT_translation
+    truepos_norm_from_ref_pt /= np.linalg.norm(truepos_norm_from_ref_pt, axis=1).reshape(-1, 1)
+    truepos_norm_from_ref_pt *= scale
+    fig.add_trace(
+        go.Scatter3d(
+            x=ref_pt[:, 0] + truepos_norm_from_ref_pt[:, 0],
+            y=ref_pt[:, 1] + truepos_norm_from_ref_pt[:, 1],
+            z=ref_pt[:, 2] + truepos_norm_from_ref_pt[:, 2],
+            mode="markers",
+            marker=dict(size=4, color=[color_list[c] for c in col]),
+            name="ground truth",
+            hovertext=ht,
+            hoverinfo="text",
+        )
+    )
+    # Also plot a dotted black line for each vertex from vertex to the true position
+    for i in range(len(truepos[mask])):
+        v = ref_pt[i]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                mode="lines",
+                line=dict(color="blue", width=1),
             )
-        # fig.show()
+        )
+        v = vertices[mask][i]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                mode="lines",
+                line=dict(color="black", width=2),
+            )
+        )
+        v = [0, 0, 0]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                mode="lines",
+                line=dict(color="gray", width=2),
+            )
+        )
     assert output_dir != ""
+    if "25.0" in output_dir:
+        print("26")
     plotly.offline.plot(fig, filename=output_dir + "event.html")
+
 
 def calculate_theta(x, y, z):
     return torch.acos(z / torch.sqrt(x ** 2 + y ** 2 + z ** 2))
@@ -1533,7 +1587,7 @@ def phi_dist(phi_pred, phi_true):
     return diff
 
 def calc_unit_circle_dist(df, pandora=False):
-    # quick histogram of distances between unit vectors of directions - to compare with the light training model
+    # A quick histogram of distances between unit vectors of directions - to compare with the light training model
     # Also returns the delta phi and delta theta
     if pandora:
         assert "pandora_calibrated_pos" in df.columns
@@ -1655,7 +1709,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
         pred_e_nocor = matched.pred_showers_E[mask]
         true_pxyz = np.array(matched.true_pos[mask].tolist())
-        bins_angle = np.linspace(-0.1, +0.1, 200)
+        bins_angle = np.linspace(-0.1, +0.1, 400)
         if np.sum(mask) > 0:  # if the bin is not empty
             e_over_true = pred_e / true_e
             e_over_reco = true_rec / true_e
@@ -1663,10 +1717,12 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             pxyz_over_true = pred_pxyz / true_pxyz
             dist, _, phi_dist, eta_dist = calc_unit_circle_dist(matched[mask], pandora=pandora)
             p_size_over_true = np.linalg.norm(pred_pxyz, axis=1) / np.linalg.norm(true_pxyz, axis=1)
-            mu, var, _, _ = get_sigma_gaussian(phi_dist, bins_angle)
-            var_phi = var*mu
-            mu, var, _, _ = get_sigma_gaussian(eta_dist, bins_angle)
-            var_theta = var*mu
+            #mu, var, _, _ = get_sigma_gaussian(phi_dist, bins_angle)
+            mu, var = obtain_MPV_and_68(phi_dist, bins_angle)
+            var_phi = var * mu
+            #mu, var, _, _ = get_sigma_gaussian(eta_dist, bins_angle)
+            mu, var = obtain_MPV_and_68(eta_dist, bins_angle)
+            var_theta = var * mu
             sigma_phi.append(var_phi)
             sigma_theta.append(var_theta)
             distr_theta.append(eta_dist)

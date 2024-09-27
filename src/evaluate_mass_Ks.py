@@ -46,7 +46,7 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/eval_Close_decays_oonly"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/_Ks_New_Model_"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -54,9 +54,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "_Ks_New_Model_/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "_with_vertex_info_eval_Ks_13_09_FT_on_Ks_FTOnly1/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "_Ks_New_Model_/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
@@ -65,7 +65,7 @@ labels = [
 ]
 
 def renumber_batch_idx(df):
-    # batch idx has missing numbers
+    # batch_idx has missing numbers
     # renumber it to be like 0,1,2...
     batch_idx = df.number_batch
     unique_batch_idx = np.unique(batch_idx)
@@ -91,7 +91,6 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
-
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )

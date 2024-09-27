@@ -583,7 +583,7 @@ class ExampleWrapper(L.LightningModule):
         #     self.args.losstype = "hgcalimplementation"
         # else:
         #     self.args.losstype = "vrepweighted"
-        loss, losses = object_condensation_loss2(
+        '''loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor1,
@@ -598,8 +598,9 @@ class ExampleWrapper(L.LightningModule):
             fill_loss_weight=self.args.fill_loss_weight,
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
-        )
+        )'''
         loss_ec = 0
+        losses, loss = 0,0
 
         print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:

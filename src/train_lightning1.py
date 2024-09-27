@@ -115,10 +115,12 @@ def main():
     model = model_setup(args, data_config)
     if args.gpus:
         gpus = [int(i) for i in args.gpus.split(",")]
+        dev = torch.device(gpus[0])
         print("Using GPUs:", gpus)
     else:
         print("No GPUs flag provided - Setting GPUs to [0]")
         gpus = [0]
+        dev = torch.device(gpus[0])
         raise Exception("Please provide GPU number")
     wandb_logger = WandbLogger(
         project=args.wandb_projectname,
@@ -149,7 +151,7 @@ def main():
             dirpath=args.model_prefix,  # checkpoints_path, # <--- specify this on the trainer itself for version control
             filename="_{epoch}_{step}",
             # every_n_epochs=val_every_n_epochs,
-            every_n_train_steps=1000,
+            every_n_train_steps=10,
             save_top_k=-1,  # <--- this is important!
             save_weights_only=True,
         )
@@ -195,7 +197,7 @@ def main():
         if args.load_model_weights is not None and args.correction:
             from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0
+                args.load_model_weights, args=args, dev=0, map_location=dev
             )
         #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", filename="profiler_eval_0705")
         #print("USING PROFILER")

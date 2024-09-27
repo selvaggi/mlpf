@@ -176,7 +176,7 @@ class ExampleWrapper(L.LightningModule):
             elif self.args.ec_model == "dnn-neutrals":
                 assert self.args.add_track_chis
                 num_global_features = 14
-                self.ec_model_wrapper_charged = PickPAtDCA()  #  #  #
+                self.ec_model_wrapper_charged = PickPAtDCA()
                 #self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                 #    device=dev,
                 #    in_features_global=num_global_features,
@@ -202,10 +202,10 @@ class ExampleWrapper(L.LightningModule):
                     print("Also running classification for charged particles", self.pids_charged)
                 if len(self.pids_neutral):
                     print("Also running classification for neutral particles", self.pids_neutral)
-                if self.args.PID_4_class:
-                    self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
-                    self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
-                    self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                #if self.args.PID_4_class:
+                self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
+                self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
+                self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
@@ -233,8 +233,9 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=False,
-                    neutral_PCA=False
+                    neutral_avg=True,
+                    neutral_PCA=False,
+                    neutral_thrust_axis=False
                 )
                 self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
                 print(" !! Using the same model for charged and neutral !! ")
@@ -292,6 +293,7 @@ class ExampleWrapper(L.LightningModule):
         # if self.trainer.is_global_zero and step_count % 500 == 0:
         #     g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
         #     PlotCoordinates(
+
         #         g,
         #         path="input_coords",
         #         outdir=self.args.model_prefix,
@@ -357,7 +359,6 @@ class ExampleWrapper(L.LightningModule):
 
     def forward_correction(self, g, x, y, return_train):
         time_matching_start = time()
-
         (
             graphs_new,
             graphs_high_level_features,
@@ -383,11 +384,11 @@ class ExampleWrapper(L.LightningModule):
         )
         if self.args.regress_pos:
             if len(self.pids_charged):
-                charged_energies, charged_positions, charged_PID_pred = charged_energies
+                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies
             else:
                 charged_energies, charged_positions, _ = charged_energies
             if len(self.pids_neutral):
-                neutral_energies, neutral_positions, neutral_PID_pred = neutral_energies
+                neutral_energies, neutral_positions, neutral_PID_pred, neutral_ref_pt_pred = neutral_energies
             else:
                 neutral_energies, neutral_positions, _ = neutral_energies
         if self.args.explain_ec:
@@ -445,15 +446,19 @@ class ExampleWrapper(L.LightningModule):
             pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred1).long().to(neutral_idx.device)
         pred_energy_corr[pred_energy_corr < 0] = 0.0
         if self.args.regress_pos:
+            pred_ref_pt = torch.ones_like(pred_pos)
             if len(charged_idx):
-                pred_pos[charged_idx.flatten()] = charged_positions
+                pred_ref_pt[charged_idx.flatten()] = charged_ref_pt_pred.to(pred_ref_pt.device)
+                pred_pos[charged_idx.flatten()] = charged_positions.float().to(pred_pos.device)
             if len(neutral_idx):
-                pred_pos[neutral_idx.flatten()] = neutral_positions.to(neutral_idx.device)
+                pred_ref_pt[neutral_idx.flatten()] = neutral_ref_pt_pred.to(neutral_idx.device)
+                pred_pos[neutral_idx.flatten()] = neutral_positions.to(neutral_idx.device).float()
             pred_energy_corr = {
                 "pred_energy_corr": pred_energy_corr,
                 "pred_pos": pred_pos,
                 "neutrals_idx": neutral_idx.flatten(),
-                "charged_idx": charged_idx.flatten()
+                "charged_idx": charged_idx.flatten(),
+                "pred_ref_pt": pred_ref_pt,
             }
             if len(self.pids_charged) or len(self.pids_neutral):
                 pred_energy_corr["pred_PID"] = pred_pid
@@ -524,6 +529,7 @@ class ExampleWrapper(L.LightningModule):
                 charged_energies = [
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
                 ]
             if len(self.pids_charged):
                 charged_energies += [torch.tensor([]).to(graphs_new.ndata["h"].device)]
@@ -545,7 +551,8 @@ class ExampleWrapper(L.LightningModule):
                 neutral_energies = [
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
-                ]
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                        ]
             if len(self.pids_neutral):
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
         return neutral_energies
@@ -601,6 +608,9 @@ class ExampleWrapper(L.LightningModule):
             ).long()
         else:
             pred_pos = None
+            pred_pid = torch.ones((graphs_high_level_features.shape[0])).to(
+                graphs_new.ndata["h"].device
+            ).long()
         node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
             :, 0:3
         ]
@@ -713,11 +723,12 @@ class ExampleWrapper(L.LightningModule):
             (model_output, e_cor, _, _) = result
         if self.args.regress_pos:
             dic = e_cor
-            e_cor, pred_pos, neutral_idx, charged_idx = (
+            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt = (
                 e_cor["pred_energy_corr"],
                 e_cor["pred_pos"],
                 e_cor["neutrals_idx"],
                 e_cor["charged_idx"],
+                e_cor["pred_ref_pt"]
             )
             if len(self.pids_charged):
                 charged_PID_pred = dic["charged_PID_pred"]
@@ -739,7 +750,10 @@ class ExampleWrapper(L.LightningModule):
             if len(self.pids_neutral):
                 neutral_PID_pred = dic["neutral_PID_pred"]
                 neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
-                # one-hot encoded
+                if type(neutral_PID_true) == np.float64:
+                    neutral_PID_true = [neutral_PID_true]
+                # One-hot encoded
+                print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
                 neutral_PID_true_onehot = torch.zeros(
                     len(neutral_PID_true), len(self.pids_neutral)
                 )
@@ -920,10 +934,13 @@ class ExampleWrapper(L.LightningModule):
                     #if self.args.PID_4_class:
                     #    neutral_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in neutral_PID_true])
                 pred_pid = e_cor["pred_PID"]
-                e_cor, pred_pos = e_cor["pred_energy_corr"], e_cor["pred_pos"]
+                e_cor, pred_pos, pred_ref_pt = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["pred_ref_pt"]
                 #pid_list = np.zeros_like(e_cor)
             else:
                 pred_pos = None
+                pred_ref_pt = None
+                e_cor = None
+                pred_pid=None
             loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
         else:
@@ -932,6 +949,8 @@ class ExampleWrapper(L.LightningModule):
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
             e_cor = e_cor1
             pred_pos = None
+            pred_pid=None
+            pred_ref_pt = None
         preds = model_output.squeeze()
         # if self.global_step < 200:
         #     self.args.losstype = "hgcalimplementation"
@@ -994,6 +1013,7 @@ class ExampleWrapper(L.LightningModule):
                 ec_x=ec_x,
                 total_number_events=self.total_number_events,
                 pred_pos=pred_pos,
+                pred_ref_pt=pred_ref_pt,
                 pred_pid=pred_pid,
                 use_gt_clusters=self.args.use_gt_clusters,
                 pids_neutral=self.pids_neutral,
@@ -1097,21 +1117,23 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, self.parameters()), lr=1e-3
-        )
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
+        # if self.args.lr_scheduler == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=int(50), # for now for testing
+            eta_min=0,
+        )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": ReduceLROnPlateau(optimizer, patience=3),
+                "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
                 "interval": "epoch",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
-                # If "monitor" references validation metrics, then "frequency" should be set to a
-                # multiple of "trainer.check_val_every_n_epoch".
-            },
-        }
+            }}
+
 
 
 def obtain_batch_numbers(g):

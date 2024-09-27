@@ -21,7 +21,7 @@ class Thrust:
             sum_magnitude_mom += np.linalg.norm(momentum)
         # STEP 3: For each momentum in momenta, use it as initial axis
 
-        if len(momenta) > 100: # temporary
+        if False and len(momenta) > 100: # temporary
             # The 10 percent of the highest energy hits
             smaller_momenta = sorted(momenta, key=lambda x: np.linalg.norm(x))[:int(0.5 * len(momenta))]
         else:
@@ -62,6 +62,37 @@ class Thrust:
         print("Calculating thrust took", t_end - t_start, "seconds")
         return thrust_axis
 
+def weighted_least_squares_line(hits_xyz, hits_E, cut_anomalies=0.15):
+    total_weight = np.sum(hits_E)
+    centroid = np.average(hits_xyz, axis=0, weights=hits_E)
+    centered_hits = hits_xyz - centroid
+    # remove outliers (33% hits furthest away from the centroid)
+    dist = np.linalg.norm(centered_hits, axis=1)
+    if cut_anomalies > 0 and len(hits_xyz) > 10:
+        mask = dist < np.quantile(dist, 1 - cut_anomalies)
+        hits_xyz = hits_xyz[mask]
+        centered_hits = centered_hits[mask]
+        hits_E = hits_E[mask]
+    W = np.sqrt(hits_E)
+    W_centered_hits = centered_hits * W[:, np.newaxis]
+    _, _, vh = np.linalg.svd(W_centered_hits, full_matrices=False)
+    direction = vh[0]
+    return centroid, direction
+
+from sklearn.linear_model import LinearRegression
+class LR: # linear regression
+    @staticmethod
+    def calculate_thrust(hits_xyz, hits_E, E_power=0):
+        """
+            Calculate the coefficient of a linear fit through the hits_xyz weighted by hits_E^E_power.
+        """
+        weights = hits_E**E_power
+        lr = LinearRegression()
+        lr.fit(hits_xyz, sample_weight=weights)
+        thrust_axis = lr.coef_
+        return thrust_axis
+
+
 def hits_xyz_to_momenta(hits_xyz, hits_E):
     # barycenter is a weighted average of hits
     barycenter = np.average(hits_xyz, weights=hits_E, axis=0)
@@ -71,6 +102,8 @@ def hits_xyz_to_momenta(hits_xyz, hits_E):
     unit_vectors /= np.linalg.norm(unit_vectors, axis=1)[:, np.newaxis]
     momenta = unit_vectors * hits_E[:, np.newaxis]
     return momenta
+
+
 if __name__ == "__main__":
     # demo for debugging
     # Example usage
