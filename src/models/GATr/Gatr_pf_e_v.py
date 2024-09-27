@@ -34,11 +34,11 @@ from src.utils.post_clustering_features import (
     calculate_eta,
     calculate_phi,
 )
-from src.models.energy_correction_NN import (
-    ECNetWrapper,
-    ECNetWrapperGNN,
-    ECNetWrapperGNNGlobalFeaturesSeparate,
-)
+# from src.models.energy_correction_NN import (
+#     ECNetWrapper,
+#     ECNetWrapperGNN,
+#     ECNetWrapperGNNGlobalFeaturesSeparate,
+# )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
@@ -79,21 +79,6 @@ def criterion(ypred, ytrue, step):
 
 
 class ExampleWrapper(L.LightningModule):
-    """Example wrapper around a GATr model.
-
-    Expects input data that consists of a point cloud: one 3D point for each item in the data.
-    Returns outputs that consists of one scalar number for the whole dataset.
-
-    Parameters
-    ----------
-    blocks : int
-        Number of transformer blocks
-    hidden_mv_channels : int
-        Number of hidden multivector channels
-    hidden_s_channels : int
-        Number of hidden scalar channels
-    """
-
     def __init__(
         self,
         args,
@@ -132,85 +117,81 @@ class ExampleWrapper(L.LightningModule):
             mlp=MLPConfig(),  # Use default parameters for MLP
         )
         self.ScaledGooeyBatchNorm2_1 = nn.BatchNorm1d(self.input_dim, momentum=0.1)
-        self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
+        # self.clustering = nn.Linear(3, self.output_dim - 1, bias=False)
         self.beta = nn.Linear(2, 1)
-        # Load the energy correction module
-        if self.args.correction:
-            #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
-            ckpt_charged = "/eos/user/g/gkrzmanc/2024/Ks_EC_features_export_BS128/models_trained_EC_charged_pi/intermediate_plots/model_step_2000_pid_211.pkl "
-            ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
-            if self.args.ec_model == "gat":
-                in_features = 17
-                if self.args.add_track_chis:
-                    in_features += 1
-                num_global_features = 14
-                self.ec_model_wrapper_charged = ECNetWrapperGNN(
-                    device=dev, in_features=in_features + num_global_features
-                )
-                self.ec_model_wrapper_neutral = ECNetWrapperGNN(
-                    device=dev, in_features=in_features + num_global_features
-                )
-            elif self.args.ec_model == "gat-concat":
-                in_features = 17
-                if self.args.add_track_chis:
-                    in_features += 1
-                num_global_features = 14
-                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
-                    device=dev,
-                    in_features_global=num_global_features,
-                    in_features_gnn=in_features,
-                    ckpt_file=ckpt_charged,
-                    gnn=True,
-                )
-                self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
-                    device=dev,
-                    in_features_global=num_global_features,
-                    in_features_gnn=in_features,
-                    ckpt_file=ckpt_neutral,
-                    gnn=True,
-                )
-            else:
-                if not self.args.add_track_chis:
-                    # self.ec_model_wrapper_charged = NetWrapper(
-                    #    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
-                    # )
-                    # self.ec_model_wrapper_neutral = NetWrapper(
-                    #    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
-                    # )
-                    self.ec_model_wrapper_charged = ECNetWrapper(
-                        ckpt_file=None, device=dev, in_features=13
-                    )
-                    self.ec_model_wrapper_neutral = ECNetWrapper(
-                        ckpt_file=None, device=dev, in_features=13
-                    )
-                else:
-                    num_global_features = 14
-                    self.ec_model_wrapper_charged = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(
-                            device=dev,
-                            in_features_global=num_global_features,
-                            in_features_gnn=18,
-                            ckpt_file=ckpt_charged,
-                            gnn=False,
-                            unit_p=self.args.regress_unit_p
-                        )
-                    )
-                    self.ec_model_wrapper_neutral = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(
-                            device=dev,
-                            in_features_global=num_global_features,
-                            in_features_gnn=18,
-                            ckpt_file=ckpt_neutral,
-                            gnn=False,
-                            unit_p=self.args.regress_unit_p
-                        )
-                    )
 
-        # freeze these models completely
-        # for param in self.ec_model_wrapper_charged.model.parameters():
-        #    param.requires_grad = False
-        # for param in self.ec_model_wrapper_neutral.model.parameters():
-        #    param.requires_grad = False
+        # if self.args.correction:
+        #     #ckpt_charged = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_electrons/intermediate_plots/model_step_10000_pid_211.pkl"
+        #     ckpt_charged = "/eos/user/g/gkrzmanc/2024/Ks_EC_features_export_BS128/models_trained_EC_charged_pi/intermediate_plots/model_step_2000_pid_211.pkl "
+        #     ckpt_neutral = "/eos/user/g/gkrzmanc/2024/ft_ec_saved_f_230424/NN_EC_pretrain_neutral/intermediate_plots/model_step_10000_pid_22.pkl"
+        #     if self.args.ec_model == "gat":
+        #         in_features = 17
+        #         if self.args.add_track_chis:
+        #             in_features += 1
+        #         num_global_features = 14
+        #         self.ec_model_wrapper_charged = ECNetWrapperGNN(
+        #             device=dev, in_features=in_features + num_global_features
+        #         )
+        #         self.ec_model_wrapper_neutral = ECNetWrapperGNN(
+        #             device=dev, in_features=in_features + num_global_features
+        #         )
+        #     elif self.args.ec_model == "gat-concat":
+        #         in_features = 17
+        #         if self.args.add_track_chis:
+        #             in_features += 1
+        #         num_global_features = 14
+        #         self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+        #             device=dev,
+        #             in_features_global=num_global_features,
+        #             in_features_gnn=in_features,
+        #             ckpt_file=ckpt_charged,
+        #             gnn=True,
+        #         )
+        #         self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
+        #             device=dev,
+        #             in_features_global=num_global_features,
+        #             in_features_gnn=in_features,
+        #             ckpt_file=ckpt_neutral,
+        #             gnn=True,
+        #         )
+        #     else:
+        #         if not self.args.add_track_chis:
+        #             # self.ec_model_wrapper_charged = NetWrapper(
+        #             #    "/eos/user/g/gkrzmanc/2024/models/charged22000.pkl", dev
+        #             # )
+        #             # self.ec_model_wrapper_neutral = NetWrapper(
+        #             #    "/eos/user/g/gkrzmanc/2024/models/neutral22000.pkl", dev
+        #             # )
+        #             self.ec_model_wrapper_charged = ECNetWrapper(
+        #                 ckpt_file=None, device=dev, in_features=13
+        #             )
+        #             self.ec_model_wrapper_neutral = ECNetWrapper(
+        #                 ckpt_file=None, device=dev, in_features=13
+        #             )
+        #         else:
+        #             num_global_features = 14
+        #             self.ec_model_wrapper_charged = (
+        #                 ECNetWrapperGNNGlobalFeaturesSeparate(
+        #                     device=dev,
+        #                     in_features_global=num_global_features,
+        #                     in_features_gnn=18,
+        #                     ckpt_file=ckpt_charged,
+        #                     gnn=False,
+        #                     unit_p=self.args.regress_unit_p
+        #                 )
+        #             )
+        #             self.ec_model_wrapper_neutral = (
+        #                 ECNetWrapperGNNGlobalFeaturesSeparate(
+        #                     device=dev,
+        #                     in_features_global=num_global_features,
+        #                     in_features_gnn=18,
+        #                     ckpt_file=ckpt_neutral,
+        #                     gnn=False,
+        #                     unit_p=self.args.regress_unit_p
+        #                 )
+        #             )
+
+
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         """Forward pass.
@@ -227,7 +208,7 @@ class ExampleWrapper(L.LightningModule):
         """
 
         inputs = g.ndata["pos_hits_xyz"]
-        if self.trainer.is_global_zero and step_count % 500 == 0:
+        if self.trainer.is_global_zero and step_count % 1000 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
                 g,
@@ -253,28 +234,26 @@ class ExampleWrapper(L.LightningModule):
         scalars = torch.zeros((inputs.shape[0], 1))
         scalars = g.ndata["h"][:, -2:]  # this corresponds to e,p
         # Pass data through GATr
-        forward_time_start = time()
+        # forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
-        )  # (..., num_points, 1, 16)
-        forward_time_end = time()
-        #  wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
+        )  
         points = extract_point(embedded_outputs[:, 0, :])
 
         # Extract scalar and aggregate outputs from point cloud
         nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        x_point = points
+        
         x_scalar = torch.cat(
             (nodewise_outputs.view(-1, 1), scalar_outputs.view(-1, 1)), dim=1
         )
-        x_cluster_coord = self.clustering(x_point)
+        x_cluster_coord = points #self.clustering(x_point)
         beta = self.beta(x_scalar)
         if self.args.tracks:
             mask = g.ndata["hit_type"] == 1
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 500 == 0:
+        if self.trainer.is_global_zero and step_count % 1000 == 0:
             PlotCoordinates(
                 g,
                 path="final_clustering",
@@ -285,9 +264,8 @@ class ExampleWrapper(L.LightningModule):
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
-
         if self.args.correction:
-            time_matching_start = time()
+            # time_matching_start = time()
             (
                 graphs_new,
                 true_new,
@@ -301,7 +279,7 @@ class ExampleWrapper(L.LightningModule):
                 self.trainer.global_rank,
                 use_gt_clusters=self.args.use_gt_clusters,
             )
-            time_matching_end = time()
+            # time_matching_end = time()
             # wandb.log(
             #     {"time_clustering_matching": time_matching_end - time_matching_start}
             # )
@@ -311,8 +289,6 @@ class ExampleWrapper(L.LightningModule):
                 batch_idx.extend([i] * n)
             batch_idx = torch.tensor(batch_idx).to(self.device)
             graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
-            # TODO: add global features to each node here
-            # print("Using global features of the graphs as well")
             # graphs_num_nodes = graphs_new.batch_num_nodes
             # add num_nodes for each node
             graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
@@ -324,7 +300,7 @@ class ExampleWrapper(L.LightningModule):
                 (graphs_new.ndata["h"], graphs_sum_features), dim=1
             )
             assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
-            # print("Also computing graph-level features")
+
             graphs_high_level_features = get_post_clustering_features(
                 graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
             )
@@ -465,6 +441,7 @@ class ExampleWrapper(L.LightningModule):
                 )
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
+
             return x, pred_energy_corr, 0, 0
 
     def build_attention_mask(self, g):
@@ -489,14 +466,11 @@ class ExampleWrapper(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        initial_time = time()
         if self.trainer.is_global_zero:
             model_output, e_cor, loss_ll, _ = self(batch_g, y, batch_idx)
         else:
             model_output, e_cor, loss_ll, _ = self(batch_g, y, 1)
-
-        loss_time_start = time()
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor,
@@ -514,8 +488,6 @@ class ExampleWrapper(L.LightningModule):
         )
         # Dummy loss to avoid errors
         loss = loss  # + torch.nn.L1Loss()(neutral_pid.sum(), neutral_pid.sum()) + torch.nn.L1Loss()(charged_pid.sum(), charged_pid.sum()) # + 0.01 * loss_ll  # + 1 / 20 * loss_E  # add energy loss # loss +
-        loss_time_end = time()
-        # wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
@@ -547,7 +519,7 @@ class ExampleWrapper(L.LightningModule):
                     },
                 )
 
-        misc_time_start = time()
+
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
         self.loss_final = loss.item() + self.loss_final
@@ -555,9 +527,7 @@ class ExampleWrapper(L.LightningModule):
         del model_output
         del e_cor
         del losses
-        final_time = time()
-        # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
-        # wandb.log({"training_step_time": final_time - initial_time})
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -613,7 +583,7 @@ class ExampleWrapper(L.LightningModule):
         #     self.args.losstype = "hgcalimplementation"
         # else:
         #     self.args.losstype = "vrepweighted"
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor1,
@@ -681,7 +651,12 @@ class ExampleWrapper(L.LightningModule):
 
     def on_train_epoch_end(self):
         self.log("train_loss_epoch", self.loss_final / self.number_b)
-
+    # def on_after_backward(self) -> None:
+    #     print("on_before_opt enter")
+    #     for name, param in self.named_parameters():
+    #         if not param.requires_grad:
+    #             print("doesn't have grad", name)
+    #     print("on_before_opt exit")
     def on_train_epoch_start(self):
         # if self.trainer.is_global_zero and self.current_epoch == 0:
         #     self.stat_dict = {}
@@ -771,7 +746,7 @@ class ExampleWrapper(L.LightningModule):
         optimizer = torch.optim.Adam(
             filter(lambda p: p.requires_grad, self.parameters()), lr=1e-3
         )
-        print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
+        # print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -793,7 +768,6 @@ def obtain_batch_numbers(g):
         gj = graphs_eval[index]
         num_nodes = gj.number_of_nodes()
         batch_numbers.append(index * torch.ones(num_nodes))
-        num_nodes = gj.number_of_nodes()
 
     batch = torch.cat(batch_numbers, dim=0)
     return batch
