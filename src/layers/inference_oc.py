@@ -66,7 +66,7 @@ def create_and_store_graph_output(
         # if shap_vals is not None:
         #    dic["shap_values"] = shap_vals
         # if ec_x is not None:
-        #    dic["ec_x"] = ec_x  ## ? no mask ?!?
+        #    dic["ec_x"] = ec_x  ## ? No mask ?!?
         if predict:
             labels_clustering = clustering_obtain_labels(
                 X, dic["graph"].ndata["beta"].view(-1), model_output.device

@@ -704,7 +704,7 @@ class FreezeClustering(BaseFinetuning):
         self.freeze(pl_module.gatr)
         # self.freeze(pl_module.postgn_dense)
         # self.freeze(pl_module.ScaledGooeyBatchNorm2_2)
-        self.freeze(pl_module.clustering)
+        #self.freeze(pl_module.clustering)
         self.freeze(pl_module.beta)
 
         print("CLUSTERING HAS BEEN FROOOZEN")

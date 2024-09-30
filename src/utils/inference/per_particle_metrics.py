@@ -1221,7 +1221,6 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     return photons_dic
 
-
 def plot_eff(title, photons_dic, label1, PATH_store, labels):
     colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
     markers = ["^", "*", "x", "d", ".", "s"]
@@ -1277,6 +1276,7 @@ def calculate_eta(x, y, z):
 from copy import copy
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
+    return
     # plot the event with Plotly. Compare ML and Pandora reconstructed with truth
     # Also plot Eta-Phi (a bit easier debugging)
     # df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!
@@ -1285,7 +1285,6 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     # y.mask(y_filt)
     # if len(df) == 0:
     #     return
-    return
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px
@@ -1381,7 +1380,9 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                 elif hit_type[i] == 1:
                     line = dict(color="black", width=1, dash="dash")
                 else:
-                    raise Exception
+                    line = dict(color="purple", width=1, dash="dot")
+                    pass # muons
+                    #raise Exception
                 def plot_single_arrow(
                     fig, vec, hovertext="", init_pt=[0, 0, 0], line=line
                 ):
@@ -1489,7 +1490,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         predpos /= np.linalg.norm(predpos, axis=1).reshape(-1, 1)
         predpos *= scale
         pred_ref_pt = np.array(df.pred_ref_pt_matched.values.tolist())
-        ref_pt = pred_ref_pt[mask]
+        ref_pt = pred_ref_pt
         pred_ref_pt_diff = pred_ref_pt[mask] - vertices[mask]
         pred_ref_pt_diff_norm = pred_ref_pt_diff / np.linalg.norm(pred_ref_pt_diff, axis=1).reshape(-1, 1)
         #GT_translation = pred_ref_pt_diff_norm[mask]
@@ -1499,9 +1500,9 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         # ... Add lines ...
         fig.add_trace(
             go.Scatter3d(
-                x=ref_pt[:, 0] + predpos[:, 0],
-                y=ref_pt[:, 1] + predpos[:, 1],
-                z=ref_pt[:, 2] + predpos[:, 2],
+                x=ref_pt[mask][:, 0] + predpos[:, 0],
+                y=ref_pt[mask][:, 1] + predpos[:, 1],
+                z=ref_pt[mask][:, 2] + predpos[:, 2],
                 mode="markers",
                 marker=dict(size=4, color="red"),
                 name="ML",
@@ -1668,10 +1669,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
     # print("time with paralel version", toc - tic)
     print("START PANDORA")
     binning = 1e-2
-    if pandora:
-        bins_per_binned_E = np.arange(0, 2, binning)
-    else:
-        bins_per_binned_E = np.arange(0, 2, binning)
+    bins_per_binned_E = np.arange(0, 2, binning)
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
@@ -1857,6 +1855,10 @@ def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title=""):
     if angle == 'theta':
         sigma = np.array(dic["sigma_theta"])
         sigma_pandora = np.array(dic["sigma_theta_pandora"])
+        #if len(sigma_pandora) < len(sigma):
+        #    sigma_pandora = np.pad(sigma_pandora, (0, len(sigma) - len(sigma_pandora)))
+        #elif len(sigma_pandora) > len(sigma):
+        #    sigma = np.pad(sigma, (0, len(sigma_pandora) - len(sigma)))
     else:
         sigma = np.array(dic["sigma_phi"])
         sigma_pandora = np.array(dic["sigma_phi_pandora"])

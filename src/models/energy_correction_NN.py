@@ -23,13 +23,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from src.models.gravnet_3_L import GravnetModel
-from src.models.GATr.Gatr_pf_e import obtain_batch_numbers as obtain_batch_numbers2
 from src.models.thrust_axis import Thrust, hits_xyz_to_momenta, LR, weighted_least_squares_line
 from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean, scatter_sum
 from gatr import GATr
 import dgl
-
 
 class Net(nn.Module):
     def __init__(self, in_features=13, out_features=1, return_raw=False):
@@ -379,16 +377,17 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             else:
                 E_pred, p_pred = res[0], res[1]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
+                _, _, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
                 if self.neutral_avg:
                     _, p_pred, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
-                    E_pred = x_global_features[:, 6]
+                    #E_pred = x_global_features[:, 6] # For the photons, just take the energy
                 elif self.neutral_PCA:
                     _, p_pred, ref_pt_pred = self.NeutralPCA.predict(x_global_features, graphs_new)
                 elif self.neutral_thrust_axis:
                     _, p_pred, ref_pt_pred = self.ThrustAxis.predict(x_global_features, graphs_new)
                 else:
                     if self.ignore_global_features_for_p:
-                        p_pred = res_pxyz # temporarily discard the pxyz output of the E prediction head
+                        p_pred = res_pxyz  # Temporarily discard the pxyz output of the E prediction head
                 if self.unit_p:
                     p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
                 return E_pred, p_pred, pid_pred, ref_pt_pred
@@ -400,6 +399,44 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             #     p = p_vectors_per_batch
             # return E, p
             return torch.clamp(res.flatten(), min=0, max=None)
+    @staticmethod
+    def obtain_batch_numbers(g):
+        graphs_eval = dgl.unbatch(g)
+        number_graphs = len(graphs_eval)
+        batch_numbers = []
+        for index in range(0, number_graphs):
+            gj = graphs_eval[index]
+            num_nodes = gj.number_of_nodes()
+            batch_numbers.append(index * torch.ones(num_nodes))
+            num_nodes = gj.number_of_nodes()
+        batch = torch.cat(batch_numbers, dim=0)
+        return batch
+
+    def build_attention_mask(self, g):
+        batch_numbers = self.obtain_batch_numbers(g)
+        return BlockDiagonalMask.from_seqlens(
+            torch.bincount(batch_numbers.long()).tolist()
+        )
+
+
+
+class ECNetWrapperAvg(torch.nn.Module):
+    # use the GNN+NN model for energy correction
+    # This one concatenates GNN features to the global features
+    def __init__(self):
+        super(ECNetWrapperAvg, self).__init__()
+        self.AvgHits = AverageHitsP()
+
+    def predict(self, x_global_features, graphs_new=None, explain=False):
+        """
+        Forward, named 'predict' for compatibility reasons
+        :param x_global_features: Global features of the graphs - to be concatenated to each node feature
+        :param graphs_new:
+        :return:
+        """
+        _, p_pred, _ = self.AvgHits.predict(x_global_features, graphs_new)
+        p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
+        return None, p_pred, None, None
     @staticmethod
     def obtain_batch_numbers(g):
         graphs_eval = dgl.unbatch(g)
@@ -481,7 +518,7 @@ class AverageHitsP(torch.nn.Module):
             batch_bounds.append(n)
         batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
         xyz_hits = graphs_new.ndata["h"][:, :3]
-        E_hits = graphs_new.ndata["h"][:, 7]
+        E_hits = graphs_new.ndata["h"][:, 8]
         weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
         E_total = scatter_sum(E_hits, batch_idx, dim=0)
         p_direction = weighted_avg_hits / E_total.unsqueeze(1)

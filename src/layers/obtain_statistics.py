@@ -83,21 +83,20 @@ def create_stats_dict(device):
     stat_dict["freq_count_angle"] = freq_count_angle
     return stat_dict
 
-
 def save_stat_dict(stat_dict, path):
     path = path + "/stat_dict.pt"
     torch.save(stat_dict, path)
 
 def stacked_hist_plot(lst, lst_pandora, path_store, title):
-    # lst is a list of arrays. plot them in a stacked histogram with the same x-axis
+    # lst is a list of arrays. plot them in a stacked histogram with the same X-axis
     fig, ax = plt.subplots(len(lst), 1, sharex=True)
     bins = np.linspace(-0.1, 0.1, 200)
     if len(lst) == 1:
         ax = [ax]
     for i in range(len(lst)):
-        ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red")
+        ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red", density=True)
         if i < len(lst_pandora):
-            ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue")
+            ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue", density=True)
         ax[i].legend()
         ax[i].grid()
         ax[i].set_yscale("log")

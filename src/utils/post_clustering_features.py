@@ -13,7 +13,7 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
     :param graph_batch: Output from the previous step - clustered, matched showers
     :return:
     '''
-    batch_num_nodes = graphs_new.batch_num_nodes() # num hits in each graph
+    batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
     batch_idx = []
     batch_bounds = []
     for i, n in enumerate(batch_num_nodes):
@@ -46,10 +46,11 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
     # similar as above but with scatter_std -- !!!!! TODO: Retrain the base EC models using this definition !!!!!
     per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
     # track_nodes =
-    track_p = scatter_sum(graphs_new.ndata["h"][:, 8], batch_idx)
+    track_p = scatter_sum(graphs_new.ndata["h"][:, 9], batch_idx)
     chis_tracks = scatter_sum(graphs_new.ndata["chi_squared_tracks"], batch_idx)
-    num_tracks = scatter_sum((graphs_new.ndata["h"][:, 8] > 0).type(torch.int), batch_idx)
+    num_tracks = scatter_sum((graphs_new.ndata["h"][:, 9] > 0).type(torch.int), batch_idx)
     track_p = track_p / num_tracks
+    track_p[num_tracks == 0] = 0.
     chis_tracks = chis_tracks / num_tracks
     num_hits = graphs_new.batch_num_nodes()
 

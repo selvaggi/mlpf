@@ -163,7 +163,7 @@ def create_inputs_from_table(
                 #     result[i] = result[i][hit_mask]
                 result[i] = result[i][hit_mask]
         hit_type_one_hot = torch.nn.functional.one_hot(
-            hit_type_feature[~mask_hits][hit_mask], num_classes=4
+            hit_type_feature[~mask_hits][hit_mask], num_classes=5
         )
     result.append(hit_type_one_hot)
     result.append(connection_list)

@@ -132,18 +132,16 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
-
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
+            #print("DEV ", dev)
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0
-            )
+                args.load_model_weights, args=args, dev=0, map_location=dev)
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0
-            )
+                args.load_model_weights, args=args, dev=0, map_location=dev)
 
         accelerator, devices = get_gpu_dev(args)
         val_every_n_epochs = 1
@@ -151,7 +149,7 @@ def main():
             dirpath=args.model_prefix,  # checkpoints_path, # <--- specify this on the trainer itself for version control
             filename="_{epoch}_{step}",
             # every_n_epochs=val_every_n_epochs,
-            every_n_train_steps=10,
+            every_n_train_steps=500,
             save_top_k=-1,  # <--- this is important!
             save_weights_only=True,
         )
@@ -195,7 +193,8 @@ def main():
 
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            print("TODO: change the model for testing manually")
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev
             )
