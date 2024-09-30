@@ -33,11 +33,11 @@ def calculate_eff(sd, log_scale=False):
     return eff, energy_eff
 
 
-def calculate_fakes(sd, matched, log_scale=False):
+def calculate_fakes(sd, matched, log_scale=False, pandora=False):
     if log_scale:
         bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins_fakes = np.arange(0, 51, 2)
+        bins_fakes = np.arange(0, 51, 4)
     fake_rate = []
     energy_fakes = []
     total_true_showers = np.sum(
@@ -46,18 +46,22 @@ def calculate_fakes(sd, matched, log_scale=False):
     for i in range(len(bins_fakes) - 1):
         bin_i = bins_fakes[i]
         bin_i1 = bins_fakes[i + 1]
-        mask_above = sd.pred_showers_E.values <= bin_i1
-        mask_below = sd.pred_showers_E.values > bin_i
-
-        mask = mask_below * mask_above
-        fakes = np.sum(np.isnan(sd.true_showers_E)[mask])
-        total_showers = len(sd.pred_showers_E.values[mask])
-
+        if pandora:
+            mask_above = sd.true_showers_E.values <= bin_i1
+            mask_below = sd.true_showers_E.values > bin_i
+            mask = mask_below * mask_above
+            fakes = np.sum(np.isnan(sd.pandora_calibrated_E)[mask])
+            total_showers = len(sd.true_showers_E.values[mask])
+        else:
+            mask_above = sd.true_showers_E.values <= bin_i1
+            mask_below = sd.true_showers_E.values > bin_i
+            mask = mask_below * mask_above
+            fakes = np.sum(np.isnan(sd.calibrated_E)[mask])
+            total_showers = len(sd.true_showers_E.values[mask])
         if total_showers > 0:
             # print(fakes, np.mean(sd.pred_energy_hits_raw[mask]))
-            fake_rate.append((fakes) / total_true_showers)
+            fake_rate.append(fakes / total_true_showers)
             energy_fakes.append((bin_i1 + bin_i) / 2)
-
     return fake_rate, energy_fakes
 
 
@@ -281,9 +285,7 @@ def calculate_purity_containment(matched, log_scale=False):
 
 
 def obtain_metrics(sd, matched, pandora=False, log_scale=False):
-
     eff, energy_eff = calculate_eff(sd, log_scale)
-
     fake_rate, energy_fakes = calculate_fakes(sd, matched, log_scale)
 
     (

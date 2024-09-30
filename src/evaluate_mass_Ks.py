@@ -12,16 +12,13 @@ plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rcParams['text.usetex'] = True
 plt.rcParams['font.size'] = 20
-
 plt.rcParams['axes.labelsize'] = 20
 #matplotlib.rc("font", size=35)
-
 plt.rcParams['xtick.labelsize'] = 20
 plt.rcParams['ytick.labelsize'] = 20
 plt.rcParams['legend.fontsize'] = 20
 
 import os
-
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix,
@@ -29,7 +26,6 @@ from utils.inference.per_particle_metrics import (
 )
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
-
 import mplhep as hep
 import torch
 import pickle
@@ -40,13 +36,18 @@ all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
-perfect_pid = False # pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = False   # set the mass to zero for all particles
-ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+perfect_pid = False # Pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = True    # Set the mass to zero for all particles
+ML_pid = False      # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/_Ks_New_Model_"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
+       # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
+       # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -54,9 +55,10 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "_Ks_New_Model_/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Ks_old_model_debug/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "_Ks_New_Model_/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Ks_old_model_debug/showers_df_evaluation/0_0_None_pandora.pt"
+    #dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
@@ -77,7 +79,6 @@ def renumber_batch_idx(df):
     df.number_batch = new_batch_idx
     return df
 
-
 def filter_df(df):
     # quick filter to exclude problematic particles
     df = df[(df.pid != 11) & (df.pid != 22) ]
@@ -89,6 +90,9 @@ def main():
     for idx, i in enumerate(path_list):
         path_hgcal = os.path.join(dir_top, i)
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
+        #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
+        print("!!!! Taking the sum of the hits for the energy !!!!")
+        sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
@@ -114,33 +118,44 @@ def main():
     #sd_pandora = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx)]
     #sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx_pandora)]
     # filter the df based on where decay type is 0
-    #allowed_batch_idx = np.where(displacement_hgb < 200)[0]
-    #sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx)]
-    #allowed_batch_idx_pandora = np.where(displacement_pandora < 200)[0]
-    #sd_pandora = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
-    sd_pandora = renumber_batch_idx(sd_pandora)
-    sd_hgb = renumber_batch_idx(sd_hgb)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    bins = np.linspace(0, 300, 200)
-    ax.hist(displacement_pandora, bins=bins, histtype="step", label="Pandora", color="blue")
-    ax.hist(displacement_hgb, bins=bins, histtype="step", label="ML", color="red")
-    ax.legend()
-    ax.set_yscale("log")
-    fig.show()
-    # Filter - only charged decays
-    print("finished collection of data and started plotting")
+    ranges = [[0, 5000]]    # Ranges of the displacement to make the plots from, in cm
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
-    #plot_confusion_matrix(sd_hgb, PATH_store)
-    plot_per_energy_resolution2_multiple(
-        sd_pandora,
-        {"ML": sd_hgb},
-        os.path.join(PATH_store, "plots"),
-        tracks=tracks,
-        perfect_pid=perfect_pid,
-        mass_zero=mass_zero,
-        ML_pid=ML_pid,
-    )
-    print("Done")
+
+    for range in ranges:
+        #metrics = obtain_metrics(sd_pandora, df_list, labels)
+        allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]
+        sd_hgb_filtered = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx)]
+        allowed_batch_idx_pandora = np.where((displacement_pandora < range[1]*10) & (displacement_pandora > range[0]*10))[0]
+        sd_pandora_filtered = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
+        sd_pandora_filtered = renumber_batch_idx(sd_pandora_filtered)
+        sd_hgb_filtered = renumber_batch_idx(sd_hgb_filtered)
+        print("Range", range, ": finished collection of data and started plotting")
+        e_ranges = [[0, 5], [5, 15], [15, 35], [35, 50]]
+        # Count number of photons in each energy range reconstructed with Pandora or ML and print this info in one line for each energy range
+        for i in e_ranges:
+            print("Range: ", i,
+                " | Pandora: ",
+                len(
+                    sd_pandora[
+                        (sd_pandora.pandora_calibrated_pfo > i[0]) & (sd_pandora.pandora_calibrated_pfo < i[1])
+                    ]
+                ),
+                "ML: ",
+                len(sd_hgb[(sd_hgb.pred_showers_E > i[0]) & (sd_hgb.pred_showers_E < i[1])]),
+            )
+        current_dir =  os.path.join(PATH_store, "plots_range_" + str(range[0]) + "_" + str(range[1]))
+        if not os.path.exists(current_dir):
+            os.makedirs(current_dir)
+        plot_per_energy_resolution2_multiple(
+            sd_pandora_filtered,
+            {"ML": sd_hgb_filtered},
+            current_dir,
+            tracks=tracks,
+            perfect_pid=perfect_pid,
+            mass_zero=mass_zero,
+            ML_pid=ML_pid,
+        )
+        print("Done")
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,7 @@ import multiprocessing
 from src.utils.inference.inference_metrics import obtain_MPV_and_68
 import concurrent.futures
 import time
-from src.utils.inference.inference_metrics import calculate_eff
+from src.utils.inference.inference_metrics import calculate_eff, calculate_fakes
 import torch
 import plotly
 import plotly.graph_objs as go
@@ -1165,10 +1165,21 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
     kaons_dic = create_eff_dic_pandora(sd_pandora, 130)
     for var_i, sd_hgb in enumerate(df_list):
         photons_dic = create_eff_dic(photons_dic, sd_hgb, 22, var_i=var_i)
+        #photons_dic.update(create_fakes_dic(photons_dic, sd_hgb, 22, var_i))
         electrons_dic = create_eff_dic(electrons_dic, sd_hgb, 11, var_i=var_i)
+        #electrons_dic.update(create_fakes_dic(electrons_dic, sd_hgb, 11, var_i))
         pions_dic = create_eff_dic(pions_dic, sd_hgb, 211, var_i=var_i)
+        #pions_dic.update(create_fakes_dic(pions_dic, sd_hgb, 211, var_i))
         kaons_dic = create_eff_dic(kaons_dic, sd_hgb, 130, var_i=var_i)
+        #kaons_dic.update(create_fakes_dic(kaons_dic, sd_hgb, 130, var_i))
     plot_eff(
+        "Electromagnetic",
+        photons_dic,
+        "Photons",
+        PATH_store,
+        labels,
+    )
+    plot_fakes(
         "Electromagnetic",
         photons_dic,
         "Photons",
@@ -1183,6 +1194,13 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
             PATH_store,
             labels,
         )
+        plot_fakes(
+            "Electromagnetic",
+            electrons_dic,
+            "Electrons",
+            PATH_store,
+            labels,
+        )
     if len(pions_dic["eff_p"]) > 0:
         plot_eff(
             "Hadronic",
@@ -1191,9 +1209,22 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
             PATH_store,
             labels,
         )
-
+        plot_fakes(
+            "Hadronic",
+            pions_dic,
+            "Pions",
+            PATH_store,
+            labels,
+        )
     if len(kaons_dic["eff_p"]) > 0:
         plot_eff(
+            "Hadronic",
+            kaons_dic,
+            "Kaons",
+            PATH_store,
+            labels,
+        )
+        plot_fakes(
             "Hadronic",
             kaons_dic,
             "Kaons",
@@ -1206,19 +1237,36 @@ def create_eff_dic_pandora(matched_pandora, id):
     mask_id = pids_pandora == id
     df_id_pandora = matched_pandora[mask_id]
     eff_p, energy_eff_p = calculate_eff(df_id_pandora, False)
+    fakes_p, energy_fakes_p = calculate_fakes(df_id_pandora, None, False, pandora=True)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
     photons_dic["energy_eff_p"] = energy_eff_p
+    photons_dic["fakes_p"] = fakes_p
+    photons_dic["energy_fakes_p"] = energy_fakes_p
     return photons_dic
 
 def create_eff_dic(photons_dic, matched_, id, var_i):
     pids = np.abs(matched_["pid"].values)
     mask_id = pids == id
     df_id = matched_[mask_id]
-
     eff, energy_eff = calculate_eff(df_id, False)
+    fakes, energy_fakes = calculate_fakes(df_id, None, False, pandora=False)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
+    photons_dic["fakes_" + str(var_i)] = fakes
+    photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
+    return photons_dic
+
+def create_fakes_dic(photons_dic, matched_, id, var_i):
+    pids = np.abs(matched_["pid"].values)
+    mask_id = pids == id
+    df_id = matched_[mask_id]
+    eff, energy_eff = calculate_eff(df_id, False)
+    fakes, energy_fakes = calculate_fakes(df_id, None, False, pandora=False)
+    photons_dic["eff_" + str(var_i)] = eff
+    photons_dic["energy_eff_" + str(var_i)] = energy_eff
+    photons_dic["fakes_" + str(var_i)] = fakes
+    photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
     return photons_dic
 
 def plot_eff(title, photons_dic, label1, PATH_store, labels):
@@ -1227,7 +1275,7 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
     fig = plt.figure()
     j = 0
     plt.xlabel("Energy [GeV]")
-    plt.ylabel("Efficiency [GeV]")
+    plt.ylabel("Efficiency")
     # ax[row_i, j].set_xscale("log")
     plt.title(title)
     plt.grid()
@@ -1251,7 +1299,7 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
         edgecolors=colors_list[2],
         label="Pandora " + label1,
         marker="x",
-        # add -- line
+        # Add -- line
         s=50,
     )
     plt.legend(loc="lower right")
@@ -1266,6 +1314,50 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
     )
 
 
+def plot_fakes(title, photons_dic, label1, PATH_store, labels):
+    colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
+    markers = ["^", "*", "x", "d", ".", "s"]
+    fig = plt.figure()
+    j = 0
+    plt.xlabel("Energy [GeV]")
+    plt.ylabel("Fake rate")
+    # ax[row_i, j].set_xscale("log")
+    plt.title(title)
+    plt.grid()
+    for i in range(0, len(labels)):
+        plt.plot(photons_dic["energy_fakes_" + str(i)],
+            photons_dic["fakes_" + str(i)], "--", color=colors_list[0])
+        plt.scatter(
+            photons_dic["energy_fakes_" + str(i)],
+            photons_dic["fakes_" + str(i)],
+            label="ML " + label1, # temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            marker=markers[i],
+            color=colors_list[0],
+            s=50,
+        )
+    plt.plot(photons_dic["energy_fakes_p"],
+        photons_dic["fakes_p"], "--", color=colors_list[2])
+    plt.scatter(
+        photons_dic["energy_fakes_p"],
+        photons_dic["fakes_p"],
+        facecolors=colors_list[2],
+        edgecolors=colors_list[2],
+        label="Pandora " + label1,
+        marker="x",
+        # add -- line
+        s=50,
+    )
+    plt.legend(loc="lower right")
+    if title == "Electromagnetic":
+        plt.ylim([0.0, 0.2])
+    else:
+        plt.ylim([0.0, 0.2])
+    plt.xscale("log")
+    fig.savefig(
+        os.path.join(PATH_store, "Fake_Rate_" + title + label1 + ".pdf"),
+        bbox_inches="tight",
+    )
+
 def calculate_phi(x, y, z=None):
     return torch.arctan2(y, x)
 
@@ -1276,13 +1368,13 @@ def calculate_eta(x, y, z):
 from copy import copy
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
-    return
-    # plot the event with Plotly. Compare ML and Pandora reconstructed with truth
+    # Plot the event with Plotly. Compare ML and Pandora reconstructed with truth
     # Also plot Eta-Phi (a bit easier debugging)
     # df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!
     # y_filt = np.where((y.pid.flatten() == 2112.0) + (y.pid.flatten() == 130.0))[0]
     # y = copy(y)
     # y.mask(y_filt)
+    return
     # if len(df) == 0:
     #     return
     import plotly
@@ -1422,10 +1514,10 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         # Color this by graph.ndata["particle_number"]
     # Get the norm of vertices
     displacement = np.linalg.norm(vertices, axis=1)
-    if displacement.max() < 400:
-        return
-    else:
-        print("Displaced")
+    #if displacement.max() < 400:
+    #    return
+    #else:
+    #    print("Displaced")
     pids = [str(x) for x in df.pid.values]
     col = np.arange(1, len(truepos) + 1)
     true_E = df.true_showers_E.values

@@ -118,7 +118,6 @@ def safeint(x, default_val=0):
         return default_val
     return int(x)
 
-
 def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
@@ -155,7 +154,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         if ML_pid:
             #assert pandora is False
             if pandora:
-                print("perfect PID for Pandora")
+                print("Perfect PID for Pandora")
                 m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
             else:
                 m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
