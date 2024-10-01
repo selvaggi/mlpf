@@ -181,7 +181,6 @@ class ExampleWrapper(L.LightningModule):
             elif self.args.ec_model == "gatr-neutrals":
                 assert self.args.add_track_chis
                 num_global_features = 14
-                print("this is the model for charged")
                 if len(self.args.classify_pid_charged):
                     self.pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")] + [0]
                 else:
@@ -201,7 +200,7 @@ class ExampleWrapper(L.LightningModule):
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
-                '''self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=20,
@@ -212,8 +211,11 @@ class ExampleWrapper(L.LightningModule):
                     charged=True,
                     pid_channels=len(self.pids_charged),
                     unit_p=self.args.regress_unit_p,
-                    out_f=1
-                )'''
+                    out_f=1,
+                    neutral_avg=False,
+                    neutral_PCA=False,
+                    neutral_thrust_axis=False,
+                )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
@@ -230,7 +232,7 @@ class ExampleWrapper(L.LightningModule):
                     neutral_thrust_axis=False,
                 )
                 self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
-                self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
+                #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral # Only for the Ks dataset!!
                 print(" !! Using the same model for charged and neutral !! - Use only for the Ks->pi0pi0 decays!!! ")
             else:  # DNN
                 # only a DNN for energy correction
@@ -382,11 +384,12 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
-            pred_pid
+            pred_pid,
+            features_charged_no_nan
         ) = self.clustering_and_global_features(g, x, y)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
-            graphs_new, charged_idx, graphs_high_level_features
+            graphs_new, charged_idx, features_charged_no_nan
         )
         neutral_energies, neutral_pxyz_avg = self.neutral_prediction(
             graphs_new, neutral_idx, features_neutral_no_nan
@@ -532,6 +535,9 @@ class ExampleWrapper(L.LightningModule):
                 charged_graphs,
                 explain=self.args.explain_ec,
             ))
+            # print params of the model
+
+
         else:
             if not self.args.regress_pos:
                 charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
@@ -554,6 +560,8 @@ class ExampleWrapper(L.LightningModule):
                 neutral_graphs,
                 explain=self.args.explain_ec,
             )
+
+
             neutral_pxyz_avg = self.ec_model_wrapper_neutral_avg.predict(
                 features_neutral_no_nan,
                 neutral_graphs,
@@ -570,6 +578,7 @@ class ExampleWrapper(L.LightningModule):
                         ]
             if len(self.pids_neutral):
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
+
         return neutral_energies, neutral_pxyz_avg
 
     def clustering_and_global_features(self, g, x, y):
@@ -676,6 +685,8 @@ class ExampleWrapper(L.LightningModule):
         )
         features_neutral_no_nan = graphs_high_level_features[neutral_idx]
         features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+        features_charged_no_nan = graphs_high_level_features[charged_idx]
+        features_charged_no_nan[features_charged_no_nan != features_charged_no_nan] = 0
         # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
         return (
             graphs_new,
@@ -691,7 +702,8 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
-            pred_pid
+            pred_pid,
+            features_charged_no_nan
         )
 
     def build_attention_mask(self, g):
@@ -770,7 +782,7 @@ class ExampleWrapper(L.LightningModule):
                 if type(neutral_PID_true) == np.float64:
                     neutral_PID_true = [neutral_PID_true]
                 # One-hot encoded
-                print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
+                #print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
                 neutral_PID_true_onehot = torch.zeros(
                     len(neutral_PID_true), len(self.pids_neutral)
                 )
@@ -813,16 +825,14 @@ class ExampleWrapper(L.LightningModule):
                     true_pos = (true_pos / torch.norm(true_pos, dim=1).view(-1, 1)).clone()
                     pred_pos = (pred_pos / torch.norm(pred_pos, dim=1).view(-1, 1)).clone()
                 #loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
-
-                true_diff = true_pos - pred_pos_avg
-                pred_diff = pred_pos  - pred_pos_avg
+                true_diff = true_pos[neutral_idx] - pred_pos_avg
+                pred_diff = pred_pos[neutral_idx] - pred_pos_avg
                 loss_pos = 1 - ((torch.nn.CosineSimilarity()(pred_pos, true_pos)).mean())
                 loss_pos_diff = 1 - ((torch.nn.CosineSimilarity()(pred_diff, true_diff)).mean())
                 loss_pos_L1_diff = torch.nn.L1Loss()(pred_diff, true_diff)
                 loss_pos_L1 = torch.nn.L1Loss()(pred_pos, true_pos)
                 # log all of those to wandb
                 wandb.log({"loss_pos": loss_pos, "loss_pos_diff": loss_pos_diff, "loss_pos_L1_diff": loss_pos_L1_diff, "loss_pos_L1": loss_pos_L1})
-
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
                 #loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
