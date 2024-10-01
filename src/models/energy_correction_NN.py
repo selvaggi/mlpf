@@ -203,8 +203,8 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                     concat=True,
                     hidden_channels=64,
                     num_layers=3)
-            if not self.neutral_avg:
-                self.model_p = Net(16, 3, return_raw=True)
+            #if not self.neutral_avg:
+            self.model_p = Net(16, 3, return_raw=True)
         self.model = Net(
             in_features=out_features_gnn + in_features_global, out_features=out_f
         )
