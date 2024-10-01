@@ -807,7 +807,7 @@ def match_showers(
     )
     iou_matrix_num[iou_matrix_num < iou_threshold] = 0
     row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
-    # next three lines remove solutions where there is a shower that is not associated and iou it's zero (or less than threshold)
+    # Next three lines remove solutions where there is a shower that is not associated and iou it's zero (or less than threshold)
     mask_matching_matrix = iou_matrix_num[row_ind, col_ind] > 0
     row_ind = row_ind[mask_matching_matrix]
     col_ind = col_ind[mask_matching_matrix]

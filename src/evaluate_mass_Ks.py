@@ -44,10 +44,12 @@ if all_E:
     PATH_store = (
         #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-        "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits"
+
+       # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
+        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -55,11 +57,11 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Ks_old_model_debug/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "Ks_old_model_debug/showers_df_evaluation/0_0_None_pandora.pt"
-    #dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
-    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
+    path_pandora = "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
+    #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
 labels = [

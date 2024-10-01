@@ -37,7 +37,6 @@ def evaluate_efficiency_tracks(
         dic = {}
         dic["graph"] = graphs[i]
         dic["part_true"] = y[mask]
-
         betas = torch.sigmoid(dic["graph"].ndata["beta"])
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"

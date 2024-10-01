@@ -134,9 +134,7 @@ class ECNetWrapperGNN(torch.nn.Module):
         gnn_output = scatter_mean(gnn_output, batch_idx, dim=0)
         return self.model(gnn_output).flatten()
 
-
 import io
-
 
 class CPU_Unpickler(pickle.Unpickler):
     def find_class(self, module, name):
@@ -205,12 +203,12 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                     concat=True,
                     hidden_channels=64,
                     num_layers=3)
-            self.model_p = Net(16, 3, return_raw=True)
+            if not self.neutral_avg:
+                self.model_p = Net(16, 3, return_raw=True)
         self.model = Net(
             in_features=out_features_gnn + in_features_global, out_features=out_f
         )
         self.model.explainer_mode = False
-
         # use a GAT
         if gnn:
             if self.use_gatr:

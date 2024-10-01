@@ -225,7 +225,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=True,
+                    neutral_avg=False,
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
                 )
