@@ -37,7 +37,7 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
 )
 from lightning.pytorch.profilers import AdvancedProfiler
-from src.models.gravnet_3_L import FreezeClustering
+from src.layers.utils_training import FreezeClustering
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ["TORCH_USE_CUDA_DSA"] = "1"
