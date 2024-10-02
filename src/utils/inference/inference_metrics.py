@@ -7,7 +7,7 @@ from scipy.optimize import curve_fit
 from scipy import asarray as ar, exp
 
 
-def calculate_eff(sd, log_scale=False):
+def calculate_eff(sd, log_scale=False, pandora=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
@@ -24,6 +24,11 @@ def calculate_eff(sd, log_scale=False):
             np.isnan(sd.pred_showers_E.values)[mask]
         )
         total_showers = len(sd.pred_showers_E.values[mask])
+        if pandora:
+            number_of_non_reconstructed_showers = np.sum(
+                np.isnan(sd.pandora_calibrated_E.values)[mask]
+            )
+            total_showers = len(sd.pandora_calibrated_E.values[mask])
         if total_showers > 0:
             eff.append(
                 (total_showers - number_of_non_reconstructed_showers) / total_showers

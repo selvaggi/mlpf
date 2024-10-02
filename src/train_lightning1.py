@@ -193,7 +193,7 @@ def main():
 
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
-            print("TODO: change the model for testing manually")
+            print("TODO: change imported the model for testing manually")
             from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev
@@ -215,6 +215,7 @@ def main():
                 trainer.validate(
                     model=model,
                     dataloaders=test_loader,
+                    ckpt_path=args.load_model_weights,
                 )
         else:
             for name, get_test_loader in test_loaders.items():

@@ -49,7 +49,7 @@ if all_E:
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)

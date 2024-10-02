@@ -231,9 +231,10 @@ class ExampleWrapper(L.LightningModule):
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
                 )
+
                 self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
                 #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral # Only for the Ks dataset!!
-                print(" !! Using the same model for charged and neutral !! - Use only for the Ks->pi0pi0 decays!!! ")
+                #print(" !! Using the same model for charged and neutral !! - Use only for the Ks->pi0pi0 decays!!! ")
             else:  # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
@@ -531,11 +532,11 @@ class ExampleWrapper(L.LightningModule):
             charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
             charged_energies = (self.ec_model_wrapper_charged
             .predict(
-                graphs_high_level_features[charged_idx],
+                graphs_high_level_features,
                 charged_graphs,
                 explain=self.args.explain_ec,
             ))
-            # print params of the model
+            # Print params of the model
 
 
         else:
@@ -1003,8 +1004,7 @@ class ExampleWrapper(L.LightningModule):
             loss_type=self.args.losstype,
         )
         loss_ec = 0
-
-        print("starting validation step", batch_idx, loss)
+        print("Starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(
                 True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
