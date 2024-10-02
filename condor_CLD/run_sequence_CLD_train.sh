@@ -10,7 +10,7 @@ mkdir ${DIR}
 mkdir ${DIR}/${SEED}
 cd ${DIR}/${SEED}
 
-SAMPLE="gun" #main card
+SAMPLE="Zcard" #main card
 
 
 # cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
@@ -30,11 +30,8 @@ then
       cp ${HOMEDIR}/Pythia_generation/pythia.py ./
 fi
 
-# cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
-# cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
-# mkdir ${DIR}/${SEED}/PandoraSettingsCLD
-# cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
-cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig_2207/CLDConfig/* .
+
+cp -r /afs/cern.ch/work/m/mgarciam/private/CLD_Config_versions/CLDConfig_230924/CLDConfig/* . 
 cp -r ${HOMEDIR}/condor/make_pftree_clic_bindings.py .
 cp -r ${HOMEDIR}/condor/tree_tools.py .
 cp -r ${HOMEDIR}/gun/${GUNCARD} .
@@ -49,11 +46,11 @@ echo " =========================================================================
 echo "  "
 
 wrapperfunction() {
-    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh  #-r 2024-03-07
+    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh -r 2024-09-18
 }
 wrapperfunction
 
-# source compile_gun.x
+
 
 # Build gun 
 if [[ "${SAMPLE}" == "gun" ]] 
@@ -102,7 +99,7 @@ echo "  "
 echo " ================================================================================ "
 echo "  "
 
-python make_pftree_clic_bindings.py out_reco_edm4hep_edm4hep.root tree.root False False
+python make_pftree_clic_bindings.py out_reco_edm4hep_REC.edm4hep.root tree5.root True False
 
 echo "  "
 echo " ================================================================================ "
@@ -113,7 +110,7 @@ echo " =========================================================================
 echo "  "
 
 mkdir -p ${OUTPUTDIR}
-python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
 
 echo "  "
 echo " ================================================================================ "
