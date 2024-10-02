@@ -286,8 +286,8 @@ def create_graph(
         #     if len(y_data_graph) < 4:
         #         graph_empty = True
 
-    if pos_xyz_hits.shape[0] < 10:
-        graph_empty = True
+        if pos_xyz_hits.shape[0] < 10:
+            graph_empty = True
     if graph_empty:
         return [g, y_data_graph], graph_empty
     # print("graph_empty",graph_empty)
