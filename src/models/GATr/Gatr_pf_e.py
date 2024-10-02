@@ -28,13 +28,13 @@ from src.utils.post_clustering_features import (
     calculate_eta,
     calculate_phi,
 )
-from src.models.energy_correction_NN import (
-    ECNetWrapper,
-    ECNetWrapperGNN,
-    ECNetWrapperGNNGlobalFeaturesSeparate,
-    PickPAtDCA,
-    AverageHitsP
-)
+# from src.models.energy_correction_NN import (
+#     ECNetWrapper,
+#     ECNetWrapperGNN,
+#     ECNetWrapperGNNGlobalFeaturesSeparate,
+#     PickPAtDCA,
+#     AverageHitsP
+# )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from src.utils.nn.tools import log_losses_wandb_tracking
@@ -290,18 +290,18 @@ class ExampleWrapper(L.LightningModule):
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         inputs = g.ndata["pos_hits_xyz"]
-        # if self.trainer.is_global_zero and step_count % 500 == 0:
-        #     g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
-        #     PlotCoordinates(
+        if self.trainer.is_global_zero and step_count % 500 == 0:
+            g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
+            PlotCoordinates(
 
-        #         g,
-        #         path="input_coords",
-        #         outdir=self.args.model_prefix,
-        #         # features_type="ones",
-        #         predict=self.args.predict,
-        #         epoch=str(self.current_epoch) + eval,
-        #         step_count=step_count,
-        #     )
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                # features_type="ones",
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
@@ -334,15 +334,15 @@ class ExampleWrapper(L.LightningModule):
             beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        # if self.trainer.is_global_zero and step_count % 500 == 0:
-        #     PlotCoordinates(
-        #         g,
-        #         path="final_clustering",
-        #         outdir=self.args.model_prefix,
-        #         predict=self.args.predict,
-        #         epoch=str(self.current_epoch) + eval,
-        #         step_count=step_count,
-        #     )
+        if self.trainer.is_global_zero and step_count % 500 == 0:
+            PlotCoordinates(
+                g,
+                path="final_clustering",
+                outdir=self.args.model_prefix,
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
         if self.args.correction:
@@ -701,7 +701,7 @@ class ExampleWrapper(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        initial_time = time()
+        # initial_time = time()
         if self.trainer.is_global_zero:
             result = self(batch_g, y, batch_idx)
         else:
@@ -767,8 +767,8 @@ class ExampleWrapper(L.LightningModule):
                     for i in range(len(neutral_PID_true)):
                         neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
-        loss_time_start = time()
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        # loss_time_start = time()
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor,
@@ -784,7 +784,7 @@ class ExampleWrapper(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
         )
-        loss_time_end = time()
+        # loss_time_end = time()
         # wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
@@ -862,7 +862,7 @@ class ExampleWrapper(L.LightningModule):
                     },
                 )
 
-        misc_time_start = time()
+        # misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
         self.loss_final = loss.item() + self.loss_final
@@ -956,7 +956,7 @@ class ExampleWrapper(L.LightningModule):
         #     self.args.losstype = "hgcalimplementation"
         # else:
         #     self.args.losstype = "vrepweighted"
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor1,

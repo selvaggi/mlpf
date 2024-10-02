@@ -242,25 +242,7 @@ def object_condensation_loss2(
         pass
     else:
         raise NotImplementedError
-    # if clust_loss_only:
-    #     # distance_threshold = torch.zeros((xj.shape[0], 3)).to(xj.device)
-    #     momentum = torch.zeros_like(bj)
-    #     pid_predicted = torch.zeros((distance_threshold.shape[0], 22)).to(
-    #         momentum.device
-    #     )
-    # else:
-    #     distance_threshold = torch.reshape(
-    #         pred[:, 1 + clust_space_dim : 4 + clust_space_dim], [-1, 3]
-    #     )  # 4, 5, 6: distance thresholds
-    #     energy_correction = torch.nn.functional.relu(
-    #         torch.reshape(pred[:, 4 + clust_space_dim], [-1, 1])
-    #     )  # 7: energy correction factor
-    #     momentum = torch.nn.functional.relu(
-    #         torch.reshape(pred[:, 27 + clust_space_dim], [-1, 1])
-    #     )
-    #     pid_predicted = pred[
-    #         :, 5 + clust_space_dim : 27 + clust_space_dim
-    #     ]  # 8:30: predicted particle one-hot encoding
+  
     dev = batch.device
     clustering_index_l = batch.ndata["particle_number"]
 
@@ -293,34 +275,11 @@ def object_condensation_loss2(
         loss_type=loss_type,
         dis=dis,
     )
-    if return_resolution:
-        return a
-    if clust_loss_only:
-        loss = 1 * a[0] + a[1]  # + 5 * a[14]
-        # if calc_e_frac_loss:
-        #     loss_E_frac, loss_E_frac_true = calc_energy_loss(
-        #         batch, xj, bj.view(-1), qmin=q_min
-        #     )
-        if add_energy_loss:
-            loss += a[2]  # TODO add weight as argument
-    else:
-        loss = (
-            a[0]
-            + a[1]
-            + 20 * a[2]
-            + 0.001 * a[3]
-            + 0.001 * a[4]
-            + 0.001
-            * a[
-                5
-            ]  # TODO: the last term is the PID classification loss, explore this yet
-        )  # L_V / batch_size, L_beta / batch_size, loss_E, loss_x, loss_particle_ids, loss_momentum, loss_mass)
-    # if clust_loss_only:
-    #     if calc_e_frac_loss:
-    #         return loss, a, 0, 0
-    #     else:
-    #         return loss, a, a[2], 0
-    return loss, a, a[2], 0
+
+   
+    loss = 1 * a[0] + a[1]  
+      
+    return loss, a
 
 
 def object_condensation_inference(self, batch, pred):
