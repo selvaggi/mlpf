@@ -84,8 +84,8 @@ def log_losses_wandb(
         wandb.log(
             {
                 "loss" + val_ + " regression": loss,
-                #"loss" + val_ + " lv": losses[0],
-                #"loss" + val_ + " beta": losses[1],
+                "loss" + val_ + " lv": losses[0],
+                "loss" + val_ + " beta": losses[1],
                 #"loss" + val_ + " E": losses[2],
                 # "loss" + val_ + " X": losses[3],
                 # "loss" + val_ + " PID": losses[4],
@@ -93,9 +93,9 @@ def log_losses_wandb(
                 # "loss" + val_ + " mass (not us. for opt.)": losses[6],
                 # "inter-clustering loss" + val_ + "": losses[10],
                 # "filling loss" + val_ + "": losses[11],
-                #"loss" + val_ + " attractive": losses[12],
-                #"loss" + val_ + " repulsive": losses[13],
-                #"loss" + val_ + " repulsive 2": losses[18],
+                "loss" + val_ + " attractive": losses[12],
+                "loss" + val_ + " repulsive": losses[13],
+                "loss" + val_ + " repulsive 2": losses[18],
                 #"loss" + val_ + " alpha coord": losses[14],
                 #"loss" + val_ + " beta zeros": losses[15],
 
