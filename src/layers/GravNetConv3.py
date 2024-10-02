@@ -12,7 +12,7 @@ import dgl.function as fn
 import numpy as np
 from dgl.nn import EdgeWeightNorm
 
-import torch_cmspepr
+# import torch_cmspepr
 
 
 class GravNetConv(MessagePassing):
@@ -93,10 +93,8 @@ class GravNetConv(MessagePassing):
         s_l: Tensor = self.lin_s(x)
         # print("weights input_spatial_transform", self.lin_s.weight.data)
         # print("bias input_spatial_transform", self.lin_s.bias.data)
-        s_l = s_l  ##+ original_coords
         # print("coordinates INPUTS TO FIRST LAYER")
         # print(s_l)
-
         graph = knn_per_graph(g, s_l, self.k)
         graph.ndata["s_l"] = s_l
         row = graph.edges()[0]
@@ -104,7 +102,6 @@ class GravNetConv(MessagePassing):
         edge_index = torch.stack([row, col], dim=0)
 
         edge_weight = (s_l[edge_index[0]] - s_l[edge_index[1]]).pow(2).sum(-1)
-
         # print("distancesq distancesq distancesq")
         # print(edge_weight)
         # edge_weight = edge_weight + 1e-5
@@ -161,7 +158,7 @@ class GravNetConv(MessagePassing):
         edge_weight = torch.exp(-torch.square(edge_weight))
         out = self.propagate(
             edge_index,
-            x=[h_l, None],
+            x=h_l,
             edge_weight=edge_weight,
             size=(s_l.size(0), s_l.size(0)),
         )
