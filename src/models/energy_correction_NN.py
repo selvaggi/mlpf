@@ -240,7 +240,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             self.gnn = None
         self.pid_channels = pid_channels
         if pid_channels > 1: # 1 is just the 'other' category
-            self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels) # additional head for PID classification
+            self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels)   # Additional head for PID classification
             self.PID_head.to(device)
         if ckpt_file is not None and ckpt_file != "":
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
@@ -274,7 +274,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             node_global_features = x_global_features
             x = graphs_new.ndata["h"]
             edge_index = torch.stack(graphs_new.edges())
-
             hits_points = graphs_new.ndata["h"][:, 0:3]
             hit_type = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
             betas = graphs_new.ndata["h"][:, 9]
@@ -286,7 +285,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             extra_scalars = torch.cat(
                 [betas.unsqueeze(1), p.unsqueeze(1), e.unsqueeze(1)], dim=1
             )
-
             mask = self.build_attention_mask(graphs_new)
             embedded_inputs = embedded_inputs.unsqueeze(-2)
             embedded_outputs, _ = self.gatr(

@@ -2,12 +2,10 @@
 
 import matplotlib
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rcParams['text.usetex'] = True
@@ -17,7 +15,6 @@ plt.rcParams['axes.labelsize'] = 20
 plt.rcParams['xtick.labelsize'] = 20
 plt.rcParams['ytick.labelsize'] = 20
 plt.rcParams['legend.fontsize'] = 20
-
 import os
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
@@ -30,26 +27,21 @@ import mplhep as hep
 import torch
 import pickle
 
+
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
-perfect_pid = False # Pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = True    # Set the mass to zero for all particles
-ML_pid = False      # Use the PID from the ML classification head (electron/CH/NH/gamma)
+perfect_pid = False  # Pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = True     # Set the mass to zero for all particles
+ML_pid = False       # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
 if all_E:
     PATH_store = (
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-       # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-
-       # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-       # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_old_clustering_NeutralAvg"
+        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -57,9 +49,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Eval_Hss_test_/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Eval_Hss_test_/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
@@ -93,8 +85,8 @@ def main():
         path_hgcal = os.path.join(dir_top, i)
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
-        print("!!!! Taking the sum of the hits for the energy !!!!")
-        sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
+        #print("!!!! Taking the sum of the hits for the energy !!!!")
+        #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
@@ -122,7 +114,7 @@ def main():
     # filter the df based on where decay type is 0
     ranges = [[0, 5000]]    # Ranges of the displacement to make the plots from, in cm
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
-
+    plot_confusion_matrix(df_list[0], PATH_store)
     for range in ranges:
         #metrics = obtain_metrics(sd_pandora, df_list, labels)
         allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]
@@ -131,7 +123,7 @@ def main():
         sd_pandora_filtered = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
         sd_pandora_filtered = renumber_batch_idx(sd_pandora_filtered)
         sd_hgb_filtered = renumber_batch_idx(sd_hgb_filtered)
-        print("Range", range, ": finished collection of data and started plotting")
+        print("Range", range, ": Finished collection of data and started plotting")
         e_ranges = [[0, 5], [5, 15], [15, 35], [35, 50]]
         # Count number of photons in each energy range reconstructed with Pandora or ML and print this info in one line for each energy range
         for i in e_ranges:
