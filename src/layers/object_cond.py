@@ -447,7 +447,7 @@ def calc_LV_Lbeta(
         # attr_weight * L_V_attractive
         # + repul_weight * L_V_repulsive
         + L_V_repulsive2 / 300
-        + L_V_attractive_2 / 300
+        + L_V_attractive_2 / 600
     )
     
  
