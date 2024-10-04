@@ -26,22 +26,30 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 import torch
 import pickle
-
-
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
 neutrals_only = False
 log_scale = False
 tracks = True
-perfect_pid = False  # Pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = True     # Set the mass to zero for all particles
-ML_pid = False       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+perfect_pid = True   # Pretend we got ideal PID and rescale the momentum vectors accordingly
+mass_zero = False    # Set the mass to zero for all particles
+ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+
+# Is there a problem with storing direction information with Pandora?
+# /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
 
 if all_E:
     PATH_store = (
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_old_clustering_NeutralAvg"
-        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds/perfect_PID_plots_set_gamma_energy_to_sumhits_photons_only"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_GT_clustering_101505_pxyz"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_fix_EcalFracE_bug"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss/ML_PID_plots"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss_ref_pt_is_diff_between_cluster_and_track"
+        #"/eos/user/g/gkrzmanc/2024/Sept24//eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_Physics_Events_Hss_GT_Clusters_fix_charged_bug_1"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss/reprod2"
+        #"eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss1_model_trained_on_Hss"
+        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -49,9 +57,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Eval_Hss_test_/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "Eval_Hss_test_/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
@@ -86,7 +94,9 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
-        #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
+        sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.reco_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
+        sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.reco_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
+        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.reco_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==2112))]
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
@@ -123,6 +133,16 @@ def main():
         sd_pandora_filtered = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
         sd_pandora_filtered = renumber_batch_idx(sd_pandora_filtered)
         sd_hgb_filtered = renumber_batch_idx(sd_hgb_filtered)
+        x = sd_hgb_filtered.pred_ref_pt_matched[sd_hgb_filtered.is_track_in_cluster==1].values
+        x = np.stack(x)
+        x = np.linalg.norm(x, axis=1)
+        fig, ax = plt.subplots()
+        bins = np.linspace(0, 0.25, 50)
+        ax.hist(x, bins=bins)
+        #ax.set_yscale("log")
+        fig.show()
+        idx_pick_reco = np.where(x > 0.10)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
+        sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].reco_showers_E.iloc[idx_pick_reco]
         print("Range", range, ": Finished collection of data and started plotting")
         e_ranges = [[0, 5], [5, 15], [15, 35], [35, 50]]
         # Count number of photons in each energy range reconstructed with Pandora or ML and print this info in one line for each energy range
@@ -135,7 +155,7 @@ def main():
                     ]
                 ),
                 "ML: ",
-                len(sd_hgb[(sd_hgb.pred_showers_E > i[0]) & (sd_hgb.pred_showers_E < i[1])]),
+                len(sd_hgb[(sd_hgb.calibrated_E > i[0]) & (sd_hgb.calibrated_E < i[1])]),
             )
         current_dir =  os.path.join(PATH_store, "plots_range_" + str(range[0]) + "_" + str(range[1]))
         if not os.path.exists(current_dir):

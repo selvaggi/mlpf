@@ -20,12 +20,13 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
         batch_idx.extend([i] * n)
         batch_bounds.append(n)
     batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
-    e_hits = graphs_new.ndata["h"][:, 6]
-    ecal_hits = graphs_new.ndata["h"][:, 4]
+    e_hits = graphs_new.ndata["h"][:, 8]
+    ecal_hits = graphs_new.ndata["h"][:, 5]
     filter_ecal = torch.where(ecal_hits)[0]
-    hcal_hits = graphs_new.ndata["h"][:, 5]
+    hcal_hits = graphs_new.ndata["h"][:, 6]
     filter_hcal = torch.where(hcal_hits)[0]
     per_graph_e_hits_ecal = scatter_sum(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1)
+    per_graph_e_hits_all = scatter_sum(e_hits, batch_idx, dim_size=batch_idx.max() + 1)
     #per_graph_e_hits_ecal_mean = per_graph_e_hits_ecal / batch_num_nodes
     per_graph_e_hits_ecal_dispersion = torch.zeros_like(per_graph_e_hits_ecal)
     #e_hits_f = e_hits[filter_ecal]

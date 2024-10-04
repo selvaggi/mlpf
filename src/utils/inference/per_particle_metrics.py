@@ -418,20 +418,23 @@ def plot_pxyz_resolution(x, resolutions_pxyz_pandora, resolutions_pxyz_model, ax
             marker="x",
             s=50,
         )
-        axs[i].scatter(
-            x,
-            resolutions_pxyz_pandora[:, i],
-            facecolors="blue",
-            edgecolors="blue",
-            label="Pandora",
-            marker="x",
-            s=50,
-        )
+        if resolutions_pxyz_pandora.shape[1] < i:
+            axs[i].scatter(
+                x,
+                resolutions_pxyz_pandora[:, i],
+                facecolors="blue",
+                edgecolors="blue",
+            
+                label="Pandora",
+                marker="x",
+                s=50,
+            )
         axs[i].grid(1)
         axs[i].legend()
 
 def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[[0, 5], [5, 15], [15, 35], [35, 50]]):
     # bars: list of energies at which to plot a vertical line
+    return
     masses = masses_lst[0]
     masses_pandora = masses_pandora_lst[0]
     is_trk_in_clust_pandora = [x.values for x in masses_pandora_lst[1]]
@@ -583,7 +586,7 @@ def plot_per_energy_resolution2_multiple(
                 [2212], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             # for neutrons
-            if plot_pandora:
+            if True:
                 if len(neutrons["distributions_pandora"]) :
                     plot_hist_distr(neutrons["distributions_pandora"][0], "Pandora", axs_distr[2112], "blue")
                 if len(hadrons_dic["distributions_pandora"]):
@@ -598,6 +601,10 @@ def plot_per_energy_resolution2_multiple(
                 ax_event_res.grid(1)
                 ax_event_res.set_ylabel("Count")
                 ax_event_res.set_xlabel(r"$E_{vis,reco} / E_{vis,true}$")
+                ax_event_res.legend()
+                fig_event_res.savefig(
+                    os.path.join(PATH_store, "total_visible_energy_resolution.pdf"), bbox_inches="tight"
+                )
                 # for pions 211
                 if len(hadrons_dic2["distributions_pandora"]):
                     plot_hist_distr(hadrons_dic2["distributions_pandora"][0], "Pandora", axs_distr[211], "blue")
@@ -681,6 +688,7 @@ def plot_per_energy_resolution2_multiple(
             charged_masses = [0.139570, 0.511/1000]
             neutral_masses = [x**2 for x in neutral_masses]
             charged_masses = [x**2 for x in charged_masses]
+
             for el in list_plots:
                 if len(photons_dic["mass_histogram"]) > 2:
                     plot_pxyz_resolution(photons_dic["energy_resolutions"], photons_dic["variance_om_pxyz_pandora"], photons_dic["variance_om_pxyz"], axs_resolution_pxyz[22], key)
@@ -1068,10 +1076,7 @@ def plot_per_energy_resolution2_multiple(
             axeta.legend()
             axeta.grid(True)
             figeta.savefig(os.path.join(PATH_store, f"eta_dist_{pid}.pdf"))
-    ax_event_res.legend()
-    fig_event_res.savefig(
-        os.path.join(PATH_store, "event_resolution.pdf"), bbox_inches="tight"
-    )
+
     #fig_mass_res.savefig(
     #    os.path.join(PATH_store, "event_mass_resolution.pdf"), bbox_inches="tight"
     #)
@@ -1236,7 +1241,7 @@ def create_eff_dic_pandora(matched_pandora, id):
     pids_pandora = np.abs(matched_pandora["pid"].values)
     mask_id = pids_pandora == id
     df_id_pandora = matched_pandora[mask_id]
-    eff_p, energy_eff_p = calculate_eff(df_id_pandora, False)
+    eff_p, energy_eff_p = calculate_eff(df_id_pandora, False, pandora=True)
     fakes_p, energy_fakes_p = calculate_fakes(df_id_pandora, None, False, pandora=True)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
@@ -1374,9 +1379,9 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     # y_filt = np.where((y.pid.flatten() == 2112.0) + (y.pid.flatten() == 130.0))[0]
     # y = copy(y)
     # y.mask(y_filt)
-    return
     # if len(df) == 0:
     #     return
+    return
     import plotly
     import plotly.graph_objs as go
     import plotly.express as px
@@ -1412,7 +1417,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
             #if has_track.sum() == 0.0:
             #    return   # filter ! ! ! Only plot those with tracks
             pids = df.pid.values
-            ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
+            ht_clusters = [f"c123luster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
         c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]
@@ -1666,6 +1671,8 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
     if "25.0" in output_dir:
         print("26")
     plotly.offline.plot(fig, filename=output_dir + "event.html")
+    # also plot a png for big events which cannot be rendered fast
+    fig.write_image(output_dir + "event.png")
 
 
 def calculate_theta(x, y, z):
@@ -1797,7 +1804,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
                 m = np.array([0 for _ in range(len(matched.pid[mask]))])
             p_squared = (pred_e**2 - m**2).values
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
-        pred_e_nocor = matched.pred_showers_E[mask]
+        pred_e_nocor = pred_e
         true_pxyz = np.array(matched.true_pos[mask].tolist())
         bins_angle = np.linspace(-0.1, +0.1, 400)
         if np.sum(mask) > 0:  # if the bin is not empty
@@ -1911,7 +1918,7 @@ def process_element(i, bins, matched, pandora, bins_per_binned_E):
     mask_check = matched["pred_showers_E"] > 0
     mask = mask_below * mask_above * mask_check
 
-    pred_e = matched.pred_showers_E[mask]
+    pred_e = matched.calibrated_E[mask]
     true_rec = matched.reco_showers_E[mask]
     if np.sum(mask) > 0:  # if the bin is not empty
         e_over_rec = pred_e / true_rec
@@ -1955,7 +1962,10 @@ def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title=""):
         sigma = np.array(dic["sigma_phi"])
         sigma_pandora = np.array(dic["sigma_phi_pandora"])
     ax.plot(E, sigma, "--", marker=".", label="ML", color="red")
-    ax.plot(E, sigma_pandora, "--", marker=".", label="Pandora", color="blue")
+    try:
+        ax.plot(E, sigma_pandora, "--", marker=".", label="Pandora", color="blue")
+    except:
+        print("Error plotting pandora")
     ax.set_xlabel("Energy [GeV]")
     if angle == "theta":
         ax.set_ylabel(r"$\theta$ resolution")

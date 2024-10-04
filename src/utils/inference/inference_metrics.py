@@ -23,7 +23,7 @@ def calculate_eff(sd, log_scale=False, pandora=False):
         number_of_non_reconstructed_showers = np.sum(
             np.isnan(sd.pred_showers_E.values)[mask]
         )
-        total_showers = len(sd.pred_showers_E.values[mask])
+        total_showers = len(sd.true_showers_E.values[mask])
         if pandora:
             number_of_non_reconstructed_showers = np.sum(
                 np.isnan(sd.pandora_calibrated_E.values)[mask]
@@ -34,7 +34,6 @@ def calculate_eff(sd, log_scale=False, pandora=False):
                 (total_showers - number_of_non_reconstructed_showers) / total_showers
             )
             energy_eff.append((bin_i1 + bin_i) / 2)
-
     return eff, energy_eff
 
 
@@ -98,7 +97,7 @@ def calculate_response(matched, pandora, log_scale=False):
         mask_check = matched["pred_showers_E"] > 0
         mask = mask_below * mask_above * mask_check
 
-        pred_e = matched.pred_showers_E[mask]
+        pred_e = matched.calibrated_E[mask]
         true_rec = matched.reco_showers_E[mask]
         true_e = matched.true_showers_E[mask]
         if pandora:

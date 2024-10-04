@@ -42,6 +42,7 @@ def create_and_store_graph_output(
     pids_neutral=None,
     pids_charged=None,
     pred_pid=None,
+    pred_xyz_track=None,
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -321,7 +322,7 @@ def generate_showers_data_frame(
     pred_pos=None,
     pred_pid=None,
     save_plots_to_folder="",
-    pred_ref_pt=None
+    pred_ref_pt=None,
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -435,7 +436,7 @@ def generate_showers_data_frame(
                     number_of_showers_total : number_of_showers_total
                     + number_of_showers
                 ]
-                * e_pred_showers[index_matches]
+                #* e_pred_showers[index_matches]
             )
             if len(row_ind) and len(index_matches):
                 assert row_ind.max() < len(is_track)
@@ -471,7 +472,7 @@ def generate_showers_data_frame(
             fake_showers_e_cali = e_pred_showers_cali[mask]
             # fakes_positions = dic["graph"].ndata["coords"][mask]
         else:
-            fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
+            fake_showers_e_cali = e_pred_showers[mask]# * (torch.nan)
         fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_positions = fakes_positions.to(e_pred_showers.device)
 

@@ -227,7 +227,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=False,
+                    neutral_avg=True,
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
                 )
@@ -276,7 +276,6 @@ class ExampleWrapper(L.LightningModule):
                             pos_regression=self.args.regress_pos,
                         )
                     )
-
         # freeze these models completely
         # for param in self.ec_model_wrapper_charged.model.parameters():
         #    param.requires_grad = False
@@ -397,7 +396,7 @@ class ExampleWrapper(L.LightningModule):
         )
         if self.args.regress_pos:
             if len(self.pids_charged):
-                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies
+                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies # charged_pxyz_pred: we are also storing the xyz of the track, to see the effect of the weirdly fitted tracks on the results
             else:
                 charged_energies, charged_positions, _ = charged_energies
             if len(self.pids_neutral):
@@ -440,10 +439,10 @@ class ExampleWrapper(L.LightningModule):
             ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
         # dummy loss to make it work without complaining about not using params in loss
         pred_energy_corr[charged_idx.flatten()] = (
-            charged_energies / sum_e.flatten()[charged_idx.flatten()]
+            charged_energies #/ sum_e.flatten()[charged_idx.flatten()]
         )
         pred_energy_corr[neutral_idx.flatten()] = (
-            neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
+            neutral_energies #/ sum_e.flatten()[neutral_idx.flatten()]
         )
         if len(self.pids_charged):
             if len(charged_idx):
@@ -460,9 +459,11 @@ class ExampleWrapper(L.LightningModule):
         pred_energy_corr[pred_energy_corr < 0] = 0.0
         if self.args.regress_pos:
             pred_ref_pt = torch.ones_like(pred_pos)
+            pred_xyz_track = torch.ones_like(pred_pos)
             if len(charged_idx):
                 pred_ref_pt[charged_idx.flatten()] = charged_ref_pt_pred.to(pred_ref_pt.device)
                 pred_pos[charged_idx.flatten()] = charged_positions.float().to(pred_pos.device)
+                #pred_xyz_track[charged_idx.flatten()] = charged_pxyz_pred.to(pred_pos.device)
             if len(neutral_idx):
                 pred_ref_pt[neutral_idx.flatten()] = neutral_ref_pt_pred.to(neutral_idx.device)
                 pred_pos[neutral_idx.flatten()] = neutral_positions.to(neutral_idx.device).float()
@@ -472,7 +473,8 @@ class ExampleWrapper(L.LightningModule):
                 "neutrals_idx": neutral_idx.flatten(),
                 "charged_idx": charged_idx.flatten(),
                 "pred_ref_pt": pred_ref_pt,
-                "pred_pos_avg": neutral_pxyz_avg,
+               # "pred_pos_avg": neutral_pxyz_avg,
+                #"pred_xyz_track": charged_pxyz_pred,
             }
             if len(self.pids_charged) or len(self.pids_neutral):
                 pred_energy_corr["pred_PID"] = pred_pid
@@ -561,8 +563,6 @@ class ExampleWrapper(L.LightningModule):
                 neutral_graphs,
                 explain=self.args.explain_ec,
             )
-
-
             neutral_pxyz_avg = self.ec_model_wrapper_neutral_avg.predict(
                 features_neutral_no_nan,
                 neutral_graphs,
@@ -798,7 +798,7 @@ class ExampleWrapper(L.LightningModule):
                         neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
         loss_time_start = time()
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        (loss, losses,) = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor,
@@ -819,7 +819,7 @@ class ExampleWrapper(L.LightningModule):
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
-            loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
+            loss_EC = criterion(e_cor, e_true_corr_daughters, step)
             if self.args.regress_pos:
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
                 if self.args.regress_unit_p:
@@ -850,15 +850,18 @@ class ExampleWrapper(L.LightningModule):
                 ) # just for logging
                 wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged, "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged})
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
-                loss = loss + loss_pos_L1_diff
+                loss = loss + loss_pos_L1
                 if len(self.pids_charged):
                     if len(charged_PID_pred):
                         loss_charged_pid = torch.nn.CrossEntropyLoss()(
                             charged_PID_pred, charged_PID_true_onehot
                         )
+                        if torch.isnan(loss_charged_pid).any():
+                            print("Charged PID loss is nan")
+                            print(loss_charged_pid)
                     else:
-                        loss_charged_pid = 0
 
+                        loss_charged_pid = 0
                     loss = loss + loss_charged_pid
                     wandb.log({"loss_charged_pid": loss_charged_pid})
                 if len(self.pids_neutral):
@@ -987,7 +990,7 @@ class ExampleWrapper(L.LightningModule):
         #     self.args.losstype = "hgcalimplementation"
         # else:
         #     self.args.losstype = "vrepweighted"
-        (loss, losses, loss_E, loss_E_frac_true,) = object_condensation_loss2(
+        (loss, losses,) = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor1,
@@ -1050,10 +1053,11 @@ class ExampleWrapper(L.LightningModule):
                 pids_charged=self.pids_charged,
             )
             # self.df_showers.append(df_batch)
+            print("DF_batch_pandora", len(df_batch_pandora))
             self.df_showers_pandora.append(df_batch_pandora)
             print("Appending another batch", len(df_batch1))
             self.df_showes_db.append(df_batch1)
-
+            print("_----------------------------------------------------------------------")
         del losses
         del loss
         del model_output
