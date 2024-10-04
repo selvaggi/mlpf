@@ -472,7 +472,7 @@ def generate_showers_data_frame(
             fake_showers_e_cali = e_pred_showers_cali[mask]
             # fakes_positions = dic["graph"].ndata["coords"][mask]
         else:
-            fake_showers_e_cali = e_pred_showers[mask] * (torch.nan)
+            fake_showers_e_cali = e_pred_showers[mask]# * (torch.nan)
         fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_positions = fakes_positions.to(e_pred_showers.device)
 
