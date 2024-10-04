@@ -143,7 +143,6 @@ class CPU_Unpickler(pickle.Unpickler):
         else:
             return super().find_class(module, name)
 
-
 class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
     # use the GNN+NN model for energy correction
     # This one concatenates GNN features to the global features
@@ -361,15 +360,27 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()'''
         res = self.model(model_x)
         if self.pid_channels > 1:
+            # replace nans in model_x with zeros (some bug with charged particles??)
+            if (torch.isnan(model_x).sum()):
+                print("Nans in model_x!!!", model_x)
+            #model_x = torch.nan_to_num(model_x)
+            if (torch.isnan(self.PID_head.weight).sum()):
+                print("Nans in PID head!!!")
             pid_pred = self.PID_head(model_x)
+            if torch.isnan(pid_pred).any():
+                print("PID prediction contains nans")
         else:
             pid_pred = None
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos, ref_pt_pred = self.PickPAtDCA.predict(x_global_features, graphs_new)
+                E = torch.norm(pos, dim=1)
                 if self.unit_p:
                     pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
-                return torch.clamp(res.flatten(), min=0, max=None), pos, pid_pred, ref_pt_pred
+                #print("Charged PID_pred", pid_pred)
+                # if model_x contains nans, print sth?
+                #E = torch.clamp(res.flatten(), min=0, max=None)
+                return E, pos, pid_pred, ref_pt_pred
             else:
                 E_pred, p_pred = res[0], res[1]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
@@ -413,8 +424,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         return BlockDiagonalMask.from_seqlens(
             torch.bincount(batch_numbers.long()).tolist()
         )
-
-
 
 class ECNetWrapperAvg(torch.nn.Module):
     # use the GNN+NN model for energy correction
@@ -475,6 +484,7 @@ class PickPAtDCA(torch.nn.Module):
         # ht = graphs_new.ndata["hit_type"]
         ht = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
         filt = ht == 1  # track
+        filt_hits = ((ht == 2) + (ht == 3)).bool()
         # if "pos_pxpypz_at_vertex" in graphs_new.ndata.keys():
         #    key = "pos_pxpypz_at_vertex"
         # else:
@@ -483,15 +493,24 @@ class PickPAtDCA(torch.nn.Module):
         #     graphs_new.ndata["pos_pxpypz_at_vertex"][filt], batch_idx[filt], dim=0
         # )
         # take the min chi squared track if there are multiple
-        p_direction = pick_lowest_chi_squared(
+        p_direction, p_xyz = pick_lowest_chi_squared(
             graphs_new.ndata["pos_pxpypz_at_vertex"][filt],
             graphs_new.ndata["chi_squared_tracks"][filt],
             batch_idx[filt],
+            graphs_new.ndata["h"][filt, :3]
         )
+        xyz_hits_calo = graphs_new.ndata["h"][filt_hits, :3]
+        E_hits_calo = graphs_new.ndata["h"][filt_hits, 8]
+        # Barycenters of clusters of hits
+        xyz_hits = graphs_new.ndata["h"][:, :3]
+        E_hits = graphs_new.ndata["h"][:, 8]
+        weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
+        E_total = scatter_sum(E_hits, batch_idx, dim=0)
+        barycenters = weighted_avg_hits / E_total.unsqueeze(1)
         p_tracks = torch.norm(p_direction, dim=1)
         p_direction = p_direction  # / torch.norm(p_direction, dim=1).unsqueeze(1)
-        return p_tracks, p_direction, torch.zeros_like(p_direction) # reference point
-        # return p_tracks
+        return p_tracks, p_direction, barycenters - p_xyz   # torch.concat([barycenters, p_xyz], dim =1) # Reference point
+
 
 class AverageHitsP(torch.nn.Module):
     # Same layout of the module as the GNN one, but just computes the average of the hits. Try to compare this + ML clustering with Pandora
@@ -566,7 +585,6 @@ class NeutralPCA(torch.nn.Module):
             #norm2 = torch.norm(mean - k)
             #if norm1 < norm2:
             #    k *= -1
-
             a = hits_xyz - mean
             dist_from_first_pca = np.sqrt(np.linalg.norm(a, axis=1) ** 2 - np.dot(a, k) ** 2)
             mask = dist_from_first_pca < np.quantile(dist_from_first_pca, 0.9)
@@ -641,15 +659,19 @@ class ThrustAxis(torch.nn.Module):
         barycenters = torch.stack(barycenters)
         return p_tracks, p_direction, barycenters # ref pt
 
-def pick_lowest_chi_squared(pxpypz, chi_s, batch_idx):
+def pick_lowest_chi_squared(pxpypz, chi_s, batch_idx, xyz_nodes):
     unique_batch = torch.unique(batch_idx)
     p_direction = []
+    track_xyz = []
     for i in range(0, len(unique_batch)):
         mask = batch_idx == unique_batch[i]
         if torch.sum(mask) > 1:
             chis = chi_s[mask]
             ind_min = torch.argmin(chis)
             p_direction.append(pxpypz[mask][ind_min].view(-1, 3))
+            track_xyz.append(xyz_nodes[mask][ind_min].view(-1, 3))
+
         else:
             p_direction.append(pxpypz[mask].view(-1, 3))
-    return torch.concat(p_direction, dim=0)
+            track_xyz.append(xyz_nodes[mask].view(-1, 3))
+    return torch.concat(p_direction, dim=0), torch.stack(track_xyz)[:, 0]

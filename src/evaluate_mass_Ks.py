@@ -45,11 +45,12 @@ if all_E:
         #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
 
-       # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits"
+      # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits/reprod_plots_02_10_2024"
+        "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug/reprod_plots_02_10_2024"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
+       # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1/reprod_plots_02_10_2024"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -57,12 +58,13 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Ks_old_model_debug/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "Eval_AvgHits_Ks_50_gatr_clustering1/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
-    #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
+    path_pandora = "Ks_old_model_debug/showers_df_evaluation/0_0_None_pandora.pt"
+    #dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
+    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
+
 
 labels = [
     "ML"
@@ -93,8 +95,8 @@ def main():
         path_hgcal = os.path.join(dir_top, i)
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
-        print("!!!! Taking the sum of the hits for the energy !!!!")
-        sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
+        #print("!!!! Taking the sum of the hits for the energy !!!!")
+        #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
@@ -143,7 +145,7 @@ def main():
                     ]
                 ),
                 "ML: ",
-                len(sd_hgb[(sd_hgb.pred_showers_E > i[0]) & (sd_hgb.pred_showers_E < i[1])]),
+                len(sd_hgb[(sd_hgb.calibrated_E > i[0]) & (sd_hgb.calibrated_E < i[1])]),
             )
         current_dir =  os.path.join(PATH_store, "plots_range_" + str(range[0]) + "_" + str(range[1]))
         if not os.path.exists(current_dir):

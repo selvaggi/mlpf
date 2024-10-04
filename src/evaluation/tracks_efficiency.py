@@ -85,7 +85,7 @@ def calculate_eff(sd, log_scale=False):
         number_of_non_reconstructed_showers = np.sum(
             np.isnan(sd.pred_showers_E.values)[mask]
         )
-        total_showers = len(sd.pred_showers_E.values[mask])
+        total_showers = len(sd.calibrated_E.values[mask])
         if total_showers > 0:
             eff.append(
                 (total_showers - number_of_non_reconstructed_showers) / total_showers
