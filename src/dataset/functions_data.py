@@ -29,6 +29,9 @@ def get_number_hits(e_hits, part_idx):
     number_of_hits = scatter_sum(torch.ones_like(e_hits), part_idx.long(), dim=0)
     return (number_of_hits[1:].flatten()).tolist()
 
+def get_e_reco(e_hits, part_idx):
+    number_of_hits = scatter_sum(e_hits, part_idx.long(), dim=0)
+    return number_of_hits[1:].flatten()
 
 def get_number_of_daughters(hit_type_feature, hit_particle_link, daughters):
     a = hit_particle_link
@@ -141,19 +144,18 @@ class CachedIndexList:
 
 def find_cluster_id(hit_particle_link):
     unique_list_particles = list(np.unique(hit_particle_link))
-    if np.sum(np.array(unique_list_particles) == -1) > 0:
-        unique_list_particles = torch.tensor(unique_list_particles)
 
-        non_noise_idx = torch.where(torch.tensor(unique_list_particles) != -1)[0]
-        noise_idx = torch.where(torch.tensor(unique_list_particles) == -1)[0]
-        non_noise_particles = torch.tensor(unique_list_particles)[non_noise_idx]
-        c_non_noise_particles = CachedIndexList(non_noise_particles.tolist())
-        cluster_id = map(
-            lambda x: c_non_noise_particles.index(x), hit_particle_link.tolist()
+    if np.sum(np.array(unique_list_particles) == -1) > 0:
+        non_noise_idx = torch.where(hit_particle_link != -1)[0]  #
+        noise_idx = torch.where(hit_particle_link == -1)[0]  #
+        unique_list_particles1 = torch.unique(hit_particle_link)[1:]
+        cluster_id_ = torch.searchsorted(
+            unique_list_particles1, hit_particle_link[non_noise_idx], right=False
         )
-        cluster_id = torch.Tensor(list(cluster_id)) + 1
-        unique_list_particles[non_noise_idx] = cluster_id
-        unique_list_particles[noise_idx] = 0
+        cluster_id_small = 1.0 * cluster_id_ + 1
+        cluster_id = hit_particle_link.clone()
+        cluster_id[non_noise_idx] = cluster_id_small
+        cluster_id[noise_idx] = 0
     else:
         c_unique_list_particles = CachedIndexList(unique_list_particles)
         cluster_id = map(
@@ -564,3 +566,35 @@ def add_batch_number(list_graphs):
         list_y.append(batch_id)
     list_y = torch.cat(list_y, dim=0)
     return list_y
+
+
+
+
+
+def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
+    unique_p_numbers = torch.unique(cluster_id)
+    number_of_hits = get_number_hits(hit_energies, cluster_id)
+    e_reco = get_e_reco(hit_energies, cluster_id)
+    mask_hits = torch.Tensor(number_of_hits) < 6
+    mask_p = e_reco<0.10
+    mask_all = mask_hits.view(-1) + mask_p.view(-1)
+    list_remove = unique_p_numbers[mask_all.view(-1)]
+    # print(e_reco)
+    # print(number_of_hits)
+    # print(list_remove)
+    if len(list_remove) > 0:
+        mask = torch.tensor(np.full((len(cluster_id)), False, dtype=bool))
+        for p in list_remove:
+            mask1 = cluster_id == p
+            mask = mask1 + mask
+    else:
+        mask = torch.tensor(np.full((len(cluster_id)), False, dtype=bool))
+    list_p = unique_p_numbers
+    if len(list_remove) > 0:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+        for p in list_remove:
+            mask_particles1 = list_p == p
+            mask_particles = mask_particles1 + mask_particles
+    else:
+        mask_particles = torch.tensor(np.full((len(list_p)), False, dtype=bool))
+    return mask.to(bool), ~mask_particles.to(bool)

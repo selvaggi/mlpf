@@ -142,7 +142,7 @@ def calc_LV_Lbeta(
 
     # Calculate q
     if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
-        q = (beta.arctanh() / 1.01) ** 2 + qmin
+        q = (beta.clip(0.0, 1 - 1e-4).arctanh() / 1.01) ** 2 + qmin
     elif beta_stabilizing == "paper":
         q = beta.arctanh() ** 2 + qmin
     elif beta_stabilizing == "clip":
@@ -551,12 +551,13 @@ def calc_LV_Lbeta(
         print("L_beta_sig", L_beta_sig)
    
     L_exp = L_beta
+    print("looooses", L_V, L_beta, L_beta_sig, L_beta_noise, L_V_attractive, L_V_repulsive)
     if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         return (
             L_V,  # 0
             L_beta,
-            0,
-            0,  # loss_x
+            L_beta_sig,
+            L_beta_noise,  # loss_x
             None,  # loss_particle_ids0,  # 4
             0,  # loss_momentum
             0,  # loss mass

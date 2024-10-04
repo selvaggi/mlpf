@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import dgl
-from torch_scatter import scatter_add, scatter_sum
+from torch_scatter import scatter_add, scatter_sum, scatter_mean
 from sklearn.preprocessing import StandardScaler
 from torch_scatter import scatter_sum
 from src.dataset.functions_data import (
@@ -12,6 +12,7 @@ from src.dataset.functions_data import (
     get_hit_features,
     calculate_distance_to_boundary,
     concatenate_Particles_GT,
+    create_noise_label
 )
 
 
@@ -69,19 +70,21 @@ def create_inputs_from_table(
         )
         assert len(y_data_graph) == len(unique_list_particles)
         # remove particles that have no energy, no hits or only track hits
-        mask_hits, mask_particles = find_mask_no_energy(
-            cluster_id,
-            hit_type_feature,
-            e_hits,
-            y_data_graph,
-            daughters,
-            prediction,
-            is_Ks=is_Ks,
-        )
-        # create mapping from links to number of particles in the event
-        cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
-        y_data_graph.mask(~mask_particles)
-
+        if not is_Ks:
+            mask_hits, mask_particles = find_mask_no_energy(
+                cluster_id,
+                hit_type_feature,
+                e_hits,
+                y_data_graph,
+                daughters,
+                prediction,
+                is_Ks=is_Ks,
+            )
+            # create mapping from links to number of particles in the event
+            cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
+            y_data_graph.mask(~mask_particles)
+        else:
+            mask_hits = torch.zeros_like(e_hits).bool().view(-1)
         if prediction:
             if is_Ks:
                 result = [
@@ -100,6 +103,7 @@ def create_inputs_from_table(
                     pandora_pfo_link[~mask_hits],
                     hit_type_feature[~mask_hits],
                     hit_link_modified[~mask_hits],
+                    daughters[~mask_hits],
                 ]
             else:
                 result = [
@@ -205,6 +209,7 @@ def create_graph(
     hit_chis = config.graph_config.get("hit_chis_track", False)
     pos_pxpy = config.graph_config.get("pos_pxpy", False)
     is_Ks = config.graph_config.get("ks", False)
+    noise_class = config.graph_config.get("noise", False)
     result = create_inputs_from_table(
         output,
         hits_only=hits_only,
@@ -234,11 +239,18 @@ def create_graph(
             pandora_pfo_link,
             hit_type,
             hit_link_modified,
+            daughters, 
             chi_squared_tracks,
             hit_type_one_hot,
-            connections_list,
+            connections_list
         ) = result
-
+        if noise_class:
+            mask_loopers, mask_particles = create_noise_label(
+            e_hits, hit_particle_link, y_data_graph, cluster_id
+            )
+            hit_particle_link[mask_loopers] = -1
+            y_data_graph.mask(mask_particles)
+            cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
         graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
         graph_empty = False
         g = dgl.graph(([], []))
@@ -273,6 +285,7 @@ def create_graph(
             if is_Ks:
                 g.ndata["pandora_momentum"] = pandora_mom
                 g.ndata["pandora_reference_point"] = pandora_ref_point
+                g.ndata["daughters"] = daughters
         y_data_graph.calculate_corrected_E(g, connections_list)
         # if is_Ks == True:
         #     if y_data_graph.pid.flatten().shape[0] == 4 and np.count_nonzero(y_data_graph.pid.flatten() == 22) == 4:
@@ -291,7 +304,10 @@ def create_graph(
     if graph_empty:
         return [g, y_data_graph], graph_empty
     # print("graph_empty",graph_empty)
-    return [store_track_at_vertex_at_track_at_calo(g), y_data_graph], graph_empty
+    g = store_track_at_vertex_at_track_at_calo(g)
+    if noise_class:
+        g = make_bad_tracks_noise_tracks(g)
+    return [g, y_data_graph], graph_empty
 
 
 def graph_batch_func(list_graphs):
@@ -311,3 +327,20 @@ def graph_batch_func(list_graphs):
     bg = dgl.batch(list_graphs_g)
     # reindex particle number
     return bg, ys
+
+def make_bad_tracks_noise_tracks(g):
+    # is_chardged =scatter_add((g.ndata["hit_type"]==1).view(-1), g.ndata["particle_number"].long())[1:]
+    mask_hit_type_t1 = g.ndata["hit_type"]==2
+    mask_hit_type_t2 = g.ndata["hit_type"]==1
+    mask_all = mask_hit_type_t1
+    mean_pos_cluster = scatter_mean(g.ndata["pos_hits_xyz"][mask_all], g.ndata["particle_number"][mask_all].long().view(-1), dim=0)
+    mean_pos_cluster
+    pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
+    particle_track = g.ndata["particle_number"][mask_hit_type_t2]
+    # print("particle_track", particle_track)
+    distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+    # print("distance_track_cluster", distance_track_cluster)
+    bad_tracks = distance_track_cluster>0.21
+    index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
+    g.ndata["particle_number"][index_bad_tracks]= 0 
+    return g
