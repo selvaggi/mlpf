@@ -551,7 +551,7 @@ def calc_LV_Lbeta(
         print("L_beta_sig", L_beta_sig)
    
     L_exp = L_beta
-    print("looooses", L_V, L_beta, L_beta_sig, L_beta_noise, L_V_attractive, L_V_repulsive)
+    # print("looooses", L_V, L_beta, L_beta_sig, L_beta_noise, L_V_attractive, L_V_repulsive)
     if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         return (
             L_V,  # 0

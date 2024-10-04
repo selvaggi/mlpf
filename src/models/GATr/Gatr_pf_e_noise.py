@@ -333,7 +333,6 @@ class ExampleWrapper(L.LightningModule):
         #     mask = g.ndata["hit_type"] == 1
         #     beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
-        print("beta", beta)
         g.ndata["beta"] = beta.view(-1)
         if self.trainer.is_global_zero and step_count % 500 == 0:
             PlotCoordinates(

@@ -342,13 +342,14 @@ def make_bad_tracks_noise_tracks(g):
         #then index 1 is at 0 
         mean_pos_cluster = mean_pos_cluster[1:,:]
         particle_track = particle_track-1
-    print(mean_pos_cluster.shape, torch.unique(g.ndata["particle_number"]).shape)
-    print("mean_pos_cluster", mean_pos_cluster.shape)
-    print("particle_track", particle_track)
-    print("pos_track", pos_track.shape)
-    distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
-    # print("distance_track_cluster", distance_track_cluster)
-    bad_tracks = distance_track_cluster>0.21
-    index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
-    g.ndata["particle_number"][index_bad_tracks]= 0 
+    # print(mean_pos_cluster.shape, torch.unique(g.ndata["particle_number"]).shape)
+    # print("mean_pos_cluster", mean_pos_cluster.shape)
+    # print("particle_track", particle_track)
+    # print("pos_track", pos_track.shape)
+    if mean_pos_cluster.shape[0] == torch.unique(g.ndata["particle_number"]).shape:
+        distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+        # print("distance_track_cluster", distance_track_cluster)
+        bad_tracks = distance_track_cluster>0.21
+        index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
+        g.ndata["particle_number"][index_bad_tracks]= 0 
     return g
