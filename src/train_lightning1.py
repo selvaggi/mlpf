@@ -132,13 +132,13 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             #print("DEV ", dev)
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
@@ -194,9 +194,9 @@ def main():
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
             print("TODO: change imported the model for testing manually")
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0, map_location=dev
+                args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )
         #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", filename="profiler_eval_0705")
         #print("USING PROFILER")
@@ -215,14 +215,14 @@ def main():
                 trainer.validate(
                     model=model,
                     dataloaders=test_loader,
-                    ckpt_path=args.load_model_weights,
+                    # ckpt_path=args.load_model_weights,
                 )
         else:
             for name, get_test_loader in test_loaders.items():
                 test_loader = get_test_loader()
                 trainer.validate(
                     model=model,
-                    ckpt_path=args.load_model_weights,
+                    # ckpt_path=args.load_model_weights,
                     dataloaders=test_loader,
                 )
 
