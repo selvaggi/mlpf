@@ -334,10 +334,13 @@ def make_bad_tracks_noise_tracks(g):
     mask_hit_type_t2 = g.ndata["hit_type"]==1
     mask_all = mask_hit_type_t1
     mean_pos_cluster = scatter_mean(g.ndata["pos_hits_xyz"][mask_all], g.ndata["particle_number"][mask_all].long().view(-1), dim=0)
-    if  torch.sum(g.ndata["particle_number"] == 0)==0:
-        mean_pos_cluster = mean_pos_cluster[:,1]
+    
     pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
     particle_track = g.ndata["particle_number"][mask_hit_type_t2]
+    if  torch.sum(g.ndata["particle_number"] == 0)==0:
+        #then index 1 is at 0 
+        mean_pos_cluster = mean_pos_cluster[:,1]
+        particle_track = particle_track-1
     print("mean_pos_cluster", mean_pos_cluster.shape)
     print("particle_track", particle_track)
     distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
