@@ -230,30 +230,31 @@ def calc_LV_Lbeta(
     # First select all norms of all signal hits w.r.t. all objects, mask out later
 
     if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
-        if dis:
-            N_k = torch.sum(M, dim=0)  # number of hits per object
-            norms = torch.sum(
-                torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
-                dim=-1,
-            )
-            norms_att = norms[is_sig]
-            norms_att = norms_att / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
-            #! att func as in line 159 of object condensation
-            norms_att = torch.log(
-                torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att + 1
-            )
-        else:
-            N_k = torch.sum(M, dim=0)  # number of hits per object
-            norms = torch.sum(
-                torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
-                dim=-1,
-            )
-            norms_att = norms[is_sig]
-            #! att func as in line 159 of object condensation
+        # if dis:
+        #     N_k = torch.sum(M, dim=0)  # number of hits per object
+        #     norms = torch.sum(
+        #         torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
+        #         dim=-1,
+        #     )
+        #     norms_att = norms[is_sig]
+        #     norms_att = norms_att / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
+        #     #! att func as in line 159 of object condensation
+        #     norms_att = torch.log(
+        #         torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att + 1
+        #     )
+     
+        N_k = torch.sum(M, dim=0)  # number of hits per object
+        norms = torch.sum(
+            torch.square(cluster_space_coords.unsqueeze(1) - x_alpha.unsqueeze(0)),
+            dim=-1,
+        ) # take the norm squared
+        norms_att = norms[is_sig]
+        #! att func as in line 159 of object condensation
+        
+        norms_att = torch.log(
+            torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
+        )
 
-            norms_att = torch.log(
-                torch.exp(torch.Tensor([1]).to(norms_att.device)) * norms_att / 2 + 1
-            )
     elif huberize_norm_for_V_attractive:
         norms_att = norms[is_sig]
         # Huberized version (linear but times 4)
@@ -281,6 +282,7 @@ def calc_LV_Lbeta(
         #! divide by the number of accounted points
         V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
         L_V_attractive = torch.mean(V_attractive)
+        L_V_attractive_2 = torch.sum(V_attractive)
     elif loss_type == "vrepweighted":
         if tracking:
             # weight the vtx hits inside the shower
@@ -412,6 +414,7 @@ def calc_LV_Lbeta(
         L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
 
         L_V_repulsive2 = L_V_repulsive2.view(-1)
+        L_V_attractive_2 = L_V_attractive_2.view(-1)
 
         # if not tracking:
         #     #! add to terms function (divide by total number of showers per event)
@@ -444,6 +447,7 @@ def calc_LV_Lbeta(
         attr_weight * L_V_attractive
         # + repul_weight * L_V_repulsive
         + L_V_repulsive2 / 300
+        # + L_V_attractive_2 / 600
     )
     
  

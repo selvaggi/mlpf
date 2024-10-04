@@ -37,7 +37,7 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
 )
 from lightning.pytorch.profilers import AdvancedProfiler
-from src.models.gravnet_3_L import FreezeClustering
+from src.layers.utils_training import FreezeClustering
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ["TORCH_USE_CUDA_DSA"] = "1"
@@ -173,13 +173,14 @@ def main():
             # accumulate_grad_batches=1,
             strategy="ddp",
             limit_train_batches=5950,
-            #limit_val_batches=20,
+            limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weig
             # hts,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
+        #
         trainer.fit(
             model=model,
             train_dataloaders=train_loader,
@@ -195,7 +196,7 @@ def main():
             print("TODO: change imported the model for testing manually")
             from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0, map_location=dev
+                args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )
         #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", filename="profiler_eval_0705")
         #print("USING PROFILER")
@@ -214,14 +215,14 @@ def main():
                 trainer.validate(
                     model=model,
                     dataloaders=test_loader,
-                    ckpt_path=args.load_model_weights,
+                    # ckpt_path=args.load_model_weights,
                 )
         else:
             for name, get_test_loader in test_loaders.items():
                 test_loader = get_test_loader()
                 trainer.validate(
                     model=model,
-                    ckpt_path=args.load_model_weights,
+                    # ckpt_path=args.load_model_weights,
                     dataloaders=test_loader,
                 )
 
