@@ -275,13 +275,19 @@ def calc_LV_Lbeta(
     if loss_type == "hgcalimplementation":
         # Final potential term
         # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
+        hit_type = (g.ndata["hit_type"][is_sig].view(-1)==3)*4+1  #weight 5 for hadronic hits, 1 for
+        tracks = g.ndata["hit_type"][is_sig]==1
+        hit_type[tracks] = 250
+        total_sum_hits_types = scatter_add(hit_type.view(-1), object_index)
         V_attractive = q[is_sig].unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
         assert V_attractive.size() == (n_hits_sig, n_objects)
         #! each shower is account for separately
         V_attractive = V_attractive.sum(dim=0)  # K objects
         #! divide by the number of accounted points
-        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
-        L_V_attractive = torch.mean(V_attractive)
+      
+        #V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
+        V_attractive = V_attractive.view(-1) / (total_sum_hits_types.view(-1) + 1e-3)
+        # L_V_attractive = torch.mean(V_attractive)
 
         ## multiply by a weight that depends on the energy of the shower:
         e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
