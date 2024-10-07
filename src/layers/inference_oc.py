@@ -378,6 +378,15 @@ def generate_showers_data_frame(
     )
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
+    if torch.sum(particle_ids == 0) > 0:
+        # particle id can be 0 because there is noise
+        # then row ind 0 in any case corresponds to particle 1.
+        # if there is particle_id 0 then row_ind should be +1?
+        row_ind_ = row_ind - 1
+    else:
+        # if there is no zero then index 0 corresponds to particle 1.
+        row_ind_ = row_ind
+
     pred_showers = shower_p_unique
     energy_t = (
         dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
@@ -408,22 +417,22 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo =   torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
-    matched_es[row_ind] = e_pred_showers[index_matches]
+    matched_es[row_ind_] = e_pred_showers[index_matches]
     if pandora:
         matched_es_cali = matched_es.clone()
-        matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
+        matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
         matched_es_cali_pfo = matched_es.clone()
-        matched_es_cali_pfo[row_ind] = e_pred_showers_pfo[index_matches]
+        matched_es_cali_pfo[row_ind_] = e_pred_showers_pfo[index_matches]
         if calc_pandora_momentum:
-            matched_positions_pfo[row_ind] = pxyz_pred_pfo[index_matches]
-            matched_ref_pts_pfo[row_ind] = ref_pt_pred_pfo[index_matches]
-        is_track[row_ind] = is_track_per_shower[index_matches].float()
+            matched_positions_pfo[row_ind_] = pxyz_pred_pfo[index_matches]
+            matched_ref_pts_pfo[row_ind_] = ref_pt_pred_pfo[index_matches]
+        is_track[row_ind_] = is_track_per_shower[index_matches].float()
     else:
         if e_corr is None:
             matched_es_cali = matched_es.clone()
-            matched_es_cali[row_ind] = e_pred_showers_cali[index_matches]
+            matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
             calibration_per_shower = matched_es.clone()
-            calibration_per_shower[row_ind] = corrections_per_shower[index_matches]
+            calibration_per_shower[row_ind_] = corrections_per_shower[index_matches]
         else:
             matched_es_cali = matched_es.clone()
             number_of_showers = e_pred_showers[index_matches].shape[0]
@@ -431,35 +440,35 @@ def generate_showers_data_frame(
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             b = e_pred_showers[index_matches]
-            matched_es_cali[row_ind] = (
+            matched_es_cali[row_ind_] = (
                 corrections_per_shower[
                     number_of_showers_total : number_of_showers_total
                     + number_of_showers
                 ]
                 #* e_pred_showers[index_matches]
             )
-            if len(row_ind) and len(index_matches):
-                assert row_ind.max() < len(is_track)
-                assert index_matches.max() < len(is_track_per_shower)
-            is_track[row_ind] = is_track_per_shower[index_matches].float()
+            # if len(row_ind) and len(index_matches):
+            #     assert row_ind.max() < len(is_track)
+            #     assert index_matches.max() < len(is_track_per_shower)
+            is_track[row_ind_] = is_track_per_shower[index_matches].float()
             if pred_pos is not None:
-                matched_positions[row_ind] = pred_pos[number_of_showers_total : number_of_showers_total
+                matched_positions[row_ind_] = pred_pos[number_of_showers_total : number_of_showers_total
                     + number_of_showers]
-                matched_ref_pt[row_ind] = pred_ref_pt[number_of_showers_total : number_of_showers_total + number_of_showers]
-                matched_pid[row_ind] = pred_pid[number_of_showers_total : number_of_showers_total + number_of_showers]
+                matched_ref_pt[row_ind_] = pred_ref_pt[number_of_showers_total : number_of_showers_total + number_of_showers]
+                matched_pid[row_ind_] = pred_pid[number_of_showers_total : number_of_showers_total + number_of_showers]
             if shap:
-                matched_shap_vals[row_ind.cpu()] = shap_vals[index_matches.cpu()]
-                matched_ec_x[row_ind.cpu()] = ec_x[index_matches.cpu()]
+                matched_shap_vals[row_ind_.cpu()] = shap_vals[index_matches.cpu()]
+                matched_ec_x[row_ind_.cpu()] = ec_x[index_matches.cpu()]
             calibration_per_shower = matched_es.clone()
-            calibration_per_shower[row_ind] = corrections_per_shower[
+            calibration_per_shower[row_ind_] = corrections_per_shower[
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
 
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
-        ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind)
-        intersection_E[row_ind] = ie_e.to(e_pred_showers.device)
+        ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind, dic)
+        intersection_E[row_ind_] = ie_e.to(e_pred_showers.device)
         pred_showers[index_matches] = -1
         pred_showers[
             0
@@ -475,7 +484,13 @@ def generate_showers_data_frame(
             fake_showers_e_cali = e_pred_showers[mask]# * (torch.nan)
         fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_positions = fakes_positions.to(e_pred_showers.device)
-
+        if pandora:
+            if calc_pandora_momentum:
+                fake_positions_pfo = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
+                fake_positions_pfo = fake_positions_pfo.to(e_pred_showers.device)
+                fake_positions_pfo = pxyz_pred_pfo[mask]
+                fakes_positions_ref = (torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)).to(e_pred_showers.device)
+                fakes_positions_ref = ref_pt_pred_pfo[mask]
         if not pandora:
             if e_corr is None:
                 fake_showers_e_cali_factor = corrections_per_shower[mask]
@@ -485,7 +500,10 @@ def generate_showers_data_frame(
             torch.nan
         )
         fake_showers_vertex = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
-        fakes_is_track = torch.zeros((fake_showers_e.shape[0])) * (torch.nan)
+        fakes_is_track = (torch.zeros((fake_showers_e.shape[0])) * (torch.nan)).to(e_pred_showers.device)
+        fakes_is_track = is_track_per_shower[mask]
+
+
         """if shap:
             fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
                 torch.nan
@@ -526,8 +544,8 @@ def generate_showers_data_frame(
             e_pred_cali_pfo = torch.cat(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
             )
-            positions_pfo = torch.cat((matched_positions_pfo, fakes_positions), dim=0)
-            ref_pts_pfo =   torch.cat((matched_ref_pts_pfo, fakes_positions), dim=0)
+            positions_pfo = torch.cat((matched_positions_pfo, fake_positions_pfo), dim=0)
+            ref_pts_pfo =   torch.cat((matched_ref_pts_pfo, fakes_positions_ref), dim=0)
         if not pandora:
             calibration_factor = torch.cat(
                 (calibration_per_shower, fake_showers_e_cali_factor), dim=0
@@ -742,10 +760,16 @@ def find_condpoints(betas, unassigned, tbeta):
     return indices_condpoints
 
 
-def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind):
+def obtain_intersection_values(intersection_matrix_w, row_ind, col_ind, dic):
     list_intersection_E = []
     # intersection_matrix_w = intersection_matrix_w
-    intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
+    particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
+    if torch.sum(particle_ids == 0) > 0:
+        # removing also the MC particle corresponding to noise
+        intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, 1:], 1, 0)
+        row_ind = row_ind - 1
+    else:
+        intersection_matrix_wt = torch.transpose(intersection_matrix_w[1:, :], 1, 0)
     for i in range(0, len(col_ind)):
         list_intersection_E.append(
             intersection_matrix_wt[row_ind[i], col_ind[i]].view(-1)
@@ -803,15 +827,23 @@ def match_showers(
     u_m = obtain_union_matrix(shower_p_unique, particle_ids, labels, dic)
     u_m = u_m.to(model_output.device)
     iou_matrix = i_m / u_m
-    iou_matrix_num = (
-        torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
-    )
+    if torch.sum(particle_ids == 0) > 0:
+        # removing also the MC particle corresponding to noise
+        iou_matrix_num = (
+            torch.transpose(iou_matrix[1:, 1:], 1, 0).clone().detach().cpu().numpy()
+        )
+    else:
+        iou_matrix_num = (
+            torch.transpose(iou_matrix[1:, :], 1, 0).clone().detach().cpu().numpy()
+        )
     iou_matrix_num[iou_matrix_num < iou_threshold] = 0
     row_ind, col_ind = linear_sum_assignment(-iou_matrix_num)
     # Next three lines remove solutions where there is a shower that is not associated and iou it's zero (or less than threshold)
     mask_matching_matrix = iou_matrix_num[row_ind, col_ind] > 0
     row_ind = row_ind[mask_matching_matrix]
     col_ind = col_ind[mask_matching_matrix]
+    if torch.sum(particle_ids == 0) > 0:
+        row_ind = row_ind + 1
     if i == 0 and local_rank == 0:
         if path_save is not None:
             if pandora:
