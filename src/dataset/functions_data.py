@@ -292,11 +292,14 @@ def get_hit_features(
                 torch.tensor(output["pf_points_pfo"][0:3, 0:number_hits]), (1, 0)
             )
             pandora_ref_point = torch.permute(
-                torch.tensor(output["pf_points_pfo"][3:, 0:number_hits]), (1, 0)
+                torch.tensor(output["pf_points_pfo"][3:6, 0:number_hits]), (1, 0)
             )
+            pandora_pid = torch.tensor(output["pf_points_pfo"][6, 0:number_hits])
+            
         else:
             pandora_mom = None
             pandora_ref_point = None
+            pandora_pid = None
         if is_Ks:
             pandora_cluster_energy = torch.tensor(
                 output["pf_features"][9, 0:number_hits]
@@ -324,6 +327,7 @@ def get_hit_features(
         chi_squared_tracks = None
         pandora_mom = None
         pandora_ref_point = None
+        pandora_pid = None
     # hit type
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
@@ -369,6 +373,7 @@ def get_hit_features(
         pfo_energy,
         pandora_mom,
         pandora_ref_point,
+        pandora_pid, 
         unique_list_particles,
         cluster_id,
         hit_type_feature,

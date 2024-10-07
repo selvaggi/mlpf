@@ -44,6 +44,7 @@ def create_inputs_from_table(
         pfo_energy,
         pandora_mom,
         pandora_ref_point,
+        pandora_pid, 
         unique_list_particles,
         cluster_id,
         hit_type_feature,
@@ -99,6 +100,7 @@ def create_inputs_from_table(
                     pandora_cluster_energy[~mask_hits],
                     pandora_mom[~mask_hits],
                     pandora_ref_point[~mask_hits],
+                    pandora_pid[~mask_hits],
                     pfo_energy[~mask_hits],
                     pandora_pfo_link[~mask_hits],
                     hit_type_feature[~mask_hits],
@@ -118,6 +120,7 @@ def create_inputs_from_table(
                     pandora_cluster_energy[~mask_hits],
                     pandora_mom,
                     pandora_ref_point,
+                    pandora_pid, 
                     pfo_energy[~mask_hits],
                     pandora_pfo_link[~mask_hits],
                     hit_type_feature[~mask_hits],
@@ -136,6 +139,7 @@ def create_inputs_from_table(
                 pandora_cluster_energy,
                 pandora_mom,
                 pandora_ref_point,
+                pandora_pid, 
                 pfo_energy,
                 pandora_pfo_link,
                 hit_type_feature[~mask_hits],
@@ -235,6 +239,7 @@ def create_graph(
             pandora_cluster_energy,
             pandora_mom,
             pandora_ref_point,
+            pandora_pid, 
             pandora_pfo_energy,
             pandora_pfo_link,
             hit_type,
@@ -286,6 +291,7 @@ def create_graph(
                 g.ndata["pandora_momentum"] = pandora_mom
                 g.ndata["pandora_reference_point"] = pandora_ref_point
                 g.ndata["daughters"] = daughters
+                g.ndata["pandora_pid"] = pandora_pid
         y_data_graph.calculate_corrected_E(g, connections_list)
         # if is_Ks == True:
         #     if y_data_graph.pid.flatten().shape[0] == 4 and np.count_nonzero(y_data_graph.pid.flatten() == 22) == 4:

@@ -141,6 +141,18 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
          )'''
+        # torch.save(
+        #     dic,
+        #     path_save
+        #     + "/graphs/"
+        #     + str(local_rank)
+        #     + "_"
+        #     + str(step)
+        #     + "_"
+        #     + str(i)
+        #     + ".pt",
+        #  )
+        
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
             #     labels_clustering,
@@ -354,8 +366,12 @@ def generate_showers_data_frame(
             ref_pt_py_pred_pfo = scatter_mean(
                 dic["graph"].ndata["pandora_reference_point"][:, 1], labels
             )
+            
             ref_pt_pz_pred_pfo = scatter_mean(
                 dic["graph"].ndata["pandora_reference_point"][:, 2], labels
+            )
+            pandora_pid = scatter_mean(
+                dic["graph"].ndata["pandora_pid"], labels
             )
             ref_pt_pred_pfo = torch.stack(
                 (ref_pt_px_pred_pfo, ref_pt_py_pred_pfo, ref_pt_pz_pred_pfo), dim=1
@@ -414,6 +430,8 @@ def generate_showers_data_frame(
     matched_pid = matched_pid.to(e_pred_showers.device).long()
     matched_positions_pfo = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_positions_pfo = matched_positions_pfo.to(e_pred_showers.device)
+
+    matched_pandora_pid = (torch.zeros((energy_t.shape[0])) * (torch.nan)).to(e_pred_showers.device)
     matched_ref_pts_pfo =   torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
@@ -423,6 +441,7 @@ def generate_showers_data_frame(
         matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
         matched_es_cali_pfo = matched_es.clone()
         matched_es_cali_pfo[row_ind_] = e_pred_showers_pfo[index_matches]
+        matched_pandora_pid[row_ind_] = pandora_pid[index_matches]
         if calc_pandora_momentum:
             matched_positions_pfo[row_ind_] = pxyz_pred_pfo[index_matches]
             matched_ref_pts_pfo[row_ind_] = ref_pt_pred_pfo[index_matches]
@@ -485,6 +504,8 @@ def generate_showers_data_frame(
         fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_positions = fakes_positions.to(e_pred_showers.device)
         if pandora:
+            fake_pandora_pid = (torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)).to(e_pred_showers.device)
+            fake_pandora_pid = pandora_pid[mask]
             if calc_pandora_momentum:
                 fake_positions_pfo = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
                 fake_positions_pfo = fake_positions_pfo.to(e_pred_showers.device)
@@ -545,6 +566,7 @@ def generate_showers_data_frame(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
             )
             positions_pfo = torch.cat((matched_positions_pfo, fake_positions_pfo), dim=0)
+            pandora_pid = torch.cat((matched_pandora_pid, fake_pandora_pid), dim=0)
             ref_pts_pfo =   torch.cat((matched_ref_pts_pfo, fakes_positions_ref), dim=0)
         if not pandora:
             calibration_factor = torch.cat(
@@ -595,6 +617,7 @@ def generate_showers_data_frame(
                 "pandora_calibrated_pos": positions_pfo.detach().cpu().tolist(),
                 "pandora_ref_pt": ref_pts_pfo.detach().cpu().tolist(),
                 "pid": pid_t.detach().cpu(),
+                "pandora_pid":pandora_pid.detach().cpu(),
                 "step": torch.ones_like(energy_t.detach().cpu()) * step,
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
