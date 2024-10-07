@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 
+
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rcParams['text.usetex'] = True
@@ -25,7 +26,7 @@ import os
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix,
-    plot_efficiency_all, calc_unit_circle_dist
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution
 )
 import matplotlib.pyplot as plt
 import mplhep as hep
@@ -44,7 +45,8 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/eval_plots_EC/GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1"
+        #""/eos/user/g/gkrzmanc/eval_plots_EC/GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1"
+        "/eos/home-g/gkrzmanc/2024/results/eval_10_09_testset_300_files_avg_pos/reprod_06_10_"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -52,10 +54,10 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
+    path_pandora = "eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/2024/results/"
     print(PATH_store)
 
 
@@ -86,6 +88,10 @@ def main():
     # _hgb["pid"] == 22) & (sd_hgb["is_track_in_cluster"] == 1.0))]
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_confusion_matrix(sd_hgb, PATH_store)
+    dir_reco = os.path.join(PATH_store, "reco")
+    if not os.path.exists(dir_reco):
+        os.makedirs(dir_reco)
+    plot_per_energy_resolution(sd_pandora, sd_hgb, dir_reco)
     plot_per_energy_resolution2_multiple(
         sd_pandora,
         {"ML": sd_hgb},

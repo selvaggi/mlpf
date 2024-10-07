@@ -2,7 +2,6 @@
 
 import matplotlib
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
@@ -22,7 +21,7 @@ import os
 from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix,
-    plot_efficiency_all, calc_unit_circle_dist
+    plot_efficiency_all, calc_unit_circle_dist, reco_hist
 )
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
@@ -31,7 +30,7 @@ import torch
 import pickle
 
 hep.style.use("CMS")
-colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
+colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # Color list Jan
 all_E = True
 neutrals_only = False
 log_scale = False
@@ -42,13 +41,12 @@ ML_pid = False      # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
+       #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-
-      # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits/reprod_plots_02_10_2024"
-        "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug/reprod_plots_02_10_2024"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
+       # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits/reprod_plots_02_10_2024"
+       "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug/reprod_plots_06_10_2024"
+       #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
+       #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
        # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1/reprod_plots_02_10_2024"
     )
@@ -88,6 +86,7 @@ def filter_df(df):
     df = df[(df.pid != 11) & (df.pid != 22) ]
     return df
 
+
 def main():
     df_list = []
     matched_all = {}
@@ -124,7 +123,7 @@ def main():
     # filter the df based on where decay type is 0
     ranges = [[0, 5000]]    # Ranges of the displacement to make the plots from, in cm
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
-
+    reco_hist(sd_hgb, sd_pandora, PATH_store)
     for range in ranges:
         #metrics = obtain_metrics(sd_pandora, df_list, labels)
         allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]

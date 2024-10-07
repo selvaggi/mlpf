@@ -113,7 +113,6 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     ax.legend()
     ax.set_xlim([0, 10])
     fig.tight_layout()
-
     fig.savefig(PATH_store + "mass_resolution_charged.pdf", bbox_inches="tight")
 
     mask_decay_neutral = event_res_dic["decay_type"] == 1

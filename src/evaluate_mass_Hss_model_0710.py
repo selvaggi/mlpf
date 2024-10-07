@@ -58,7 +58,8 @@ if all_E:
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/6_10_"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/photons_only"
         #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/reprod_07_10_2024_cut_025"   # THIS ONE IS OK!!!!
-        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/gamma_only"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/gamma_only"
+        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000 "
 
     )
 
@@ -71,12 +72,11 @@ if all_E:
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
-        "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
     #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
-    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_pandora.pt"   # THIS ONE IS OK
 
-    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
@@ -112,7 +112,7 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
-        sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
+        #sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
 
         sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
         # set GT energy for 130, 2112, 22
@@ -128,7 +128,7 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )
-    sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
+    #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
     decay_type = get_decay_type(sd_hgb)
     decay_type_pandora = get_decay_type(sd_pandora)
     print("!!! Filtering !!!")
