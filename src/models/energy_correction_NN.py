@@ -511,12 +511,10 @@ class PickPAtDCA(torch.nn.Module):
         p_direction = p_direction  # / torch.norm(p_direction, dim=1).unsqueeze(1)
         return p_tracks, p_direction, barycenters - p_xyz   # torch.concat([barycenters, p_xyz], dim =1) # Reference point
 
-
 class AverageHitsP(torch.nn.Module):
     # Same layout of the module as the GNN one, but just computes the average of the hits. Try to compare this + ML clustering with Pandora
     def __init__(self):
         super(AverageHitsP, self).__init__()
-
     def predict(self, x_global_features, graphs_new=None, explain=False):
         """
         Forward, named 'predict' for compatibility reasons

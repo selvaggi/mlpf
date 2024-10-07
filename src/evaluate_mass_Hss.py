@@ -32,36 +32,21 @@ import pickle
 hep.style.use("CMS")
 colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
+
 neutrals_only = False
 log_scale = False
 tracks = True
 perfect_pid = False   # Pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = False    # Set the mass to zero for all particles
-ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+mass_zero = True    # Set the mass to zero for all particles
+ML_pid = False       # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
 # Is there a problem with storing direction information with Pandora?
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
 
 if all_E:
     PATH_store = (
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds/perfect_PID_plots_set_gamma_energy_to_sumhits_photons_only"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_GT_clustering_101505_pxyz"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_fix_EcalFracE_bug"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss/ML_PID_plots"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss_ref_pt_is_diff_between_cluster_and_track"
-        #"/eos/user/g/gkrzmanc/2024/Sept24//eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_Physics_Events_Hss_GT_Clusters_fix_charged_bug_1"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss/reprod2"
-        #"eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_training_101505_ds_finetuned_on_Hss1_model_trained_on_Hss"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID/GT_showers_E_1"  # With fixed fakes problems...
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_GT_Clusters"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/6_10_"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/photons_only"
-        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/reprod_07_10_2024_cut_025"   # THIS ONE IS OK!!!!
-        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/gamma_only"
-
+    "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610_data4000/gamma_only"
     )
-
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     plots_path = os.path.join(PATH_store, "plots")
@@ -113,7 +98,6 @@ def main():
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
         sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
-
         sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
         # set GT energy for 130, 2112, 22
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
@@ -151,6 +135,11 @@ def main():
     # filter the df based on where decay type is 0
     ranges = [[0, 5000]]    # Ranges of the displacement to make the plots from, in cm
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
+    #fakes_ml = sd_hgb[pd.isna(sd_hgb.pid)].pred_showers_E.values
+    #fakes_pandora = sd_pandora[pd.isna(sd_pandora.pid)].pred_showers_E.values
+    # remove fakes
+    #sd_hgb = sd_hgb[~pd.isna(sd_hgb.pid)]
+    #sd_pandora = sd_pandora[~pd.isna(sd_pandora.pid)]
     reco_hist(sd_hgb, sd_pandora, PATH_store)
     plot_confusion_matrix(df_list[0], PATH_store)
     for range in ranges:
