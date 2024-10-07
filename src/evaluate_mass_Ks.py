@@ -41,14 +41,7 @@ ML_pid = False      # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-       #"/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-       # "/eos/user/g/gkrzmanc/2024/Sept24/Gatr_p_e_v_Train_DiffLoss_L1Loss_TEST_DATASET_eval"
-       # "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_E_sum_hits/reprod_plots_02_10_2024"
        "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug/reprod_plots_06_10_2024"
-       #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1"
-       #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-       # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_05_gatr_clustering"
-       # "/eos/user/g/gkrzmanc/2024/Sept24/Eval_AvgHits_Ks_50_gatr_clustering1/reprod_plots_02_10_2024"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -95,7 +88,7 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
-        #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
+        sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E)]
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
