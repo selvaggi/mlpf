@@ -294,7 +294,7 @@ def get_hit_features(
             pandora_ref_point = torch.permute(
                 torch.tensor(output["pf_points_pfo"][3:6, 0:number_hits]), (1, 0)
             )
-            pandora_pid = torch.tensor(output["pf_points_pfo"][6, 0:number_hits])
+            pandora_pid = torch.tensor(output["pf_points_pfo"][5, 0:number_hits])
             
         else:
             pandora_mom = None
