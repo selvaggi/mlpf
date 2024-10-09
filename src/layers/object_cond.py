@@ -290,13 +290,13 @@ def calc_LV_Lbeta(
         # L_V_attractive = torch.mean(V_attractive)
 
         ## multiply by a weight that depends on the energy of the shower:
-        # e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
-        # weight_att = torch.exp(e_hits/15)  
+        e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
+        weight_att = torch.exp(e_hits/15)  
         # print("e_hits", e_hits)
         # print("weight_att", weight_att)
-        # L_V_attractive = torch.sum(V_attractive*weight_att)
-        L_V_attractive = torch.mean(V_attractive)
-        # L_V_attractive = L_V_attractive / torch.sum(weight_att)
+        L_V_attractive = torch.sum(V_attractive*weight_att)
+        # L_V_attractive = torch.mean(V_attractive)
+        L_V_attractive = L_V_attractive / torch.sum(weight_att)
 
         L_V_attractive_2 = torch.sum(V_attractive)
     elif loss_type == "vrepweighted":
