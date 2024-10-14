@@ -298,7 +298,7 @@ def get_hit_features(
                 pandora_pid = torch.tensor(output["pf_points_pfo"][6, 0:number_hits])
             else:
                 # zeros
-                print("Zeros for pandora pid!")
+                # print("Zeros for pandora pid!")
                 pandora_pid=torch.zeros(number_hits)
             
         else:
