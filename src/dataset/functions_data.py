@@ -278,6 +278,7 @@ def modify_index_link_for_gamma_e(
 def get_hit_features(
     output, number_hits, prediction, number_part, hit_chis, pos_pxpy, is_Ks=False
 ):
+    
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
     if prediction:
         indx_daugthers = 3
@@ -589,9 +590,7 @@ def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
     mask_p = e_reco<0.10
     mask_all = mask_hits.view(-1) + mask_p.view(-1)
     list_remove = unique_p_numbers[mask_all.view(-1)]
-    # print(e_reco)
-    # print(number_of_hits)
-    # print(list_remove)
+
     if len(list_remove) > 0:
         mask = torch.tensor(np.full((len(cluster_id)), False, dtype=bool))
         for p in list_remove:

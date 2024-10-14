@@ -20,12 +20,6 @@ from src.data.preprocess import (
     WeightMaker,
 )
 from src.dataset.functions_graph import create_graph
-from src.dataset.functions_graph_tracking import (
-    create_graph_tracking,
-    create_graph_tracking_global,
-)
-from src.dataset.functions_graph_tracking_CLD import create_graph_tracking_CLD
-
 
 def _finalize_inputs(table, data_config):
     # transformation
@@ -291,28 +285,9 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
         if not self.synthetic:
-            if self._data_config.graph_config.get("tracking", False):
-                if self._data_config.graph_config.get("global", False):
-                    get_vtx = self._data_config.graph_config.get("VTX", False)
-                    vector = self._data_config.graph_config.get("vector", False)
-
-                    [g, features_partnn], graph_empty = create_graph_tracking_global(
-                        X, get_vtx, vector
-                    )
-                else:
-                    [g, features_partnn], graph_empty = create_graph_tracking(
-                        X,
-                    )
-            elif self._data_config.graph_config.get("tracking_CLD", False):
-                [g, features_partnn], graph_empty = create_graph_tracking_CLD(
-                    X,
-                )
-
-            else:
-                [g, features_partnn], graph_empty = create_graph(
-                    X, self._data_config, n_noise=self.n_noise
-                )
-
+            [g, features_partnn], graph_empty = create_graph(
+                X, self._data_config, n_noise=self.n_noise
+            )
         else:
             npart_min, npart_max = self.synthetic_npart_min, self.synthetic_npart_max
             [g, features_partnn], graph_empty = create_graph_synthetic(
