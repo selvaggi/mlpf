@@ -45,7 +45,6 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
     pids = np.abs(matched_["pid"].values)
     mask_id = get_mask_id(id, pids)
     df_id = matched_[mask_id]
-
     (
         mean_p,
         variance_om_p,
@@ -212,8 +211,8 @@ def plot_X(
             photons_dic["energy_resolutions" + reco], photons_dic[y_axis + reco]
         )
         dic1_fit_pandora = get_fit(
-            photons_dic["energy_resolutions_p" + reco],
-            photons_dic[y_axis + "_p" + reco],
+           photons_dic["energy_resolutions_p" + reco],
+           photons_dic[y_axis + "_p" + reco],
         )
         dic2_fit = get_fit(
             electrons_dic["energy_resolutions" + reco], electrons_dic[y_axis + reco]
@@ -247,6 +246,10 @@ def plot_X(
             line_type_fits_l2 = ["-", "-", "-."]
         else:
             fits = [dic1_fit, dic1_fit_pandora, dic2_fit, dic2_fit_pandora]
+            fits_l1 = dic1_fit
+            fits_l2 = dic2_fit
+            line_type_fits_l1 = ["-", "-", "-."]
+            line_type_fits_l2 = ["-", "-", "-."]
             color_list_fits = [
                 colors_list[1],
                 colors_list[2],
@@ -254,10 +257,10 @@ def plot_X(
                 colors_list[2],
             ]
             line_type_fits = ["-", "-", "-.", "-."]
-        if plot_label1:
-            plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1)
-        if plot_label2:
-            plot_fit(fits_l2, line_type_fits_l2, color_list_fits_l2)
+        #if plot_label1:
+        #    plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1)
+        #if plot_label2:
+        #    plot_fit(fits_l2, line_type_fits_l2, color_list_fits_l2)
         if reco == "_reco":
             plt.yscale("log")
         else:
@@ -281,7 +284,8 @@ def plot_X(
         label = label1
     if plot_label2:
         label = label2
-    fig.savefig(PATH_store + title + reco + label + "_v0.png", bbox_inches="tight")
+    path = os.path.join(PATH_store, title + reco + label + ".pdf")
+    fig.savefig(path, bbox_inches="tight")
 
 
 def plot_fit(fits, line_type_fits, color_list_fits, ax=None):
@@ -546,7 +550,7 @@ def plot_per_energy_resolution2_multiple(
         axs_response_pxyz[pid][3].set_title("p norm response [GeV]")
         axs_response_pxyz[pid][2].set_xlabel("Energy [GeV]")
         axs_mass_hist[pid][-1].set_xlabel("Mass [GeV]")
-    event_res_dic = {} # event energy resolution
+    event_res_dic = {} # Event energy resolution
     event_res_dic_p = {} # event p resolution
     event_res_dic_mass = {} # event mass resolution
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(10, 6))
@@ -568,7 +572,8 @@ def plot_per_energy_resolution2_multiple(
                 matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
             photons_dic = get_response_for_id_i(
-                [22], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
+                [22], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero,
+                ML_pid=ML_pid
             )
             electrons_dic = get_response_for_id_i(
                 [11], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid , mass_zero=mass_zero, ML_pid=ML_pid
@@ -600,7 +605,7 @@ def plot_per_energy_resolution2_multiple(
                                   label="ML", color="red")
                 ax_event_res.grid(1)
                 ax_event_res.set_ylabel("Count")
-                ax_event_res.set_xlabel(r"$E_{vis,reco} / E_{vis,true}$")
+                ax_event_res.set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
                 ax_event_res.legend()
                 fig_event_res.savefig(
                     os.path.join(PATH_store, "total_visible_energy_resolution.pdf"), bbox_inches="tight"
@@ -1081,9 +1086,49 @@ def plot_per_energy_resolution2_multiple(
     #    os.path.join(PATH_store, "event_mass_resolution.pdf"), bbox_inches="tight"
     #)
 
+def reco_hist(ml, pandora, PATH_store, pids=[22, 130, 2112, 211]):
+    e_bins = [[0,5], [5, 15], [15, 50]]
+    path_reco = os.path.join(PATH_store, "reco_histograms")
+    if not os.path.exists(path_reco):
+        os.makedirs(path_reco)
+    for pid in pids:
+        # make n rows, where n is the number of energy bins
+        fig, ax = plt.subplots(len(e_bins), 1, figsize=(15, 10))
+        for i, bin in enumerate(e_bins):
+            filt_ml = (ml.pid==pid) & (ml.true_showers_E < bin[1]) & (ml.true_showers_E >= bin[0])
+            filt_pandora = (pandora.pid==pid) & (pandora.true_showers_E < bin[1]) & (pandora.true_showers_E >= bin[0])
+            reco_ml = ml.pred_showers_E[filt_ml] / ml.reco_showers_E[filt_ml]
+            reco_pandora = pandora.pandora_calibrated_pfo[filt_pandora] / pandora.true_showers_E[filt_pandora]
+            bins = np.linspace(0, 3,300)
+            if i == 0 and pid == 22:
+                fig1, ax1 = plt.subplots()
+                ax1.hist(reco_ml, bins=bins, histtype='step', label='ML', color='red', density=True)
+                ax1.hist(reco_pandora, bins=bins, histtype='step', label='Pandora', color='blue', density=True)
+                ax1.set_xlabel(r"$E_{reco, pred.}/E_{reco, true}$")
+                ax1.set_ylabel("Density")
+                ax1.set_title("Photons [0, 5] GeV")
+                ax1.set_yscale("log")
+                ax1.legend()
+                fig1.savefig(os.path.join(PATH_store, "reco_hist_photons_5GeV.pdf"))
+            #filt_ml = (ml.pid == 130) & (ml.true_showers_E < 5)
+            #filt_pandora = (pandora.pid == 130) & (pandora.true_showers_E < 5)
+            #reco_ml = ml.pred_showers_E[filt_ml] / ml.reco_showers_E[filt_ml]
+            #reco_pandora = pandora.pandora_calibrated_pfo[filt_pandora] / pandora.true_showers_E[filt_pandora]
+            #bins = np.linspace(0, 2, 200)
+            #fig, ax = plt.subplots()
+            ax[i].hist(reco_ml, bins=bins, histtype='step', label='ML', color='red', density=True)
+            ax[i].hist(reco_pandora, bins=bins, histtype='step', label='Pandora', color='blue', density=True)
+            ax[i].set_xlabel(r"$E_{reco, pred.}/E_{reco, true}$")
+            ax[i].set_ylabel("Density")
+            ax[i].set_title("PID: {}, E range: {} GeV".format(pid, bin))
+            ax[i].set_yscale("log")
+            ax[i].legend()
+        fig.tight_layout()
+        fig.savefig(os.path.join(path_reco, "reco_hist_{}.pdf".format(pid)))
+
 
 def plot_per_energy_resolution(
-    sd_pandora, sd_hgb, matched_pandora, matched_, PATH_store, tracks=False
+     matched_pandora, matched_, PATH_store, tracks=False
 ):
     plot_response = True
     if plot_response:
@@ -1092,8 +1137,8 @@ def plot_per_energy_resolution(
             colors_list = ["#fde0dd", "#c994c7", "#dd1c77"]  # Color list poster Neurips
             marker_size = 15
             log_scale = True
-            photons_dic = get_response_for_id_i(22, matched_pandora, matched_)
-            electrons_dic = get_response_for_id_i(11, matched_pandora, matched_)
+            photons_dic = get_response_for_id_i([22], matched_pandora, matched_)
+            electrons_dic = get_response_for_id_i([11], matched_pandora, matched_)
             plot_X(
                 "Electromagnetic Response",
                 photons_dic,
@@ -1127,8 +1172,8 @@ def plot_per_energy_resolution(
                 el,
                 plot_label2=True,
             )
-            pions_dic = get_response_for_id_i(211.0, matched_pandora, matched_)
-            kaons_dic = get_response_for_id_i(130.0, matched_pandora, matched_)
+            pions_dic = get_response_for_id_i([211], matched_pandora, matched_)
+            kaons_dic = get_response_for_id_i([130], matched_pandora, matched_)
             plot_X(
                 "Hadronic Response",
                 pions_dic,
@@ -1168,8 +1213,12 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
     kaons_dic = create_eff_dic_pandora(sd_pandora, 130)
+    fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True)
+    fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1], "fake_percent_energy_p": fakes_dic_p[2]}
     for var_i, sd_hgb in enumerate(df_list):
         photons_dic = create_eff_dic(photons_dic, sd_hgb, 22, var_i=var_i)
+        fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False)
+        fakes_dic_p.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #photons_dic.update(create_fakes_dic(photons_dic, sd_hgb, 22, var_i))
         electrons_dic = create_eff_dic(electrons_dic, sd_hgb, 11, var_i=var_i)
         #electrons_dic.update(create_fakes_dic(electrons_dic, sd_hgb, 11, var_i))
@@ -1186,7 +1235,14 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels):
     )
     plot_fakes(
         "Electromagnetic",
-        photons_dic,
+        fakes_dic_p,
+        "Photons",
+        PATH_store,
+        labels,
+    )
+    plot_fakes_E(
+        "Electromagnetic",
+        fakes_dic_p,
         "Photons",
         PATH_store,
         labels,
@@ -1242,12 +1298,13 @@ def create_eff_dic_pandora(matched_pandora, id):
     mask_id = pids_pandora == id
     df_id_pandora = matched_pandora[mask_id]
     eff_p, energy_eff_p = calculate_eff(df_id_pandora, False, pandora=True)
-    fakes_p, energy_fakes_p = calculate_fakes(df_id_pandora, None, False, pandora=True)
+    fakes_p, energy_fakes_p, fake_percent_energy = calculate_fakes(df_id_pandora, None, False, pandora=True)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
     photons_dic["energy_eff_p"] = energy_eff_p
     photons_dic["fakes_p"] = fakes_p
     photons_dic["energy_fakes_p"] = energy_fakes_p
+    photons_dic["fake_percent_energy_p"] = fake_percent_energy
     return photons_dic
 
 def create_eff_dic(photons_dic, matched_, id, var_i):
@@ -1255,11 +1312,12 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
     mask_id = pids == id
     df_id = matched_[mask_id]
     eff, energy_eff = calculate_eff(df_id, False)
-    fakes, energy_fakes = calculate_fakes(df_id, None, False, pandora=False)
+    fakes, energy_fakes, fake_percent_energy = calculate_fakes(df_id, None, False, pandora=False)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
     photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
+    photons_dic["fake_percent_energy_" + str(var_i)] = fake_percent_energy
     return photons_dic
 
 def create_fakes_dic(photons_dic, matched_, id, var_i):
@@ -1267,7 +1325,7 @@ def create_fakes_dic(photons_dic, matched_, id, var_i):
     mask_id = pids == id
     df_id = matched_[mask_id]
     eff, energy_eff = calculate_eff(df_id, False)
-    fakes, energy_fakes = calculate_fakes(df_id, None, False, pandora=False)
+    fakes, energy_fakes, fake_percent_energy = calculate_fakes(df_id, None, False, pandora=False)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
@@ -1319,6 +1377,50 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels):
     )
 
 
+def plot_fakes_E(title, photons_dic, label1, PATH_store, labels):
+    colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
+    markers = ["x", "*", "x", "d", ".", "s"]
+    fig = plt.figure()
+    j = 0
+    plt.xlabel("Energy [GeV]")
+    plt.ylabel("Fake energy rate")
+    # ax[row_i, j].set_xscale("log")
+    plt.title(title)
+    plt.grid()
+    for i in range(0, len(labels)):
+        plt.plot(photons_dic["energy_fakes_" + str(i)],
+            photons_dic["fake_percent_energy_" + str(i)], "--", color=colors_list[0])
+        plt.scatter(
+            photons_dic["energy_fakes_" + str(i)],
+            photons_dic["fake_percent_energy_" + str(i)],
+            label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            marker=markers[i],
+            color=colors_list[0],
+            s=50,
+        )
+    plt.plot(photons_dic["energy_fakes_p"],
+        photons_dic["fake_percent_energy_p"], "--", color=colors_list[2])
+    plt.scatter(
+        photons_dic["energy_fakes_p"],
+        photons_dic["fake_percent_energy_p"],
+        facecolors=colors_list[2],
+        edgecolors=colors_list[2],
+        label="Pandora",
+        marker="x",
+        # add -- line
+        s=50,
+    )
+    plt.legend(loc="upper right")
+    #if title == "Electromagnetic":
+    #    plt.ylim([0.0, 0.5])
+    #else:
+    #    plt.ylim([0.0, 0.5])
+    plt.xscale("log")
+    fig.savefig(
+        os.path.join(PATH_store, "Fake_Energy_Frac_" + title + label1 + ".pdf"),
+        bbox_inches="tight",
+    )
+
 def plot_fakes(title, photons_dic, label1, PATH_store, labels):
     colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
     markers = ["^", "*", "x", "d", ".", "s"]
@@ -1326,7 +1428,6 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels):
     j = 0
     plt.xlabel("Energy [GeV]")
     plt.ylabel("Fake rate")
-    # ax[row_i, j].set_xscale("log")
     plt.title(title)
     plt.grid()
     for i in range(0, len(labels)):
@@ -1335,7 +1436,7 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels):
         plt.scatter(
             photons_dic["energy_fakes_" + str(i)],
             photons_dic["fakes_" + str(i)],
-            label="ML " + label1, # temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
             marker=markers[i],
             color=colors_list[0],
             s=50,
@@ -1347,16 +1448,16 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels):
         photons_dic["fakes_p"],
         facecolors=colors_list[2],
         edgecolors=colors_list[2],
-        label="Pandora " + label1,
+        label="Pandora",
         marker="x",
         # add -- line
         s=50,
     )
     plt.legend(loc="lower right")
-    if title == "Electromagnetic":
-        plt.ylim([0.0, 0.2])
-    else:
-        plt.ylim([0.0, 0.2])
+    #if title == "Electromagnetic":
+    #    plt.ylim([0.0, 0.07])
+    #else:
+    #    plt.ylim([0.0, 0.07])
     plt.xscale("log")
     fig.savefig(
         os.path.join(PATH_store, "Fake_Rate_" + title + label1 + ".pdf"),
@@ -1733,12 +1834,18 @@ def calc_unit_circle_dist(df, pandora=False):
 particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
 particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # Electron, CH, NH, photon
 
+def safeint(x):
+    # if x is nan, return nan
+    try:
+        return int(x)
+    except:
+        return x
 def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        # bins = np.arange(0, 51, 6)
-        bins = [0, 5, 15, 35, 50]
+        bins = np.linspace(0, 51, 5)
+        #bins = [0, 5, 15, 35, 50]
     mean = []
     variance_om = []
     mean_baseline = []
@@ -1749,7 +1856,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
     variance_om_errors = []
     energy_resolutions = []
     energy_resolutions_reco = []
-    distributions = []  # distributions of E/Etrue for plotting later
+    distributions = []  # Distributions of E/Etrue for plotting later
     mean_pxyz = []
     variance_pxyz = []
     masses = []
@@ -1774,19 +1881,17 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         bin_i1 = bins[i + 1]
         mask_above = matched["true_showers_E"] <= bin_i1
         mask_below = matched["true_showers_E"] > bin_i
-        mask_check = matched["pred_showers_E"] > 0
-        mask = mask_below * mask_above * mask_check
+       # mask_check = matched["pred_showers_E"
+        mask = mask_below * mask_above #* mask_check
         true_e = matched.true_showers_E[mask]
         true_rec = matched.reco_showers_E[mask]
         if pandora:
-            if tracks:
-                pred_e = matched.pandora_calibrated_pfo[mask]
-            else:
-                pred_e = matched.pandora_calibrated_E[mask]
+            pred_e = matched.pandora_calibrated_pfo[mask]
             pred_pxyz = np.array(matched.pandora_calibrated_pos[mask].tolist())
         else:
             pred_e = matched.calibrated_E[mask]
             pred_pxyz = np.array(matched.pred_pos_matched[mask].tolist())
+        pred_e_nocor = matched.pred_showers_E[mask]
         trk_in_clust = matched.is_track_in_cluster[mask]
         if perfect_pid or mass_zero or ML_pid:
             if len(pred_pxyz):
@@ -1799,12 +1904,11 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
                     print("Perf. PID for Pandora")
                     m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
                 else:
-                    m = np.array([particle_masses_4_class[int(i)] for i in matched.pred_pid_matched[mask]])
+                    m = np.array([particle_masses_4_class.get(safeint(i), 0.0) for i in matched.pred_pid_matched[mask]])
             if mass_zero:
                 m = np.array([0 for _ in range(len(matched.pid[mask]))])
             p_squared = (pred_e**2 - m**2).values
             pred_pxyz = np.sqrt(p_squared).reshape(-1, 1) * pred_pxyz
-        pred_e_nocor = pred_e
         true_pxyz = np.array(matched.true_pos[mask].tolist())
         bins_angle = np.linspace(-0.1, +0.1, 400)
         if np.sum(mask) > 0:  # if the bin is not empty
@@ -1845,6 +1949,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
                 err_mean_reco_ML,
                 err_mean_var_reco_ML,
             ) = get_sigma_gaussian(e_over_reco_ML, bins_per_binned_E)
+            if not pandora:
+                print("Not Pandora")
             mean_pxyz_, var_pxyz_ = [], []
             pxyz_true.append(true_pxyz)
             pxyz_pred.append(pred_pxyz)
@@ -1868,8 +1974,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             #mean_pxyz_ = np.array(mean_pxyz_)
             #var_pxyz_ = np.array(var_pxyz_)
             # raise err if mean_reco_ML is nan
-            if np.isnan(mean_reco_ML):
-                raise ValueError("mean_reco_ML is nan")
+            #if np.isnan(mean_reco_ML):
+            #    raise ValueError("mean_reco_ML is nan")
             mean_true_rec.append(mean_reco_ML)
             variance_om_true_rec.append(np.abs(var_reco_ML))
             mean_baseline.append(mean_reco_true)
@@ -2181,10 +2287,10 @@ def plot_one_label(
             for a in ax:
                 plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1, ax=a)
         else:
-            raise NotImplementedError
-            # line_type_fits = ["-", "-."]
-            # for a in ax:
-            #    plot_fit(fits, line_type_fits, color_list_fits, ax=a)
+            #raise NotImplementedError
+            line_type_fits = ["-", "-."]
+            for a in ax:
+               plot_fit(fits, line_type_fits, color_list_fits, ax=a)
         if reco == "_reco":
             plt.yscale("log")
         else:

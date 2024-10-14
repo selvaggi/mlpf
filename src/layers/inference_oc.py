@@ -1,6 +1,8 @@
 import dgl
 import torch
 import os
+
+from alembic.command import current
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
@@ -43,9 +45,11 @@ def create_and_store_graph_output(
     pids_charged=None,
     pred_pid=None,
     pred_xyz_track=None,
+    number_of_fakes=None
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
+    number_of_fake_showers_total1 = 0
     batch_g.ndata["coords"] = model_output[:, 0:3]
     batch_g.ndata["beta"] = model_output[:, 3]
     if not tracking:
@@ -56,6 +60,7 @@ def create_and_store_graph_output(
     df_list = []
     df_list1 = []
     df_list_pandora = []
+    total_number_candidates = 0
     for i in range(0, len(graphs)):
         mask = batch_id == i
         dic = {}
@@ -76,12 +81,19 @@ def create_and_store_graph_output(
             labels_hdb = dic["graph"].ndata["particle_number"].type(torch.int64)
         else:
             labels_hdb = hfdb_obtain_labels(X, model_output.device)
+            num_clusters = len(labels_hdb.unique())
             #if labels_hdb.min() == 0 and labels_hdb.sum() == 0:
             #    labels_hdb += 1  # Quick hack
             #    raise Exception("!!!! Labels==0 !!!!")
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
+            num_clusters_pandora = len(labels_pandora.unique())
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
+        #current_number_candidates = num_clusters
+        #pred_pos_batch = pred_pos[total_number_candidates:total_number_candidates+current_number_candidates]
+        #pred_ref_pt_batch = pred_ref_pt[total_number_candidates:total_number_candidates+current_number_candidates]
+        #pred_pid_batch = pred_pid[total_number_candidates:total_number_candidates+current_number_candidates]
+        #e_corr_batch = e_corr[total_number_candidates:total_number_candidates+current_number_candidates]
         """if predict:
             shower_p_unique = torch.unique(labels_clustering)
             shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
@@ -156,6 +168,7 @@ def create_and_store_graph_output(
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
             #     labels_clustering,
+            #     labels_clustering,
             #     dic,
             #     shower_p_unique,
             #     particle_ids,
@@ -176,7 +189,7 @@ def create_and_store_graph_output(
             # theta = torch.acos(pred_pos[:, 2] / torch.norm(pred_pos, dim=1))
             # pred_pos = spherical_to_cartesian(theta, phi, torch.norm(pred_pos, dim=1), normalized=True)
             # pred_pos= pred_pos.to(model_output.device)
-            df_event1, number_of_showers_total1 = generate_showers_data_frame(
+            df_event1, number_of_showers_total1, number_of_fake_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,
                 shower_p_unique_hdb,
@@ -195,6 +208,8 @@ def create_and_store_graph_output(
                 pred_ref_pt=pred_ref_pt,
                 pred_pid=pred_pid,
                 save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging",
+                number_of_fakes=number_of_fakes,
+                number_of_fake_showers_total=number_of_fake_showers_total1,
             )
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
@@ -335,6 +350,8 @@ def generate_showers_data_frame(
     pred_pid=None,
     save_plots_to_folder="",
     pred_ref_pt=None,
+    number_of_fake_showers_total=None,
+    number_of_fakes=None
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -388,6 +405,10 @@ def generate_showers_data_frame(
             e_pred_showers_cali = e_pred_showers * corrections_per_shower
         else:
             corrections_per_shower = e_corr.view(-1)
+            if number_of_fakes > 0:
+                corrections_per_shower_fakes = corrections_per_shower[-number_of_fakes:]
+                corrections_per_shower = corrections_per_shower[:-number_of_fakes]
+
     e_reco_showers = scatter_add(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
@@ -430,7 +451,6 @@ def generate_showers_data_frame(
     matched_pid = matched_pid.to(e_pred_showers.device).long()
     matched_positions_pfo = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_positions_pfo = matched_positions_pfo.to(e_pred_showers.device)
-
     matched_pandora_pid = (torch.zeros((energy_t.shape[0])) * (torch.nan)).to(e_pred_showers.device)
     matched_ref_pts_pfo =   torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
@@ -454,11 +474,8 @@ def generate_showers_data_frame(
             calibration_per_shower[row_ind_] = corrections_per_shower[index_matches]
         else:
             matched_es_cali = matched_es.clone()
-            number_of_showers = e_pred_showers[index_matches].shape[0]
-            a = corrections_per_shower[
-                number_of_showers_total : number_of_showers_total + number_of_showers
-            ]
-            b = e_pred_showers[index_matches]
+            number_of_showers = e_pred_showers[index_matches].shape[0] # DOESN'T INCLUDE THE FAKE SHOWERS
+            #number_of_fake_showers = e_pred_showers.shape[0] - number_of_showers
             matched_es_cali[row_ind_] = (
                 corrections_per_shower[
                     number_of_showers_total : number_of_showers_total
@@ -483,7 +500,6 @@ def generate_showers_data_frame(
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
-
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind, dic)
@@ -493,16 +509,31 @@ def generate_showers_data_frame(
             0
         ] = (
             -1
-        )  # this takes into account that the class 0 for pandora and for dbscan is noise
+        )  # This takes into account that the class 0 for pandora and for dbscan is noise
         mask = pred_showers != -1
+        number_of_fake_showers = mask.sum()
+        fakes_in_event = mask.sum()
         fake_showers_e = e_pred_showers[mask]
         if e_corr is None or pandora:
             fake_showers_e_cali = e_pred_showers_cali[mask]
             # fakes_positions = dic["graph"].ndata["coords"][mask]
         else:
-            fake_showers_e_cali = e_pred_showers[mask]# * (torch.nan)
-        fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
-        fakes_positions = fakes_positions.to(e_pred_showers.device)
+            #fake_showers_e_cali = corrections_per_shower[number_of_showers_total:number_of_showers_total+number_of_showers][mask]# * (torch.nan)
+            #fakes_positions = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
+            #fake_showers_e_cali = fake_showers_e
+            #fakes_pid_pred = torch.zeros((fake_showers_e.shape[0])) * (torch.nan) # just for now for debugigng
+            #fakes_positions = fakes_positions.to(e_pred_showers.device)
+            #fakes_pid_pred = fakes_pid_pred.to(e_pred_showers.device)
+            fakes_positions = pred_pos[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
+            fake_showers_e_cali = e_corr[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
+            fakes_pid_pred = pred_pid[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
+            fake_showers_e_reco = e_reco_showers[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
+            fakes_positions = fakes_positions.to(e_pred_showers.device)
+            fake_showers_e_cali = fake_showers_e_cali.to(e_pred_showers.device)
+            fakes_pid_pred = fakes_pid_pred.to(e_pred_showers.device)
+            fake_showers_e_reco = fake_showers_e_reco.to(e_pred_showers.device)
+            #fakes_pid_pred = pred_pid[number_of_showers_total:number_of_showers_total+number_of_showers][mask]
+            #fakes_positions = fakes_positions.to(e_pred_showers.device)
         if pandora:
             fake_pandora_pid = (torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)).to(e_pred_showers.device)
             fake_pandora_pid = pandora_pid[mask]
@@ -523,8 +554,9 @@ def generate_showers_data_frame(
         fake_showers_vertex = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         fakes_is_track = (torch.zeros((fake_showers_e.shape[0])) * (torch.nan)).to(e_pred_showers.device)
         fakes_is_track = is_track_per_shower[mask]
-
-
+        fakes_positions_t = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
+        if not pandora:
+            number_of_fake_showers_total = number_of_fake_showers_total + number_of_fake_showers
         """if shap:
             fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
                 torch.nan
@@ -540,6 +572,7 @@ def generate_showers_data_frame(
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
+        fakes_positions_t = fakes_positions_t.to(e_pred_showers.device)
         fake_showers_vertex = fake_showers_vertex.to(e_pred_showers.device)
         energy_t = torch.cat(
             (energy_t, fake_showers_showers_e_truw),
@@ -551,7 +584,7 @@ def generate_showers_data_frame(
             dim=0,
         )
         pos_t = torch.cat(
-            (pos_t, fakes_positions),
+            (pos_t, fakes_positions_t),
             dim=0,
         )
         e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
@@ -559,7 +592,7 @@ def generate_showers_data_frame(
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
             e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
-            e_pred_pid = torch.cat((matched_pid, fake_showers_showers_e_truw), dim=0)
+            e_pred_pid = torch.cat((matched_pid, fakes_pid_pred), dim=0)
             e_pred_ref_pt = torch.cat((matched_ref_pt, fakes_positions), dim=0)
         if pandora:
             e_pred_cali_pfo = torch.cat(
@@ -684,9 +717,9 @@ def generate_showers_data_frame(
         if number_of_showers_total is None:
             return df
         else:
-            return df, number_of_showers_total
+            return df, number_of_showers_total, number_of_fake_showers_total
     else:
-        return [], 0
+        return [], 0, 0
 
 
 def get_correction_per_shower(labels, dic):

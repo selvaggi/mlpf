@@ -118,6 +118,8 @@ def safeint(x, default_val=0):
         return default_val
     return int(x)
 
+
+
 def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
@@ -388,22 +390,22 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["mass_over_true_model"],
         bins=bins,
         histtype="step",
-        label="ML $\mu$={} $\sigma/\mu$={}".format(
-            round((event_res_dic["mean_mass_model"]), 2),
-            round((event_res_dic["var_mass_model"]), 2),
-        ),
-        color="red",
+        label="ML"# $\mu$={} $\sigma/\mu$={}".format(
+           # round((event_res_dic["mean_mass_model"]), 2),
+           # round((event_res_dic["var_mass_model"]), 2),
+        #),
+        ,color="red",
         density=True,
     )
     ax.hist(
         event_res_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
-        label="Pandora $\mu$={} $\sigma/\mu$={}".format(
-            round((event_res_dic["mean_mass_pandora"]), 2),
-            round((event_res_dic["var_mass_pandora"]), 2),
-        ),
-        color="blue",
+        label="Pandora" #$\mu$={} $\sigma/\mu$={}".format(
+            #round((event_res_dic["mean_mass_pandora"]), 2),
+            #round((event_res_dic["var_mass_pandora"]), 2),
+        #),
+        ,color="blue",
         density=True,
     )
     ax.grid()
