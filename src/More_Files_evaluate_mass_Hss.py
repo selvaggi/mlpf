@@ -43,7 +43,7 @@ def safeint(x, default_val=0):
         return default_val
     return int(x)
 
-def calculate_event_mass_resolution_light(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
+def calculate_event_mass_resolution_light(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False, pandora_perf_pid=False):
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
@@ -79,8 +79,11 @@ def calculate_event_mass_resolution_light(df, pandora, perfect_pid=False, mass_z
         if ML_pid:
             #assert pandora is False
             if pandora:
-                print("Perfect PID for Pandora")
-                m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+                print("Using Pandora PID")
+                if pandora_perf_pid:
+                    m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+                else:
+                    m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pandora_pid])
             else:
                 m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
         else:
@@ -105,10 +108,13 @@ def calculate_event_mass_resolution_light(df, pandora, perfect_pid=False, mass_z
 
 # Is there a problem with storing direction information with Pandora?
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
-
+#/eos/user/g/gkrzmanc/2024/Sept24/1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0610
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/2024/Sept24/MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/no_gamma_corr"
+        #"/eos/user/g/gkrzmanc/2024/Sept24/MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_PandoraPID"
+       # "/eos/user/g/gkrzmanc/2024/Sept24/MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_PandoraPID"
+        "/eos/user/g/gkrzmanc/2024/Sept24/1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0610_hdbeps02"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -117,14 +123,16 @@ if all_E:
         os.makedirs(plots_path)
     path_list = [
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
-        "MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
+        #"MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_PandoraPID/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_GT_clustering_101505_model/showers_df_evaluation/0_0_None_hdbscan.pt"
+        #"1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0610/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0610_hdbeps02/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
+    #path_pandora = "MoreFiles_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_PandoraPID/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0610_hdbeps02/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
-
 
 labels = [
     "ML"
@@ -170,9 +178,8 @@ def main():
                 mask_part = np.zeros(len(sd_hgb), dtype=bool)
                 mask_part[mask_idx_part] = True
                 sd_hgb.loc[mask_part, "calibrated_E"] = sd_hgb.loc[mask_part, "pred_showers_E"]
-            #sd_hgb.iloc[mask_idx, sd_hgb.columns.get_loc("calibrated_E")] = sd_hgb.iloc[mask_idx, sd_hgb.columns.get_loc("pred_showers_E")]
+            sd_hgb.iloc[mask_idx, sd_hgb.columns.get_loc("calibrated_E")] = sd_hgb.iloc[mask_idx, sd_hgb.columns.get_loc("pred_showers_E")]
             print("Filtered!")
-
             print("Set calibrated_E to sum_hits for photons...")
         print("Compute mass resolution")
         m_model, m_true_model = calculate_event_mass_resolution_light(sd_hgb, pandora=False, ML_pid=True)
@@ -187,10 +194,16 @@ def main():
             dir_top + path_pandora, neutrals_only
         )
         print("Opened pandora df")
+        sd_pandora_copy = sd_pandora.copy()
+
         m_pandora, m_true_pandora = calculate_event_mass_resolution_light(sd_pandora, pandora=True, ML_pid=True)
-        # " save these files"
+        m_pandora_perfpid, m_true_pandora_perfpid = calculate_event_mass_resolution_light(sd_pandora_copy, pandora=True, ML_pid=True, pandora_perf_pid=True)
+        # "save these files"
         save_dict(m_pandora, os.path.join(PATH_store, "mass_pandora.pkl"))
         save_dict(m_true_pandora, os.path.join(PATH_store, "mass_true_pandora.pkl"))
+        save_dict(m_pandora_perfpid, os.path.join(PATH_store, "mass_pandora_perfpid.pkl"))
+        save_dict(m_true_pandora_perfpid, os.path.join(PATH_store, "mass_true_pandora_perfpid.pkl"))
+
 
 def save_dict(di_, filename_):
     with open(filename_, "wb") as f:

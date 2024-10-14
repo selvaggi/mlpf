@@ -20,7 +20,6 @@ def plot_model(model, label, ax, ax_abs):
     #bins_abs = [50, 51, 52...]
     bins_abs = np.arange(50, 250)# 500)
     ax.hist(m_model/m_true_model, bins=bins, histtype="step",  label=label)
-    ax.hist(m_model / m_true_model, bins=bins, histtype="step", label=label)
     ax.legend()
     ax_abs.hist(m_model, bins=bins_abs, histtype="step", label=label)
     ax_abs.legend()
@@ -31,15 +30,14 @@ fig_abs, ax_abs = plt.subplots()
 
 plot_model("model", "Model", ax, ax_abs)
 plot_model("pandora", "Pandora", ax, ax_abs)
+plot_model("pandora_perfpid", "Pandora GT PID", ax, ax_abs)
 ax.set_xlabel("Mpred/Mtrue")
 ax.set_ylabel("Frequency")
 ax_abs.set_xlabel("Mpred")
 ax_abs.set_ylabel("Frequency")
-
+ax.set_xlim([0.5, 1.5])
 fig.show()
 fig_abs.show()
-
-
 
 print("Done")
 
