@@ -222,7 +222,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_charged),
                     unit_p=self.args.regress_unit_p,
                     out_f=1,
-                    neutral_avg=True,
+                    neutral_avg=False,
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
                 )
@@ -237,7 +237,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=False,
+                    neutral_avg=True,
                     neutral_PCA=False,
                     neutral_thrust_axis=False
 
@@ -335,9 +335,9 @@ class ExampleWrapper(L.LightningModule):
         )
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
-        if self.args.tracks:
-            mask = g.ndata["hit_type"] == 1
-            beta[mask] = 9
+        #if self.args.tracks:
+        #    mask = g.ndata["hit_type"] == 1
+        #    beta[mask] = 9 # TODO: UNCOMMENT THIS IF RUNNING FOR Ks OR OTHER STUFF
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         # if self.trainer.is_global_zero and step_count % 500 == 0:
@@ -380,7 +380,8 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             pred_energy_corr,
             pred_pid,
-            features_charged_no_nan
+            features_charged_no_nan,
+            number_of_fakes
         ) = self.clustering_and_global_features(g, x, y)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
@@ -489,6 +490,7 @@ class ExampleWrapper(L.LightningModule):
                 true_pid,
                 true_new,
                 true_coords,
+                number_of_fakes
             )
         else:
             if self.args.explain_ec:
@@ -504,6 +506,7 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     shap_vals,
                     ec_x,
+                    number_of_fakes
                 )
             return (
                 x,
@@ -516,6 +519,7 @@ class ExampleWrapper(L.LightningModule):
                 true_pid,
                 e_true_corr_daughters,
                 true_coords,
+                number_of_fakes
             )
 
     def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
@@ -574,12 +578,13 @@ class ExampleWrapper(L.LightningModule):
         time_matching_start = time()
         # Match graphs
         (
-            graphs_new,
-            true_new,
-            sum_e,
-            true_pid,
-            e_true_corr_daughters,
-            true_coords,
+            graphs_new, # Contains both fakes and true showers
+            true_new, # FOR THE MATCHED SHOWERS
+            sum_e, # FOR THE MATCHED + FAKE SHOWERS
+            true_pid, # FOR THE MATCHED SHOWERS
+            e_true_corr_daughters, # FOR THE MATCHED SHOWERS
+            true_coords, # FOR THE MATCHED SHOWERS
+            number_of_fakes
         ) = obtain_clustering_for_matched_showers(
             g,
             x,
@@ -692,7 +697,8 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             pred_energy_corr,
             pred_pid,
-            features_charged_no_nan
+            features_charged_no_nan,
+            number_of_fakes
         )
 
     def build_attention_mask(self, g):
@@ -734,6 +740,7 @@ class ExampleWrapper(L.LightningModule):
                 pid_true_matched,
                 e_true_corr_daughters,
                 part_coords_matched,
+                num_fakes
             ) = result
         else:
             (model_output, e_cor, _, _) = result
@@ -921,6 +928,7 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     shap_vals,
                     ec_x,
+                    num_fakes
                 ) = result
             else:
                 (
@@ -934,6 +942,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_true_matched,
                     e_true_corr_daughters,
                     coords_true,
+                    num_fakes
                 ) = result
             if self.args.regress_pos:
                 if len(self.pids_charged):
@@ -1035,6 +1044,7 @@ class ExampleWrapper(L.LightningModule):
                 use_gt_clusters=self.args.use_gt_clusters,
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,
+                number_of_fakes=num_fakes,
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)

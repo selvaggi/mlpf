@@ -6,7 +6,6 @@ from scipy import stats
 from scipy.optimize import curve_fit
 from scipy import asarray as ar, exp
 
-
 def calculate_eff(sd, log_scale=False, pandora=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
@@ -36,14 +35,14 @@ def calculate_eff(sd, log_scale=False, pandora=False):
             energy_eff.append((bin_i1 + bin_i) / 2)
     return eff, energy_eff
 
-
 def calculate_fakes(sd, matched, log_scale=False, pandora=False):
     if log_scale:
         bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins_fakes = np.arange(0, 51, 4)
+        bins_fakes = np.linspace(0, 51, 5)
     fake_rate = []
     energy_fakes = []
+    fake_percent_energy = []
     total_true_showers = np.sum(
         ~np.isnan(sd.true_showers_E.values)
     )  # the ones where truthHitAssignedEnergies is not nan
@@ -51,22 +50,31 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False):
         bin_i = bins_fakes[i]
         bin_i1 = bins_fakes[i + 1]
         if pandora:
-            mask_above = sd.true_showers_E.values <= bin_i1
-            mask_below = sd.true_showers_E.values > bin_i
+            mask_above = sd.pred_showers_E.values <= bin_i1
+            mask_below = sd.pred_showers_E.values > bin_i
             mask = mask_below * mask_above
-            fakes = np.sum(np.isnan(sd.pandora_calibrated_E)[mask])
-            total_showers = len(sd.true_showers_E.values[mask])
+            fakes = np.sum(np.isnan(sd.pid)[mask])
+            non_fakes_mask = ~np.isnan(sd.pid)[mask]
+            fakes_mask = np.isnan(sd.pid)[mask]
+            energy_in_fakes = np.sum(sd.pandora_calibrated_pfo[mask].values[fakes_mask])
+            total_energy_true = np.sum(sd.true_showers_E.values[mask][non_fakes_mask])
+            total_showers = len(sd.pred_showers_E.values[mask])
         else:
-            mask_above = sd.true_showers_E.values <= bin_i1
-            mask_below = sd.true_showers_E.values > bin_i
+            mask_above = sd.pred_showers_E.values <= bin_i1
+            mask_below = sd.pred_showers_E.values > bin_i
             mask = mask_below * mask_above
-            fakes = np.sum(np.isnan(sd.calibrated_E)[mask])
-            total_showers = len(sd.true_showers_E.values[mask])
+            fakes = np.sum(np.isnan(sd.pid)[mask])
+            total_showers = len(sd.pred_showers_E.values[mask])
+            fakes_mask = np.isnan(sd.pid)[mask]
+            energy_in_fakes = np.sum(sd.pred_showers_E[mask].values[fakes_mask])
+            non_fakes_mask = ~np.isnan(sd.pid)[mask]
+            total_energy_true = np.sum(sd.true_showers_E.values[mask][non_fakes_mask])
         if total_showers > 0:
             # print(fakes, np.mean(sd.pred_energy_hits_raw[mask]))
             fake_rate.append(fakes / total_true_showers)
             energy_fakes.append((bin_i1 + bin_i) / 2)
-    return fake_rate, energy_fakes
+            fake_percent_energy.append(energy_in_fakes / total_energy_true)
+    return fake_rate, energy_fakes, fake_percent_energy
 
 
 def calculate_response(matched, pandora, log_scale=False):
@@ -209,7 +217,7 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
     # sigma_over_E_error = errors[2] / param_optimised[1]
     return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]
 
-def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
+def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.0001):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
     MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2

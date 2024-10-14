@@ -89,7 +89,7 @@ def save_stat_dict(stat_dict, path):
 
 def stacked_hist_plot(lst, lst_pandora, path_store, title):
     # lst is a list of arrays. plot them in a stacked histogram with the same X-axis
-    fig, ax = plt.subplots(len(lst), 1, sharex=True)
+    fig, ax = plt.subplots(len(lst), 1, figsize=(15, 10))
     bins = np.linspace(-0.1, 0.1, 200)
     if len(lst) == 1:
         ax = [ax]
@@ -100,7 +100,8 @@ def stacked_hist_plot(lst, lst_pandora, path_store, title):
         ax[i].legend()
         ax[i].grid()
         ax[i].set_yscale("log")
-    ax[-1].set_xlabel("angle difference")
+    ax[-1].set_xlabel(r"$\Delta \phi$")
+    fig.tight_layout()
     fig.suptitle(title)
     fig.savefig(os.path.join(path_store, title + "_angle_distributions.pdf"))
 

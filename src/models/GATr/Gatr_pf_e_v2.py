@@ -236,7 +236,7 @@ class ExampleWrapper(L.LightningModule):
                     neutral_avg=False,
                     neutral_PCA=False
                 )
-                self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
+                #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
                 print(" !! Using the same model for charged and neutral !! ")
             else:  # DNN
                 # only a DNN for energy correction

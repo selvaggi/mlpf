@@ -27,7 +27,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from src.utils.post_clustering_features import get_post_clustering_features
 from src.models.GattedGCN_correction import GraphTransformerNet, GCNNet, LinearGNNLayer
 from src.layers.inference_oc import hfdb_obtain_labels
-# import torch_cmspepr
+import torch_cmspepr
 from src.layers.inference_oc import match_showers
 from lightning.pytorch.callbacks import BaseFinetuning
 import os
@@ -814,8 +814,10 @@ def obtain_clustering_for_matched_showers(
     if use_gt_clusters:
         print("!!! Using GT clusters for Energy Correction !!!!")
     graphs_showers_matched = []
+    graphs_showers_fakes = []
     true_energy_showers = []
     reco_energy_showers = []
+    reco_energy_showers_fakes = []
     energy_true_daughters = []
     y_pids_matched = []
     y_coords_matched = []
@@ -921,10 +923,46 @@ def obtain_clustering_for_matched_showers(
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
                     reco_energy_showers.append(reco_energy_shower.view(-1))
-    graphs_showers_matched = dgl.batch(graphs_showers_matched)
+            pred_showers = shower_p_unique
+            pred_showers[index_matches] = -1
+            pred_showers[
+                0
+            ] = (
+                -1
+            )
+            mask_fakes = pred_showers != -1
+            fakes_idx = torch.where(mask_fakes)[0]
+            for j in fakes_idx:
+                mask = labels == j
+                sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
+                k = 7
+                edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+                g = dgl.graph(
+                    (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+                )
+                g = dgl.remove_self_loop(g)
+                g.ndata["h"] = torch.cat(
+                    (
+                        graphs[i].ndata["h"][mask],
+                        graphs[i].ndata["beta"][mask].view(-1, 1),
+                    ),
+                    dim=1,
+                )
+                if "pos_pxpypz" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
+                if "pos_pxpypz_at_vertex" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
+                        "pos_pxpypz_at_vertex"
+                    ][mask]
+                g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
+                graphs_showers_fakes.append(g)
+                reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
+                reco_energy_showers_fakes.append(reco_energy_shower.view(-1))
+    graphs_showers_matched = dgl.batch(graphs_showers_matched + graphs_showers_fakes)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
-    reco_energy_showers = torch.cat(reco_energy_showers, dim=0)
+    reco_energy_showers = torch.cat(reco_energy_showers + reco_energy_showers_fakes, dim=0)
     e_true_corr_daughters = torch.cat(energy_true_daughters, dim=0)
+    number_of_fakes = len(reco_energy_showers_fakes)
     return (
         graphs_showers_matched,
         true_energy_showers,
@@ -932,6 +970,7 @@ def obtain_clustering_for_matched_showers(
         y_pids_matched,
         e_true_corr_daughters,
         y_coords_matched,
+        number_of_fakes
     )
 
 

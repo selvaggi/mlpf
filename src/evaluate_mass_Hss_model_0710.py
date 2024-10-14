@@ -44,8 +44,8 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 if all_E:
     PATH_store = (
-        "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000/gamma_only"
-
+        #"/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000"
+"/eos/user/g/gkrzmanc/2024/Sept24/1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0710_hdbeps02"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -53,11 +53,12 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
+        #/eos/user/g/gkrzmanc/2024/Sept24/1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0710_hdbeps02
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
-        "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0710_hdbeps02/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
     #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
-    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0710noise_data4000/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "1file_Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters0710_hdbeps02/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
@@ -92,7 +93,6 @@ def main():
         sd_hgb, matched_hgb = open_mlpf_dataframe(path_hgcal, neutrals_only)
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
-        sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
         sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
         # set GT energy for 130, 2112, 22
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
@@ -107,7 +107,14 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         dir_top + path_pandora, neutrals_only
     )
+    # same for pandora: 22, 13, 2112 set to sum hits
+    sd_pandora.pandora_calibrated_pfo[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & (sd_pandora.pid==22)] = sd_pandora.pred_showers_E[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & ((sd_pandora.pid==22))]
+    # same for pandora: 22, 13, 2112 set to sum hits
+    #sd_pandora.pandora_calibrated_pfo[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & (sd_pandora.pid==130)] = sd_pandora.true_showers_E[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & ((sd_pandora.pid==130))]
+    #sd_pandora.pandora_calibrated_pfo[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & (sd_pandora.pid==2112)] = sd_pandora.true_showers_E[(~np.isnan(sd_pandora.pandora_calibrated_pfo)) & ((sd_pandora.pid==2112))]
     #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
+    #sd_pandora.pandora_calibrated_pfo[~np.isnan(sd_pandora.pandora_calibrated_pfo)] = sd_pandora.pred_showers_E[~np.isnan(sd_pandora.pandora_calibrated_pfo)]
+    #sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid == 22) | (pd.isna(sd_hgb.pid))])
     decay_type = get_decay_type(sd_hgb)
     decay_type_pandora = get_decay_type(sd_pandora)
     print("!!! Filtering !!!")
@@ -148,8 +155,8 @@ def main():
         ax.hist(x, bins=bins)
         #ax.set_yscale("log")
         fig.show()
-        idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
-        sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
+        #idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
+        #sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
         print("Range", range, ": Finished collection of data and started plotting")
         e_ranges = [[0, 5], [5, 15], [15, 50]]
         # Count number of photons in each energy range reconstructed with Pandora or ML and print this info in one line for each energy range

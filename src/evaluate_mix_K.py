@@ -26,7 +26,7 @@ log_scale = False
 tracks = True
 
 if all_E:
-    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_eval_reprod_3_6/eval_plots_"
+    PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_old_model_debug_0810_100files_fix_fakes"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization/results_3005"
     # PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_EP_regression_with_ML_model_clustering_1_without_normalization_train_with_no_GT/results3005"
     #PATH_store = "/eos/user/g/gkrzmanc/eval_plots_EC/Ks_GATr_eval_3105_E_p_regression_fixbug/eval_3105_old_fn"
@@ -36,9 +36,9 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_hdbscan.pt",
+        "Ks_old_model_debug_0810_100files_fix_fakes/showers_df_evaluation/0_0_None_hdbscan.pt",
     ]
-    path_pandora = "Ks_eval_reprod_3_6/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "Ks_old_model_debug_0810_100files_fix_fakes/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
 
 labels = [
@@ -73,8 +73,8 @@ def main():
          os.path.join(PATH_store, "plots"),
          tracks=tracks,
      )
-    dist_pandora, pids = calc_unit_circle_dist(matched_pandora, pandora=True)
-    dist_ml, pids_ml = calc_unit_circle_dist(matched_hgb, pandora=False)
+    dist_pandora, pids, _, _ = calc_unit_circle_dist(matched_pandora, pandora=True)
+    dist_ml, pids_ml,_,_ = calc_unit_circle_dist(matched_hgb, pandora=False)
     for pid in [22, -211, 211]:
         # plot histogram
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
