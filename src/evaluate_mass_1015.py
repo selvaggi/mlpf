@@ -2,13 +2,10 @@
 
 import matplotlib
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
-
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-
-
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
@@ -16,7 +13,6 @@ plt.rcParams['text.usetex'] = True
 plt.rcParams['font.size'] = 20
 plt.rcParams['axes.labelsize'] = 20
 #matplotlib.rc("font", size=35)
-
 plt.rcParams['xtick.labelsize'] = 20
 plt.rcParams['ytick.labelsize'] = 20
 plt.rcParams['legend.fontsize'] = 20
@@ -44,9 +40,8 @@ mass_zero = False   # Set the mass to zero for all particles
 ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
 if all_E:
-    PATH_store = (
-        #""/eos/user/g/gkrzmanc/eval_plots_EC/GTClusters_Plot_Eval_101505_pca_one_file_debug_ref_pts_only_move_GT_1"
-        "/eos/home-g/gkrzmanc/2024/results/eval_10_09_testset_300_files_avg_pos/reprod_07_10_"
+    PATH_store = (#/eos/home-g/gkrzmanc/2024/results/eval_10_09_testset_300_files_avg_pos_reprod_clust_only_newmodel
+        "/eos/home-g/gkrzmanc/2024/results/eval_10_09_testset_300_files_avg_pos_reprod_clust_only_newmodel_Clustering061024"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -54,12 +49,11 @@ if all_E:
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
     path_list = [
-        "eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "eval_10_09_testset_300_files_avg_pos_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    path_pandora = "eval_10_09_testset_300_files_avg_pos/showers_df_evaluation/0_0_None_pandora.pt"
+    path_pandora = "eval_10_09_testset_300_files_avg_pos_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_pandora.pt"
     dir_top = "/eos/user/g/gkrzmanc/2024/results/"
     print(PATH_store)
-
 
 labels = [
     "ML"
@@ -67,7 +61,7 @@ labels = [
 
 def filter_df(df):
     # quick filter to exclude problematic particles
-    df = df[(df.pid != 11) & (df.pid != 22) ]
+    df = df[(df.pid != 11) & (df.pid != 22)]
     return df
 
 def main():
@@ -86,6 +80,7 @@ def main():
     #sd_pandora = sd_pandora[~((sd_pandora["pid"] == 22) & (sd_pandora["is_track_in_cluster"] == 1.0))]
     #sd_hgb = sd_hgb
     # _hgb["pid"] == 22) & (sd_hgb["is_track_in_cluster"] == 1.0))]
+    # remove fakes
     plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
     plot_confusion_matrix(sd_hgb, PATH_store)
     dir_reco = os.path.join(PATH_store, "reco")

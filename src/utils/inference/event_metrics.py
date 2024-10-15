@@ -338,10 +338,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
         _,
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
-
     mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
-
     (
         mean_energy_over_true,
         var_energy_over_true,
@@ -381,31 +379,30 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
     return dic
 
-
 def plot_mass_resolution(event_res_dic, PATH_store):
     fig, ax = plt.subplots(figsize=(7, 7))
-    ax.set_xlabel(r"$M_{pred}/M_{true}$")
+    ax.set_xlabel(r"$m_{pred}/m_{true}$")
     bins = np.linspace(0, 3, 100)
     ax.hist(
         event_res_dic["mass_over_true_model"],
         bins=bins,
         histtype="step",
-        label="ML"# $\mu$={} $\sigma/\mu$={}".format(
-           # round((event_res_dic["mean_mass_model"]), 2),
-           # round((event_res_dic["var_mass_model"]), 2),
-        #),
-        ,color="red",
+        label="ML $\mu$={} $\sigma/\mu$={}".format(
+            round((event_res_dic["mean_mass_model"]), 2),
+            round((event_res_dic["var_mass_model"]), 2),
+        ),
+        color="red",
         density=True,
     )
     ax.hist(
         event_res_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
-        label="Pandora" #$\mu$={} $\sigma/\mu$={}".format(
-            #round((event_res_dic["mean_mass_pandora"]), 2),
-            #round((event_res_dic["var_mass_pandora"]), 2),
-        #),
-        ,color="blue",
+        label="Pandora $\mu$={} $\sigma/\mu$={}".format(
+            round((event_res_dic["mean_mass_pandora"]), 2),
+            round((event_res_dic["var_mass_pandora"]), 2),
+        ),
+        color="blue",
         density=True,
     )
     ax.grid()
@@ -439,4 +436,3 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     #ax.set_xlim([0, 10])
     fig.tight_layout()
     fig.savefig(os.path.join(PATH_store, "mass_reco_absolute.pdf"), bbox_inches="tight")
-

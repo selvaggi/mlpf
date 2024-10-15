@@ -113,6 +113,9 @@ def main():
     hgb_vertex = hgb_vertex[~mask_nan_hgb]
     displacement_pandora = np.linalg.norm(pandora_vertex, axis=1)
     displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)
+    # remove those from the event
+    #filter = pd.isna(sd_hgb.true_showers_E)
+    #sd_hgb = sd_hgb[~filter]
     #sd_pandora = sd_pandora[decay_type_pandora == 1]
     #sd_hgb = sd_hgb[decay_type == 1]
     #allowed_batch_idx = np.where(decay_type_pandora == 1)[0]

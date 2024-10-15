@@ -44,8 +44,8 @@ ML_pid = False       # Use the PID from the ML classification head (electron/CH/
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
 
 if all_E:
-    PATH_store = (
-    "/eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/all_particles_s"
+    PATH_store = ( #/eos/user/g/gkrzmanc/2024/train/export_f_10_09_testset_300_files_avg_pos_reprod
+        "/eos/user/g/gkrzmanc/2024/results/evalHss_reprod_clust_only_newmodel_Clustering061024"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -56,16 +56,13 @@ if all_E:
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
-        "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "evalHss_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
     #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
-    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_pandora.pt"   # THIS ONE IS OK
-
-    path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/2024/Sept24/"
+    path_pandora = "evalHss_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/g/gkrzmanc/2024/results/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
-
 
 labels = [
     "ML"
