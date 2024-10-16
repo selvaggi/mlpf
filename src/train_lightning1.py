@@ -132,13 +132,13 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
             #print("DEV ", dev)
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
@@ -194,11 +194,11 @@ def main():
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
             print("TODO: change imported the model for testing manually")
-            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )
-        #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", filename="profiler_eval_0705")
+        #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", fgatr_pf_eilename="profiler_eval_0705")
         #print("USING PROFILER")
         trainer = L.Trainer(
             callbacks=[TQDMProgressBar(refresh_rate=1)],

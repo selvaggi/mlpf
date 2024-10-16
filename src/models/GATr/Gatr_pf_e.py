@@ -1,6 +1,5 @@
 from os import path
 import sys
-
 # sys.path.append(
 #     path.abspath("/afs/cern.ch/work/m/mgarciam/private/geometric-algebra-transformer/")
 # )
@@ -139,9 +138,6 @@ class ExampleWrapper(L.LightningModule):
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
-                print(
-                    "Regressing position as well, changing the hardcoded models to sth else"
-                )
             if self.args.ec_model == "gat":
                 in_features = 17
                 if self.args.add_track_chis:
@@ -237,12 +233,10 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=True,
+                    neutral_avg=self.args.predict,
                     neutral_PCA=False,
                     neutral_thrust_axis=False
-
                 )
-
                 self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
                 #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral # Only for the Ks dataset!!
                 #print(" !! Using the same model for charged and neutral !! - Use only for the Ks->pi0pi0 decays!!! ")
@@ -337,7 +331,7 @@ class ExampleWrapper(L.LightningModule):
         beta = self.beta(x_scalar)
         #if self.args.tracks:
         #    mask = g.ndata["hit_type"] == 1
-        #    beta[mask] = 9 # TODO: UNCOMMENT THIS IF RUNNING FOR Ks OR OTHER STUFF
+        #    beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
         # if self.trainer.is_global_zero and step_count % 500 == 0:
@@ -382,7 +376,7 @@ class ExampleWrapper(L.LightningModule):
             pred_pid,
             features_charged_no_nan,
             number_of_fakes
-        ) = self.clustering_and_global_features(g, x, y)
+        ) = self.clustering_and_global_features(g, x, y, add_fakes=self.args.predict)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
             graphs_new, charged_idx, features_charged_no_nan
@@ -574,7 +568,7 @@ class ExampleWrapper(L.LightningModule):
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
         return neutral_energies, neutral_pxyz_avg
 
-    def clustering_and_global_features(self, g, x, y):
+    def clustering_and_global_features(self, g, x, y, add_fakes=True):
         time_matching_start = time()
         # Match graphs
         (
@@ -591,6 +585,7 @@ class ExampleWrapper(L.LightningModule):
             y,
             self.trainer.global_rank,
             use_gt_clusters=self.args.use_gt_clusters,
+            add_fakes=add_fakes,
         )
         time_matching_end = time()
         # wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
@@ -886,7 +881,6 @@ class ExampleWrapper(L.LightningModule):
                         "pid_y": pid_true_matched,
                     },
                 )
-
         misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
@@ -1007,10 +1001,10 @@ class ExampleWrapper(L.LightningModule):
             )
         if self.args.explain_ec:
             self.validation_step_outputs.append(
-                [model_output, e_cor, batch_g, y, shap_vals, ec_x]
+                [model_output, e_cor, batch_g, y, shap_vals, ec_x, num_fakes]
             )
         else:
-            self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
+            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, num_fakes])
         if self.args.predict:
             if self.args.correction:
                 model_output1 = model_output
@@ -1118,6 +1112,7 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
                     e_corr = None
+                '''print("------------------------------------self.validation_step_outputs[0][4]", self.validation_step_outputs[0][4])
                 create_and_store_graph_output(
                     batch_g,
                     model_output1,
@@ -1135,7 +1130,8 @@ class ExampleWrapper(L.LightningModule):
                     shap_vals=shap_vals,
                     ec_x=ec_x,
                     use_gt_clusters=self.args.use_gt_clusters,
-                )
+                    number_of_fakes = self.validation_step_outputs[0][4]
+                )'''
                 del model_output1
                 del batch_g
         self.validation_step_outputs = []
