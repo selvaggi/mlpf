@@ -151,7 +151,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         device,
         in_features_global=13,
         in_features_gnn=13,
-        out_features_gnn=32,
+        out_features_gnn=16,
         ckpt_file=None,
         gnn=True,
         pos_regression=False,
@@ -300,11 +300,11 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             #    return energy, p_vectors
             # return energy
             if use_full_mv:
-                padding = torch.randn(x_global_features.shape[0], 16).to(
-                    p_vectors_per_batch.device
-                )
+                #padding = torch.randn(x_global_features.shape[0], 16).to(
+                #    p_vectors_per_batch.device
+                #)
                 model_x = torch.cat(
-                    [x_global_features, embedded_outputs_per_batch, padding], dim=1
+                    [x_global_features, embedded_outputs_per_batch], dim=1
                 ).to(self.model.model[0].weight.device)
                 if self.ignore_global_features_for_p:
                     if self.simple_p_GNN:
@@ -324,7 +324,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                         #)
                         res_pxyz = self.model_p(embedded_outputs_per_batch_p)
             else:
-                padding = torch.randn(x_global_features.shape[0], 32).to(
+                padding = torch.randn(x_global_features.shape[0], 16).to(
                     p_vectors_per_batch.device
                 )
                 model_x = torch.cat([x_global_features, padding], dim=1).to(
@@ -374,6 +374,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos, ref_pt_pred = self.PickPAtDCA.predict(x_global_features, graphs_new)
+                #if self.args.predict:
                 E = torch.norm(pos, dim=1)
                 if self.unit_p:
                     pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
