@@ -98,12 +98,14 @@ def find_pandora_pfo_and_cluster_of_hit(
     pfo_energy_found = 0
     reference_point_found = None
     momentum_found = None
+    pid_reconstructed_pfo = -1
     for index_pfo, pfo in enumerate(pfo_collection):
         # print("index pfo ", index_pfo)
         clusters_pfo = pfo.getClusters()
         pfo_energy = pfo.getEnergy()
         reference_point = pfo.getReferencePoint()
         momentum = pfo.getMomentum()
+        pid_reconstructed_pfo = pfo.getPDG()
         for index_c, cluster in enumerate(clusters_pfo):
             # print("index cluster ", index_c)
             cluster_hits = cluster.getHits()
@@ -139,6 +141,7 @@ def find_pandora_pfo_and_cluster_of_hit(
         pfo_index,
         reference_point_found,
         momentum_found,
+        pid_reconstructed_pfo
     )
 
 
@@ -148,11 +151,13 @@ def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
     pfo_energy_found = 0
     pfo_momentum_found = None
     pfo_reference_point_found = None
+    pandora_pid = None
     for index_pfo, pfo in enumerate(pfo_collection):
         tracks_pfo = pfo.getTracks()
         pfo_energy = pfo.getEnergy()
         pfo_momentum = pfo.getMomentum()
         pfo_reference_point = pfo.getReferencePoint()
+        pandora_pid = pfo.getPDG()
         for index_t, track in enumerate(tracks_pfo):
             # print("index cluster ", index_c)
             track_index = track.getObjectID().index
@@ -178,6 +183,7 @@ def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
         pandora_pfo_index,
         pfo_reference_point_found,
         pfo_momentum_found,
+        pandora_pid
     )
 
 
@@ -279,6 +285,7 @@ def initialize(t):
     hit__pandora_px = ROOT.std.vector("float")()
     hit__pandora_py = ROOT.std.vector("float")()
     hit__pandora_pz = ROOT.std.vector("float")()
+    pandora_pid = ROOT.std.vector("float")()
     hit_t = ROOT.std.vector("float")()
     hit_p = ROOT.std.vector("float")()
     hit_e = ROOT.std.vector("float")()
@@ -337,6 +344,7 @@ def initialize(t):
     t.Branch("hit_pz", hit_pz)
     t.Branch("hit__pandora_x", hit__pandora_x)
     t.Branch("hit__pandora_y", hit__pandora_y)
+    t.Branch("pandora_pid", pandora_pid)
     t.Branch("hit__pandora_z", hit__pandora_z)
     t.Branch("hit__pandora_px", hit__pandora_px)
     t.Branch("hit__pandora_py", hit__pandora_py)
@@ -389,6 +397,7 @@ def initialize(t):
         "hit_px": hit_px,
         "hit_py": hit_py,
         "hit_pz": hit_pz,
+        "pandora_pid": pandora_pid, 
         "hit__pandora_x": hit__pandora_x,
         "hit__pandora_y": hit__pandora_y,
         "hit__pandora_z": hit__pandora_z,
@@ -699,6 +708,7 @@ def store_tracks(
                 pandora_index_pfo,
                 reference_point_pandora,
                 momentum_pandora,
+                pid_pandora
             ) = find_pandora_pfo_track(
                 track.getObjectID().index,
                 track.getObjectID().collectionID,
@@ -713,6 +723,7 @@ def store_tracks(
                 dic["hit__pandora_x"].push_back(reference_point_pandora.x)
                 dic["hit__pandora_y"].push_back(reference_point_pandora.y)
                 dic["hit__pandora_z"].push_back(reference_point_pandora.z)
+                dic["pandora_pid"].push_back(pid_pandora)
             else:
                 dic["hit__pandora_px"].push_back(-1)
                 dic["hit__pandora_py"].push_back(-1)
@@ -720,6 +731,7 @@ def store_tracks(
                 dic["hit__pandora_x"].push_back(-1)
                 dic["hit__pandora_y"].push_back(-1)
                 dic["hit__pandora_z"].push_back(-1)
+                dic["pandora_pid"].push_back(-1)
 
         link_vector = ROOT.std.vector("int")()
         for idx in gen_indices:
@@ -831,6 +843,7 @@ def store_tracks(
                 dic["hit__pandora_x"].push_back(reference_point_pandora.x)
                 dic["hit__pandora_y"].push_back(reference_point_pandora.y)
                 dic["hit__pandora_z"].push_back(reference_point_pandora.z)
+                dic["pandora_pid"].push_back(pid_pandora)
             else:
                 dic["hit__pandora_px"].push_back(-1)
                 dic["hit__pandora_py"].push_back(-1)
@@ -838,6 +851,7 @@ def store_tracks(
                 dic["hit__pandora_x"].push_back(-1)
                 dic["hit__pandora_y"].push_back(-1)
                 dic["hit__pandora_z"].push_back(-1)
+                dic["pandora_pid"].push_back(-1)
 
         genlink = -1
         if ngen > 0:
@@ -1021,6 +1035,7 @@ def store_calo_hits(
                     pandora_pfo_index,
                     reference_point_pandora,
                     momentum_pandora,
+                    pandora_pid
                 ) = find_pandora_pfo_and_cluster_of_hit(
                     j, hit_collection, pandora_clusters_event, pandora_pfos_event
                 )
@@ -1033,6 +1048,7 @@ def store_calo_hits(
                     dic["hit__pandora_x"].push_back(reference_point_pandora.x)
                     dic["hit__pandora_y"].push_back(reference_point_pandora.y)
                     dic["hit__pandora_z"].push_back(reference_point_pandora.z)
+                    dic["pandora_pid"].push_back(pandora_pid)
                 else:
                     dic["hit__pandora_px"].push_back(-1)
                     dic["hit__pandora_py"].push_back(-1)
@@ -1040,6 +1056,7 @@ def store_calo_hits(
                     dic["hit__pandora_x"].push_back(-1)
                     dic["hit__pandora_y"].push_back(-1)
                     dic["hit__pandora_z"].push_back(-1)
+                    dic["pandora_pid"].push_back(-1)
 
             if len(gen_indices) > 0:
                 dic["hit_genlink0"].push_back(gen_indices[0])
