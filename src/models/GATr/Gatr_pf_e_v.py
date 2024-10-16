@@ -227,7 +227,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=True,
+                    neutral_avg=self.args.predict,
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
                 )
@@ -385,7 +385,8 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             pred_energy_corr,
             pred_pid,
-            features_charged_no_nan
+            features_charged_no_nan,
+            number_of_fakes
         ) = self.clustering_and_global_features(g, x, y)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
@@ -525,6 +526,7 @@ class ExampleWrapper(L.LightningModule):
                 true_pid,
                 e_true_corr_daughters,
                 true_coords,
+                number_of_fakes
             )
 
     def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
@@ -592,6 +594,7 @@ class ExampleWrapper(L.LightningModule):
             true_pid,
             e_true_corr_daughters,
             true_coords,
+            number_of_fakes
         ) = obtain_clustering_for_matched_showers(
             g,
             x,
@@ -704,7 +707,8 @@ class ExampleWrapper(L.LightningModule):
             e_true_corr_daughters,
             pred_energy_corr,
             pred_pid,
-            features_charged_no_nan
+            features_charged_no_nan,
+            number_of_fakes
         )
 
     def build_attention_mask(self, g):
@@ -752,13 +756,13 @@ class ExampleWrapper(L.LightningModule):
             (model_output, e_cor, _, _) = result
         if self.args.regress_pos:
             dic = e_cor
-            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt, pred_pos_avg = (
+            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt = (
                 e_cor["pred_energy_corr"],
                 e_cor["pred_pos"],
                 e_cor["neutrals_idx"],
                 e_cor["charged_idx"],
                 e_cor["pred_ref_pt"],
-                e_cor["pred_pos_avg"],
+                #e_cor["pred_pos_avg"],
             )
             if len(self.pids_charged):
                 charged_PID_pred = dic["charged_PID_pred"]
@@ -826,14 +830,14 @@ class ExampleWrapper(L.LightningModule):
                     true_pos = (true_pos / torch.norm(true_pos, dim=1).view(-1, 1)).clone()
                     pred_pos = (pred_pos / torch.norm(pred_pos, dim=1).view(-1, 1)).clone()
                 #loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
-                true_diff = true_pos[neutral_idx] - pred_pos_avg
-                pred_diff = pred_pos[neutral_idx] - pred_pos_avg
+                #true_diff = true_pos[neutral_idx] - pred_pos_avg
+                #pred_diff = pred_pos[neutral_idx] - pred_pos_avg
                 loss_pos = 1 - ((torch.nn.CosineSimilarity()(pred_pos, true_pos)).mean())
-                loss_pos_diff = 1 - ((torch.nn.CosineSimilarity()(pred_diff, true_diff)).mean())
-                loss_pos_L1_diff = torch.nn.L1Loss()(pred_diff, true_diff)
-                loss_pos_L1 = torch.nn.L1Loss()(pred_pos, true_pos)
+                #loss_pos_diff = 1 - ((torch.nn.CosineSimilarity()(pred_diff, true_diff)).mean())
+                #loss_pos_L1_diff = torch.nn.L1Loss()(pred_diff, true_diff)
+                #loss_pos_L1 = torch.nn.L1Loss()(pred_pos, true_pos)
                 # log all of those to wandb
-                wandb.log({"loss_pos": loss_pos, "loss_pos_diff": loss_pos_diff, "loss_pos_L1_diff": loss_pos_L1_diff, "loss_pos_L1": loss_pos_L1})
+                #wandb.log({"loss_pos": loss_pos, "loss_pos_diff": loss_pos_diff, "loss_pos_L1_diff": loss_pos_L1_diff, "loss_pos_L1": loss_pos_L1})
                 charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
                 #loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
                 #loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
@@ -850,7 +854,7 @@ class ExampleWrapper(L.LightningModule):
                 ) # just for logging
                 wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged, "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged})
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
-                loss = loss + loss_pos_L1
+                loss = loss + loss_pos
                 if len(self.pids_charged):
                     if len(charged_PID_pred):
                         loss_charged_pid = torch.nn.CrossEntropyLoss()(
@@ -937,6 +941,7 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     shap_vals,
                     ec_x,
+                    num_fakes
                 ) = result
             else:
                 (
@@ -950,6 +955,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_true_matched,
                     e_true_corr_daughters,
                     coords_true,
+                    num_fakes
                 ) = result
             if self.args.regress_pos:
                 if len(self.pids_charged):
@@ -1014,10 +1020,10 @@ class ExampleWrapper(L.LightningModule):
             )
         if self.args.explain_ec:
             self.validation_step_outputs.append(
-                [model_output, e_cor, batch_g, y, shap_vals, ec_x]
+                [model_output, e_cor, batch_g, y, shap_vals, ec_x, num_fakes]
             )
         else:
-            self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
+            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, num_fakes])
         if self.args.predict:
             if self.args.correction:
                 model_output1 = model_output
@@ -1051,13 +1057,14 @@ class ExampleWrapper(L.LightningModule):
                 use_gt_clusters=self.args.use_gt_clusters,
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,
+                number_of_fakes=num_fakes,
             )
             # self.df_showers.append(df_batch)
-            print("DF_batch_pandora", len(df_batch_pandora))
+            #print("DF_batch_pandora", len(df_batch_pandora))
             self.df_showers_pandora.append(df_batch_pandora)
-            print("Appending another batch", len(df_batch1))
+            #print("Appending another batch", len(df_batch1))
             self.df_showes_db.append(df_batch1)
-            print("_----------------------------------------------------------------------")
+            #print("_----------------------------------------------------------------------")
         del losses
         del loss
         del model_output
