@@ -115,24 +115,24 @@ for i, event in enumerate(reader.get("events")):
         CLIC,
     )
 
-    if debug:
-        print("total_e", total_e)
-        print(total_calohit_)
-        print(e_pp)
-        print("pandora", total_calohit_pandora)
-        fracs = []
-        for i in range(2, 11):
-            print(total_calohit_[i] / e_pp[i])
-            fracs.append(total_calohit_[i] / e_pp[i])
-        # if np.sum(np.array(fracs) < 0.1) > 1:
-        #     break
-        print("total number of hits: {}".format(n_hit[0]))
-        print(
-            "total number of hits with no gen links: {}".format(
-                number_of_hist_with_no_genlinks
-            )
-        )
-        print(": {}".format(number_of_hist_with_no_genlinks))
+    # if debug:
+    #     print("total_e", total_e)
+    #     print(total_calohit_)
+    #     print(e_pp)
+    #     print("pandora", total_calohit_pandora)
+    #     fracs = []
+    #     for i in range(2, 11):
+    #         print(total_calohit_[i] / e_pp[i])
+    #         fracs.append(total_calohit_[i] / e_pp[i])
+    #     # if np.sum(np.array(fracs) < 0.1) > 1:
+    #     #     break
+    #     print("total number of hits: {}".format(n_hit[0]))
+    #     print(
+    #         "total number of hits with no gen links: {}".format(
+    #             number_of_hist_with_no_genlinks
+    #         )
+    #     )
+    #     print(": {}".format(number_of_hist_with_no_genlinks))
 
     if n_hit[0] <= number_of_hist_with_no_genlinks:
         print(
