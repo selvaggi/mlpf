@@ -1,12 +1,12 @@
 import torch
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
-import dgl
 import matplotlib.pyplot as plt
 import os
 
 
 def obtain_statistics_graph(stat_dict, y_all, g_all, pf=True):
+    import dgl
     graphs = dgl.unbatch(g_all)
     batch_id = y_all[:, -1].view(-1)
     for i in range(0, len(graphs)):
@@ -87,23 +87,31 @@ def save_stat_dict(stat_dict, path):
     path = path + "/stat_dict.pt"
     torch.save(stat_dict, path)
 
-def stacked_hist_plot(lst, lst_pandora, path_store, title):
+def stacked_hist_plot(lst, lst_pandora, path_store, title, title_no_latex):
     # lst is a list of arrays. plot them in a stacked histogram with the same X-axis
-    fig, ax = plt.subplots(len(lst), 1, figsize=(15, 10))
-    bins = np.linspace(-0.1, 0.1, 200)
+    fig, ax = plt.subplots(len(lst), 1, figsize=(6, 13))
     if len(lst) == 1:
         ax = [ax]
+    binsE = [0, 5, 15, 35, 51]
     for i in range(len(lst)):
+        if i == 0:
+            bins = np.linspace(-0.03, 0.03, 200)
+        else:
+            bins = np.linspace(-0.005, 0.005, 200)
         ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red", density=True)
         if i < len(lst_pandora):
             ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue", density=True)
         ax[i].legend()
         ax[i].grid()
         ax[i].set_yscale("log")
-    ax[-1].set_xlabel(r"$\Delta \phi$")
+        ax[i].set_xlabel(r"$\Delta \phi$")
+        ax[i].set_title(title + " [{},{}] GeV".format(binsE[i], binsE[i+1]))
+        ax[i].title.set_size(15)
+        # set size of legend as well
+        ax[i].legend(prop={"size": 14})
+    #fig.suptitle(title)
     fig.tight_layout()
-    fig.suptitle(title)
-    fig.savefig(os.path.join(path_store, title + "_angle_distributions.pdf"))
+    fig.savefig(os.path.join(path_store, title_no_latex + "_angle_distributions.pdf"))
 
 def plot_distributions(stat_dict, PATH_store, pf=False):
     # energy per event
