@@ -870,7 +870,7 @@ class ExampleWrapper(L.LightningModule):
         del model_output
         del e_cor
         del losses
-        final_time = time()
+        # final_time = time()
         # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
         # wandb.log({"training_step_time": final_time - initial_time})
         return loss
@@ -1075,42 +1075,42 @@ class ExampleWrapper(L.LightningModule):
                     predict=True,
                     store=True,
                 )
-            else:
-                model_output = self.validation_step_outputs[0][0]
-                e_corr = self.validation_step_outputs[0][1]
-                batch_g = self.validation_step_outputs[0][2]
-                y = self.validation_step_outputs[0][3]
-                shap_vals = None
-                ec_x = None
-                if self.args.explain_ec:
-                    shap_vals = self.validation_step_outputs[0][4]
-                    ec_x = self.validation_step_outputs[0][5]
-                if self.args.correction:
-                    model_output1 = model_output
-                    e_corr = e_corr
-                else:
-                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                    e_corr = None
-                create_and_store_graph_output(
-                    batch_g,
-                    model_output1,
-                    y,
-                    0,
-                    0,
-                    0,
-                    path_save=os.path.join(
-                        self.args.model_prefix, "showers_df_evaluation"
-                    ),
-                    store=True,
-                    predict=False,
-                    e_corr=e_corr,
-                    tracks=self.args.tracks,
-                    shap_vals=shap_vals,
-                    ec_x=ec_x,
-                    use_gt_clusters=self.args.use_gt_clusters,
-                )
-                del model_output1
-                del batch_g
+            # else:
+            #     model_output = self.validation_step_outputs[0][0]
+            #     e_corr = self.validation_step_outputs[0][1]
+            #     batch_g = self.validation_step_outputs[0][2]
+            #     y = self.validation_step_outputs[0][3]
+            #     shap_vals = None
+            #     ec_x = None
+            #     if self.args.explain_ec:
+            #         shap_vals = self.validation_step_outputs[0][4]
+            #         ec_x = self.validation_step_outputs[0][5]
+            #     if self.args.correction:
+            #         model_output1 = model_output
+            #         e_corr = e_corr
+            #     else:
+            #         model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+            #         e_corr = None
+            #     create_and_store_graph_output(
+            #         batch_g,
+            #         model_output1,
+            #         y,
+            #         0,
+            #         0,
+            #         0,
+            #         path_save=os.path.join(
+            #             self.args.model_prefix, "showers_df_evaluation"
+            #         ),
+            #         store=True,
+            #         predict=False,
+            #         e_corr=e_corr,
+            #         tracks=self.args.tracks,
+            #         shap_vals=shap_vals,
+            #         ec_x=ec_x,
+            #         use_gt_clusters=self.args.use_gt_clusters,
+            #     )
+            #     del model_output1
+            #     del batch_g
         self.validation_step_outputs = []
         self.df_showers = []
         self.df_showers_pandora = []
@@ -1122,14 +1122,14 @@ class ExampleWrapper(L.LightningModule):
         # if self.args.lr_scheduler == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
-            T_max=int(10), # for now for testing
-            eta_min=0,
+            T_max=int(10300*3), # for now for testing
+            eta_min=1e-6,
         )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
-                "interval": "epoch",
+                "interval": "step",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
             }}
