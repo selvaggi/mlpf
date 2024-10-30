@@ -2,7 +2,7 @@ import dgl
 import torch
 import os
 
-from alembic.command import current
+# from alembic.command import current
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np

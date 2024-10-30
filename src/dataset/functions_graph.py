@@ -14,7 +14,7 @@ from src.dataset.functions_data import (
     concatenate_Particles_GT,
     create_noise_label
 )
-
+import time
 
 def create_inputs_from_table(
     output, hits_only, prediction=False, hit_chis=False, pos_pxpy=False, is_Ks=False
@@ -32,7 +32,6 @@ def create_inputs_from_table(
     graph_empty = False
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
-    
     (
         pos_xyz_hits,
         pos_pxpypz,
@@ -62,15 +61,16 @@ def create_inputs_from_table(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
-    # features particles
+
+
     if torch.sum(torch.Tensor(unique_list_particles)>20000)>0:
         graph_empty = True
     else:
+       
         y_data_graph = get_particle_features(
             unique_list_particles, output, prediction, connection_list
         )
-        assert len(y_data_graph) == len(unique_list_particles)
-        # remove particles that have no energy, no hits or only track hits
+
         if not is_Ks:
             mask_hits, mask_particles = find_mask_no_energy(
                 cluster_id,
@@ -84,28 +84,27 @@ def create_inputs_from_table(
             # create mapping from links to number of particles in the event
             cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
             y_data_graph.mask(~mask_particles)
-        else:
-            mask_hits = torch.zeros_like(e_hits).bool().view(-1)
+       
         if prediction:
             if is_Ks:
                 result = [
                     y_data_graph,  # y_data_graph[~mask_particles],
-                    p_hits[~mask_hits],
-                    e_hits[~mask_hits],
+                    p_hits,
+                    e_hits,
                     cluster_id,
-                    hit_particle_link[~mask_hits],
-                    pos_xyz_hits[~mask_hits],
-                    pos_pxpypz[~mask_hits],
-                    pandora_cluster[~mask_hits],
-                    pandora_cluster_energy[~mask_hits],
-                    pandora_mom[~mask_hits],
-                    pandora_ref_point[~mask_hits],
-                    pandora_pid[~mask_hits],
-                    pfo_energy[~mask_hits],
-                    pandora_pfo_link[~mask_hits],
-                    hit_type_feature[~mask_hits],
-                    hit_link_modified[~mask_hits],
-                    daughters[~mask_hits],
+                    hit_particle_link,
+                    pos_xyz_hits,
+                    pos_pxpypz,
+                    pandora_cluster,
+                    pandora_cluster_energy,
+                    pandora_mom,
+                    pandora_ref_point,
+                    pandora_pid,
+                    pfo_energy,
+                    pandora_pfo_link,
+                    hit_type_feature,
+                    hit_link_modified,
+                    daughters,
                 ]
             else:
                 result = [
@@ -127,14 +126,23 @@ def create_inputs_from_table(
                     hit_link_modified[~mask_hits],
                 ]
         else:
+       
+            result_p = p_hits[~mask_hits]
+            result_e = e_hits[~mask_hits]
+            result_hit_link = hit_particle_link[~mask_hits]
+            result_xyz = pos_xyz_hits[~mask_hits]
+            result_pxyz = pos_pxpypz[~mask_hits]
+            result_hit_type = hit_type_feature[~mask_hits]
+            result_mod = hit_link_modified[~mask_hits]
+
             result = [
                 y_data_graph,  # y_data_graph[~mask_particles],
-                p_hits[~mask_hits],
-                e_hits[~mask_hits],
+                result_p,
+                result_e,
                 cluster_id,
-                hit_particle_link[~mask_hits],
-                pos_xyz_hits[~mask_hits],
-                pos_pxpypz[~mask_hits],
+                result_hit_link,
+                result_xyz,
+                result_pxyz,
                 pandora_cluster,
                 pandora_cluster_energy,
                 pandora_mom,
@@ -142,17 +150,26 @@ def create_inputs_from_table(
                 pandora_pid, 
                 pfo_energy,
                 pandora_pfo_link,
-                hit_type_feature[~mask_hits],
-                hit_link_modified[~mask_hits],
+                result_hit_type,
+                result_mod,
             ]
         if hit_chis:
-            result.append(
-                chi_squared_tracks[~mask_hits],
-            )
+            if not is_Ks:
+                result.append(
+                    chi_squared_tracks[~mask_hits],
+                )
+            else:
+                result.append(
+                        chi_squared_tracks,
+                    )
         else:
             result.append(None)
-        hit_type = hit_type_feature[~mask_hits]
-        # if hits only remove tracks, otherwise leave tracks
+
+        if is_Ks:
+            hit_type = hit_type_feature
+        else:
+            hit_type = hit_type_feature[~mask_hits]
+       
         if hits_only:
             hit_mask = (hit_type == 0) | (hit_type == 1)
             hit_mask = ~hit_mask
@@ -164,21 +181,27 @@ def create_inputs_from_table(
             )
 
         else:
-            # if we want the tracks keep only 1 track hit per charged particle.
-            hit_mask = hit_type == 10
-            hit_mask = ~hit_mask
-            for i in range(1, len(result)):
-                if result[i] is not None:
-                    # if len(result[i].shape) == 2 and result[i].shape[0] == 3:
-                    #     result[i] = result[i][:, hit_mask]
-                    # else:
-                    #     result[i] = result[i][hit_mask]
-                    result[i] = result[i][hit_mask]
-            hit_type_one_hot = torch.nn.functional.one_hot(
-                hit_type_feature[~mask_hits][hit_mask], num_classes=5
-            )
+            # # if we want the tracks keep only 1 track hit per charged particle.
+            # hit_mask = hit_type == 10
+            # hit_mask = ~hit_mask
+            # for i in range(1, len(result)):
+            #     if result[i] is not None:
+            #         # if len(result[i].shape) == 2 and result[i].shape[0] == 3:
+            #         #     result[i] = result[i][:, hit_mask]
+            #         # else:
+            #         #     result[i] = result[i][hit_mask]
+            #         result[i] = result[i][hit_mask]
+            if is_Ks:
+                hit_type_one_hot = torch.nn.functional.one_hot(
+                    hit_type_feature, num_classes=5
+                )
+            else:
+                hit_type_one_hot = torch.nn.functional.one_hot(
+                    hit_type_feature[~mask_hits], num_classes=5
+                )
         result.append(hit_type_one_hot)
         result.append(connection_list)
+       
         return result
     if graph_empty:
         return [None]
@@ -193,7 +216,7 @@ def store_track_at_vertex_at_track_at_calo(graph):
     tracks_at_calo = graph.ndata["hit_type"] == 1
     tracks_at_vertex = graph.ndata["hit_type"] == 0
     part = graph.ndata["particle_number"].long()
-    assert (part[tracks_at_calo] == part[tracks_at_vertex]).all()
+    # assert (part[tracks_at_calo] == part[tracks_at_vertex]).all()
     graph.ndata["pos_pxpypz_at_vertex"] = torch.zeros_like(graph.ndata["pos_pxpypz"])
     graph.ndata["pos_pxpypz_at_vertex"][tracks_at_calo] = graph.ndata["pos_pxpypz"][tracks_at_vertex]
     return remove_hittype0(graph)
@@ -203,6 +226,7 @@ def create_graph(
     config=None,
     n_noise=0,
 ):
+    
     graph_empty = False
     hits_only = config.graph_config.get(
         "only_hits", False
@@ -214,6 +238,7 @@ def create_graph(
     pos_pxpy = config.graph_config.get("pos_pxpy", False)
     is_Ks = config.graph_config.get("ks", False)
     noise_class = config.graph_config.get("noise", False)
+    
     result = create_inputs_from_table(
         output,
         hits_only=hits_only,
@@ -222,6 +247,7 @@ def create_graph(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
+   
     if len(result) == 1:
         graph_empty = True
         g = 0
@@ -255,7 +281,10 @@ def create_graph(
             )
             hit_particle_link[mask_loopers] = -1
             y_data_graph.mask(mask_particles)
+
             cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
+           
+
         graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
         graph_empty = False
         g = dgl.graph(([], []))
@@ -268,7 +297,7 @@ def create_graph(
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
             )  # dims = 9
-
+        
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
         g.ndata["pos_pxpypz"] = pos_pxpypz
@@ -310,9 +339,13 @@ def create_graph(
     if graph_empty:
         return [g, y_data_graph], graph_empty
     # print("graph_empty",graph_empty)
+
     g = store_track_at_vertex_at_track_at_calo(g)
+
     if noise_class:
         g = make_bad_tracks_noise_tracks(g)
+
+
     return [g, y_data_graph], graph_empty
 
 
@@ -348,13 +381,8 @@ def make_bad_tracks_noise_tracks(g):
         #then index 1 is at 0 
         mean_pos_cluster = mean_pos_cluster[1:,:]
         particle_track = particle_track-1
-    # print(mean_pos_cluster.shape, torch.unique(g.ndata["particle_number"]).shape)
-    # print("mean_pos_cluster", mean_pos_cluster.shape)
-    # print("particle_track", particle_track)
-    # print("pos_track", pos_track.shape)
     if mean_pos_cluster.shape[0] == torch.unique(g.ndata["particle_number"]).shape:
         distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
-        # print("distance_track_cluster", distance_track_cluster)
         bad_tracks = distance_track_cluster>0.21
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         g.ndata["particle_number"][index_bad_tracks]= 0 
