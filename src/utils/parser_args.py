@@ -636,5 +636,11 @@ parser.add_argument(
     help="Classify into electron, CH, NH, gamma - both for charged and neutral.",
 )
 
-# --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211
+parser.add_argument(
+    "--balance-pid-classes",
+    default=False,
+    action="store_true",
+    help="Whether to weigh the classes",
+)
 
+# --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211

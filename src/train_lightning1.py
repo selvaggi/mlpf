@@ -133,14 +133,12 @@ def main():
         # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
         # wandb.run.name = args.wandb_displayname
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
-            #print("DEV ", dev)
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
-
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev)
 
@@ -188,14 +186,12 @@ def main():
             val_dataloaders=val_loader,
             # ckpt_path=args.load_model_weights,
         )
-
         # TODO save checkpoints and hyperparameters
         # TODO use accumulate_grad_batches=7
-
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
             print("TODO: change imported the model for testing manually")
-            from src.models.GATr.Gatr_pf_e_v import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )

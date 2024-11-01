@@ -164,10 +164,12 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         neutral_avg=False,
         neutral_PCA=False,
         neutral_thrust_axis=True,
-        simple_p_GNN=False
+        simple_p_GNN=False,
+        predict=True
     ):
         super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
         self.charged = charged
+        self.predict_arg = predict
         self.simple_p_GNN = simple_p_GNN
         self.neutral_avg = neutral_avg
         self.pos_regression = pos_regression
@@ -354,6 +356,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
                     explainer = shap.KernelExplainer(
                         model_exp, model_x[:n_samples].detach().cpu().numpy()
                     )
+                    
                     shap_vals = explainer.shap_values(
                         model_x.detach().cpu().numpy(), nsamples=200
             )
@@ -374,13 +377,16 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos, ref_pt_pred = self.PickPAtDCA.predict(x_global_features, graphs_new)
-                #if self.args.predict:
-                E = torch.norm(pos, dim=1)
+                if self.predict_arg:
+                    print("Using norm for E")
+                    E = torch.norm(pos, dim=1)
+                else:
+                    print("Using model result for E")
+                    E = torch.clamp(res.flatten(), min=0, max=None)
                 if self.unit_p:
                     pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
                 #print("Charged PID_pred", pid_pred)
                 # if model_x contains nans, print sth?
-                #E = torch.clamp(res.flatten(), min=0, max=None)
                 return E, pos, pid_pred, ref_pt_pred
             else:
                 E_pred, p_pred = res[0], res[1]
