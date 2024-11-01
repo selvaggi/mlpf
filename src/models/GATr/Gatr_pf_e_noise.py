@@ -1173,3 +1173,14 @@ class CosineAnnealingThenFixedScheduler:
             return self.cosine_scheduler.get_last_lr()
         else:
             return [self.fixed_lr for _ in self.optimizer.param_groups]
+    def state_dict(self):
+        # Save the state including current step count and cosine scheduler state
+        return {
+            "step_count": self.step_count,
+            "cosine_scheduler_state": self.cosine_scheduler.state_dict()
+        }
+
+    def load_state_dict(self, state_dict):
+        # Restore step count and cosine scheduler state
+        self.step_count = state_dict["step_count"]
+        self.cosine_scheduler.load_state_dict(state_dict["cosine_scheduler_state"])
