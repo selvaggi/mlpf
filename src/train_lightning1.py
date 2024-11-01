@@ -171,8 +171,8 @@ def main():
             max_epochs=args.num_epochs,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=7900, #10300
-            limit_val_batches=20,
+            limit_train_batches=3, #10300
+            limit_val_batches=2,
             # precision=16
             # resume_from_checkpoint=args.load_model_weig
             # hts,
@@ -213,7 +213,7 @@ def main():
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
             #profiler=profiler,
-            devices=[2],
+            devices=[3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             # limit_val_batches=1,

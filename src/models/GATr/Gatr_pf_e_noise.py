@@ -47,6 +47,7 @@ from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # from src.layers.obtain_statistics import (
 #     obtain_statistics_graph_tracking,
@@ -1118,13 +1119,12 @@ class ExampleWrapper(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
-        # if self.args.lr_scheduler == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=int(10300*3), # for now for testing
-            eta_min=1e-6,
-        )
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=int(7900*3), # for now for testing
+        #     eta_min=1e-6,
+        # )
+        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(3), fixed_lr=1e-6 )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -1133,6 +1133,7 @@ class ExampleWrapper(L.LightningModule):
                 "monitor": "train_loss_epoch",
                 "frequency": 1
             }}
+   
 
 
 
@@ -1147,3 +1148,28 @@ def obtain_batch_numbers(g):
         num_nodes = gj.number_of_nodes()
     batch = torch.cat(batch_numbers, dim=0)
     return batch
+
+
+
+
+class CosineAnnealingThenFixedScheduler:
+    def __init__(self, optimizer, T_max, fixed_lr):
+        self.cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max)
+        self.fixed_lr = 1e-6
+        self.T_max = T_max
+        self.step_count = 0
+        self.optimizer = optimizer
+
+    def step(self):
+        if self.step_count < self.T_max:
+            self.cosine_scheduler.step()
+        else:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.fixed_lr
+        self.step_count += 1
+
+    def get_last_lr(self):
+        if self.step_count < self.T_max:
+            return self.cosine_scheduler.get_last_lr()
+        else:
+            return [self.fixed_lr for _ in self.optimizer.param_groups]
