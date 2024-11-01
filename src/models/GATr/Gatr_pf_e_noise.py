@@ -1157,7 +1157,7 @@ def obtain_batch_numbers(g):
 
 class CosineAnnealingThenFixedScheduler:
     def __init__(self, optimizer, T_max, fixed_lr):
-        self.cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max)
+        self.cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=fixed_lr)
         self.fixed_lr = 1e-6
         self.T_max = T_max
         self.step_count = 0
