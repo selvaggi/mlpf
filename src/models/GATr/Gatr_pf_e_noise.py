@@ -1166,9 +1166,12 @@ class CosineAnnealingThenFixedScheduler:
     def step(self):
         if self.step_count < self.T_max:
             self.cosine_scheduler.step()
+            for param_group in self.optimizer.param_groups:
+                print("before scheduler change", param_group['lr'])
         else:
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = self.fixed_lr
+                print("after scheduler change",param_group['lr'])
         self.step_count += 1
 
     def get_last_lr(self):
