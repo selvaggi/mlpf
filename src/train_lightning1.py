@@ -171,8 +171,8 @@ def main():
             max_epochs=args.num_epochs,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=3, #10300
-            limit_val_batches=2,
+            limit_train_batches=7900, #10300
+            limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weig
             # hts,
