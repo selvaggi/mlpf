@@ -1133,7 +1133,7 @@ class ExampleWrapper(L.LightningModule):
                 "monitor": "train_loss_epoch",
                 "frequency": 1
             }}
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric=None):
         # Manually step the scheduler
         scheduler.step()
    
