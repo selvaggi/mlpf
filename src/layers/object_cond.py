@@ -1127,3 +1127,100 @@ def L_clusters_calc(batch, cluster_space_coords, cluster_index, frac_combination
     #     # loss_ce = torch.nn.BCELoss()
     #     loss_mse = torch.nn.MSELoss()
     #     # loss_x = loss_mse(positions_particles_pred.to(device), x_particles.to(device))
+
+
+
+def object_condensation_loss2(
+    batch,
+    pred,
+    pred_2,
+    y,
+    return_resolution=False,
+    clust_loss_only=False,
+    add_energy_loss=False,
+    calc_e_frac_loss=False,
+    q_min=0.1,
+    frac_clustering_loss=0.1,
+    attr_weight=1.0,
+    repul_weight=1.0,
+    fill_loss_weight=1.0,
+    use_average_cc_pos=0.0,
+    loss_type="hgcalimplementation",
+    output_dim=4,
+    clust_space_norm="none",
+    dis=False,
+):
+    """
+
+    :param batch:
+    :param pred:
+    :param y:
+    :param return_resolution: If True, it will only output resolution data to plot for regression (only used for evaluation...)
+    :param clust_loss_only: If True, it will only add the clustering terms to the loss
+    :return:
+    """
+    _, S = pred.shape
+    if clust_loss_only:
+        clust_space_dim = output_dim - 1
+    else:
+        clust_space_dim = output_dim - 28
+
+    # xj = torch.nn.functional.normalize(
+    #     pred[:, 0:clust_space_dim], dim=1
+    # )  # 0, 1, 2: cluster space coords
+
+    bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
+    # print("bj", bj)
+    original_coords = batch.ndata["h"][:, 0:clust_space_dim]
+    if dis:
+        distance_threshold = torch.reshape(pred[:, -1], [-1, 1])
+    else:
+        distance_threshold = 0
+    energy_correction = pred_2
+    xj = pred[:, 0:clust_space_dim]  # xj: cluster space coords
+    if clust_space_norm == "twonorm":
+        xj = torch.nn.functional.normalize(xj, dim=1)  # 0, 1, 2: cluster space coords
+    elif clust_space_norm == "tanh":
+        xj = torch.tanh(xj)
+    elif clust_space_norm == "none":
+        pass
+    else:
+        raise NotImplementedError
+  
+    dev = batch.device
+    clustering_index_l = batch.ndata["particle_number"]
+
+    len_batch = len(batch.batch_num_nodes())
+    batch_numbers = torch.repeat_interleave(
+        torch.arange(0, len_batch).to(dev), batch.batch_num_nodes()
+    ).to(dev)
+
+    a = calc_LV_Lbeta(
+        original_coords,
+        batch,
+        y,
+        distance_threshold,
+        energy_correction,
+        beta=bj.view(-1),
+        cluster_space_coords=xj,  # Predicted by model
+        cluster_index_per_event=clustering_index_l.view(
+            -1
+        ).long(),  # Truth hit->cluster index
+        batch=batch_numbers.long(),
+        qmin=q_min,
+        return_regression_resolution=return_resolution,
+        post_pid_pool_module=None,
+        clust_space_dim=clust_space_dim,
+        frac_combinations=frac_clustering_loss,
+        attr_weight=attr_weight,
+        repul_weight=repul_weight,
+        fill_loss_weight=fill_loss_weight,
+        use_average_cc_pos=use_average_cc_pos,
+        loss_type=loss_type,
+        dis=dis,
+    )
+
+   
+    loss = 1 * a[0] + a[1]  
+      
+    return loss, a

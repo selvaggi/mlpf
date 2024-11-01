@@ -1,10 +1,5 @@
 from os import path
 import sys
-
-# sys.path.append(
-#     path.abspath("/afs/cern.ch/work/m/mgarciam/private/geometric-algebra-transformer/")
-# )
-# sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 from time import time
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 from gatr.interface import (
@@ -18,17 +13,14 @@ from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
 from src.utils.save_features import save_features
-from src.logger.plotting_tools import PlotCoordinates
 import numpy as np
 from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
 from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_calibration import (
-    object_condensation_loss2,
-    obtain_batch_numbers,
-)
-from src.models.gravnet_3_L import obtain_clustering_for_matched_showers
+from src.layers.object_cond import object_condensation_loss2
+from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
     calculate_eta,
@@ -44,23 +36,12 @@ from src.models.energy_correction_NN import (
 )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
-from src.utils.nn.tools import log_losses_wandb_tracking
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
-from src.layers.inference_oc_tracks import (
-    evaluate_efficiency_tracks,
-    store_at_batch_end,
-)
-from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
+
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
 
-# from src.layers.obtain_statistics import (
-#     obtain_statistics_graph_tracking,
-#     create_stats_dict,
-#     save_stat_dict,
-#     plot_distributions,
-# )
 from src.utils.nn.tools import log_losses_wandb
 import torch.nn.functional as F
 

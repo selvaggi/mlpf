@@ -1,17 +1,17 @@
 # Similar to evaluate_mix, but plots a comparison between different ML methods on the same plot
 
 import matplotlib
-
+import sys
+sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
 from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist
-
 matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-plt.rc("text", usetex=True)
-plt.rc("font", family="serif")
-plt.rcParams['text.usetex'] = True
+# plt.rc("text", usetex=True)
+# plt.rc("font", family="serif")
+# plt.rcParams['text.usetex'] = True
 plt.rcParams['font.size'] = 20
 plt.rcParams['axes.labelsize'] = 20
 #matplotlib.rc("font", size=35)
@@ -19,8 +19,8 @@ plt.rcParams['xtick.labelsize'] = 20
 plt.rcParams['ytick.labelsize'] = 20
 plt.rcParams['legend.fontsize'] = 20
 import os
-from utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
-from utils.inference.per_particle_metrics import (
+from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
+from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix,
     plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2
 )
@@ -45,7 +45,7 @@ ML_pid = False       # Use the PID from the ML classification head (electron/CH/
 
 if all_E:
     PATH_store = ( #/eos/user/g/gkrzmanc/2024/train/export_f_10_09_testset_300_files_avg_pos_reprod
-        "/eos/user/g/gkrzmanc/2024/results/evalHss_reprod_clust_only_newmodel_Clustering061024"
+        "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/evalHss_reprod_clust_only_newmodel_Clustering2810_v1"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -56,11 +56,11 @@ if all_E:
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
-        "evalHss_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "evalHss_reprod_clust_only_newmodel_Clustering2810_v1/showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
     #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
-    path_pandora = "evalHss_reprod_clust_only_newmodel_Clustering061024/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/g/gkrzmanc/2024/results/"
+    path_pandora = "evalHss_reprod_clust_only_newmodel_Clustering2810_v1/showers_df_evaluation/0_0_None_pandora.pt"
+    dir_top = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/"
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 

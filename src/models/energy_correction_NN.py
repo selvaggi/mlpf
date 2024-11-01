@@ -79,6 +79,7 @@ class ECNetWrapper(torch.nn.Module):
         # print("Temporarily not loading the model weights")
         self.model.to(device)
 
+
     def predict(self, x):
         # if isinstance(pred, tuple):
         #    return (pred[0].flatten(), pred[1])
@@ -245,7 +246,10 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
             with open(ckpt_file.strip(), "rb") as f:
                 self.model.model = CPU_Unpickler(f).load()
-            print("Loaded energy correction model weights from", ckpt_file)
+                # if self.use_gatr:
+                #     self.gatr = CPU_Unpickler(f).load()
+            print("Loaded energy correction model weights from ECNetWrapperGNNGlobalFeaturesSeparate", ckpt_file)
+    
         else:
             print("Not loading energy correction model weights")
         self.model.to(device)

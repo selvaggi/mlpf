@@ -17,12 +17,9 @@ import numpy as np
 from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
-from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_calibration import (
-    object_condensation_loss2,
-    obtain_batch_numbers,
-)
-from src.models.gravnet_3_L import obtain_clustering_for_matched_showers
+from src.layers.object_cond import object_condensation_loss2
+from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
     calculate_eta,
@@ -43,7 +40,6 @@ from src.layers.inference_oc_tracks import (
     evaluate_efficiency_tracks,
     store_at_batch_end,
 )
-from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb

@@ -1,0 +1,145 @@
+all genparts: N: 0, PID: 11, Q: -1.0, P: 4.50e+01, Theta: 0.00e+00, Phi: 0.00e+00, M: 5.11e-04, status: 4, parents: [], daughters: [1, 2], decayed_traacker: 0
+all genparts: N: 1, PID: 11, Q: -1.0, P: 4.50e+01, Theta: 0.00e+00, Phi: 0.00e+00, M: 0.00e+00, status: 21, parents: [0], daughters: [6], decayed_traacker: 0
+all genparts: N: 2, PID: 22, Q: 0.0, P: 2.95e-07, Theta: 0.00e+00, Phi: 0.00e+00, M: 0.00e+00, status: 1, parents: [0], daughters: [], decayed_traacker: 1
+all genparts: N: 3, PID: -11, Q: 1.0, P: 4.50e+01, Theta: 3.14e+00, Phi: 0.00e+00, M: 5.11e-04, status: 4, parents: [], daughters: [4, 5], decayed_traacker: 0
+all genparts: N: 4, PID: -11, Q: 1.0, P: 4.50e+01, Theta: 3.14e+00, Phi: 0.00e+00, M: 0.00e+00, status: 21, parents: [3], daughters: [6], decayed_traacker: 0
+all genparts: N: 5, PID: 22, Q: 0.0, P: 2.49e-05, Theta: 3.14e+00, Phi: 0.00e+00, M: 0.00e+00, status: 1, parents: [3], daughters: [], decayed_traacker: 1
+all genparts: N: 6, PID: 23, Q: 0.0, P: 2.46e-05, Theta: 0.00e+00, Phi: 0.00e+00, M: 9.00e+01, status: 22, parents: [1, 4], daughters: [7, 8], decayed_traacker: 0
+all genparts: N: 7, PID: 4, Q: 0.6666666865348816, P: 4.50e+01, Theta: 6.17e-01, Phi: 6.21e-01, M: 1.50e+00, status: 23, parents: [6], daughters: [9], decayed_traacker: 0
+all genparts: N: 8, PID: -4, Q: -0.6666666865348816, P: 4.50e+01, Theta: 2.52e+00, Phi: -2.52e+00, M: 1.50e+00, status: 23, parents: [6], daughters: [10, 11], decayed_traacker: 0
+all genparts: N: 9, PID: 4, Q: 0.6666666865348816, P: 4.47e+01, Theta: 6.17e-01, Phi: 6.21e-01, M: 1.50e+00, status: 52, parents: [7], daughters: [12, 13], decayed_traacker: 0
+all genparts: N: 10, PID: -4, Q: -0.6666666865348816, P: 2.98e+01, Theta: 2.61e+00, Phi: -2.62e+00, M: 1.50e+00, status: 51, parents: [8], daughters: [14], decayed_traacker: 0
+all genparts: N: 11, PID: 21, Q: 0.0, P: 1.54e+01, Theta: 2.34e+00, Phi: -2.39e+00, M: 0.00e+00, status: 51, parents: [8], daughters: [15], decayed_traacker: 0
+all genparts: N: 12, PID: 4, Q: 0.6666666865348816, P: 3.88e+01, Theta: 6.33e-01, Phi: 7.29e-01, M: 1.50e+00, status: 51, parents: [9], daughters: [16], decayed_traacker: 0
+all genparts: N: 13, PID: 21, Q: 0.0, P: 6.28e+00, Theta: 6.51e-01, Phi: -1.01e-01, M: 0.00e+00, status: 51, parents: [9], daughters: [17, 18], decayed_traacker: 0
+all genparts: N: 14, PID: -4, Q: -0.6666666865348816, P: 2.36e+01, Theta: 2.61e+00, Phi: -2.61e+00, M: 1.50e+00, status: 52, parents: [10], daughters: [19], decayed_traacker: 0
+all genparts: N: 15, PID: 21, Q: 0.0, P: 1.51e+01, Theta: 2.34e+00, Phi: -2.39e+00, M: 0.00e+00, status: 52, parents: [11], daughters: [20, 21], decayed_traacker: 0
+all genparts: N: 16, PID: 4, Q: 0.6666666865348816, P: 2.96e+01, Theta: 6.33e-01, Phi: 7.26e-01, M: 1.50e+00, status: 52, parents: [12], daughters: [22], decayed_traacker: 0
+all genparts: N: 17, PID: 21, Q: 0.0, P: 2.03e+00, Theta: 9.83e-01, Phi: -3.31e-01, M: 0.00e+00, status: 51, parents: [13], daughters: [23], decayed_traacker: 0
+all genparts: N: 18, PID: 21, Q: 0.0, P: 1.34e+01, Theta: 5.76e-01, Phi: 5.55e-01, M: 0.00e+00, status: 51, parents: [13], daughters: [24, 25], decayed_traacker: 0
+all genparts: N: 19, PID: -4, Q: -0.6666666865348816, P: 2.36e+01, Theta: 2.61e+00, Phi: -2.61e+00, M: 1.50e+00, status: 71, parents: [14], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 20, PID: 21, Q: 0.0, P: 1.48e+01, Theta: 2.37e+00, Phi: -2.40e+00, M: 0.00e+00, status: 51, parents: [15], daughters: [26, 29], decayed_traacker: 0
+all genparts: N: 21, PID: 21, Q: 0.0, P: 6.09e-01, Theta: 1.08e+00, Phi: -1.40e+00, M: 0.00e+00, status: 51, parents: [15], daughters: [34], decayed_traacker: 0
+all genparts: N: 22, PID: 4, Q: 0.6666666865348816, P: 2.96e+01, Theta: 6.33e-01, Phi: 7.26e-01, M: 1.50e+00, status: 71, parents: [16], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 23, PID: 21, Q: 0.0, P: 1.67e+00, Theta: 9.83e-01, Phi: -3.31e-01, M: 0.00e+00, status: 52, parents: [17], daughters: [36], decayed_traacker: 0
+all genparts: N: 24, PID: 21, Q: 0.0, P: 7.53e+00, Theta: 5.28e-01, Phi: 4.29e-01, M: 0.00e+00, status: 51, parents: [18], daughters: [42], decayed_traacker: 0
+all genparts: N: 25, PID: 21, Q: 0.0, P: 6.09e+00, Theta: 6.45e-01, Phi: 6.51e-01, M: 0.00e+00, status: 51, parents: [18], daughters: [40], decayed_traacker: 0
+all genparts: N: 26, PID: 21, Q: 0.0, P: 1.06e+01, Theta: 2.53e+00, Phi: -2.29e+00, M: 0.00e+00, status: 51, parents: [20], daughters: [27], decayed_traacker: 0
+all genparts: N: 27, PID: 21, Q: 0.0, P: 8.36e+00, Theta: 2.53e+00, Phi: -2.29e+00, M: 0.00e+00, status: 52, parents: [26], daughters: [28], decayed_traacker: 0
+all genparts: N: 28, PID: 21, Q: 0.0, P: 8.36e+00, Theta: 2.53e+00, Phi: -2.29e+00, M: 0.00e+00, status: 71, parents: [27], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 29, PID: 21, Q: 0.0, P: 1.04e+01, Theta: 2.35e+00, Phi: -2.59e+00, M: 0.00e+00, status: 51, parents: [20], daughters: [30, 31], decayed_traacker: 0
+all genparts: N: 30, PID: 21, Q: 0.0, P: 2.55e+00, Theta: 2.34e+00, Phi: -2.83e+00, M: 0.00e+00, status: 51, parents: [29], daughters: [33], decayed_traacker: 0
+all genparts: N: 31, PID: 21, Q: 0.0, P: 1.01e+01, Theta: 2.39e+00, Phi: -2.48e+00, M: 0.00e+00, status: 51, parents: [29], daughters: [32], decayed_traacker: 0
+all genparts: N: 32, PID: 21, Q: 0.0, P: 1.01e+01, Theta: 2.39e+00, Phi: -2.48e+00, M: 0.00e+00, status: 71, parents: [31], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 33, PID: 21, Q: 0.0, P: 2.55e+00, Theta: 2.34e+00, Phi: -2.83e+00, M: 0.00e+00, status: 71, parents: [30], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 34, PID: 21, Q: 0.0, P: 1.01e+00, Theta: 1.22e+00, Phi: -1.04e+00, M: 4.27e-01, status: 73, parents: [21, 37], daughters: [35], decayed_traacker: 0
+all genparts: N: 35, PID: 21, Q: 0.0, P: 1.01e+00, Theta: 1.22e+00, Phi: -1.04e+00, M: 4.27e-01, status: 71, parents: [34], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 36, PID: 21, Q: 0.0, P: 1.48e+00, Theta: 9.83e-01, Phi: -3.31e-01, M: 0.00e+00, status: 52, parents: [23], daughters: [37, 38], decayed_traacker: 0
+all genparts: N: 37, PID: 21, Q: 0.0, P: 4.83e-01, Theta: 1.45e+00, Phi: -6.34e-01, M: 0.00e+00, status: 51, parents: [36], daughters: [34], decayed_traacker: 0
+all genparts: N: 38, PID: 21, Q: 0.0, P: 2.75e+00, Theta: 6.66e-01, Phi: 3.13e-01, M: 0.00e+00, status: 51, parents: [36], daughters: [39], decayed_traacker: 0
+all genparts: N: 39, PID: 21, Q: 0.0, P: 2.75e+00, Theta: 6.66e-01, Phi: 3.13e-01, M: 0.00e+00, status: 71, parents: [38], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 40, PID: 21, Q: 0.0, P: 4.34e+00, Theta: 6.45e-01, Phi: 6.51e-01, M: 0.00e+00, status: 52, parents: [25], daughters: [41], decayed_traacker: 0
+all genparts: N: 41, PID: 21, Q: 0.0, P: 4.34e+00, Theta: 6.45e-01, Phi: 6.51e-01, M: 0.00e+00, status: 71, parents: [40], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 42, PID: 21, Q: 0.0, P: 7.53e+00, Theta: 5.28e-01, Phi: 4.29e-01, M: 0.00e+00, status: 71, parents: [24], daughters: [43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], decayed_traacker: 0
+all genparts: N: 43, PID: 421, Q: 0.0, P: 2.94e+01, Theta: 6.14e-01, Phi: 7.03e-01, M: 1.86e+00, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [60, 61], decayed_traacker: 1
+all genparts: N: 44, PID: 113, Q: 0.0, P: 2.75e+00, Theta: 6.82e-01, Phi: 3.62e-01, M: 8.31e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [62, 63], decayed_traacker: 1
+all genparts: N: 45, PID: 221, Q: 0.0, P: 5.10e+00, Theta: 5.80e-01, Phi: 4.95e-01, M: 5.48e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [64, 65, 66], decayed_traacker: 1
+all genparts: N: 46, PID: 321, Q: 1.0, P: 2.07e+00, Theta: 5.58e-01, Phi: 8.33e-01, M: 4.94e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [136, 137], decayed_traacker: 1
+all genparts: N: 47, PID: -311, Q: 0.0, P: 2.01e+00, Theta: 7.75e-01, Phi: 3.71e-01, M: 4.98e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [67], decayed_traacker: 1
+all genparts: N: 48, PID: 311, Q: 0.0, P: 1.44e+00, Theta: 5.54e-01, Phi: 7.84e-01, M: 4.98e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [68], decayed_traacker: 1
+all genparts: N: 49, PID: 221, Q: 0.0, P: 1.62e+00, Theta: 5.02e-01, Phi: -2.58e-01, M: 5.48e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [69, 70, 71], decayed_traacker: 1
+all genparts: N: 50, PID: -321, Q: -1.0, P: 5.47e-01, Theta: 2.41e+00, Phi: -2.32e+00, M: 4.94e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [126, 127, 128], decayed_traacker: 1
+all genparts: N: 51, PID: 211, Q: 1.0, P: 1.41e-01, Theta: 2.43e+00, Phi: -2.02e+00, M: 1.40e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [107, 108], decayed_traacker: 1
+all genparts: N: 52, PID: -211, Q: -1.0, P: 1.78e+00, Theta: 2.51e+00, Phi: -2.62e+00, M: 1.40e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [], decayed_traacker: 0
+all genparts: N: 53, PID: 211, Q: 1.0, P: 1.92e+00, Theta: 2.16e+00, Phi: -2.75e+00, M: 1.40e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [106], decayed_traacker: 0
+all genparts: N: 54, PID: -213, Q: -1.0, P: 2.92e+00, Theta: 2.46e+00, Phi: -2.23e+00, M: 8.37e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [72, 73], decayed_traacker: 1
+all genparts: N: 55, PID: 113, Q: 0.0, P: 4.91e+00, Theta: 2.54e+00, Phi: -2.60e+00, M: 8.22e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [74, 75], decayed_traacker: 1
+all genparts: N: 56, PID: 221, Q: 0.0, P: 3.11e+00, Theta: 2.59e+00, Phi: -2.46e+00, M: 5.48e-01, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [76, 77, 78], decayed_traacker: 1
+all genparts: N: 57, PID: 211, Q: 1.0, P: 3.72e+00, Theta: 2.59e+00, Phi: -2.32e+00, M: 1.40e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [], decayed_traacker: 0
+all genparts: N: 58, PID: -211, Q: -1.0, P: 5.01e+00, Theta: 2.45e+00, Phi: -2.75e+00, M: 1.40e-01, status: 1, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [], decayed_traacker: 0
+all genparts: N: 59, PID: -423, Q: 0.0, P: 2.04e+01, Theta: 2.58e+00, Phi: -2.50e+00, M: 2.01e+00, status: 2, parents: [19, 22, 28, 32, 33, 35, 39, 41, 42], daughters: [79, 80], decayed_traacker: 0
+all genparts: N: 60, PID: 311, Q: 0.0, P: 1.78e+01, Theta: 6.47e-01, Phi: 7.23e-01, M: 4.98e-01, status: 2, parents: [43], daughters: [81], decayed_traacker: 1
+all genparts: N: 61, PID: 223, Q: 0.0, P: 1.17e+01, Theta: 5.66e-01, Phi: 6.69e-01, M: 7.75e-01, status: 2, parents: [43], daughters: [82, 83], decayed_traacker: 1
+all genparts: N: 62, PID: 211, Q: 1.0, P: 2.13e+00, Theta: 6.96e-01, Phi: 6.06e-01, M: 1.40e-01, status: 1, parents: [44], daughters: [], decayed_traacker: 0
+all genparts: N: 63, PID: -211, Q: -1.0, P: 7.24e-01, Theta: 8.12e-01, Phi: -3.16e-01, M: 1.40e-01, status: 1, parents: [44], daughters: [], decayed_traacker: 0
+all genparts: N: 64, PID: 211, Q: 1.0, P: 8.79e-01, Theta: 6.20e-01, Phi: 5.81e-01, M: 1.40e-01, status: 1, parents: [45], daughters: [], decayed_traacker: 0
+all genparts: N: 65, PID: -211, Q: -1.0, P: 9.74e-01, Theta: 6.26e-01, Phi: 5.65e-01, M: 1.40e-01, status: 1, parents: [45], daughters: [], decayed_traacker: 0
+all genparts: N: 66, PID: 111, Q: 0.0, P: 3.26e+00, Theta: 5.57e-01, Phi: 4.46e-01, M: 1.35e-01, status: 2, parents: [45], daughters: [84, 85], decayed_traacker: 1
+all genparts: N: 67, PID: 130, Q: 0.0, P: 2.01e+00, Theta: 7.75e-01, Phi: 3.71e-01, M: 4.98e-01, status: 1, parents: [47], daughters: [133, 134, 135], decayed_traacker: 1
+all genparts: N: 68, PID: 310, Q: 0.0, P: 1.44e+00, Theta: 5.54e-01, Phi: 7.84e-01, M: 4.98e-01, status: 2, parents: [48], daughters: [86, 87], decayed_traacker: 1
+all genparts: N: 69, PID: 211, Q: 1.0, P: 3.24e-01, Theta: 4.82e-01, Phi: -6.00e-02, M: 1.40e-01, status: 1, parents: [49], daughters: [], decayed_traacker: 0
+all genparts: N: 70, PID: -211, Q: -1.0, P: 5.76e-01, Theta: 3.60e-01, Phi: 1.73e-01, M: 1.40e-01, status: 1, parents: [49], daughters: [], decayed_traacker: 0
+all genparts: N: 71, PID: 111, Q: 0.0, P: 7.54e-01, Theta: 6.61e-01, Phi: -5.08e-01, M: 1.35e-01, status: 2, parents: [49], daughters: [88, 89], decayed_traacker: 1
+all genparts: N: 72, PID: -211, Q: -1.0, P: 1.27e+00, Theta: 2.65e+00, Phi: -1.77e+00, M: 1.40e-01, status: 1, parents: [54], daughters: [], decayed_traacker: 0
+all genparts: N: 73, PID: 111, Q: 0.0, P: 1.75e+00, Theta: 2.29e+00, Phi: -2.43e+00, M: 1.35e-01, status: 2, parents: [54], daughters: [90, 91], decayed_traacker: 1
+all genparts: N: 74, PID: 211, Q: 1.0, P: 7.56e-01, Theta: 2.43e+00, Phi: -3.14e+00, M: 1.40e-01, status: 1, parents: [55], daughters: [], decayed_traacker: 0
+all genparts: N: 75, PID: -211, Q: -1.0, P: 4.21e+00, Theta: 2.55e+00, Phi: -2.49e+00, M: 1.40e-01, status: 1, parents: [55], daughters: [103], decayed_traacker: 0
+all genparts: N: 76, PID: 211, Q: 1.0, P: 1.15e+00, Theta: 2.54e+00, Phi: -2.48e+00, M: 1.40e-01, status: 1, parents: [56], daughters: [], decayed_traacker: 0
+all genparts: N: 77, PID: -211, Q: -1.0, P: 1.38e+00, Theta: 2.55e+00, Phi: -2.34e+00, M: 1.40e-01, status: 1, parents: [56], daughters: [], decayed_traacker: 0
+all genparts: N: 78, PID: 111, Q: 0.0, P: 6.02e-01, Theta: 2.73e+00, Phi: -2.78e+00, M: 1.35e-01, status: 2, parents: [56], daughters: [92, 93], decayed_traacker: 1
+all genparts: N: 79, PID: -421, Q: 0.0, P: 1.91e+01, Theta: 2.58e+00, Phi: -2.50e+00, M: 1.86e+00, status: 2, parents: [59], daughters: [94, 95, 96], decayed_traacker: 1
+all genparts: N: 80, PID: 111, Q: 0.0, P: 1.25e+00, Theta: 2.60e+00, Phi: -2.45e+00, M: 1.35e-01, status: 2, parents: [59], daughters: [97, 98], decayed_traacker: 1
+all genparts: N: 81, PID: 130, Q: 0.0, P: 1.78e+01, Theta: 6.47e-01, Phi: 7.23e-01, M: 4.98e-01, status: 1, parents: [60], daughters: [], decayed_traacker: 0
+all genparts: N: 82, PID: 111, Q: 0.0, P: 4.20e+00, Theta: 5.49e-01, Phi: 8.26e-01, M: 1.35e-01, status: 2, parents: [61], daughters: [99, 100], decayed_traacker: 1
+all genparts: N: 83, PID: 22, Q: 0.0, P: 7.54e+00, Theta: 5.80e-01, Phi: 5.86e-01, M: 0.00e+00, status: 1, parents: [61], daughters: [], decayed_traacker: 0
+all genparts: N: 84, PID: 22, Q: 0.0, P: 2.64e+00, Theta: 5.48e-01, Phi: 4.11e-01, M: 0.00e+00, status: 1, parents: [66], daughters: [], decayed_traacker: 0
+all genparts: N: 85, PID: 22, Q: 0.0, P: 6.19e-01, Theta: 6.00e-01, Phi: 5.81e-01, M: 0.00e+00, status: 1, parents: [66], daughters: [], decayed_traacker: 0
+all genparts: N: 86, PID: 211, Q: 1.0, P: 9.29e-01, Theta: 5.81e-01, Phi: 3.88e-01, M: 1.40e-01, status: 1, parents: [68], daughters: [], decayed_traacker: 0
+all genparts: N: 87, PID: -211, Q: -1.0, P: 5.70e-01, Theta: 6.59e-01, Phi: 1.38e+00, M: 1.40e-01, status: 1, parents: [68], daughters: [131, 132], decayed_traacker: 1
+all genparts: N: 88, PID: 22, Q: 0.0, P: 3.35e-01, Theta: 4.61e-01, Phi: -5.38e-01, M: 0.00e+00, status: 1, parents: [71], daughters: [], decayed_traacker: 0
+all genparts: N: 89, PID: 22, Q: 0.0, P: 4.30e-01, Theta: 8.17e-01, Phi: -4.94e-01, M: 0.00e+00, status: 1, parents: [71], daughters: [], decayed_traacker: 0
+all genparts: N: 90, PID: 22, Q: 0.0, P: 1.02e+00, Theta: 2.24e+00, Phi: -2.50e+00, M: 0.00e+00, status: 1, parents: [73], daughters: [], decayed_traacker: 0
+all genparts: N: 91, PID: 22, Q: 0.0, P: 7.42e-01, Theta: 2.34e+00, Phi: -2.34e+00, M: 0.00e+00, status: 1, parents: [73], daughters: [], decayed_traacker: 0
+all genparts: N: 92, PID: 22, Q: 0.0, P: 3.30e-02, Theta: 1.79e+00, Phi: -2.41e+00, M: 0.00e+00, status: 1, parents: [78], daughters: [], decayed_traacker: 0
+all genparts: N: 93, PID: 22, Q: 0.0, P: 5.84e-01, Theta: 2.77e+00, Phi: -2.84e+00, M: 0.00e+00, status: 1, parents: [78], daughters: [], decayed_traacker: 0
+all genparts: N: 94, PID: 310, Q: 0.0, P: 1.20e+01, Theta: 2.58e+00, Phi: -2.49e+00, M: 4.98e-01, status: 2, parents: [79], daughters: [101, 102], decayed_traacker: 1
+all genparts: N: 95, PID: -211, Q: -1.0, P: 2.12e+00, Theta: 2.45e+00, Phi: -2.83e+00, M: 1.40e-01, status: 1, parents: [79], daughters: [], decayed_traacker: 0
+all genparts: N: 96, PID: 211, Q: 1.0, P: 5.13e+00, Theta: 2.61e+00, Phi: -2.36e+00, M: 1.40e-01, status: 1, parents: [79], daughters: [], decayed_traacker: 0
+all genparts: N: 97, PID: 22, Q: 0.0, P: 5.68e-01, Theta: 2.55e+00, Phi: -2.65e+00, M: 0.00e+00, status: 1, parents: [80], daughters: [], decayed_traacker: 0
+all genparts: N: 98, PID: 22, Q: 0.0, P: 6.89e-01, Theta: 2.63e+00, Phi: -2.27e+00, M: 0.00e+00, status: 1, parents: [80], daughters: [], decayed_traacker: 0
+all genparts: N: 99, PID: 22, Q: 0.0, P: 2.37e+00, Theta: 5.26e-01, Phi: 7.93e-01, M: 0.00e+00, status: 1, parents: [82], daughters: [141, 142], decayed_traacker: 1
+all genparts: N: 100, PID: 22, Q: 0.0, P: 1.84e+00, Theta: 5.79e-01, Phi: 8.65e-01, M: 0.00e+00, status: 1, parents: [82], daughters: [], decayed_traacker: 0
+all genparts: N: 101, PID: 211, Q: 1.0, P: 3.41e+00, Theta: 2.60e+00, Phi: -2.58e+00, M: 1.40e-01, status: 1, parents: [94], daughters: [], decayed_traacker: 0
+all genparts: N: 102, PID: -211, Q: -1.0, P: 8.55e+00, Theta: 2.58e+00, Phi: -2.45e+00, M: 1.40e-01, status: 1, parents: [94], daughters: [], decayed_traacker: 0
+all genparts: N: 103, PID: 11, Q: -1.0, P: 2.00e-02, Theta: 2.59e+00, Phi: -2.89e+00, M: 5.11e-04, status: 0, parents: [75], daughters: [104, 105], decayed_traacker: 1
+all genparts: N: 104, PID: 11, Q: -1.0, P: 1.58e-03, Theta: 2.17e+00, Phi: -1.28e+00, M: 5.11e-04, status: 0, parents: [103], daughters: [], decayed_traacker: 1
+all genparts: N: 105, PID: 22, Q: 0.0, P: 4.99e-03, Theta: 2.62e+00, Phi: 2.71e+00, M: 0.00e+00, status: 0, parents: [103], daughters: [], decayed_traacker: 0
+all genparts: N: 106, PID: 11, Q: -1.0, P: 3.67e-03, Theta: 1.72e+00, Phi: 3.05e+00, M: 5.11e-04, status: 0, parents: [53], daughters: [], decayed_traacker: 1
+all genparts: N: 107, PID: 14, Q: 0.0, P: 2.98e-02, Theta: 4.53e-01, Phi: 2.08e+00, M: 0.00e+00, status: 0, parents: [51], daughters: [], decayed_traacker: 0
+all genparts: N: 108, PID: -13, Q: 1.0, P: 2.98e-02, Theta: 2.69e+00, Phi: -1.06e+00, M: 1.06e-01, status: 0, parents: [51], daughters: [109, 110, 111], decayed_traacker: 1
+all genparts: N: 109, PID: -14, Q: 0.0, P: 4.87e-02, Theta: 6.84e-01, Phi: -7.33e-01, M: 0.00e+00, status: 0, parents: [108], daughters: [], decayed_traacker: 0
+all genparts: N: 110, PID: 12, Q: 0.0, P: 8.70e-03, Theta: 2.09e+00, Phi: 6.12e-01, M: 0.00e+00, status: 0, parents: [108], daughters: [], decayed_traacker: 0
+all genparts: N: 111, PID: -11, Q: 1.0, P: 4.77e-02, Theta: 2.36e+00, Phi: 2.63e+00, M: 5.11e-04, status: 0, parents: [108], daughters: [112, 113, 114, 115, 116, 117], decayed_traacker: 1
+all genparts: N: 112, PID: 22, Q: 0.0, P: 2.61e-03, Theta: 2.37e+00, Phi: 2.55e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [125], decayed_traacker: 1
+all genparts: N: 113, PID: 22, Q: 0.0, P: 7.18e-03, Theta: 2.17e+00, Phi: 2.63e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [124], decayed_traacker: 1
+all genparts: N: 114, PID: 22, Q: 0.0, P: 1.00e-02, Theta: 1.98e+00, Phi: 2.74e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [122, 123], decayed_traacker: 1
+all genparts: N: 115, PID: 22, Q: 0.0, P: 1.86e-03, Theta: 1.99e+00, Phi: 2.70e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [121], decayed_traacker: 1
+all genparts: N: 116, PID: 22, Q: 0.0, P: 4.06e-03, Theta: 1.34e+00, Phi: 1.41e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [120], decayed_traacker: 1
+all genparts: N: 117, PID: 22, Q: 0.0, P: 7.46e-03, Theta: 1.45e+00, Phi: 1.49e+00, M: 0.00e+00, status: 0, parents: [111], daughters: [118, 119], decayed_traacker: 1
+all genparts: N: 118, PID: 11, Q: -1.0, P: 3.18e-03, Theta: 1.52e+00, Phi: 1.56e+00, M: 5.11e-04, status: 0, parents: [117], daughters: [], decayed_traacker: 1
+all genparts: N: 119, PID: -11, Q: 1.0, P: 4.20e-03, Theta: 1.29e+00, Phi: 1.29e+00, M: 5.11e-04, status: 0, parents: [117], daughters: [], decayed_traacker: 1
+all genparts: N: 120, PID: 11, Q: -1.0, P: 2.05e-03, Theta: 8.59e-01, Phi: 1.57e+00, M: 5.11e-04, status: 0, parents: [116], daughters: [], decayed_traacker: 1
+all genparts: N: 121, PID: 11, Q: -1.0, P: 1.87e-03, Theta: 2.22e+00, Phi: 2.65e+00, M: 5.11e-04, status: 0, parents: [115], daughters: [], decayed_traacker: 1
+all genparts: N: 122, PID: 11, Q: -1.0, P: 2.34e-03, Theta: 2.06e+00, Phi: 2.63e+00, M: 5.11e-04, status: 0, parents: [114], daughters: [], decayed_traacker: 1
+all genparts: N: 123, PID: -11, Q: 1.0, P: 7.59e-03, Theta: 1.96e+00, Phi: 2.75e+00, M: 5.11e-04, status: 0, parents: [114], daughters: [], decayed_traacker: 1
+all genparts: N: 124, PID: -11, Q: 1.0, P: 5.71e-03, Theta: 2.21e+00, Phi: 2.80e+00, M: 5.11e-04, status: 0, parents: [113], daughters: [], decayed_traacker: 1
+all genparts: N: 125, PID: 11, Q: -1.0, P: 2.67e-03, Theta: 2.31e+00, Phi: 2.74e+00, M: 5.11e-04, status: 0, parents: [112], daughters: [], decayed_traacker: 1
+all genparts: N: 126, PID: 11, Q: -1.0, P: 2.10e-01, Theta: 2.02e+00, Phi: 1.25e+00, M: 5.11e-04, status: 0, parents: [50], daughters: [], decayed_traacker: 0
+all genparts: N: 127, PID: -12, Q: 0.0, P: 8.96e-02, Theta: 2.13e+00, Phi: 9.21e-01, M: 0.00e+00, status: 0, parents: [50], daughters: [], decayed_traacker: 0
+all genparts: N: 128, PID: 111, Q: 0.0, P: 4.13e-01, Theta: 2.28e+00, Phi: -6.45e-01, M: 1.35e-01, status: 0, parents: [50], daughters: [129, 130], decayed_traacker: 1
+all genparts: N: 129, PID: 22, Q: 0.0, P: 3.96e-01, Theta: 2.30e+00, Phi: -5.34e-01, M: 0.00e+00, status: 0, parents: [128], daughters: [], decayed_traacker: 0
+all genparts: N: 130, PID: 22, Q: 0.0, P: 3.85e-02, Theta: 1.71e+00, Phi: -1.68e+00, M: 0.00e+00, status: 0, parents: [128], daughters: [], decayed_traacker: 0
+all genparts: N: 131, PID: -14, Q: 0.0, P: 8.58e-02, Theta: 3.32e-01, Phi: 2.73e+00, M: 0.00e+00, status: 0, parents: [87], daughters: [], decayed_traacker: 0
+all genparts: N: 132, PID: 13, Q: -1.0, P: 4.89e-01, Theta: 7.10e-01, Phi: 2.96e+00, M: 1.06e-01, status: 0, parents: [87], daughters: [], decayed_traacker: 0
+all genparts: N: 133, PID: 13, Q: -1.0, P: 6.68e-01, Theta: 8.64e-01, Phi: 1.24e-01, M: 1.06e-01, status: 0, parents: [67], daughters: [], decayed_traacker: 0
+all genparts: N: 134, PID: -14, Q: 0.0, P: 1.69e-01, Theta: 5.19e-01, Phi: -2.94e-01, M: 0.00e+00, status: 0, parents: [67], daughters: [], decayed_traacker: 0
+all genparts: N: 135, PID: 211, Q: 1.0, P: 1.22e+00, Theta: 7.92e-01, Phi: 5.76e-01, M: 1.40e-01, status: 0, parents: [67], daughters: [], decayed_traacker: 0
+all genparts: N: 136, PID: 111, Q: 0.0, P: 1.04e+00, Theta: 5.41e-01, Phi: 6.96e-01, M: 1.35e-01, status: 0, parents: [46], daughters: [139, 140], decayed_traacker: 1
+all genparts: N: 137, PID: 211, Q: 1.0, P: 1.07e+00, Theta: 6.36e-01, Phi: -3.33e-04, M: 1.40e-01, status: 0, parents: [46], daughters: [138], decayed_traacker: 0
+all genparts: N: 138, PID: 11, Q: -1.0, P: 1.72e-03, Theta: 1.03e+00, Phi: -9.12e-01, M: 5.11e-04, status: 0, parents: [137], daughters: [], decayed_traacker: 0
+all genparts: N: 139, PID: 22, Q: 0.0, P: 7.38e-01, Theta: 5.35e-01, Phi: 8.59e-01, M: 0.00e+00, status: 0, parents: [136], daughters: [], decayed_traacker: 0
+all genparts: N: 140, PID: 22, Q: 0.0, P: 3.14e-01, Theta: 5.98e-01, Phi: 3.43e-01, M: 0.00e+00, status: 0, parents: [136], daughters: [], decayed_traacker: 0
+all genparts: N: 141, PID: 11, Q: -1.0, P: 1.54e+00, Theta: 5.28e-01, Phi: 7.89e-01, M: 5.11e-04, status: 0, parents: [99], daughters: [144], decayed_traacker: 0
+all genparts: N: 142, PID: -11, Q: 1.0, P: 8.22e-01, Theta: 5.25e-01, Phi: 7.97e-01, M: 5.11e-04, status: 0, parents: [99], daughters: [143], decayed_traacker: 0
+all genparts: N: 143, PID: 22, Q: 0.0, P: 1.63e-03, Theta: 5.24e-01, Phi: 7.78e-01, M: 0.00e+00, status: 0, parents: [142], daughters: [], decayed_traacker: 0
+all genparts: N: 144, PID: 11, Q: -1.0, P: 2.37e-03, Theta: 9.01e-01, Phi: 6.59e-02, M: 5.11e-04, status: 0, parents: [141], daughters: [], decayed_traacker: 1

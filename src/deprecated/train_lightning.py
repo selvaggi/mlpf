@@ -124,7 +124,7 @@ def main():
         print("args.load_model_weights", args.load_model_weights)
         if args.load_model_weights is not None:
             print("LOADING MODEL WEIGHTS")
-            from src.models.GATr.Gatr import ExampleWrapper as GravnetModel
+            from mlpf.src.models.GATr.deprecated.Gatr import ExampleWrapper as GravnetModel
 
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0

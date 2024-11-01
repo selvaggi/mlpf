@@ -1,5 +1,6 @@
 from os import path
 import sys
+
 # sys.path.append(
 #     path.abspath("/afs/cern.ch/work/m/mgarciam/private/geometric-algebra-transformer/")
 # )
@@ -30,8 +31,7 @@ from src.models.energy_correction_NN import (
     ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
     PickPAtDCA,
-    AverageHitsP,
-    ECNetWrapperAvg
+    AverageHitsP
 )
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
@@ -41,10 +41,10 @@ from src.layers.inference_oc_tracks import (
     evaluate_efficiency_tracks,
     store_at_batch_end,
 )
-from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # from src.layers.obtain_statistics import (
 #     obtain_statistics_graph_tracking,
@@ -136,6 +136,9 @@ class ExampleWrapper(L.LightningModule):
                 print(
                     "Regressing position as well, changing the hardcoded models to sth else"
                 )
+                print(
+                    "Regressing position as well, changing the hardcoded models to sth else"
+                )
             if self.args.ec_model == "gat":
                 in_features = 17
                 if self.args.add_track_chis:
@@ -204,7 +207,7 @@ class ExampleWrapper(L.LightningModule):
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
-                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                '''self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=20,
@@ -215,11 +218,8 @@ class ExampleWrapper(L.LightningModule):
                     charged=True,
                     pid_channels=len(self.pids_charged),
                     unit_p=self.args.regress_unit_p,
-                    out_f=1,
-                    neutral_avg=False,
-                    neutral_PCA=False,
-                    neutral_thrust_axis=False,
-                )
+                    out_f=1
+                )'''
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
                     in_features_global=num_global_features,
@@ -231,13 +231,12 @@ class ExampleWrapper(L.LightningModule):
                     pid_channels=len(self.pids_neutral),
                     unit_p=self.args.regress_unit_p,
                     out_f=out_f,
-                    neutral_avg=self.args.predict,
+                    neutral_avg=True,
                     neutral_PCA=False,
                     neutral_thrust_axis=False
                 )
-                self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
-                #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral # Only for the Ks dataset!!
-                #print(" !! Using the same model for charged and neutral !! - Use only for the Ks->pi0pi0 decays!!! ")
+                self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral
+                print(" !! Using the same model for charged and neutral !! ")
             else:  # DNN
                 # only a DNN for energy correction
                 if not self.args.add_track_chis:
@@ -266,6 +265,7 @@ class ExampleWrapper(L.LightningModule):
                             gnn=False,
                             pos_regression=self.args.regress_pos,
                             charged=True,
+                            no_trainable_params=False
                         )
                     )
                     # self.pos_dca = PickPAtDCA()
@@ -288,18 +288,18 @@ class ExampleWrapper(L.LightningModule):
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         inputs = g.ndata["pos_hits_xyz"]
-        # if self.trainer.is_global_zero and step_count % 500 == 0:
-        #     g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
-        #     PlotCoordinates(
+        if self.trainer.is_global_zero and step_count % 500 == 0:
+            g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
+            PlotCoordinates(
 
-        #         g,
-        #         path="input_coords",
-        #         outdir=self.args.model_prefix,
-        #         # features_type="ones",
-        #         predict=self.args.predict,
-        #         epoch=str(self.current_epoch) + eval,
-        #         step_count=step_count,
-        #     )
+                g,
+                path="input_coords",
+                outdir=self.args.model_prefix,
+                # features_type="ones",
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         inputs_scalar = g.ndata["hit_type"].view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
@@ -327,20 +327,20 @@ class ExampleWrapper(L.LightningModule):
         )
         x_cluster_coord = self.clustering(x_point)
         beta = self.beta(x_scalar)
-        #if self.args.tracks:
-        #    mask = g.ndata["hit_type"] == 1
-        #    beta[mask] = 9
+        # if self.args.tracks:
+        #     mask = g.ndata["hit_type"] == 1
+        #     beta[mask] = 9
         g.ndata["final_cluster"] = x_cluster_coord
         g.ndata["beta"] = beta.view(-1)
-        # if self.trainer.is_global_zero and step_count % 500 == 0:
-        #     PlotCoordinates(
-        #         g,
-        #         path="final_clustering",
-        #         outdir=self.args.model_prefix,
-        #         predict=self.args.predict,
-        #         epoch=str(self.current_epoch) + eval,
-        #         step_count=step_count,
-        #     )
+        if self.trainer.is_global_zero and step_count % 500 == 0:
+            PlotCoordinates(
+                g,
+                path="final_clustering",
+                outdir=self.args.model_prefix,
+                predict=self.args.predict,
+                epoch=str(self.current_epoch) + eval,
+                step_count=step_count,
+            )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
         if self.args.correction:
@@ -371,20 +371,18 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
-            pred_pid,
-            features_charged_no_nan,
-            number_of_fakes
-        ) = self.clustering_and_global_features(g, x, y, add_fakes=self.args.predict)
+            pred_pid
+        ) = self.clustering_and_global_features(g, x, y)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
-            graphs_new, charged_idx, features_charged_no_nan
+            graphs_new, charged_idx, graphs_high_level_features
         )
-        neutral_energies, neutral_pxyz_avg = self.neutral_prediction(
+        neutral_energies = self.neutral_prediction(
             graphs_new, neutral_idx, features_neutral_no_nan
         )
         if self.args.regress_pos:
             if len(self.pids_charged):
-                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies # charged_pxyz_pred: we are also storing the xyz of the track, to see the effect of the weirdly fitted tracks on the results
+                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies
             else:
                 charged_energies, charged_positions, _ = charged_energies
             if len(self.pids_neutral):
@@ -427,10 +425,10 @@ class ExampleWrapper(L.LightningModule):
             ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
         # dummy loss to make it work without complaining about not using params in loss
         pred_energy_corr[charged_idx.flatten()] = (
-            charged_energies #/ sum_e.flatten()[charged_idx.flatten()]
+            charged_energies / sum_e.flatten()[charged_idx.flatten()]
         )
         pred_energy_corr[neutral_idx.flatten()] = (
-            neutral_energies #/ sum_e.flatten()[neutral_idx.flatten()]
+            neutral_energies / sum_e.flatten()[neutral_idx.flatten()]
         )
         if len(self.pids_charged):
             if len(charged_idx):
@@ -482,7 +480,6 @@ class ExampleWrapper(L.LightningModule):
                 true_pid,
                 true_new,
                 true_coords,
-                number_of_fakes
             )
         else:
             if self.args.explain_ec:
@@ -498,7 +495,6 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     shap_vals,
                     ec_x,
-                    number_of_fakes
                 )
             return (
                 x,
@@ -511,7 +507,6 @@ class ExampleWrapper(L.LightningModule):
                 true_pid,
                 e_true_corr_daughters,
                 true_coords,
-                number_of_fakes
             )
 
     def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
@@ -521,11 +516,10 @@ class ExampleWrapper(L.LightningModule):
             charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
             charged_energies = (self.ec_model_wrapper_charged
             .predict(
-                graphs_high_level_features,
+                graphs_high_level_features[charged_idx],
                 charged_graphs,
                 explain=self.args.explain_ec,
             ))
-
         else:
             if not self.args.regress_pos:
                 charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
@@ -548,13 +542,6 @@ class ExampleWrapper(L.LightningModule):
                 neutral_graphs,
                 explain=self.args.explain_ec,
             )
-            # print("features_neutral_no_nan", features_neutral_no_nan)
-            # print(neutral_energies[0])
-            neutral_pxyz_avg = self.ec_model_wrapper_neutral_avg.predict(
-                features_neutral_no_nan,
-                neutral_graphs,
-                explain=self.args.explain_ec,
-            )[1]
         else:
             if not self.args.regress_pos:
                 neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
@@ -566,26 +553,24 @@ class ExampleWrapper(L.LightningModule):
                         ]
             if len(self.pids_neutral):
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
-        return neutral_energies, neutral_pxyz_avg
+        return neutral_energies
 
-    def clustering_and_global_features(self, g, x, y, add_fakes=True):
+    def clustering_and_global_features(self, g, x, y):
         time_matching_start = time()
         # Match graphs
         (
-            graphs_new, # Contains both fakes and true showers
-            true_new, # FOR THE MATCHED SHOWERS
-            sum_e, # FOR THE MATCHED + FAKE SHOWERS
-            true_pid, # FOR THE MATCHED SHOWERS
-            e_true_corr_daughters, # FOR THE MATCHED SHOWERS
-            true_coords, # FOR THE MATCHED SHOWERS
-            number_of_fakes
+            graphs_new,
+            true_new,
+            sum_e,
+            true_pid,
+            e_true_corr_daughters,
+            true_coords,
         ) = obtain_clustering_for_matched_showers(
             g,
             x,
             y,
             self.trainer.global_rank,
             use_gt_clusters=self.args.use_gt_clusters,
-            add_fakes=add_fakes,
         )
         time_matching_end = time()
         # wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
@@ -674,8 +659,6 @@ class ExampleWrapper(L.LightningModule):
         )
         features_neutral_no_nan = graphs_high_level_features[neutral_idx]
         features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
-        features_charged_no_nan = graphs_high_level_features[charged_idx]
-        features_charged_no_nan[features_charged_no_nan != features_charged_no_nan] = 0
         # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
         return (
             graphs_new,
@@ -691,9 +674,7 @@ class ExampleWrapper(L.LightningModule):
             batch_idx,
             e_true_corr_daughters,
             pred_energy_corr,
-            pred_pid,
-            features_charged_no_nan,
-            number_of_fakes
+            pred_pid
         )
 
     def build_attention_mask(self, g):
@@ -718,7 +699,7 @@ class ExampleWrapper(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        initial_time = time()
+        # initial_time = time()
         if self.trainer.is_global_zero:
             result = self(batch_g, y, batch_idx)
         else:
@@ -735,7 +716,6 @@ class ExampleWrapper(L.LightningModule):
                 pid_true_matched,
                 e_true_corr_daughters,
                 part_coords_matched,
-                num_fakes
             ) = result
         else:
             (model_output, e_cor, _, _) = result
@@ -746,9 +726,7 @@ class ExampleWrapper(L.LightningModule):
                 e_cor["pred_pos"],
                 e_cor["neutrals_idx"],
                 e_cor["charged_idx"],
-                e_cor["pred_ref_pt"],
-                #e_cor["pred_pos_avg"],
-
+                e_cor["pred_ref_pt"]
             )
             if len(self.pids_charged):
                 charged_PID_pred = dic["charged_PID_pred"]
@@ -773,7 +751,7 @@ class ExampleWrapper(L.LightningModule):
                 if type(neutral_PID_true) == np.float64:
                     neutral_PID_true = [neutral_PID_true]
                 # One-hot encoded
-                #print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
+                print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
                 neutral_PID_true_onehot = torch.zeros(
                     len(neutral_PID_true), len(self.pids_neutral)
                 )
@@ -787,8 +765,8 @@ class ExampleWrapper(L.LightningModule):
                     for i in range(len(neutral_PID_true)):
                         neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
-        loss_time_start = time()
-        (loss, losses,) = object_condensation_loss2(
+        # loss_time_start = time()
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor,
@@ -804,12 +782,12 @@ class ExampleWrapper(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
         )
-        loss_time_end = time()
+        # loss_time_end = time()
         # wandb.log({"loss_comp_time_inside_training": loss_time_end - loss_time_start})
         if self.args.correction:
             # loss_EC = torch.nn.L1Loss()(e_cor * e_sum_hits, e_true)
             step = self.trainer.global_step
-            loss_EC = criterion(e_cor, e_true_corr_daughters, step)
+            loss_EC = criterion(e_cor * e_sum_hits, e_true_corr_daughters, step)
             if self.args.regress_pos:
                 true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
                 if self.args.regress_unit_p:
@@ -858,7 +836,7 @@ class ExampleWrapper(L.LightningModule):
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             # wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
-            #loss = loss_EC_neutrals
+            # loss = loss_EC
             if self.args.save_features:
                 cluster_features_path = os.path.join(
                     self.args.model_prefix, "cluster_features"
@@ -881,19 +859,18 @@ class ExampleWrapper(L.LightningModule):
                         "pid_y": pid_true_matched,
                     },
                 )
-        misc_time_start = time()
+
+        # misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
-        
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
         del model_output
         del e_cor
         del losses
-        final_time = time()
+        # final_time = time()
         # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
         # wandb.log({"training_step_time": final_time - initial_time})
-
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -924,7 +901,6 @@ class ExampleWrapper(L.LightningModule):
                     e_true_corr_daughters,
                     shap_vals,
                     ec_x,
-                    num_fakes
                 ) = result
             else:
                 (
@@ -938,7 +914,6 @@ class ExampleWrapper(L.LightningModule):
                     pid_true_matched,
                     e_true_corr_daughters,
                     coords_true,
-                    num_fakes
                 ) = result
             if self.args.regress_pos:
                 if len(self.pids_charged):
@@ -979,7 +954,7 @@ class ExampleWrapper(L.LightningModule):
         #     self.args.losstype = "hgcalimplementation"
         # else:
         #     self.args.losstype = "vrepweighted"
-        (loss, losses,) = object_condensation_loss2(
+        loss, losses = object_condensation_loss2(
             batch_g,
             model_output,
             e_cor1,
@@ -996,17 +971,18 @@ class ExampleWrapper(L.LightningModule):
             loss_type=self.args.losstype,
         )
         loss_ec = 0
-        print("Starting validation step", batch_idx, loss)
+
+        print("starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(
                 True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
             )
         if self.args.explain_ec:
             self.validation_step_outputs.append(
-                [model_output, e_cor, batch_g, y, shap_vals, ec_x, num_fakes]
+                [model_output, e_cor, batch_g, y, shap_vals, ec_x]
             )
         else:
-            self.validation_step_outputs.append([model_output, e_cor, batch_g, y, num_fakes])
+            self.validation_step_outputs.append([model_output, e_cor, batch_g, y])
         if self.args.predict:
             if self.args.correction:
                 model_output1 = model_output
@@ -1040,7 +1016,6 @@ class ExampleWrapper(L.LightningModule):
                 use_gt_clusters=self.args.use_gt_clusters,
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,
-                number_of_fakes=num_fakes,
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
@@ -1098,44 +1073,42 @@ class ExampleWrapper(L.LightningModule):
                     predict=True,
                     store=True,
                 )
-            else:
-                model_output = self.validation_step_outputs[0][0]
-                e_corr = self.validation_step_outputs[0][1]
-                batch_g = self.validation_step_outputs[0][2]
-                y = self.validation_step_outputs[0][3]
-                shap_vals = None
-                ec_x = None
-                if self.args.explain_ec:
-                    shap_vals = self.validation_step_outputs[0][4]
-                    ec_x = self.validation_step_outputs[0][5]
-                if self.args.correction:
-                    model_output1 = model_output
-                    e_corr = e_corr
-                else:
-                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                    e_corr = None
-                '''print("------------------------------------self.validation_step_outputs[0][4]", self.validation_step_outputs[0][4])
-                create_and_store_graph_output(
-                    batch_g,
-                    model_output1,
-                    y,
-                    0,
-                    0,
-                    0,
-                    path_save=os.path.join(
-                        self.args.model_prefix, "showers_df_evaluation"
-                    ),
-                    store=True,
-                    predict=False,
-                    e_corr=e_corr,
-                    tracks=self.args.tracks,
-                    shap_vals=shap_vals,
-                    ec_x=ec_x,
-                    use_gt_clusters=self.args.use_gt_clusters,
-                    number_of_fakes = self.validation_step_outputs[0][4]
-                )'''
-                del model_output1
-                del batch_g
+            # else:
+            #     model_output = self.validation_step_outputs[0][0]
+            #     e_corr = self.validation_step_outputs[0][1]
+            #     batch_g = self.validation_step_outputs[0][2]
+            #     y = self.validation_step_outputs[0][3]
+            #     shap_vals = None
+            #     ec_x = None
+            #     if self.args.explain_ec:
+            #         shap_vals = self.validation_step_outputs[0][4]
+            #         ec_x = self.validation_step_outputs[0][5]
+            #     if self.args.correction:
+            #         model_output1 = model_output
+            #         e_corr = e_corr
+            #     else:
+            #         model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+            #         e_corr = None
+            #     create_and_store_graph_output(
+            #         batch_g,
+            #         model_output1,
+            #         y,
+            #         0,
+            #         0,
+            #         0,
+            #         path_save=os.path.join(
+            #             self.args.model_prefix, "showers_df_evaluation"
+            #         ),
+            #         store=True,
+            #         predict=False,
+            #         e_corr=e_corr,
+            #         tracks=self.args.tracks,
+            #         shap_vals=shap_vals,
+            #         ec_x=ec_x,
+            #         use_gt_clusters=self.args.use_gt_clusters,
+            #     )
+            #     del model_output1
+            #     del batch_g
         self.validation_step_outputs = []
         self.df_showers = []
         self.df_showers_pandora = []
@@ -1143,21 +1116,24 @@ class ExampleWrapper(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
-        # if self.args.lr_scheduler == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=int(50), # for now for testing
-            eta_min=0,
-        )
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=int(7900*3), # for now for testing
+        #     eta_min=1e-6,
+        # )
+        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(7900*3), fixed_lr=1e-6 )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
-                "interval": "epoch",
+                "interval": "step",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
             }}
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric=None):
+        # Manually step the scheduler
+        scheduler.step()
+   
 
 
 
@@ -1172,3 +1148,42 @@ def obtain_batch_numbers(g):
         num_nodes = gj.number_of_nodes()
     batch = torch.cat(batch_numbers, dim=0)
     return batch
+
+
+
+
+class CosineAnnealingThenFixedScheduler:
+    def __init__(self, optimizer, T_max, fixed_lr):
+        self.cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=fixed_lr)
+        self.fixed_lr = 1e-6
+        self.T_max = T_max
+        self.step_count = 0
+        self.optimizer = optimizer
+
+    def step(self):
+        if self.step_count < self.T_max:
+            self.cosine_scheduler.step()
+            # for param_group in self.optimizer.param_groups:
+            #     print("before scheduler change", param_group['lr'])
+        else:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.fixed_lr
+                # print("after scheduler change",param_group['lr'])
+        self.step_count += 1
+
+    def get_last_lr(self):
+        if self.step_count < self.T_max:
+            return self.cosine_scheduler.get_last_lr()
+        else:
+            return [self.fixed_lr for _ in self.optimizer.param_groups]
+    def state_dict(self):
+        # Save the state including current step count and cosine scheduler state
+        return {
+            "step_count": self.step_count,
+            "cosine_scheduler_state": self.cosine_scheduler.state_dict()
+        }
+
+    def load_state_dict(self, state_dict):
+        # Restore step count and cosine scheduler state
+        self.step_count = state_dict["step_count"]
+        self.cosine_scheduler.load_state_dict(state_dict["cosine_scheduler_state"])
