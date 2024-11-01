@@ -143,21 +143,21 @@ class GraphTransformerLayer(nn.Module):
 
         self.O = nn.Linear(out_dim, out_dim)
 
-        if self.layer_norm:
-            self.layer_norm1 = nn.LayerNorm(out_dim)
+        # if self.layer_norm:
+        #     self.layer_norm1 = nn.LayerNorm(out_dim)
 
-        if self.batch_norm:
-            self.batch_norm1 = nn.BatchNorm1d(out_dim)
+        # if self.batch_norm:
+        #     self.batch_norm1 = nn.BatchNorm1d(out_dim)
 
-        # FFN
-        self.FFN_layer1 = nn.Linear(out_dim, out_dim * 2)
-        self.FFN_layer2 = nn.Linear(out_dim * 2, out_dim)
+        # # FFN
+        # self.FFN_layer1 = nn.Linear(out_dim, out_dim * 2)
+        # self.FFN_layer2 = nn.Linear(out_dim * 2, out_dim)
 
-        if self.layer_norm:
-            self.layer_norm2 = nn.LayerNorm(out_dim)
+        # if self.layer_norm:
+        #     self.layer_norm2 = nn.LayerNorm(out_dim)
 
-        if self.batch_norm:
-            self.batch_norm2 = nn.BatchNorm1d(out_dim)
+        # if self.batch_norm:
+        #     self.batch_norm2 = nn.BatchNorm1d(out_dim)
 
     def forward(self, g, h):
         h_l = self.lin_h(h)
@@ -167,38 +167,38 @@ class GraphTransformerLayer(nn.Module):
         h_in1 = h_l  # for first residual connection
 
         # multi-head attention out
-        attn_out = self.attention(graph, h)
+        attn_out = self.attention(graph, h_l)
         h = attn_out.view(-1, self.out_channels)
 
         h = F.dropout(h, self.dropout, training=self.training)
 
         h = self.O(h)
-        
+
         h = self.lin(torch.cat((h_l, h), dim=1))
-        if self.residual:
-            h = h_in1 + h  # residual connection
+        # if self.residual:
+        #     h = h_in1 + h  # residual connection
 
-        if self.layer_norm:
-            h = self.layer_norm1(h)
+        # if self.layer_norm:
+        #     h = self.layer_norm1(h)
 
-        if self.batch_norm:
-            h = self.batch_norm1(h)
+        # if self.batch_norm:
+        #     h = self.batch_norm1(h)
 
-        h_in2 = h  # for second residual connection
+        # h_in2 = h  # for second residual connection
 
-        # FFN
-        h = self.FFN_layer1(h)
-        h = F.relu(h)
-        h = F.dropout(h, self.dropout, training=self.training)
-        h = self.FFN_layer2(h)
+        # # FFN
+        # h = self.FFN_layer1(h)
+        # h = F.relu(h)
+        # h = F.dropout(h, self.dropout, training=self.training)
+        # h = self.FFN_layer2(h)
 
-        if self.residual:
-            h = h_in2 + h  # residual connection
+        # if self.residual:
+        #     h = h_in2 + h  # residual connection
 
-        if self.layer_norm:
-            h = self.layer_norm2(h)
+        # if self.layer_norm:
+        #     h = self.layer_norm2(h)
 
-        if self.batch_norm:
-            h = self.batch_norm2(h)
+        # if self.batch_norm:
+        #     h = self.batch_norm2(h)
 
         return h, s_l

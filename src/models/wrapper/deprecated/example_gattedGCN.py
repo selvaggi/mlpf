@@ -1,5 +1,5 @@
 import torch
-from src.models.GattedGCN import GatedGCNNet
+from mlpf.src.models.deprecated.GattedGCN import GatedGCNNet
 
 
 class GatedGCNNetWrapper(torch.nn.Module):

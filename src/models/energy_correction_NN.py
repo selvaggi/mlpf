@@ -22,7 +22,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from src.models.gravnet_3_L import GravnetModel
 from src.models.thrust_axis import Thrust, hits_xyz_to_momenta, LR, weighted_least_squares_line
 from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean, scatter_sum
@@ -78,6 +77,7 @@ class ECNetWrapper(torch.nn.Module):
             print("Loaded energy correction model weights from", ckpt_file)
         # print("Temporarily not loading the model weights")
         self.model.to(device)
+
 
     def predict(self, x):
         # if isinstance(pred, tuple):
@@ -247,7 +247,10 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
             with open(ckpt_file.strip(), "rb") as f:
                 self.model.model = CPU_Unpickler(f).load()
-            print("Loaded energy correction model weights from", ckpt_file)
+                # if self.use_gatr:
+                #     self.gatr = CPU_Unpickler(f).load()
+            print("Loaded energy correction model weights from ECNetWrapperGNNGlobalFeaturesSeparate", ckpt_file)
+    
         else:
             print("Not loading energy correction model weights")
         self.model.to(device)

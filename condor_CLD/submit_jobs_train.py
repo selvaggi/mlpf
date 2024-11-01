@@ -76,7 +76,7 @@ def main():
     for name in glob.glob("{}/*.root".format(outdir)):
         list_of_outfiles.append(name)
 
-    script = "run_sequence_CLD_train.sh"
+    script = "run_sequence_CLD_train_ks.sh"
 
     jobCount = 0
 

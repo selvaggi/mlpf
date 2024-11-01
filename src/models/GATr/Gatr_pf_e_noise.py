@@ -17,12 +17,9 @@ import numpy as np
 from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
-from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_calibration import (
-    object_condensation_loss2,
-    obtain_batch_numbers,
-)
-from src.models.gravnet_3_L import obtain_clustering_for_matched_showers
+from src.layers.object_cond import object_condensation_loss2
+from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
     calculate_eta,
@@ -43,10 +40,10 @@ from src.layers.inference_oc_tracks import (
     evaluate_efficiency_tracks,
     store_at_batch_end,
 )
-from src.models.gravnet_3_L_tracking import object_condensation_loss_tracking
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # from src.layers.obtain_statistics import (
 #     obtain_statistics_graph_tracking,
@@ -870,7 +867,7 @@ class ExampleWrapper(L.LightningModule):
         del model_output
         del e_cor
         del losses
-        final_time = time()
+        # final_time = time()
         # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
         # wandb.log({"training_step_time": final_time - initial_time})
         return loss
@@ -1075,42 +1072,42 @@ class ExampleWrapper(L.LightningModule):
                     predict=True,
                     store=True,
                 )
-            else:
-                model_output = self.validation_step_outputs[0][0]
-                e_corr = self.validation_step_outputs[0][1]
-                batch_g = self.validation_step_outputs[0][2]
-                y = self.validation_step_outputs[0][3]
-                shap_vals = None
-                ec_x = None
-                if self.args.explain_ec:
-                    shap_vals = self.validation_step_outputs[0][4]
-                    ec_x = self.validation_step_outputs[0][5]
-                if self.args.correction:
-                    model_output1 = model_output
-                    e_corr = e_corr
-                else:
-                    model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
-                    e_corr = None
-                create_and_store_graph_output(
-                    batch_g,
-                    model_output1,
-                    y,
-                    0,
-                    0,
-                    0,
-                    path_save=os.path.join(
-                        self.args.model_prefix, "showers_df_evaluation"
-                    ),
-                    store=True,
-                    predict=False,
-                    e_corr=e_corr,
-                    tracks=self.args.tracks,
-                    shap_vals=shap_vals,
-                    ec_x=ec_x,
-                    use_gt_clusters=self.args.use_gt_clusters,
-                )
-                del model_output1
-                del batch_g
+            # else:
+            #     model_output = self.validation_step_outputs[0][0]
+            #     e_corr = self.validation_step_outputs[0][1]
+            #     batch_g = self.validation_step_outputs[0][2]
+            #     y = self.validation_step_outputs[0][3]
+            #     shap_vals = None
+            #     ec_x = None
+            #     if self.args.explain_ec:
+            #         shap_vals = self.validation_step_outputs[0][4]
+            #         ec_x = self.validation_step_outputs[0][5]
+            #     if self.args.correction:
+            #         model_output1 = model_output
+            #         e_corr = e_corr
+            #     else:
+            #         model_output1 = torch.cat((model_output, e_corr.view(-1, 1)), dim=1)
+            #         e_corr = None
+            #     create_and_store_graph_output(
+            #         batch_g,
+            #         model_output1,
+            #         y,
+            #         0,
+            #         0,
+            #         0,
+            #         path_save=os.path.join(
+            #             self.args.model_prefix, "showers_df_evaluation"
+            #         ),
+            #         store=True,
+            #         predict=False,
+            #         e_corr=e_corr,
+            #         tracks=self.args.tracks,
+            #         shap_vals=shap_vals,
+            #         ec_x=ec_x,
+            #         use_gt_clusters=self.args.use_gt_clusters,
+            #     )
+            #     del model_output1
+            #     del batch_g
         self.validation_step_outputs = []
         self.df_showers = []
         self.df_showers_pandora = []
@@ -1118,21 +1115,24 @@ class ExampleWrapper(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        print("Optimizer params:", filter(lambda p: p.requires_grad, self.parameters()))
-        # if self.args.lr_scheduler == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=int(10), # for now for testing
-            eta_min=0,
-        )
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        #     optimizer,
+        #     T_max=int(7900*3), # for now for testing
+        #     eta_min=1e-6,
+        # )
+        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(7900*3), fixed_lr=1e-6 )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
-                "interval": "epoch",
+                "interval": "step",
                 "monitor": "train_loss_epoch",
                 "frequency": 1
             }}
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric=None):
+        # Manually step the scheduler
+        scheduler.step()
+   
 
 
 
@@ -1147,3 +1147,42 @@ def obtain_batch_numbers(g):
         num_nodes = gj.number_of_nodes()
     batch = torch.cat(batch_numbers, dim=0)
     return batch
+
+
+
+
+class CosineAnnealingThenFixedScheduler:
+    def __init__(self, optimizer, T_max, fixed_lr):
+        self.cosine_scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=fixed_lr)
+        self.fixed_lr = 1e-6
+        self.T_max = T_max
+        self.step_count = 0
+        self.optimizer = optimizer
+
+    def step(self):
+        if self.step_count < self.T_max:
+            self.cosine_scheduler.step()
+            # for param_group in self.optimizer.param_groups:
+            #     print("before scheduler change", param_group['lr'])
+        else:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = self.fixed_lr
+                # print("after scheduler change",param_group['lr'])
+        self.step_count += 1
+
+    def get_last_lr(self):
+        if self.step_count < self.T_max:
+            return self.cosine_scheduler.get_last_lr()
+        else:
+            return [self.fixed_lr for _ in self.optimizer.param_groups]
+    def state_dict(self):
+        # Save the state including current step count and cosine scheduler state
+        return {
+            "step_count": self.step_count,
+            "cosine_scheduler_state": self.cosine_scheduler.state_dict()
+        }
+
+    def load_state_dict(self, state_dict):
+        # Restore step count and cosine scheduler state
+        self.step_count = state_dict["step_count"]
+        self.cosine_scheduler.load_state_dict(state_dict["cosine_scheduler_state"])

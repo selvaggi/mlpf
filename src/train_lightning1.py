@@ -130,17 +130,17 @@ def main():
     )
     wandb_logger.experiment.config.update(args)
     if training_mode:
-        # wandb.init(project=args.wandb_projectname, entity=args.wandb_entity)
-        # wandb.run.name = args.wandb_displayname
+        # previously this was Gatr_pf_e_v and strict argument was not in
         if args.load_model_weights is not None and args.correction:
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0, map_location=dev)
+                args.load_model_weights, args=args, dev=0, map_location=dev,strict=False)
 
         elif args.load_model_weights is not None:
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
+
             model = GravnetModel.load_from_checkpoint(
-                args.load_model_weights, args=args, dev=0, map_location=dev)
+                args.load_model_weights, args=args, dev=0, map_location=dev,strict=False)
 
         accelerator, devices = get_gpu_dev(args)
         val_every_n_epochs = 1
@@ -171,7 +171,7 @@ def main():
             max_epochs=args.num_epochs,
             # accumulate_grad_batches=1,
             strategy="ddp",
-            limit_train_batches=5950,
+            limit_train_batches=7900, #10300
             limit_val_batches=20,
             # precision=16
             # resume_from_checkpoint=args.load_model_weig
@@ -186,8 +186,10 @@ def main():
             val_dataloaders=val_loader,
             # ckpt_path=args.load_model_weights,
         )
+
         # TODO save checkpoints and hyperparameters
         # TODO use accumulate_grad_batches=7
+
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
             print("TODO: change imported the model for testing manually")
@@ -195,6 +197,16 @@ def main():
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )
+            print("weight before checkpoint", model.ec_model_wrapper_neutral.gatr.linear_out.s2mvs.weight)
+            print("weight before checkpoint gatr", model.gatr.linear_out.s2mvs.weight)
+            model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/061024_cont2/_epoch=0_step=5500.ckpt", args=args, dev=0,strict=False)
+            #model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/181024_Hss/_epoch=3_step=41000.ckpt", args=args, dev=0,strict=False)
+            model.gatr = model2.gatr
+            model.ScaledGooeyBatchNorm2_1 = model2.ScaledGooeyBatchNorm2_1
+            model.clustering = model2.clustering
+            model.beta = model2.beta
+            print("weight 2", model.ec_model_wrapper_neutral.gatr.linear_out.s2mvs.weight)
+            print("weight before checkpoint gatr", model.gatr.linear_out.s2mvs.weight)
         #profiler = AdvancedProfiler(dirpath="/eos/home-g/gkrzmanc/profiler/", fgatr_pf_eilename="profiler_eval_0705")
         #print("USING PROFILER")
         trainer = L.Trainer(

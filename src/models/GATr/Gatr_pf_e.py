@@ -17,11 +17,9 @@ from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
 from src.layers.obj_cond_inf import calc_energy_loss
-from src.models.gravnet_calibration import (
-    object_condensation_loss2,
-    obtain_batch_numbers,
-)
-from src.models.gravnet_3_L import obtain_clustering_for_matched_showers
+from src.layers.object_cond import object_condensation_loss2
+from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
     calculate_eta,
@@ -551,6 +549,8 @@ class ExampleWrapper(L.LightningModule):
                 neutral_graphs,
                 explain=self.args.explain_ec,
             )
+            # print("features_neutral_no_nan", features_neutral_no_nan)
+            # print(neutral_energies[0])
             neutral_pxyz_avg = self.ec_model_wrapper_neutral_avg.predict(
                 features_neutral_no_nan,
                 neutral_graphs,
@@ -875,7 +875,7 @@ class ExampleWrapper(L.LightningModule):
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             # wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
-            # loss = loss_EC
+            #loss = loss_EC_neutrals
             if self.args.save_features:
                 cluster_features_path = os.path.join(
                     self.args.model_prefix, "cluster_features"
@@ -901,6 +901,7 @@ class ExampleWrapper(L.LightningModule):
         misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
+        
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
         del model_output
@@ -909,6 +910,7 @@ class ExampleWrapper(L.LightningModule):
         final_time = time()
         # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
         # wandb.log({"training_step_time": final_time - initial_time})
+
         return loss
 
     def validation_step(self, batch, batch_idx):

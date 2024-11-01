@@ -2,6 +2,7 @@ import dgl
 import torch
 import os
 
+# from alembic.command import current
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
@@ -14,9 +15,11 @@ from src.utils.inference.per_particle_metrics import plot_event
 import random
 import string
 
+
 def generate_random_string(length):
     letters = string.ascii_letters + string.digits
     return "".join(random.choice(letters) for i in range(length))
+
 
 def create_and_store_graph_output(
     batch_g,
@@ -186,7 +189,6 @@ def create_and_store_graph_output(
             # theta = torch.acos(pred_pos[:, 2] / torch.norm(pred_pos, dim=1))
             # pred_pos = spherical_to_cartesian(theta, phi, torch.norm(pred_pos, dim=1), normalized=True)
             # pred_pos= pred_pos.to(model_output.device)
-            print("<<<<<<<<<<<<<<<<<<<<<< Number of fakes", number_of_fakes)
             df_event1, number_of_showers_total1, number_of_fake_showers_total1 = generate_showers_data_frame(
                 labels_hdb,
                 dic,

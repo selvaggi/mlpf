@@ -3,7 +3,7 @@
 graph_config:
    only_hits: false
    k: 40
-   prediction: false
+   prediction: true
    hit_chis_track: false
    pos_pxpy: true
    ks: true

@@ -227,6 +227,7 @@ def object_condensation_loss2(
     # )  # 0, 1, 2: cluster space coords
 
     bj = torch.sigmoid(torch.reshape(pred[:, clust_space_dim], [-1, 1]))  # 3: betas
+    # print("bj", bj)
     original_coords = batch.ndata["h"][:, 0:clust_space_dim]
     if dis:
         distance_threshold = torch.reshape(pred[:, -1], [-1, 1])
