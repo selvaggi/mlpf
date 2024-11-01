@@ -22,7 +22,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from src.models.gravnet_3_L import GravnetModel
 from src.models.thrust_axis import Thrust, hits_xyz_to_momenta, LR, weighted_least_squares_line
 from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean, scatter_sum
