@@ -199,7 +199,7 @@ def main():
             )
             print("weight before checkpoint", model.ec_model_wrapper_neutral.gatr.linear_out.s2mvs.weight)
             print("weight before checkpoint gatr", model.gatr.linear_out.s2mvs.weight)
-            model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/011124_Hss_v2/_epoch=4_step=37500.ckpt", args=args, dev=0,strict=False)
+            model2 = model.load_from_checkpoint("/mnt/proj2/dd-24-98/models/011124_Hss_v2/_epoch=4_step=37500.ckpt", args=args, dev=0,strict=False)
             #model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/181024_Hss/_epoch=3_step=41000.ckpt", args=args, dev=0,strict=False)
             model.gatr = model2.gatr
             model.ScaledGooeyBatchNorm2_1 = model2.ScaledGooeyBatchNorm2_1
