@@ -219,6 +219,7 @@ class ExampleWrapper(L.LightningModule):
                     neutral_avg=False,
                     neutral_PCA=False,
                     neutral_thrust_axis=False,
+                    predict=self.args.predict
                 )
                 self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
                     device=dev,
@@ -233,7 +234,8 @@ class ExampleWrapper(L.LightningModule):
                     out_f=out_f,
                     neutral_avg=self.args.predict,
                     neutral_PCA=False,
-                    neutral_thrust_axis=False
+                    neutral_thrust_axis=False,
+                    predict=self.args.predict
                 )
                 self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
                 #self.ec_model_wrapper_charged = self.ec_model_wrapper_neutral # Only for the Ks dataset!!
@@ -519,12 +521,11 @@ class ExampleWrapper(L.LightningModule):
         unbatched = dgl.unbatch(graphs_new)
         if len(charged_idx) > 0:
             charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
-            charged_energies = (self.ec_model_wrapper_charged
-            .predict(
+            charged_energies = self.ec_model_wrapper_charged.predict(
                 graphs_high_level_features,
                 charged_graphs,
                 explain=self.args.explain_ec,
-            ))
+            )
 
         else:
             if not self.args.regress_pos:
@@ -838,8 +839,16 @@ class ExampleWrapper(L.LightningModule):
                 # print("Loss pxyz neutrals", loss_pos_neutrals)
                 loss = loss + loss_pos
                 if len(self.pids_charged):
+                    if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:
+                        # Batch size must be big enough
+                        weights = charged_PID_true_onehot.sum(dim=0)
+                        weights[weights == 0] = 1 # to avoid issues
+                        weights = 1 / weights # maybe choose something else?
+                        print("Charged class weights:", weights)
+                    else:
+                        weights = torch.tensor([1, 1, 1, 1]).to(charged_PID_pred.device)
                     if len(charged_PID_pred):
-                        loss_charged_pid = torch.nn.CrossEntropyLoss()(
+                        loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
                             charged_PID_pred, charged_PID_true_onehot
                         )
                     else:
@@ -847,8 +856,16 @@ class ExampleWrapper(L.LightningModule):
                     loss = loss + loss_charged_pid
                     wandb.log({"loss_charged_pid": loss_charged_pid})
                 if len(self.pids_neutral):
+                    if self.args.balance_pid_classes and neutral_PID_true_onehot.shape[0] > 20:
+                        # Batch size must be big enough
+                        weights = neutral_PID_true_onehot.sum(dim=0)
+                        weights[weights == 0] = 1 # To avoid issues
+                        weights = 1 / weights # Maybe choose something else?
+                        print("Neutral class weights:", weights)
+                    else:
+                        weights = torch.tensor([1, 1, 1, 1]).to(charged_PID_pred.device)
                     if len(neutral_PID_pred):
-                        loss_neutral_pid = torch.nn.CrossEntropyLoss()(
+                        loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
                             neutral_PID_pred, neutral_PID_true_onehot
                         )
                     else:

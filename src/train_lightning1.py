@@ -128,7 +128,7 @@ def main():
         name=args.wandb_displayname,
         log_model="all",
     )
-    # wandb_logger.experiment.config.update(args)
+    wandb_logger.experiment.config.update(args)
     if training_mode:
         # previously this was Gatr_pf_e_v and strict argument was not in
         if args.load_model_weights is not None and args.correction:
@@ -213,10 +213,10 @@ def main():
             callbacks=[TQDMProgressBar(refresh_rate=1)],
             accelerator="gpu",
             #profiler=profiler,
-            devices=[3],
+            devices=gpus,
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
-            # limit_val_batches=1,
+            # limit_val_batches=19,
         )
         if args.correction:
             for name, get_test_loader in test_loaders.items():
@@ -224,7 +224,7 @@ def main():
                 trainer.validate(
                     model=model,
                     dataloaders=test_loader,
-                    # ckpt_path="/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/061024_cont2/_epoch=0_step=5500.ckpt",
+                    # ckpt_path=args.load_model_weights,
                 )
         else:
             for name, get_test_loader in test_loaders.items():

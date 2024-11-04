@@ -231,6 +231,8 @@ def create_and_store_graph_output(
                 )
                 if df_event_pandora is not None and type(df_event_pandora) is not tuple:
                     df_list_pandora.append(df_event_pandora)
+                else:
+                    print("Not appending to df_list_pandora")
             total_number_events = total_number_events + 1
         # print("number of showers total", number_of_showers_total)
         # number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
