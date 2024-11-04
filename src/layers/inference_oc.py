@@ -507,7 +507,7 @@ def generate_showers_data_frame(
             number_of_showers_total = number_of_showers_total + number_of_showers
     
     # match the tracks to the particle
-    tracks_label = scatter_add((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels_hdb).int()
+    tracks_label = scatter_add((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels).int()
     tracks_label = tracks_label-1
     tracks_label[tracks_label<0]=0
     tracks_label = torch.tensor(tracks_label)
