@@ -128,7 +128,7 @@ def main():
         name=args.wandb_displayname,
         log_model="all",
     )
-    wandb_logger.experiment.config.update(args)
+    # wandb_logger.experiment.config.update(args)
     if training_mode:
         # previously this was Gatr_pf_e_v and strict argument was not in
         if args.load_model_weights is not None and args.correction:
