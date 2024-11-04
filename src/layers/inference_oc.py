@@ -514,7 +514,7 @@ def generate_showers_data_frame(
     matched_es_tracks = torch.zeros_like(energy_t) * (torch.nan)
     matched_es_tracks_1 = torch.zeros_like(energy_t) * (torch.nan)
     matched_es_tracks[row_ind_]=row_ind_.float()
-    matched_es_tracks_1[row_ind_]=tracks_label[index_matches]
+    matched_es_tracks_1[row_ind_]=tracks_label[index_matches].float()
     matched_es_tracks_1 = 1.0*(matched_es_tracks==matched_es_tracks_1)
     matched_es_tracks_1 = matched_es_tracks_1*is_track
 
