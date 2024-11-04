@@ -128,7 +128,7 @@ def main():
         name=args.wandb_displayname,
         log_model="all",
     )
-    wandb_logger.experiment.config.update(args)
+    # wandb_logger.experiment.config.update(args)
     if training_mode:
         # previously this was Gatr_pf_e_v and strict argument was not in
         if args.load_model_weights is not None and args.correction:
@@ -193,13 +193,13 @@ def main():
     if args.data_test:
         if args.load_model_weights is not None and args.correction:
             print("TODO: change imported the model for testing manually")
-            from src.models.GATr.Gatr_pf_e import ExampleWrapper as GravnetModel
+            from src.models.GATr.Gatr_pf_e_v2 import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(
                 args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
             )
             print("weight before checkpoint", model.ec_model_wrapper_neutral.gatr.linear_out.s2mvs.weight)
             print("weight before checkpoint gatr", model.gatr.linear_out.s2mvs.weight)
-            model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/061024_cont2/_epoch=0_step=5500.ckpt", args=args, dev=0,strict=False)
+            model2 = model.load_from_checkpoint("/mnt/proj2/dd-24-98/models/061024_cont2/_epoch=0_step=5500.ckpt", args=args, dev=0,strict=False)
             #model2 = model.load_from_checkpoint("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/181024_Hss/_epoch=3_step=41000.ckpt", args=args, dev=0,strict=False)
             model.gatr = model2.gatr
             model.ScaledGooeyBatchNorm2_1 = model2.ScaledGooeyBatchNorm2_1

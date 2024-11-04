@@ -1115,24 +1115,24 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-6 )
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer,
         #     T_max=int(7900*3), # for now for testing
         #     eta_min=1e-6,
         # )
-        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(7900*3), fixed_lr=1e-6 )
+        # scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(7900*3), fixed_lr=1e-6 )
         return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
-                "interval": "step",
-                "monitor": "train_loss_epoch",
-                "frequency": 1
-            }}
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric=None):
-        # Manually step the scheduler
-        scheduler.step()
+            "optimizer": optimizer}
+            # "lr_scheduler": {
+            #     "scheduler": scheduler,  # ReduceLROnPlateau(optimizer, patience=3),
+            #     "interval": "step",
+            #     "monitor": "train_loss_epoch",
+            #     "frequency": 1
+            # }}
+    # def lr_scheduler_step(self, scheduler, optimizer_idx, metric=None):
+    #     # Manually step the scheduler
+    #     scheduler.step()
    
 
 

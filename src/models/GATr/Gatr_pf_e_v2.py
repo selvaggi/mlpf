@@ -99,7 +99,7 @@ class ExampleWrapper(L.LightningModule):
         k_gravnet: int = 7,
         activation: str = "elu",
         weird_batchnom=False,
-        blocks=10,
+        blocks=12,
         hidden_mv_channels=16,
         hidden_s_channels=64,
     ):
