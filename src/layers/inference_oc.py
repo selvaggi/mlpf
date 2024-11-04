@@ -153,17 +153,17 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
          )'''
-        torch.save(
-            dic,
-            path_save
-            + "/graphs/"
-            + str(local_rank)
-            + "_"
-            + str(step)
-            + "_"
-            + str(i)
-            + ".pt",
-         )
+        # torch.save(
+        #     dic,
+        #     path_save
+        #     + "/graphs/"
+        #     + str(local_rank)
+        #     + "_"
+        #     + str(step)
+        #     + "_"
+        #     + str(i)
+        #     + ".pt",
+        #  )
         
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
@@ -458,6 +458,9 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind_] = e_pred_showers[index_matches]
+
+   
+
     if pandora:
         matched_es_cali = matched_es.clone()
         matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
@@ -502,6 +505,20 @@ def generate_showers_data_frame(
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
+    
+    # match the tracks to the particle
+    tracks_label = scatter_add((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels_hdb).int()
+    tracks_label = tracks_label-1
+    tracks_label[tracks_label<0]=0
+    tracks_label = torch.tensor(tracks_label)
+    matched_es_tracks = torch.zeros_like(energy_t) * (torch.nan)
+    matched_es_tracks_1 = torch.zeros_like(energy_t) * (torch.nan)
+    matched_es_tracks[row_ind_]=row_ind_
+    matched_es_tracks_1[row_ind_]=tracks_label[index_matches]
+    matched_es_tracks_1 = 1.0*(matched_es_tracks==matched_es_tracks_1)
+    matched_es_tracks_1 = matched_es_tracks_1*is_track
+
+
     intersection_E = torch.zeros_like(energy_t) * (torch.nan)
     if len(col_ind) > 0:
         ie_e = obtain_intersection_values(i_m_w, row_ind, col_ind, dic)
@@ -641,6 +658,7 @@ def generate_showers_data_frame(
         #     dim=0,
         # )
         is_track = torch.cat((is_track, fakes_is_track.to(is_track.device)), dim=0)
+        matched_es_tracks_1 = torch.cat((matched_es_tracks_1, 0*fakes_is_track.to(is_track.device)), dim=0)
         if pandora:
             d = {
                 "true_showers_E": energy_t.detach().cpu(),
@@ -657,6 +675,7 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
+                "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
         else:
@@ -672,6 +691,7 @@ def generate_showers_data_frame(
                 "number_batch": torch.ones_like(energy_t.detach().cpu())
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
+                "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
             if pred_pos is not None:
