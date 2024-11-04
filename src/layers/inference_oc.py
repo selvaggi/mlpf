@@ -153,17 +153,17 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
          )'''
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        #  )
+        torch.save(
+            dic,
+            path_save
+            + "/graphs/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(i)
+            + ".pt",
+         )
         
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
