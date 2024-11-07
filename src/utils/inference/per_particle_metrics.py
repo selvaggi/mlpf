@@ -75,9 +75,10 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         variance_errors,
         mean_pxyz, variance_om_pxyz, masses, pxyz_true, pxyz_pred, sigma_phi, sigma_theta, distr_phi, distr_theta
     ) = calculate_response(df_id, False, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    print("COR:__________________________________")
     print(variance_om_p)
     print(variance_om)
-    print("recoooo")
+    print("RECO:__________________________________")
     print(variance_om_true_rec_p)
     print(variance_om_true_rec)
     dic = {}
@@ -572,25 +573,41 @@ def plot_per_energy_resolution2_multiple(
             event_res_dic[key] = get_response_for_event_energy(
                 matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
+            print("PID:22___________________________________________")
             photons_dic = get_response_for_id_i(
                 [22], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero,
                 ML_pid=ML_pid
             )
+            np.save(PATH_store+"/22.npy", photons_dic)
+            print("PID:11___________________________________________")
             electrons_dic = get_response_for_id_i(
                 [11], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid , mass_zero=mass_zero, ML_pid=ML_pid
             )
+            np.save(PATH_store+"/11.npy", electrons_dic)
+            print("PID:130___________________________________________")
             hadrons_dic = get_response_for_id_i(
                 [130], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
+            np.save(PATH_store+"/130.npy", hadrons_dic)
+            print("PID:211___________________________________________")
             hadrons_dic2 = get_response_for_id_i(
                 [211], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
+            np.save(PATH_store+"/211.npy", hadrons_dic2)
+            print("PID:neutron___________________________________________")
             neutrons = get_response_for_id_i(
                 [2112], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
+            np.save(PATH_store+"/2112.npy", neutrons)
+            print("PID:proton___________________________________________")
             protons = get_response_for_id_i(
                 [2212], matched_pandora, matched_, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
+            np.save(PATH_store+"2212.npy", protons)
+            print(PATH_store+"/2212.npy")
+
+
+            plot_full_comparison(photons_dic,electrons_dic,hadrons_dic,hadrons_dic2,  neutrons, protons,PATH_store+"/full_comp.png")
             # For neutrons
             if True:
                 if len(neutrons["distributions_pandora"]) :
@@ -1926,7 +1943,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
         #bins = np.linspace(0, 51, 5)
-        bins = [0, 5, 15, 35, 51]
+        bins = [0, 5, 15,  51]
     mean = []
     variance_om = []
     mean_baseline = []
@@ -1956,6 +1973,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
         mask = mask_below * mask_above * mask_check
         true_e = matched.true_showers_E[mask]
         true_rec = matched.reco_showers_E[mask]
+        print("sum mask", bin_i, bin_i1, np.sum(mask))
         if pandora:
             pred_e = matched.pandora_calibrated_pfo[mask]
             pred_pxyz = np.array(matched.pandora_calibrated_pos[mask].tolist())
@@ -2357,11 +2375,11 @@ def plot_one_label(
                 line_type_fits_l1.append("-.")
             for a in ax:
                 plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1, ax=a)
-        else:
-            #raise NotImplementedError
-            line_type_fits = ["-", "-."]
-            for a in ax:
-               plot_fit(fits, line_type_fits, color_list_fits, ax=a)
+        # else:
+        #     #raise NotImplementedError
+        #     line_type_fits = ["-", "-."]
+        #     for a in ax:
+        #        plot_fit(fits, line_type_fits, color_list_fits, ax=a)
         if reco == "_reco":
             plt.yscale("log")
         else:
@@ -2473,3 +2491,28 @@ def plot_histograms(
     ax_distr.legend()
     ax_distr.set_yscale("log")
     fig_distr.tight_layout()
+
+
+def plot_full_comparison(photons_dic,electrons_dic,hadrons_dic,hadrons_dic2,  neutrons, protons,path):
+
+    dics = [electrons_dic,hadrons_dic, neutrons, photons_dic, protons, hadrons_dic2 ]
+    pids = ["11", "130", "2112", "22", "2212", "211"]
+    fig_distr, ax_distr = plt.subplots(6,2,figsize=(20, 45))
+    for i, dic in enumerate(dics):
+        ax_distr[i,0].plot(dic["energy_resolutions_p"], dic["variance_om_p_reco"], c="blue", label="Pandora")
+        ax_distr[i,0].plot(dic["energy_resolutions"], dic["variance_om_reco"], c="red", label="ML")
+        ax_distr[i,0].plot(dic["energy_resolutions"], dic["variance_om_baseline"], c="k", label="Baseline")
+        ax_distr[i,0].set_xlabel("Energy [GeV]", fontsize=30)
+        ax_distr[i,0].grid()
+        ax_distr[i,0].legend()
+        ax_distr[i,0].set_title(pids[i])
+
+        ax_distr[i,1].plot(dic["energy_resolutions_p"], dic["variance_om_p"], c="blue", label="Pandora")
+        ax_distr[i,1].plot(dic["energy_resolutions"], dic["variance_om"], c="red", label="ML")
+        ax_distr[i,1].plot(dic["energy_resolutions"], dic["variance_om_baseline"], c="k", label="Baseline")
+        ax_distr[i,1].set_xlabel("Energy [GeV]", fontsize=30)
+        ax_distr[i,1].grid()
+        ax_distr[i,1].legend()
+        ax_distr[i,1].set_title(pids[i])  
+    
+    fig_distr.savefig(path, bbox_inches="tight")
