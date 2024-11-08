@@ -18,6 +18,8 @@ from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
 from src.layers.obj_cond_inf import calc_energy_loss
+from src.utils.pid_conversion import pid_conversion_dict
+
 from src.models.gravnet_calibration import (
     object_condensation_loss2,
     obtain_batch_numbers,
@@ -29,8 +31,6 @@ from src.utils.post_clustering_features import (
     calculate_phi,
 )
 from src.models.energy_correction_NN import (
-    ECNetWrapper,
-    ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
     PickPAtDCA,
     AverageHitsP
@@ -205,7 +205,7 @@ class ExampleWrapper(L.LightningModule):
                 if self.args.PID_4_class:
                     self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
                     self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
-                    self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                    self.pid_conversion_dict = pid_conversion_dict
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3

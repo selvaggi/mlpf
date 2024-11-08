@@ -1,6 +1,6 @@
 # Doesn't plot anything, just saves the mass data - for processing bigger files (>10k events)
 
-
+from src.utils.pid_conversion import pid_conversion_dict
 from torch_scatter import scatter_sum
 import numpy as np
 import os
@@ -17,7 +17,6 @@ def open_mlpf_dataframe(path_mlpf, neutrals_only=False):
         )
     else:
         sd = data
-    pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
     mask = (~np.isnan(sd["pred_showers_E"])) & (~np.isnan(sd["reco_showers_E"]))
     sd["pid_4_class_true"] = sd["pid"].map(pid_conversion_dict)
     if "pred_pid_matched" in sd.columns:
@@ -80,10 +79,10 @@ def calculate_event_mass_resolution_light(df, pandora, perfect_pid=False, mass_z
             #assert pandora is False
             if pandora:
                 print("Using Pandora PID")
-                if pandora_perf_pid:
-                    m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
-                else:
-                    m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pandora_pid])
+                #if pandora_perf_pid:
+                #    m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+                #else:
+                m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pandora_pid])
             else:
                 m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
         else:

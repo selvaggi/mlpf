@@ -12,6 +12,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved")
 parser.add_argument("--gpu", type=int, help="GPU to use for the evaluation")
 parser.add_argument("--redo", action="store_true", help="Redo the evaluation for all checkpoints, even if they are already saved")
+parser.add_argument("--redo-plots", action="store_true", help="Redo the plots, even if they are already saved")
+
 args = parser.parse_args()
 gpu = int(args.gpu)
 dir_ckpt = os.path.join(args.path, "eval_results")
@@ -60,7 +62,7 @@ while True:
         plots_stdout = os.path.join(current_folder_path, "plots_stdout.txt")
         plots_stderr = os.path.join(current_folder_path, "plots_stderr.txt")
         # if plots stdout file exitss
-        if os.path.exists(plots_stdout) and not args.redo:
+        if os.path.exists(plots_stdout) and not args.redo_plots:
             print(f"Plots already exist for {f}")
         else:
             print("Plotting for ", current_folder_path)

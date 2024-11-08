@@ -26,7 +26,7 @@ from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum, scatter_mean
 from src.utils.inference.event_metrics import (
     get_response_for_event_energy,
-    plot_mass_resolution,
+    plot_mass_resolution, get_mass_contribution_per_PID,
 )
 
 
@@ -466,28 +466,53 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         #    if bar * 0.95 < mean_mass:
         #        axs[i].axvline(bar, color="black", linestyle="--")
 
-def plot_confusion_matrix(sd_hgb1, save_dir):
-    pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False):
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
     class_true = sd_hgb1["pid_4_class_true"].values
     class_pred = sd_hgb1["pred_pid_matched"].values
+    pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
     no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
     from sklearn.metrics import confusion_matrix
     cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
     # plot cm
+    # Add pie charts
+    fig, ax = plt.subplots(figsize=(6,6))
+    if add_pie_charts:
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                if cm[i, j] > 0:
+                    x = j
+                    y = i
+                    size = 1.0 # Adjust size as needed
+                    true_pids = pid_true[(class_true == i) & (class_pred == j)]
+                    unique, counts = np.unique(true_pids, return_counts=True)
+                    # Pie chart in here
+                    ax_inset = inset_axes(ax, width="100%", height="100%", loc="center",
+                                          bbox_to_anchor=(x, y, size, size),
+                                          bbox_transform=ax.transData,
+                                          borderpad=0)
+                    ax_inset.pie(counts, labels=unique, autopct="%1.1f%%", textprops={'fontsize': 14})
     class_names = ["e", "CH", "NH", "gamma"]
-
-    import seaborn as sns
-    plt.figure()
-    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    if not add_pie_charts:
+        sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax)
+    else:
+        # now plot just the ticks on the plot without the CM
+        ax.set_xticks(np.arange(cm.shape[1]) + 0.5, minor=False)
+        ax.set_yticks(np.arange(cm.shape[0]) + 0.5, minor=False)
+        ax.set_xticklabels(class_names, minor=False)
+        ax.set_yticklabels(class_names, minor=False)
+        ax.grid(False)
     # axes
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.title("Confusion Matrix")
-    plt.savefig(os.path.join(save_dir, "confusion_matrix_PID.pdf"), bbox_inches="tight")
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_title("Confusion Matrix")
+    suffix = ""
+    if add_pie_charts:
+        suffix = "_pie_charts"
+    fig.savefig(os.path.join(save_dir, "confusion_matrix_PID" + suffix + ".pdf"), bbox_inches="tight")
     plt.clf()
     f = no_nan_filter & (is_trk == 1)
     f1 = no_nan_filter & (is_trk == 0)
@@ -495,7 +520,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     cm1 = confusion_matrix(class_true[f1], class_pred[f1])
     # plot cm
     class_names = ["e", "CH", "NH", "gamma"]
-    import seaborn as sns
     plt.figure()
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
     # axes
@@ -513,6 +537,130 @@ def plot_confusion_matrix(sd_hgb1, save_dir):
     plt.savefig(os.path.join(save_dir, "confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
     plt.clf()
 
+def nanindex(x, list):
+    if pd.isna(x):
+        return np.nan
+    return list.index(x)
+
+def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False):
+    class_true = np.array(sd_pandora.pid.values)
+    class_pred = np.array(sd_pandora.pandora_pid.values)
+    allowed_pids =  sorted(sd_pandora.pandora_pid.dropna().unique())
+    all_pids = [0] + [int(x) for x in allowed_pids]
+    no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
+    class_true[~np.isin(class_true, allowed_pids)] = 0 # 0 = "other" class
+    pids_true = sd_pandora["pid"].values
+    is_trk = sd_pandora.is_track_in_cluster.values
+    class_true = np.array([nanindex(x, all_pids) for x in class_true])
+    class_pred = np.array([nanindex(x, all_pids) for x in class_pred])
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
+    # Plot cm
+    # Add pie charts
+
+    if add_pie_charts:
+        fig, ax = plt.subplots(figsize=(20, 20))
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                if cm[i, j] > 0:
+                    x = j
+                    y = i
+                    size = 1.0 # Adjust size as needed
+                    true_pids = pids_true[(class_true == i) & (class_pred == j)]
+                    unique, counts = np.unique(true_pids[~np.isnan(true_pids)], return_counts=True)
+                    # Pie chart in here
+                    ax_inset = inset_axes(ax, width="100%", height="100%", loc="center",
+                                          bbox_to_anchor=(x, y, size, size),
+                                          bbox_transform=ax.transData,
+                                          borderpad=0)
+                    percentage_counts = counts / np.sum(counts) * 100
+                    # move categories less than 0.5% into 'other'
+                    unique = np.array([x if y > 1 else "other" for x, y in zip(unique, percentage_counts)])
+                    counts = np.array([y if y > 1 else np.sum(counts[percentage_counts < 1]) for y in counts])
+                    # fix - now 'other' repeats too many times
+                    unique1, counts1 = [], []
+                    for u, c in zip(unique, counts):
+                        if u not in unique1:
+                            unique1.append(u)
+                            counts1.append(c)
+                        else:
+                            pass
+                    ax_inset.pie(counts1, labels=unique1, autopct="%1.1f%%", textprops={'fontsize': 12})
+    class_names = all_pids
+    if not add_pie_charts:
+        fig, ax = plt.subplots(figsize=(10, 10))
+        sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax)
+    else:
+        # now plot just the ticks on the plot without the CM
+        ax.set_xticks(np.arange(cm.shape[1]) + 0.5, minor=False)
+        ax.set_yticks(np.arange(cm.shape[0]) + 0.5, minor=False)
+        ax.set_xticklabels(class_names, minor=False)
+        ax.set_yticklabels(class_names, minor=False)
+        ax.grid(False)
+    # axes
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_title("Confusion Matrix")
+    suffix = ""
+    if add_pie_charts:
+        suffix = "_pie_charts"
+    fig.tight_layout()
+    fig.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID" + suffix + ".pdf"), bbox_inches="tight")
+    plt.clf()
+    if add_pie_charts:
+        return
+    f = no_nan_filter & (is_trk == 1)
+    f1 = no_nan_filter & (is_trk == 0)
+    cm = confusion_matrix(class_true[f], class_pred[f])
+    cm1 = confusion_matrix(class_true[f1], class_pred[f1])
+    # plot cm
+    plt.figure()
+    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    # axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix (track in cluster)")
+    plt.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID_track_in_cluster.pdf"), bbox_inches="tight")
+    plt.clf()
+    plt.figure()
+    sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names)
+    # axes
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix (no track in cluster)")
+    plt.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
+    plt.clf()
+
+
+def analyze_fakes(matched_pandora, matched_all, PATH_store):
+    fakes_pandora = matched_pandora[pd.isna(matched_pandora.true_showers_E)]
+    nonfakes_pandora = matched_pandora[~pd.isna(matched_pandora.true_showers_E)]
+    fakes_model = matched_all[pd.isna(matched_all.true_showers_E)]
+    nonfakes_model = matched_all[~pd.isna(matched_all.true_showers_E)]
+
+    fig, ax = plt.subplots(4, 1, figsize=(10, 15))
+    bins = np.linspace(0, 5, 100)
+    density=False
+    # plot the reco energy histogram for fakes and nonfakes
+    ax[0].hist(fakes_pandora.pred_showers_E, bins=bins, histtype="step", label="Pandora fakes reco", color="blue", density=density)
+    ax[0].hist(nonfakes_pandora.pred_showers_E, bins=bins, histtype="step", label="Pandora nonfakes reco", color="red", density=density)
+    ax[1].hist(fakes_model.pred_showers_E, bins=bins, histtype="step", label="Model fakes reco", color="blue", density=density)
+    ax[1].hist(nonfakes_model.pred_showers_E, bins=bins, histtype="step", label="Model nonfakes reco", color="red", density=density)
+    # plot the reco energy resolution for fakes and nonfakes
+    ax[2].hist(fakes_pandora.pandora_calibrated_pfo, bins=bins, histtype="step", label="Pandora fakes", color="blue", density=density)
+    ax[2].hist(nonfakes_pandora.pandora_calibrated_pfo, bins=bins, histtype="step", label="Pandora nonfakes", color="red", density=density)
+    ax[3].hist(fakes_model.calibrated_E, bins=bins, histtype="step", label="Model fakes", color="blue", density=density)
+    ax[3].hist(nonfakes_model.calibrated_E, bins=bins, histtype="step", label="Model nonfakes", color="red", density=density)
+    ax[0].legend()
+    ax[1].legend()
+    ax[2].legend()
+    ax[3].legend()
+    ax[0].set_yscale("log")
+    ax[1].set_yscale("log")
+    ax[2].set_yscale("log")
+    ax[3].set_yscale("log")
+    fig.savefig(os.path.join(PATH_store, "fakes_analysis.pdf"))
+
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False
@@ -525,14 +673,16 @@ def plot_per_energy_resolution2_multiple(
     figs_theta_res, axs_theta_res = {}, {} # theta resolution
     figs_resolution_pxyz, axs_resolution_pxyz = {}, {} # px, py, pz resolution
     figs_response_pxyz, axs_response_pxyz = {}, {} # px, py, pz response
-    figs_mass_hist, axs_mass_hist = {}, {}
+    figs_mass_hist, axs_mass_hist = plt.subplots(6, 2, figsize=(9, 19))
     # distribution at some energy slice for each particle (the little histogram plots)
     # colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
     colors = {
         "ML": "red",
     }
     plot_pandora, plot_baseline = True, True
-    for pid in [22, 11, 130, 211, 2112, 2212]:
+    massPID, massPIDpandora, EPID, EPIDpandora = get_mass_contribution_per_PID(matched_pandora, matched_all["ML"], ML_pid=ML_pid, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    bins_mass = np.linspace(0, 2, 100)
+    for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
         figs_theta_res[pid], axs_theta_res[pid] = plt.subplots(1, 1, figsize=(7, 7))
         figs[pid], axs[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
         figs_r[pid], axs_r[pid] = plt.subplots(2, 1, figsize=(15, 10), sharex=False)
@@ -540,7 +690,7 @@ def plot_per_energy_resolution2_multiple(
         figs_distr_HE[pid], axs_distr_HE[pid] = plt.subplots(1, 1, figsize=(7, 7))
         figs_resolution_pxyz[pid], axs_resolution_pxyz[pid] = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
         figs_response_pxyz[pid], axs_response_pxyz[pid] = plt.subplots(4, 1, figsize=(8, 15), sharex=True)
-        figs_mass_hist[pid], axs_mass_hist[pid] = plt.subplots(4, 1, figsize=(8, 20), sharex=False)
+        #figs_mass_hist[pid], axs_mass_hist[pid] = plt.subplots(1, 1, figsize=(8, 20), sharex=False)
         axs_resolution_pxyz[pid][0].set_title(f"{pid} px resolution")
         axs_resolution_pxyz[pid][1].set_title(f"{pid} py resolution")
         axs_resolution_pxyz[pid][2].set_title(f"{pid} pz resolution")
@@ -551,8 +701,24 @@ def plot_per_energy_resolution2_multiple(
         axs_response_pxyz[pid][2].set_title(f"{pid} pz response")
         axs_response_pxyz[pid][3].set_title("p norm response [GeV]")
         axs_response_pxyz[pid][2].set_xlabel("Energy [GeV]")
-        axs_mass_hist[pid][-1].set_xlabel("Mass [GeV]")
+        axs_mass_hist[i, 0].grid(1)
+        #axs_mass_hist[i, 0].set_title(f"{pid} contribution to mass")
+        axs_mass_hist[i, 0].set_xlabel(f"M pred., {pid} / M true, {pid}")
+        axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
+        axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue", density=True)
+        # same with energy into [i, 1]
+        axs_mass_hist[i, 1].grid(1)
+        #axs_mass_hist[i, 1].set_title(f"{pid} contribution to E")
+        axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid} / E true, {pid}")
+        axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
+        axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue", density=True)
     event_res_dic = {} # Event energy resolution
+    figs_mass_hist.tight_layout()
+    # Path(os.path.join(PATH_store, "mass_hist")).mkdir(parents=True, exist_ok=True)
+    figs_mass_hist.savefig(
+        os.path.join(PATH_store, f"mass_breakdown_by_PID.pdf"),
+        bbox_inches="tight",
+    )
     event_res_dic_p = {} # Event p resolution
     event_res_dic_mass = {} # Event mass resolution
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(7, 7))
@@ -696,6 +862,13 @@ def plot_per_energy_resolution2_multiple(
             axs_distr_HE[2112].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr_HE[2112].set_ylabel("Density")
             axs_distr_HE[2112].legend()
+            if len(neutrons["distributions_model"]) > 0:
+                plot_hist_distr(neutrons["distributions_model"][-1], key, axs_distr_HE[130], colors[key], bins=np.linspace(0.9, 1.1, 100))
+            axs_distr_HE[130].set_title("K_L [35, 50] GeV")
+            axs_distr_HE[130].set_xlabel("$E_{pred.} / E_{true}$")
+            axs_distr_HE[130].set_ylabel("Density")
+            axs_distr_HE[130].legend()
+
             '''plot_histograms(
                 "Event Energy Resolution",
                 event_res_dic[key],
@@ -1004,12 +1177,7 @@ def plot_per_energy_resolution2_multiple(
             os.path.join(PATH_store, f"distr_35_50_GeV_{key}.pdf"),
             bbox_inches="tight",
         )
-        figs_mass_hist[key].tight_layout()
-        Path(os.path.join(PATH_store, "mass_hist")).mkdir(parents=True, exist_ok=True)
-        figs_mass_hist[key].savefig(
-            os.path.join(PATH_store, "mass_hist", f"mass_hist_{key}.pdf"),
-            bbox_inches="tight",
-        )
+
         dist_pandora, pids, phi_dist_pandora, eta_dist_pandora = calc_unit_circle_dist(matched_pandora, pandora=True)
         dist_ml, pids_ml, phi_dist_ml, eta_dist_ml = calc_unit_circle_dist(matched_, pandora=False)
         for pid in [22, -211, 211, 2112, 130, 11]:
@@ -1102,7 +1270,7 @@ def plot_per_energy_resolution2_multiple(
     #    os.path.join(PATH_store, "event_mass_resolution.pdf"), bbox_inches="tight"
     #)
 
-def reco_hist(ml, pandora, PATH_store, pids=[22, 130, 2112, 211]):
+def reco_hist(ml, pandora, PATH_store, pids=[22, 130, 2112, 211, 2212, 310]):
     e_bins = [[0,5], [5, 15], [15, 50]]
     path_reco = os.path.join(PATH_store, "reco_histograms")
     if not os.path.exists(path_reco):
@@ -1321,7 +1489,7 @@ def create_eff_dic_pandora(matched_pandora, id):
     mask_id = pids_pandora == id
     df_id_pandora = matched_pandora[mask_id]
     eff_p, energy_eff_p = calculate_eff(df_id_pandora, False, pandora=True)
-    fakes_p, energy_fakes_p, fake_percent_energy = calculate_fakes(df_id_pandora, None, False, pandora=True)
+    fakes_p, energy_fakes_p, fake_percent_energy = calculate_fakes(df_id_pandora, None, False, pandora=True, id=id)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
     photons_dic["energy_eff_p"] = energy_eff_p
@@ -1335,7 +1503,7 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
     mask_id = pids == id
     df_id = matched_[mask_id]
     eff, energy_eff = calculate_eff(df_id, False)
-    fakes, energy_fakes, fake_percent_energy = calculate_fakes(df_id, None, False, pandora=False)
+    fakes, energy_fakes, fake_percent_energy = calculate_fakes(df_id, None, False, pandora=False, id=id)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
@@ -1929,7 +2097,7 @@ def calc_unit_circle_dist(df, pandora=False):
     etadist = theta_pred - theta_true # formely eta
     return dist, df.pid.values, phidist, etadist
 
-particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565}
+particle_masses = {22: 0, 11: 0.00511, 211: 0.13957, 130: 0.493677, 2212: 0.938272, 2112: 0.939565, 321: 0.493677, 13: 0.1056}
 particle_masses_4_class = {0: 0.00511, 1: 0.13957, 2: 0.939565, 3: 0.0} # Electron, CH, NH, photon
 
 def safeint(x):
@@ -1938,6 +2106,7 @@ def safeint(x):
         return int(x)
     except:
         return x
+
 def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
@@ -1990,8 +2159,8 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             elif ML_pid:
                 #assert not pandora
                 if pandora:
-                    print("Perf. PID for Pandora")
-                    m = np.array([particle_masses[abs(int(i))] for i in matched.pid[mask]])
+                    print("Using Pandora PID")
+                    m = np.array([particle_masses[abs(int(i))] for i in matched.pandora_pid[mask]])
                 else:
                     m = np.array([particle_masses_4_class.get(safeint(i), 0.0) for i in matched.pred_pid_matched[mask]])
             if mass_zero:

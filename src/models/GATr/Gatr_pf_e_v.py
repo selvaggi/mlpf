@@ -10,6 +10,7 @@ from gatr.interface import (
     embed_translation,
 )
 from torch_scatter import scatter_add, scatter_mean
+from src.utils.pid_conversion import pid_conversion_dict
 import torch
 import torch.nn as nn
 from src.utils.save_features import save_features
@@ -177,7 +178,7 @@ class ExampleWrapper(L.LightningModule):
                 #if self.args.PID_4_class:
                 self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
                 self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
-                self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                self.pid_conversion_dict = pid_conversion_dict
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
@@ -845,7 +846,6 @@ class ExampleWrapper(L.LightningModule):
                             print("Charged PID loss is nan")
                             print(loss_charged_pid)
                     else:
-
                         loss_charged_pid = 0
                     loss = loss + loss_charged_pid
                     wandb.log({"loss_charged_pid": loss_charged_pid})

@@ -11,6 +11,7 @@ from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
 from src.utils.save_features import save_features
+from src.utils.pid_conversion import pid_conversion_dict
 from src.logger.plotting_tools import PlotCoordinates
 import numpy as np
 from typing import Tuple, Union, List
@@ -26,8 +27,6 @@ from src.utils.post_clustering_features import (
     calculate_phi,
 )
 from src.models.energy_correction_NN import (
-    ECNetWrapper,
-    ECNetWrapperGNN,
     ECNetWrapperGNNGlobalFeaturesSeparate,
     PickPAtDCA,
     AverageHitsP,
@@ -199,7 +198,8 @@ class ExampleWrapper(L.LightningModule):
                 #if self.args.PID_4_class:
                 self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
                 self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
-                self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                self.pid_conversion_dict = pid_conversion_dict
+                # TODO: fix the unknown particles!
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
@@ -766,6 +766,8 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     for i in range(len(charged_PID_true)):
                         charged_PID_true_onehot[i, self.pid_conversion_dict.get(charged_PID_true[i], 3)] = 1
+                        if charged_PID_true not in self.pid_conversion_dict:
+                            print("Unknown PID", charged_PID_true[i])
                 charged_PID_true_onehot = charged_PID_true_onehot.clone().to(dic["charged_idx"].device)
             if len(self.pids_neutral):
                 neutral_PID_pred = dic["neutral_PID_pred"]
@@ -786,6 +788,8 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     for i in range(len(neutral_PID_true)):
                         neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
+                        if neutral_PID_true not in self.pid_conversion_dict:
+                            print("Unknown PID", neutral_PID_true[i])
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
         loss_time_start = time()
         (loss, losses,) = object_condensation_loss2(

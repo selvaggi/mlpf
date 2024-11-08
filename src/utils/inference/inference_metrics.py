@@ -5,6 +5,7 @@ import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
 from scipy import asarray as ar, exp
+from src.utils.pid_conversion import our_to_pandora_mapping, pandora_to_our_mapping
 
 def calculate_eff(sd, log_scale=False, pandora=False):
     if log_scale:
@@ -35,7 +36,8 @@ def calculate_eff(sd, log_scale=False, pandora=False):
             energy_eff.append((bin_i1 + bin_i) / 2)
     return eff, energy_eff
 
-def calculate_fakes(sd, matched, log_scale=False, pandora=False):
+
+def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
     if log_scale:
         bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
@@ -45,14 +47,15 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False):
     fake_percent_energy = []
     total_true_showers = np.sum(
         ~np.isnan(sd.true_showers_E.values)
-    )  # the ones where truthHitAssignedEnergies is not nan
+    )  # The ones where truthHitAssignedEnergies is not nan
     for i in range(len(bins_fakes) - 1):
         bin_i = bins_fakes[i]
         bin_i1 = bins_fakes[i + 1]
         if pandora:
             mask_above = sd.pred_showers_E.values <= bin_i1
             mask_below = sd.pred_showers_E.values > bin_i
-            mask = mask_below * mask_above
+            mask_pid = sd.pandora_pid.isin(our_to_pandora_mapping[id])
+            mask = mask_below * mask_above * mask_pid
             fakes = np.sum(np.isnan(sd.pid)[mask])
             non_fakes_mask = ~np.isnan(sd.pid)[mask]
             fakes_mask = np.isnan(sd.pid)[mask]
@@ -62,7 +65,8 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False):
         else:
             mask_above = sd.pred_showers_E.values <= bin_i1
             mask_below = sd.pred_showers_E.values > bin_i
-            mask = mask_below * mask_above
+            mask_pid = sd.pid.isin(pandora_to_our_mapping[id])
+            mask = mask_below * mask_above * mask_pid
             fakes = np.sum(np.isnan(sd.pid)[mask])
             total_showers = len(sd.pred_showers_E.values[mask])
             fakes_mask = np.isnan(sd.pid)[mask]

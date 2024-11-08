@@ -54,6 +54,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 # )
 from src.utils.nn.tools import log_losses_wandb
 import torch.nn.functional as F
+from src.utils.pid_conversion import pid_conversion_dict
 
 
 def criterion(ypred, ytrue, step):
@@ -203,7 +204,7 @@ class ExampleWrapper(L.LightningModule):
                 #if self.args.PID_4_class:
                 self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
                 self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
-                self.pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
+                self.pid_conversion_dict = pid_conversion_dict
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3

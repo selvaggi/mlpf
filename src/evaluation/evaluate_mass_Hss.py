@@ -21,8 +21,8 @@ plt.rcParams['legend.fontsize'] = 20
 import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
-    plot_per_energy_resolution2_multiple, plot_confusion_matrix,
-    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2
+    plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes
 )
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
@@ -37,15 +37,21 @@ neutrals_only = False
 log_scale = False
 tracks = True
 perfect_pid = False   # Pretend we got ideal PID and rescale the momentum vectors accordingly
-mass_zero = True    # Set the mass to zero for all particles
-ML_pid = False       # Use the PID from the ML classification head (electron/CH/NH/gamma)
+mass_zero = False    # Set the mass to zero for all particles
+ML_pid = True       # Use the PID from the ML classification head (electron/CH/NH/gamma)
 
 # Is there a problem with storing direction information with Pandora?
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
-
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved"
+                    , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss")
+args = parser.parse_args()
 if all_E:
     PATH_store = ( #/eos/user/g/gkrzmanc/2024/train/export_f_10_09_testset_300_files_avg_pos_reprod
-        "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/evalHss_reprod_clust_only_newmodel_Clustering2810_v1"
+        #args.path
+        "/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID_no_filt_tracks"
+        #"/eos/user/g/gkrzmanc/results/2024/evalHss_reprod_clust_only_newmodel_Clustering2810_v2"
     )
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
@@ -56,11 +62,12 @@ if all_E:
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
         #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
-        "evalHss_reprod_clust_only_newmodel_Clustering2810_v1/showers_df_evaluation/0_0_None_hdbscan.pt"
+        "showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
     #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
-    path_pandora = "evalHss_reprod_clust_only_newmodel_Clustering2810_v1/showers_df_evaluation/0_0_None_pandora.pt"
-    dir_top = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/"
+    path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
+    #dir_top = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/"
+    dir_top = args.path
     #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
@@ -95,7 +102,8 @@ def main():
         #sd_hgb.pred_showers_E = sd_hgb.reco_showers_E
         #print("!!!! Taking the sum of the hits for the energy !!!!")
         # sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
-        sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
+        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
+        sd_hgb[sd_hgb.pred_pid_matched == 3].calibrated_E = sd_hgb[sd_hgb.pred_pid_matched == 3].pred_showers_E
         # set GT energy for 130, 2112, 22
         #
         ##sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
@@ -108,7 +116,7 @@ def main():
         df_list.append(sd_hgb)
         matched_all[labels[idx]] = matched_hgb
     sd_pandora, matched_pandora = open_mlpf_dataframe(
-        dir_top + path_pandora, neutrals_only
+        os.path.join(dir_top, path_pandora), neutrals_only
     )
     #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
     decay_type = get_decay_type(sd_hgb)
@@ -140,6 +148,9 @@ def main():
     #sd_pandora = sd_pandora[~pd.isna(sd_pandora.pid)]
     reco_hist(sd_hgb, sd_pandora, PATH_store)
     plot_confusion_matrix(df_list[0], PATH_store)
+    plot_confusion_matrix(df_list[0], PATH_store, add_pie_charts=True)
+    plot_confusion_matrix_pandora(sd_pandora, PATH_store)
+    plot_confusion_matrix_pandora(sd_pandora, PATH_store, add_pie_charts=True)
     for range in ranges:
         #metrics = obtain_metrics(sd_pandora, df_list, labels)
         allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]
@@ -148,6 +159,8 @@ def main():
         sd_pandora_filtered = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
         sd_pandora_filtered = renumber_batch_idx(sd_pandora_filtered)
         sd_hgb_filtered = renumber_batch_idx(sd_hgb_filtered)
+        #sd_pandora_filtered = sd_pandora
+        #sd_hgb_filtered = sd_hgb
         x = sd_hgb_filtered.pred_ref_pt_matched[sd_hgb_filtered.is_track_in_cluster==1].values
         x = np.stack(x)
         x = np.linalg.norm(x, axis=1)
@@ -179,6 +192,7 @@ def main():
         if not os.path.exists(dir_reco):
             os.makedirs(dir_reco)
         #plot_per_energy_resolution(sd_pandora_filtered, sd_hgb_filtered, dir_reco)
+        #analyze_fakes(sd_pandora_filtered, sd_hgb_filtered, PATH_store)
         plot_per_energy_resolution2_multiple(
             sd_pandora_filtered,
             {"ML": sd_hgb_filtered},

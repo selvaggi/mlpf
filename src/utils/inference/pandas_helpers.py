@@ -1,6 +1,7 @@
 import gzip
 import pickle
 import mplhep as hep
+from src.utils.pid_conversion import pid_conversion_dict
 
 hep.style.use("CMS")
 import matplotlib
@@ -45,7 +46,6 @@ def open_mlpf_dataframe(path_mlpf, neutrals_only=False):
         )
     else:
         sd = data
-    pid_conversion_dict = {11: 0, -11: 0, 211: 1, -211: 1, 130: 2, -130: 2, 2112: 2, -2112: 2, 22: 3}
     mask = (~np.isnan(sd["pred_showers_E"])) * (~np.isnan(sd["reco_showers_E"]))
     sd["pid_4_class_true"] = sd["pid"].map(pid_conversion_dict)
     if "pred_pid_matched" in sd.columns:
