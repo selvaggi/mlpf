@@ -3,10 +3,9 @@ import pickle
 import mplhep as hep
 from src.utils.pid_conversion import pid_conversion_dict
 
-hep.style.use("CMS")
+#hep.style.use("CMS")
 import matplotlib
 
-matplotlib.rc("font", size=25)
 import numpy as np
 import pandas as pd
 

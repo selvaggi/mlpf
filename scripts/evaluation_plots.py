@@ -6,7 +6,7 @@ import pandas as pd
 hep.style.use("CMS")
 import matplotlib
 
-matplotlib.rc("font", size=25)
+#matplotlib.rc("font", size=25)
 import numpy as np
 import numpy as np
 

@@ -41,41 +41,41 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
     if log_scale:
         bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins_fakes = np.linspace(0, 51, 5)
+        bins_fakes = np.linspace(0, 51, 8)
     fake_rate = []
     energy_fakes = []
     fake_percent_energy = []
-    total_true_showers = np.sum(
-        ~np.isnan(sd.true_showers_E.values)
-    )  # The ones where truthHitAssignedEnergies is not nan
+    id_our = pandora_to_our_mapping[id]
     for i in range(len(bins_fakes) - 1):
         bin_i = bins_fakes[i]
         bin_i1 = bins_fakes[i + 1]
         if pandora:
             mask_above = sd.pred_showers_E.values <= bin_i1
             mask_below = sd.pred_showers_E.values > bin_i
-            mask_pid = sd.pandora_pid.isin(our_to_pandora_mapping[id])
+            mask_pid = sd.pandora_pid.isin(our_to_pandora_mapping[id_our])
+            mask_pid_truth = mask_above * mask_below * sd.pid.isin(our_to_pandora_mapping[id_our]) # The matched ones
             mask = mask_below * mask_above * mask_pid
             fakes = np.sum(np.isnan(sd.pid)[mask])
             non_fakes_mask = ~np.isnan(sd.pid)[mask]
             fakes_mask = np.isnan(sd.pid)[mask]
             energy_in_fakes = np.sum(sd.pandora_calibrated_pfo[mask].values[fakes_mask])
-            total_energy_true = np.sum(sd.true_showers_E.values[mask][non_fakes_mask])
-            total_showers = len(sd.pred_showers_E.values[mask])
+            total_energy_true = np.sum(sd.true_showers_E.values[mask_pid_truth])
+            total_showers = len(sd.pred_showers_E.values[mask_pid_truth]) # The true showers
         else:
             mask_above = sd.pred_showers_E.values <= bin_i1
             mask_below = sd.pred_showers_E.values > bin_i
-            mask_pid = sd.pid.isin(pandora_to_our_mapping[id])
+            mask_pid = sd.pred_pid_matched == id_our
+            mask_pid_truth = sd.pid.isin(our_to_pandora_mapping[id_our]) # The matched ones!
             mask = mask_below * mask_above * mask_pid
             fakes = np.sum(np.isnan(sd.pid)[mask])
-            total_showers = len(sd.pred_showers_E.values[mask])
+            total_showers = len(sd.pred_showers_E.values[mask_pid_truth])
             fakes_mask = np.isnan(sd.pid)[mask]
             energy_in_fakes = np.sum(sd.pred_showers_E[mask].values[fakes_mask])
-            non_fakes_mask = ~np.isnan(sd.pid)[mask]
-            total_energy_true = np.sum(sd.true_showers_E.values[mask][non_fakes_mask])
+            #non_fakes_mask = ~np.isnan(sd.pid)[mask]
+            total_energy_true = np.sum(sd.true_showers_E.values[mask_pid_truth])
         if total_showers > 0:
             # print(fakes, np.mean(sd.pred_energy_hits_raw[mask]))
-            fake_rate.append(fakes / total_true_showers)
+            fake_rate.append(fakes / total_showers)
             energy_fakes.append((bin_i1 + bin_i) / 2)
             fake_percent_energy.append(energy_in_fakes / total_energy_true)
     return fake_rate, energy_fakes, fake_percent_energy

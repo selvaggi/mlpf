@@ -313,12 +313,18 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         ret += [None]
     return ret
 
+
+
 def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True):
     # get the mass contributions to event energy and event mass per PID
     mass_over_true = {}
     mass_over_true_pandora = {}
     E_over_true = {}
     E_over_true_pandora = {}
+    pid_model_over_pred = {}
+    pid_pandora_over_pred = {}
+    pid_model_over_true = {}
+    pid_pandora_over_true = {}
     for pid in [11,130,2112,22,2212,211]:
         mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result = calculate_event_mass_resolution(matched_pandora[matched_pandora.pid==pid],
                                                                                                                         True,
@@ -329,12 +335,33 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
                                                                                                         perfect_pid=perfect_pid,
                                                                                                         mass_zero=mass_zero,
                                                                                                         ML_pid=ML_pid)
+        dimsize = int(matched_.number_batch.max() + 1)
+        assert dimsize == matched_pandora.number_batch.max() + 1
+        E_model = torch.nan_to_num(torch.tensor(matched_.calibrated_E.values))
+        E_pandora = torch.nan_to_num(torch.tensor(matched_pandora.pandora_calibrated_pfo.values))
+        E_true = torch.nan_to_num(torch.tensor(matched_.true_showers_E.values))
+        E_model_PID = torch.nan_to_num(torch.tensor(matched_[matched_.pid==pid].calibrated_E.values))
+        E_pandora_PID = torch.nan_to_num(torch.tensor(matched_pandora[matched_pandora.pid==pid].pandora_calibrated_pfo.values))
+
+        event_energy_true = scatter_sum(E_true, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
+        event_energy_pred = scatter_sum(E_model, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
+        event_energy_pred_pandora = scatter_sum(E_pandora, torch.tensor(matched_pandora.number_batch.values).long(), dim_size=dimsize)
+        event_energy_pred_PID = scatter_sum(E_model_PID, torch.tensor(matched_[matched_.pid==pid].number_batch.values).long(), dim_size=dimsize)
+        event_energy_pred_pandora_PID = scatter_sum(E_pandora_PID, torch.tensor(matched_pandora[matched_pandora.pid==pid].number_batch.values).long(), dim_size=dimsize)
+        # event_energy_pred_PID / event_energy_pred, event_energy_pred_pandora_PID / event_energy_pred_pandora, event_energy_pred_PID / event_energy_true, event_energy_pred_pandora_PID / event_energy_true
+        pid_model_over_pred_result = event_energy_pred_PID / event_energy_pred
+        pid_pandora_over_pred_result = event_energy_pred_pandora_PID / event_energy_pred_pandora
+        pid_model_over_true_result = event_energy_pred_PID / event_energy_true
+        pid_pandora_over_true_result = event_energy_pred_pandora_PID / event_energy_true
         mass_over_true[pid] = distr_mass
         mass_over_true_pandora[pid] = distr_mass_p
         E_over_true[pid] = E_over_true_result
         E_over_true_pandora[pid] = E_over_true_pandora_result
-    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora
-
+        pid_model_over_pred[pid] = pid_model_over_pred_result
+        pid_pandora_over_pred[pid] = pid_pandora_over_pred_result
+        pid_model_over_true[pid] = pid_model_over_true_result
+        pid_pandora_over_true[pid] = pid_pandora_over_true_result
+    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_pred, pid_pandora_over_pred, pid_model_over_true, pid_pandora_over_true
 
 def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False):
     (
