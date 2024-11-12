@@ -4,20 +4,11 @@ import matplotlib
 import sys
 sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
 from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist
-matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-# plt.rc("text", usetex=True)
-# plt.rc("font", family="serif")
-# plt.rcParams['text.usetex'] = True
-plt.rcParams['font.size'] = 20
-plt.rcParams['axes.labelsize'] = 20
-#matplotlib.rc("font", size=35)
-plt.rcParams['xtick.labelsize'] = 20
-plt.rcParams['ytick.labelsize'] = 20
-plt.rcParams['legend.fontsize'] = 20
+import mplhep as hep
 import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
@@ -26,10 +17,15 @@ from src.utils.inference.per_particle_metrics import (
 )
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
-import mplhep as hep
 import torch
 import pickle
 hep.style.use("CMS")
+# set hep font size
+
+fs = 10
+font = {'size': fs}
+matplotlib.rc('font', **font)
+
 colors_list = ["#deebf7", "#9ecae1", "#d415bd"]  # color list Jan
 all_E = True
 
@@ -45,30 +41,28 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved"
-                    , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss")
+                    , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
 args = parser.parse_args()
 if all_E:
-    PATH_store = ( #/eos/user/g/gkrzmanc/2024/train/export_f_10_09_testset_300_files_avg_pos_reprod
-        #args.path
-        "/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID_no_filt_tracks"
-        #"/eos/user/g/gkrzmanc/results/2024/evalHss_reprod_clust_only_newmodel_Clustering2810_v2"
+    PATH_store = (
+        #"/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID"
+        args.path
     )
+
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
-    plots_path = os.path.join(PATH_store, "plots")
-    if not os.path.exists(plots_path):
-        os.makedirs(plots_path)
+    PATH_store_individual_plots = os.path.join(PATH_store, "individual_plots")
+    PATH_store_detailed_plots = os.path.join(PATH_store, "summary_plots")
+    if not os.path.exists(PATH_store_individual_plots):
+        os.makedirs(PATH_store_individual_plots)
+    if not os.path.exists(PATH_store_detailed_plots):
+        os.makedirs(PATH_store_detailed_plots)
+
     path_list = [
-        #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_hdbscan.pt"
-        #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"
-        #"Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters_model_0610/showers_df_evaluation/0_0_None_hdbscan.pt"  # THIS ONE IS OK
         "showers_df_evaluation/0_0_None_hdbscan.pt"
     ]
-    #path_pandora = "Eval_Hss_test_Neutrals_Avg_FT_E_p_PID_Use_model_Clusters/showers_df_evaluation/0_0_None_pandora.pt"
     path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
-    #dir_top = "/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/"
     dir_top = args.path
-    #dir_top = "/eos/user/g/gkrzmanc/eval_plots_EC/"
     print(PATH_store)
 
 labels = [
@@ -132,35 +126,28 @@ def main():
     hgb_vertex = hgb_vertex[~mask_nan_hgb]
     displacement_pandora = np.linalg.norm(pandora_vertex, axis=1)
     displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)
-    #sd_pandora = sd_pandora[decay_type_pandora == 1]
-    #sd_hgb = sd_hgb[decay_type == 1]
-    #allowed_batch_idx = np.where(decay_type_pandora == 1)[0]
-    #allowed_batch_idx_pandora = np.where(decay_type == 1)[0]
-    #sd_pandora = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx)]
-    #sd_hgb = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx_pandora)]
     # filter the df based on where decay type is 0
-    ranges = [[0, 5000]]    # Ranges of the displacement to make the plots from, in cm
-    plot_efficiency_all(sd_pandora, df_list, PATH_store, labels)
-    #fakes_ml = sd_hgb[pd.isna(sd_hgb.pid)].pred_showers_E.values
-    #fakes_pandora = sd_pandora[pd.isna(sd_pandora.pid)].pred_showers_E.values
-    # remove fakes
-    #sd_hgb = sd_hgb[~pd.isna(sd_hgb.pid)]
-    #sd_pandora = sd_pandora[~pd.isna(sd_pandora.pid)]
-    reco_hist(sd_hgb, sd_pandora, PATH_store)
-    plot_confusion_matrix(df_list[0], PATH_store)
-    plot_confusion_matrix(df_list[0], PATH_store, add_pie_charts=True)
-    plot_confusion_matrix_pandora(sd_pandora, PATH_store)
-    plot_confusion_matrix_pandora(sd_pandora, PATH_store, add_pie_charts=True)
+    ranges = [[0, 5000]]   # Ranges of the displacement to make the plots from, in cm
+    fig, ax = plt.subplots(4, 5, figsize=(22, 22*4/5)) # The overview figure of efficiencies
+    plot_efficiency_all(sd_pandora, df_list, PATH_store_individual_plots, labels, ax=ax)
+    #reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
+    #plot_confusion_matrix(df_list[0], PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])
+    #plot_confusion_matrix(df_list[0], PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 3])
+    #plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, 4], ax1=ax[1, 4], ax2=ax[2, 4])
+    #plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 4])
+    #x_position = 3 / 5  # Normalize the position of the line between the 3rd and 4th columns
+    #fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
+    #fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
+    #fig.tight_layout()
+    # Draw a vertical line between 3rd and 4th column in the big figure
+    #fig.savefig(os.path.join(PATH_store_detailed_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
     for range in ranges:
-        #metrics = obtain_metrics(sd_pandora, df_list, labels)
         allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]
         sd_hgb_filtered = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx)]
         allowed_batch_idx_pandora = np.where((displacement_pandora < range[1]*10) & (displacement_pandora > range[0]*10))[0]
         sd_pandora_filtered = sd_pandora[sd_pandora.number_batch.isin(allowed_batch_idx_pandora)]
         sd_pandora_filtered = renumber_batch_idx(sd_pandora_filtered)
         sd_hgb_filtered = renumber_batch_idx(sd_hgb_filtered)
-        #sd_pandora_filtered = sd_pandora
-        #sd_hgb_filtered = sd_hgb
         x = sd_hgb_filtered.pred_ref_pt_matched[sd_hgb_filtered.is_track_in_cluster==1].values
         x = np.stack(x)
         x = np.linalg.norm(x, axis=1)
@@ -185,12 +172,16 @@ def main():
                 "ML: ",
                 len(sd_hgb[(sd_hgb.calibrated_E > i[0]) & (sd_hgb.calibrated_E < i[1])]),
             )
-        current_dir =  os.path.join(PATH_store, "plots_range_" + str(range[0]) + "_" + str(range[1]))
+        if len(ranges) == 1:
+            current_dir = PATH_store_individual_plots
+            current_dir_detailed = PATH_store_detailed_plots
+        else:
+            current_dir =  os.path.join(PATH_store_individual_plots, "plots_range_" + str(range[0]) + "_" + str(range[1]))
+            current_dir_detailed = os.path.join(PATH_store_detailed_plots, "plots_range_" + str(range[0]) + "_" + str(range[1]))
         if not os.path.exists(current_dir):
             os.makedirs(current_dir)
-        dir_reco = os.path.join(current_dir, "reco")
-        if not os.path.exists(dir_reco):
-            os.makedirs(dir_reco)
+        if not os.path.exists(current_dir_detailed):
+            os.makedirs(current_dir_detailed)
         #plot_per_energy_resolution(sd_pandora_filtered, sd_hgb_filtered, dir_reco)
         #analyze_fakes(sd_pandora_filtered, sd_hgb_filtered, PATH_store)
         plot_per_energy_resolution2_multiple(
@@ -201,6 +192,7 @@ def main():
             perfect_pid=perfect_pid,
             mass_zero=mass_zero,
             ML_pid=ML_pid,
+            PATH_store_detailed_plots=current_dir_detailed
         )
         print("Done")
 

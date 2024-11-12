@@ -313,8 +313,6 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         ret += [None]
     return ret
 
-
-
 def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True):
     # get the mass contributions to event energy and event mass per PID
     mass_over_true = {}
@@ -325,6 +323,7 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
     pid_pandora_over_pred = {}
     pid_model_over_true = {}
     pid_pandora_over_true = {}
+    pid_true_over_true = {}
     for pid in [11,130,2112,22,2212,211]:
         mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result = calculate_event_mass_resolution(matched_pandora[matched_pandora.pid==pid],
                                                                                                                         True,
@@ -342,7 +341,8 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
         E_true = torch.nan_to_num(torch.tensor(matched_.true_showers_E.values))
         E_model_PID = torch.nan_to_num(torch.tensor(matched_[matched_.pid==pid].calibrated_E.values))
         E_pandora_PID = torch.nan_to_num(torch.tensor(matched_pandora[matched_pandora.pid==pid].pandora_calibrated_pfo.values))
-
+        E_PID_true = torch.nan_to_num(torch.tensor(matched_[matched_.pid==pid].true_showers_E.values))
+        event_energy_PID_true = scatter_sum(E_PID_true, torch.tensor(matched_[matched_.pid==pid].number_batch.values).long(), dim_size=int(dimsize))
         event_energy_true = scatter_sum(E_true, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
         event_energy_pred = scatter_sum(E_model, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
         event_energy_pred_pandora = scatter_sum(E_pandora, torch.tensor(matched_pandora.number_batch.values).long(), dim_size=dimsize)
@@ -361,7 +361,8 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
         pid_pandora_over_pred[pid] = pid_pandora_over_pred_result
         pid_model_over_true[pid] = pid_model_over_true_result
         pid_pandora_over_true[pid] = pid_pandora_over_true_result
-    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_pred, pid_pandora_over_pred, pid_model_over_true, pid_pandora_over_true
+        pid_true_over_true[pid] = event_energy_PID_true
+    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_pred, pid_pandora_over_pred, pid_model_over_true, pid_pandora_over_true, pid_true_over_true
 
 def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False):
     (
@@ -426,9 +427,12 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     return dic
 
 def plot_mass_resolution(event_res_dic, PATH_store):
+    old_font_size = matplotlib.rcParams['font.size']
+    matplotlib.rcParams.update({'font.size': 22})
     fig, ax = plt.subplots(figsize=(7, 7))
+    # set fontsize to 20
     ax.set_xlabel(r"$m_{pred}/m_{true}$")
-    bins = np.linspace(0, 3, 100)
+    bins = np.linspace(0, 2, 200)
     ax.hist(
         event_res_dic["mass_over_true_model"],
         bins=bins,
@@ -458,27 +462,4 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     print("Saving mass resolution")
     import os
     fig.savefig(os.path.join(PATH_store, "mass_resolution.pdf"), bbox_inches="tight")
-    fig, ax = plt.subplots(figsize=(7, 7))
-    ax.set_xlabel(r"$M_{reco}$")
-    bins = np.linspace(0, 3, 100)
-    ax.hist(
-        event_res_dic["mass_model"],
-        bins=bins,
-        histtype="step",
-        label="ML",
-        color="red",
-        density=True,
-    )
-    ax.hist(
-        event_res_dic["mass_pandora"],
-        bins=bins,
-        histtype="step",
-        label="Pandora",
-        color="blue",
-        density=True,
-    )
-    ax.grid()
-    ax.legend()
-    #ax.set_xlim([0, 10])
-    fig.tight_layout()
-    fig.savefig(os.path.join(PATH_store, "mass_reco_absolute.pdf"), bbox_inches="tight")
+    matplotlib.rcParams.update({'font.size': old_font_size})

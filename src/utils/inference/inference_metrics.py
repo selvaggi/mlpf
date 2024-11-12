@@ -11,7 +11,7 @@ def calculate_eff(sd, log_scale=False, pandora=False):
     if log_scale:
         bins = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins = np.arange(0, 51, 5)
+        bins = [0, 5, 10, 35, 50]
     eff = []
     energy_eff = []
     for i in range(len(bins) - 1):
