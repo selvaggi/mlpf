@@ -55,7 +55,7 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
         e_over_e_distr_pandora,
         mean_errors_p,
         variance_errors_p,
-        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p, sigma_phi_pandora, sigma_theta_pandora, distr_phi_pandora, distr_theta_pandora, distr_E_reco
+        mean_pxyz_pandora, variance_om_pxyz_pandora, masses_pandora, pxyz_true_p, pxyz_pred_p, sigma_phi_pandora, sigma_theta_pandora, distr_phi_pandora, distr_theta_pandora, distr_E_reco_pandora
     ) = calculate_response(df_id_pandora, True, False, tracks=tracks, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
     # Pandora: TODO: do some sort of PID for Pandora
     (
@@ -99,8 +99,8 @@ def get_response_for_id_i(id, matched_pandora, matched_, tracks=False, perfect_p
     dic["variance_om_baseline"] = variance_om_baseline
     dic["distributions_pandora"] = e_over_e_distr_pandora
     dic["distributions_model"] = e_over_e_distr_model
-    dic["distributions_pandora_reco"] = e_over_e_distr_pandora
-    dic["distributions_model_reco"] = e_over_e_distr_model
+    dic["distributions_pandora_reco"] = distr_E_reco_pandora
+    dic["distributions_model_reco"] = distr_E_reco
     dic["mean_pxyz"] = mean_pxyz
     dic["variance_om_pxyz"] = variance_om_pxyz
     dic["mean_pxyz_pandora"] = mean_pxyz_pandora
@@ -731,8 +731,38 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     nonfakes_pandora = matched_pandora[~pd.isna(matched_pandora.true_showers_E)]
     fakes_model = matched_all[pd.isna(matched_all.true_showers_E)]
     nonfakes_model = matched_all[~pd.isna(matched_all.true_showers_E)]
+    # energy bins:
+    energies = [0, 5, 15, 35, 50]
+    # for each bin, plot a pie chart with the PIDs and their percentages.
+    fig, ax = plt.subplots(2, 4, figsize=(10, 5))
+    for i in range(len(energies) - 1):
+        fakes_pandora_i = fakes_pandora[(fakes_pandora.pred_showers_E > energies[i]) & (fakes_pandora.pred_showers_E < energies[i + 1])]
+        fakes_model_i = fakes_model[(fakes_model.pred_showers_E > energies[i]) & (fakes_model.pred_showers_E < energies[i + 1])]
+        # plot the PID distribution for fakes
+        pid_names = ["e", "CH", "NH", "gamma"]
+        pid_model = fakes_model_i.pred_pid_matched.values
+        pid_pandora = fakes_pandora_i.pandora_pid.values
+        pid_pandora = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora]
+        pid_model = [pid_names[int(x)] for x in pid_model]
+        pid_model = pd.value_counts(pid_model)
+        pid_pandora = pd.value_counts(pid_pandora)
 
-    fig, ax = plt.subplots(4, 1, figsize=(10, 15))
+
+        colors = ["blue", "red", "green", "purple"]
+        #pid_model = [pid_names[int(x)] for x in pid_model]
+        #pid_pandora.index = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora.index]
+        ax[0, i].pie(pid_pandora, labels=pid_pandora.index, autopct="%1.1f%%")
+        ax[0, i].set_title(f"Pandora [{energies[i]}, {energies[i + 1]}] GeV")
+        ax[1, i].pie(pid_model, labels=pid_model.index, autopct="%1.1f%%")
+        ax[1, i].set_title(f"Model [{energies[i]}, {energies[i + 1]}] GeV")
+        # plot the PID distribution for nonfakes
+        #nonfakes_pandora_i = nonfakes_pandora[(nonfakes_pandora.pred_showers_E > energies[i]) & (nonfakes_pandora.pred_showers_E < energies[i + 1])]
+        #nonfakes_model_i = nonfakes_model[(nonfakes_model.pred_showers_E > energies[i]) & (nonfakes_model.pred_showers_E < energies[i + 1])]
+        #pid_pandora = nonfakes_pandora_i.pid.value_counts()
+    fig.savefig(os.path.join(PATH_store, "fakes_PID_structure.pdf"))
+
+
+    '''fig, ax = plt.subplots(4, 1, figsize=(10, 15))
     bins = np.linspace(0, 5, 100)
     density=False
     # plot the reco energy histogram for fakes and nonfakes
@@ -753,7 +783,7 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     ax[1].set_yscale("log")
     ax[2].set_yscale("log")
     ax[3].set_yscale("log")
-    fig.savefig(os.path.join(PATH_store, "fakes_analysis.pdf"))
+    fig.savefig(os.path.join(PATH_store, "fakes_analysis.pdf"))'''
 
 
 def plot_per_energy_resolution2_multiple(
@@ -1029,27 +1059,31 @@ def plot_per_energy_resolution2_multiple(
                 if len(hadrons_dic["energy_resolutions"]) > 0:
                     plot_pxyz_resolution(hadrons_dic["energy_resolutions"], hadrons_dic["mean_pxyz_pandora"], hadrons_dic["mean_pxyz"], axs_response_pxyz[130], key)'''
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
+                fig_phi, ax_phi = plt.subplots(len(PIDs), 4, figsize=(len(PIDs)*2, 10))
+                fig_theta, ax_theta = plt.subplots(len(PIDs), 4, figsize=(len(PIDs)*2, 10))
                 for angle in ["theta", "phi"]:
                     if len(photons_dic["distr_phi"]) > 0:
-                        stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, r"Photons $\Phi$", "Photons_Phi")
-                        stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, r"Photons $\theta$", "Photons_Theta")
+                        stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, r"Photons $\Phi$", "Photons_Phi", ax=ax_phi[PIDs.index(22)])
+                        stacked_hist_plot(photons_dic["distr_theta"], photons_dic["distr_theta_pandora"], PATH_store, r"Photons $\theta$", "Photons_Theta", ax=ax_theta[PIDs.index(22)])
                         plot_sigma_angle_vs_energy(photons_dic, PATH_store, "photons", angle, "Photons")
                     if len(neutrons["distr_phi"]) > 3:
-                        stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons $\Phi$", "Neutrons_Phi")
-                        stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons $\Theta$", "Neutrons_Theta")
+                        stacked_hist_plot(neutrons["distr_phi"], neutrons["distr_phi_pandora"], PATH_store, "Neutrons $\Phi$", "Neutrons_Phi", ax=ax_phi[PIDs.index(2112)])
+                        stacked_hist_plot(neutrons["distr_theta"], neutrons["distr_theta_pandora"], PATH_store, "Neutrons $\Theta$", "Neutrons_Theta", ax=ax_theta[PIDs.index(2112)])
                         plot_sigma_angle_vs_energy(neutrons, PATH_store, "neutrons", angle, "Neutrons")
                     if len(hadrons_dic["distr_phi"]) > 0:
-                        stacked_hist_plot(hadrons_dic["distr_phi"], hadrons_dic["distr_phi_pandora"], PATH_store, r"K_L $\Phi$", "KL_Phi")
-                        stacked_hist_plot(hadrons_dic["distr_theta"], hadrons_dic["distr_theta_pandora"], PATH_store, r"K_L $\theta$", "KL_Theta")
+                        stacked_hist_plot(hadrons_dic["distr_phi"], hadrons_dic["distr_phi_pandora"], PATH_store, r"K_L $\Phi$", "KL_Phi", ax=ax_phi[PIDs.index(130)])
+                        stacked_hist_plot(hadrons_dic["distr_theta"], hadrons_dic["distr_theta_pandora"], PATH_store, r"K_L $\theta$", "KL_Theta", ax=ax_theta[PIDs.index(130)])
                         plot_sigma_angle_vs_energy(hadrons_dic, PATH_store, "KL", angle, "$K_L$")
                     if len(hadrons_dic2["distr_phi"]) > 0:
-                        stacked_hist_plot(hadrons_dic2["distr_phi"], hadrons_dic2["distr_phi_pandora"], PATH_store, r"$\Pi^{\pm}$ $\Phi$", "Pions_Phi")
-                        stacked_hist_plot(hadrons_dic2["distr_theta"], hadrons_dic2["distr_theta_pandora"], PATH_store, r"$\Pi^{\pm}$ $\theta$", "Pions_Theta")
+                        stacked_hist_plot(hadrons_dic2["distr_phi"], hadrons_dic2["distr_phi_pandora"], PATH_store, r"$\Pi^{\pm}$ $\Phi$", "Pions_Phi", ax=ax_phi[PIDs.index(211)])
+                        stacked_hist_plot(hadrons_dic2["distr_theta"], hadrons_dic2["distr_theta_pandora"], PATH_store, r"$\Pi^{\pm}$ $\theta$", "Pions_Theta", ax=ax_theta[PIDs.index(211)])
                         plot_sigma_angle_vs_energy(hadrons_dic2, PATH_store, "Pions", angle, "Pions")
                     if len(electrons_dic["distr_phi"]) > 0:
-                        stacked_hist_plot(electrons_dic["distr_phi"], electrons_dic["distr_phi_pandora"], PATH_store, r"e $\Phi$", "Electrons_Phi")
-                        stacked_hist_plot(electrons_dic["distr_theta"], electrons_dic["distr_theta_pandora"], PATH_store, r"e $\theta$", "Electrons_Theta")
+                        stacked_hist_plot(electrons_dic["distr_phi"], electrons_dic["distr_phi_pandora"], PATH_store, r"e $\Phi$", "Electrons_Phi", ax=ax_phi[PIDs.index(11)])
+                        stacked_hist_plot(electrons_dic["distr_theta"], electrons_dic["distr_theta_pandora"], PATH_store, r"e $\theta$", "Electrons_Theta", ax=ax_theta[PIDs.index(11)])
                         plot_sigma_angle_vs_energy(electrons_dic, PATH_store, "electrons", angle, "Electrons")
+                fig_theta.savefig(os.path.join(PATH_store_detailed_plots, "theta.pdf"), bbox_inches="tight")
+                fig_phi.savefig(os.path.join(PATH_store_detailed_plots, "phi.pdf"), bbox_inches="tight")
                 if len(photons_dic["energy_resolutions"]) > 1:
                     plot_one_label(
                         "Electromagnetic Resolution",
@@ -2399,7 +2433,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             distr_theta.append(eta_dist)
             distr_phi.append(phi_dist)
             distributions.append(e_over_true)
-            distributions_reco.append(e_over_reco)
+            distributions_reco.append(e_over_reco_ML)
             (
                 mean_predtotrue,
                 var_predtotrue,
@@ -2571,16 +2605,23 @@ def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, titl
     frac_model_dropped = int(
         (1 - len(distr_model) / len(photons_dic["distributions_model"][i])) * 1000
     )
-    mask = distr_pandora < 2.0
+    mask = distr_pandora < 3.0
     distr_pandora = distr_pandora[mask]
     frac_pandora_dropped = int(
         (1 - len(distr_pandora) / len(photons_dic["distributions_pandora"][i]))
         * 1000
     )
-    mu = photons_dic["mean"][i]
-    sigma = (photons_dic["variance_om"][i]) * mu
-    mu_pandora = photons_dic["mean_p"][i]
-    sigma_pandora = (photons_dic["variance_om_p"][i]) * mu
+    if "reco" not in title.lower():
+        mu = photons_dic["mean"][i]
+        sigma = (photons_dic["variance_om"][i]) * mu
+        mu_pandora = photons_dic["mean_p"][i]
+        sigma_pandora = (photons_dic["variance_om_p"][i]) * mu
+    else:
+        mu = photons_dic["mean_reco"][i]
+        sigma = (photons_dic["variance_om_reco"][i]) * mu
+        mu_pandora = photons_dic["mean_p_reco"][i]
+        sigma_pandora = (photons_dic["variance_om_p_reco"][i]) * mu
+
     ax_distr[i].hist(
         distr_model,
         bins=np.arange(0, 3, 1e-2),
@@ -2624,6 +2665,7 @@ def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, titl
     )
     ax_distr[i].legend()
     ax_distr[i].grid()
+    ax_distr[i].set_yscale("log")
 
 def plot_one_label(
     title,
@@ -2674,7 +2716,7 @@ def plot_one_label(
     for i in range(len(photons_dic["energy_resolutions" + reco])):
         distr_model = photons_dic["distributions_model"][i]
         distr_pandora = photons_dic["distributions_pandora"][i]
-        plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, label1 + f" {photons_dic['energy_resolutions'][i]:.2f} GeV " + " (Energy correction)")
+        plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, label1 + f" {photons_dic['energy_resolutions'][i]:.2f} GeV " + " (EC)")
         distr_model = photons_dic["distributions_model_reco"][i]
         distr_pandora = photons_dic["distributions_pandora_reco"][i]
         plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr_reco, i, label1 + f" {photons_dic['energy_resolutions'][i]:.2f} GeV " + " (reco)")

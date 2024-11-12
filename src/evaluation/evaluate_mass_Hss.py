@@ -130,17 +130,17 @@ def main():
     ranges = [[0, 5000]]   # Ranges of the displacement to make the plots from, in cm
     fig, ax = plt.subplots(4, 5, figsize=(22, 22*4/5)) # The overview figure of efficiencies
     plot_efficiency_all(sd_pandora, df_list, PATH_store_individual_plots, labels, ax=ax)
-    #reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
-    #plot_confusion_matrix(df_list[0], PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])
-    #plot_confusion_matrix(df_list[0], PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 3])
-    #plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, 4], ax1=ax[1, 4], ax2=ax[2, 4])
-    #plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 4])
-    #x_position = 3 / 5  # Normalize the position of the line between the 3rd and 4th columns
-    #fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
-    #fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
-    #fig.tight_layout()
+    reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
+    plot_confusion_matrix(df_list[0], PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])
+    plot_confusion_matrix(df_list[0], PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 3])
+    plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, 4], ax1=ax[1, 4], ax2=ax[2, 4])
+    plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 4])
+    x_position = 3 / 5  # Normalize the position of the line between the 3rd and 4th columns
+    fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
+    fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
+    fig.tight_layout()
     # Draw a vertical line between 3rd and 4th column in the big figure
-    #fig.savefig(os.path.join(PATH_store_detailed_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
+    fig.savefig(os.path.join(PATH_store_detailed_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
     for range in ranges:
         allowed_batch_idx = np.where((displacement_hgb < range[1]*10) & (displacement_hgb > range[0]*10))[0]
         sd_hgb_filtered = sd_hgb[sd_hgb.number_batch.isin(allowed_batch_idx)]
@@ -183,7 +183,7 @@ def main():
         if not os.path.exists(current_dir_detailed):
             os.makedirs(current_dir_detailed)
         #plot_per_energy_resolution(sd_pandora_filtered, sd_hgb_filtered, dir_reco)
-        #analyze_fakes(sd_pandora_filtered, sd_hgb_filtered, PATH_store)
+        analyze_fakes(sd_pandora_filtered, sd_hgb_filtered, PATH_store_detailed_plots)
         plot_per_energy_resolution2_multiple(
             sd_pandora_filtered,
             {"ML": sd_hgb_filtered},
