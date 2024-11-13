@@ -766,7 +766,7 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     for i in range(len(charged_PID_true)):
                         charged_PID_true_onehot[i, self.pid_conversion_dict.get(charged_PID_true[i], 3)] = 1
-                        if charged_PID_true not in self.pid_conversion_dict:
+                        if charged_PID_true[i] not in self.pid_conversion_dict:
                             print("Unknown PID", charged_PID_true[i])
                 charged_PID_true_onehot = charged_PID_true_onehot.clone().to(dic["charged_idx"].device)
             if len(self.pids_neutral):
@@ -788,7 +788,7 @@ class ExampleWrapper(L.LightningModule):
                 else:
                     for i in range(len(neutral_PID_true)):
                         neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
-                        if neutral_PID_true not in self.pid_conversion_dict:
+                        if neutral_PID_true[i] not in self.pid_conversion_dict:
                             print("Unknown PID", neutral_PID_true[i])
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
         loss_time_start = time()

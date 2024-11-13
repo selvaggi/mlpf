@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import torch
 from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum, scatter_mean
+import os
 
 def plot_per_event_metrics(sd, sd_pandora, PATH_store=None):
     (
@@ -361,7 +362,7 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
         pid_pandora_over_pred[pid] = pid_pandora_over_pred_result
         pid_model_over_true[pid] = pid_model_over_true_result
         pid_pandora_over_true[pid] = pid_pandora_over_true_result
-        pid_true_over_true[pid] = event_energy_PID_true
+        pid_true_over_true[pid] = event_energy_PID_true / event_energy_true
     return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_pred, pid_pandora_over_pred, pid_model_over_true, pid_pandora_over_true, pid_true_over_true
 
 def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False):
@@ -429,35 +430,50 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
 def plot_mass_resolution(event_res_dic, PATH_store):
     old_font_size = matplotlib.rcParams['font.size']
     matplotlib.rcParams.update({'font.size': 22})
-    fig, ax = plt.subplots(figsize=(7, 7))
+    fig, ax = plt.subplots(1, 2,figsize=(7, 7))
     # set fontsize to 20
-    ax.set_xlabel(r"$m_{pred}/m_{true}$")
+    ax[0].set_xlabel(r"$m_{pred}/m_{true}$")
     bins = np.linspace(0, 2, 200)
-    ax.hist(
+    ax[0].hist(
         event_res_dic["mass_over_true_model"],
         bins=bins,
         histtype="step",
         label="ML $\mu$={} $\sigma/\mu$={}".format(
-            round((event_res_dic["mean_mass_model"]), 2),
-            round((event_res_dic["var_mass_model"]), 2),
+            round((event_res_dic["mean_mass_model"]), 4),
+            round((event_res_dic["var_mass_model"]), 4),
         ),
         color="red",
         density=True,
     )
-    ax.hist(
+    ax[0].hist(
         event_res_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
         label="Pandora $\mu$={} $\sigma/\mu$={}".format(
-            round((event_res_dic["mean_mass_pandora"]), 2),
-            round((event_res_dic["var_mass_pandora"]), 2),
+            round((event_res_dic["mean_mass_pandora"]), 4),
+            round((event_res_dic["var_mass_pandora"]), 4),
         ),
         color="blue",
         density=True,
     )
-    ax.grid()
-    ax.legend()
+    ax[0].grid()
+    ax[0].legend()
     #ax.set_xlim([0, 10])
+    mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["ML"]["mean_energy_over_true_pandora"], 4), round(
+        event_res_dic["ML"]["var_energy_over_true_pandora"], 4)
+    mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 4), round(
+        event_res_dic["ML"]["var_energy_over_true"], 4)
+    ax[1].hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=bins, histtype="step",
+                      label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
+                                                                         sigma_e_over_true_pandora), color="blue",
+                      density=True)
+    ax[1].hist(event_res_dic["ML"]["energy_over_true"], bins=bins, histtype="step",
+                      label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color="red",
+                      density=True)
+    ax[1].grid(1)
+    ax[1].set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
+    ax[1].legend()
+
     fig.tight_layout()
     print("Saving mass resolution")
     import os
