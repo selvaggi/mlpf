@@ -119,6 +119,9 @@ def safeint(x, default_val=0):
     return int(x)
 
 def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
+    # reco showers> 0 does not consider showers that are in the event but do not contribute energy to the total in the event
+    df = df[((df.reco_showers_E>0))]
+
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
