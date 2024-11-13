@@ -433,7 +433,7 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
 def plot_mass_resolution(event_res_dic, PATH_store):
     old_font_size = matplotlib.rcParams['font.size']
     matplotlib.rcParams.update({'font.size': 22})
-    fig, ax = plt.subplots(1, 2,figsize=(7, 7))
+    fig, ax = plt.subplots(1, 2,figsize=(16, 8))
     # set fontsize to 20
     ax[0].set_xlabel(r"$m_{pred}/m_{true}$")
     bins = np.linspace(0, 2, 200)
@@ -462,15 +462,15 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     ax[0].grid()
     ax[0].legend()
     #ax.set_xlim([0, 10])
-    mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["ML"]["mean_energy_over_true_pandora"], 4), round(
-        event_res_dic["ML"]["var_energy_over_true_pandora"], 4)
-    mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 4), round(
-        event_res_dic["ML"]["var_energy_over_true"], 4)
-    ax[1].hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=bins, histtype="step",
+    mean_e_over_true_pandora, sigma_e_over_true_pandora = round(event_res_dic["mean_energy_over_true_pandora"], 4), round(
+        event_res_dic["var_energy_over_true_pandora"], 4)
+    mean_e_over_true, sigma_e_over_true = round(event_res_dic["mean_energy_over_true"], 4), round(
+        event_res_dic["var_energy_over_true"], 4)
+    ax[1].hist(event_res_dic["energy_over_true_pandora"], bins=bins, histtype="step",
                       label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
                                                                          sigma_e_over_true_pandora), color="blue",
                       density=True)
-    ax[1].hist(event_res_dic["ML"]["energy_over_true"], bins=bins, histtype="step",
+    ax[1].hist(event_res_dic["energy_over_true"], bins=bins, histtype="step",
                       label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color="red",
                       density=True)
     ax[1].grid(1)

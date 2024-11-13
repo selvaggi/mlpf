@@ -465,7 +465,7 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         #    if bar * 0.95 < mean_mass:
         #        axs[i].axvline(bar, color="black", linestyle="--")
 
-def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None):
+def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None, suffix=""):
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
@@ -495,13 +495,15 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
                                           bbox_to_anchor=(x, y, size, size),
                                           bbox_transform=ax.transData,
                                           borderpad=0)
-                    ax_inset.pie(counts, labels=unique, autopct="%1.1f%%", textprops={'fontsize': 5})
+                    # each label should always have the same color, i.e. 130-> purple etc.
+
+                    #ax_inset.pie(counts, labels=unique, autopct="%1.1f%%", textprops={'fontsize': 5})
     class_names = ["e", "CH", "NH", "gamma"]
     if not add_pie_charts:
-        sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax, norm=LogNorm())
         row_sums = cm.sum(axis=1, keepdims=True)
         cm_percent = cm / row_sums * 100  # Get percentages per row
-        sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax, norm=LogNorm())
+        palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
+        sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax, cmap=palette)
         # Loop over each cell to add custom annotations
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
@@ -511,7 +513,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
                 percent = cm_percent[i, j]
                 # Display count on top, percentage below in smaller font
                 ax.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                        ha="center", va="center", color="gray",
+                        ha="center", va="center", color="0.8",
                         fontsize=9)
     else:
         # now plot just the ticks on the plot without the CM
@@ -523,7 +525,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("Confusion Matrix")
+    ax.set_title("Confusion Matrix" + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -539,9 +541,11 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     savefigs = ax1 is None
     if ax1 is None:
         fig, ax1 = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1, norm=LogNorm())
     row_sums = cm.sum(axis=1, keepdims=True)
     cm_percent = cm / row_sums * 100  # Get percentages per row
+    palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
+    sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1, cmap=palette)
+    #sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1, norm=LogNorm())
     # Loop over each cell to add custom annotations
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
@@ -551,21 +555,21 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
             percent = cm_percent[i, j]
             # Display count on top, percentage below in smaller font
             ax1.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                    ha="center", va="center", color="gray",
+                    ha="center", va="center", color="0.8",
                     fontsize=10)
-
-    # axes
     ax1.set_xlabel("Predicted")
     ax1.set_ylabel("True")
-    ax1.set_title("Confusion Matrix (track in cluster)")
+    ax1.set_title("Confusion Matrix (track in cluster)" + suffix)
     if savefigs:
         fig.savefig(os.path.join(save_dir, "confusion_matrix_PID_track_in_cluster.pdf"), bbox_inches="tight")
     savefigs = ax2 is None
     if ax2 is None:
         fig, ax2 = plt.subplots()
-    sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2, norm=LogNorm())
+    #sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2, norm=LogNorm())
     row_sums = cm1.sum(axis=1, keepdims=True)
     cm_percent = cm1 / row_sums * 100  # Get percentages per row
+    palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
+    sns.heatmap(cm_percent, annot=cm1, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2, cmap=palette)
     # Loop over each cell to add custom annotations
     for i in range(cm1.shape[0]):
         for j in range(cm1.shape[1]):
@@ -575,13 +579,12 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
             percent = cm_percent[i, j]
             # Display count on top, percentage below in smaller font
             ax2.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                    ha="center", va="center", color="gray",
+                    ha="center", va="center", color="0.8",
                     fontsize=10)
-
     # axes
     ax2.set_xlabel("Predicted")
     ax2.set_ylabel("True")
-    ax2.set_title("Confusion Matrix (no track in cluster)")
+    ax2.set_title("Confusion Matrix (no track in cluster)" + suffix)
     if savefigs:
         fig.savefig(os.path.join(save_dir, "confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
 
@@ -590,7 +593,7 @@ def nanindex(x, list):
         return np.nan
     return list.index(x)
 
-def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None):
+def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None, suffix=""):
     class_true = np.array(sd_pandora.pid.values)
     class_pred = np.array(sd_pandora.pandora_pid.values)
     #allowed_pids =  sorted(sd_pandora.pandora_pid.dropna().unique())
@@ -638,10 +641,12 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
                     ax_inset.pie(counts1, labels=unique1, autopct="%1.1f%%", textprops={'fontsize': 10})
     class_names = ["e", "CH", "NH", "gamma"]
     if not add_pie_charts:
-        sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax, norm=LogNorm())
         # Calculate percentages
         row_sums = cm.sum(axis=1, keepdims=True)
         cm_percent = cm / row_sums * 100  # Get percentages per row
+        palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
+        sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax,
+                    cmap=palette)
         # Loop over each cell to add custom annotations
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
@@ -651,7 +656,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
                 percent = cm_percent[i, j]
                 # Display count on top, percentage below in smaller font
                 ax.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                        ha="center", va="center", color="gray",
+                        ha="center", va="center", color="0.8",
                         fontsize=10)
 
     else:
@@ -664,7 +669,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("Pandora Confusion Matrix")
+    ax.set_title("Pandora Confusion Matrix" + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -681,13 +686,15 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     savefigs = ax1 is None
     if ax1 is None:
         fig, ax1 = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1, norm=LogNorm())
-    # axes
-    ax1.set_xlabel("Predicted")
-    ax1.set_ylabel("True")
-    ax1.set_title("Pandora CM (track in cluster)")
+    #sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1, norm=LogNorm())
     row_sums = cm.sum(axis=1, keepdims=True)
     cm_percent = cm / row_sums * 100  # Get percentages per row
+    palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
+    sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax1,
+                cmap=palette)
+    ax1.set_xlabel("Predicted")
+    ax1.set_ylabel("True")
+    ax1.set_title("Pandora CM (track in cluster)" + suffix)
     # Loop over each cell to add custom annotations
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
@@ -697,16 +704,19 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
             percent = cm_percent[i, j]
             # Display count on top, percentage below in smaller font
             ax1.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                    ha="center", va="center", color="gray",
+                    ha="center", va="center", color="0.8",
                     fontsize=10)
     if savefigs:
         fig.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID_track_in_cluster.pdf"), bbox_inches="tight")
     savefigs = ax2 is None
     if savefigs:
         fig, ax2 = plt.subplots()
-    sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2, norm=LogNorm())
+    #sns.heatmap(cm1, annot=True, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2, norm=LogNorm())
+    palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
     row_sums = cm1.sum(axis=1, keepdims=True)
     cm_percent = cm1 / row_sums * 100  # Get percentages per row
+    sns.heatmap(cm_percent, annot=cm1, fmt="d", xticklabels=class_names, yticklabels=class_names, ax=ax2,
+                cmap=palette)
     # Loop over each cell to add custom annotations
     for i in range(cm1.shape[0]):
         for j in range(cm1.shape[1]):
@@ -716,12 +726,12 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
             percent = cm_percent[i, j]
             # Display count on top, percentage below in smaller font
             ax2.text(j + 0.5, i + 0.85, f"{percent:.1f}%",
-                    ha="center", va="center", color="gray",
+                    ha="center", va="center", color="0.8",
                     fontsize=10)
     # axes
     ax2.set_xlabel("Predicted")
     ax2.set_ylabel("True")
-    ax2.set_title("Pandora CM (no track in cluster)")
+    ax2.set_title("Pandora CM (no track in cluster)" + suffix)
     if savefigs:
         fig.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
         plt.clf()
@@ -746,8 +756,6 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
         pid_model = [pid_names[int(x)] for x in pid_model]
         pid_model = pd.value_counts(pid_model)
         pid_pandora = pd.value_counts(pid_pandora)
-
-
         colors = ["blue", "red", "green", "purple"]
         #pid_model = [pid_names[int(x)] for x in pid_model]
         #pid_pandora.index = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora.index]
@@ -785,6 +793,21 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     ax[3].set_yscale("log")
     fig.savefig(os.path.join(PATH_store, "fakes_analysis.pdf"))'''
 
+
+def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store):
+    # Plot confusion matrix for each energy bin
+    fig, ax = plt.subplots(8, 4, figsize=(20, 40))
+    energies = [0, 1, 10, 100]
+    for i in range(len(energies) - 1):
+        sd_hgb_i = sd_hgb[(sd_hgb.pred_showers_E > energies[i]) & (sd_hgb.pred_showers_E < energies[i + 1])]
+        sd_pandora_i = sd_pandora[(sd_pandora.pred_showers_E > energies[i]) & (sd_pandora.pred_showers_E < energies[i + 1])]
+        suffix = "[{},{}] GeV".format(energies[i], energies[i + 1])
+        plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=False, ax=ax[0, i], ax1=ax[2, i], ax2=ax[4, i], suffix=suffix)
+        plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[1, i], ax1=ax[3, i], ax2=ax[5, i], suffix=suffix)
+        plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=True, ax=ax[6, i], suffix=suffix)
+        plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=True, ax=ax[7, i], suffix=suffix)
+    fig.tight_layout()
+    fig.savefig(os.path.join(path_store_summary_plots, "confusion_matrix_per_energy.pdf"))
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False, PATH_store_detailed_plots=None
@@ -2030,7 +2053,7 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
             #if has_track.sum() == 0.0:
             #    return   # filter ! ! ! Only plot those with tracks
             pids = df.pid.values
-            ht_clusters = [f"c123luster {i}, has_track={has_track[i]}" for i in labels]
+            ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
         c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]

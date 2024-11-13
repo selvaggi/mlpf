@@ -38,15 +38,18 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 # Is there a problem with storing direction information with Pandora?
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved"
                     , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
+
 args = parser.parse_args()
 if all_E:
     PATH_store = (
         #"/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID"
-        os.path.join(args.path, "corrected_pid_classes")
+        os.path.join(args.path, "reprod_plots_without_change")
+        #args.path
     )
 
     if not os.path.exists(PATH_store):
@@ -90,15 +93,15 @@ def filter_df(df):
 pid_correction_track = {0: 0, 1: 1, 2: 1, 3: 0}
 pid_correction_no_track = {0: 3, 1: 2, 2: 2, 3: 3}
 
-def apply_class_correction(sd_hgb, sd_pandora):
+def apply_class_correction(sd_hgb):
     # apply the correction to the class according to pid_correction_track and pid_correction_no_track
     # track
-    sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched.apply(lambda x: pid_correction_track[x])
-    sd_pandora[sd_pandora.is_track_in_cluster==1].pred_pid_matched = sd_pandora[sd_pandora.is_track_in_cluster==1].pred_pid_matched.apply(lambda x: pid_correction_track[x])
+    #sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched.apply(lambda x: pid_correction_track.get(x, np.nan))
+    sd_hgb.loc[sd_hgb.is_track_in_cluster==1, "pred_pid_matched"] = sd_hgb.loc[sd_hgb.is_track_in_cluster==1, "pred_pid_matched"].apply(lambda x: pid_correction_track.get(x, np.nan))
     # no track
-    sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched.apply(lambda x: pid_correction_no_track[x])
-    sd_pandora[sd_pandora.is_track_in_cluster==0].pred_pid_matched = sd_pandora[sd_pandora.is_track_in_cluster==0].pred_pid_matched.apply(lambda x: pid_correction_no_track[x])
-    return sd_hgb, sd_pandora
+    #sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched.apply(lambda x: pid_correction_no_track.get(x, np.nan))
+    sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"] = sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"].apply(lambda x: pid_correction_no_track.get(x, np.nan))
+    return sd_hgb
 
 
 def main():
@@ -126,8 +129,6 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         os.path.join(dir_top, path_pandora), neutrals_only
     )
-    sd_hgb, sd_pandora = apply_class_correction(df_list[0], sd_pandora)
-    df_list = [sd_hgb]
     #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
     decay_type = get_decay_type(sd_hgb)
     decay_type_pandora = get_decay_type(sd_pandora)
