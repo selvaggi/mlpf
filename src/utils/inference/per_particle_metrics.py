@@ -755,7 +755,47 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     fakes_model = matched_all[pd.isna(matched_all.true_showers_E)]
     nonfakes_model = matched_all[~pd.isna(matched_all.true_showers_E)]
     # energy bins:
+    fakes_model_extra_f = np.stack(fakes_model.matched_extra_features.values)
+    nonfakes_model_extra_f = np.stack(nonfakes_model.matched_extra_features.values)
     energies = [0, 5, 15, 35, 50]
+    highest_beta = fakes_model_extra_f[:, 1]
+    filt_model_fakes = (np.isnan(highest_beta)) | (highest_beta >= 0.05) | (highest_beta <= 0.03)
+    fakes_filt = fakes_model[~filt_model_fakes]
+    highest_beta = nonfakes_model_extra_f[:, 1]
+    filt_model_nonfakes = (np.isnan(highest_beta)) | (highest_beta >= 0.05) | (highest_beta <= 0.03)
+    nonfakes_filt = nonfakes_model[~filt_model_nonfakes]
+    fig, ax = plt.subplots(2, 1, figsize=(5, 10))
+    bins = np.linspace(0,5,200)
+    ax[0].hist(fakes_filt.calibrated_E, histtype='step', bins=bins, label="fakes", color="red")
+    ax[0].hist(nonfakes_filt.calibrated_E, histtype='step', bins=bins, label="nonfakes", color="blue")
+    ax[0].legend()
+    ax[0].set_title("calibrated E")
+    bins = np.linspace(-2, 2, 100)
+    frac_fakes = ((fakes_filt.pred_showers_E - fakes_filt.calibrated_E) / fakes_filt.pred_showers_E).values
+    frac_nonfakes = ((nonfakes_filt.pred_showers_E - nonfakes_filt.calibrated_E) / nonfakes_filt.pred_showers_E).values
+    ax[1].hist(frac_fakes[frac_fakes != 0], histtype='step', bins=bins, label="fakes", color="red")
+    ax[1].hist(frac_nonfakes[frac_nonfakes!=0] ,histtype='step', bins=bins, label="nonfakes", color="blue")
+    ax[1].legend()
+    ax[1].set_title("(reco E - cali E) / reco E")
+    ax[0].set_yscale('log')
+    ax[1].set_yscale('log')
+    fig.show()
+    fig, ax = plt.subplots()
+    bins = np.arange(0, 100, 1)
+    ax.hist(fakes_model_extra_f[:, 0], histtype='step', bins=bins, label="ML fakes", color="red", density=True)
+    ax.hist(nonfakes_model_extra_f[:, 0], histtype='step', bins=bins, label="ML matched", color="blue", density=True)
+    ax.legend()
+    ax.set_title("Reco energy distribution for fakes")
+    fig.show()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    bins = np.linspace(0, 1, 200)
+    ax.hist(fakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML fakes", color="red")
+    ax.hist(nonfakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML matched", color="blue")
+    ax.legend()
+    ax.set_title("highest beta")
+    fig.show()
+
     # for each bin, plot a pie chart with the PIDs and their percentages.
     fig, ax = plt.subplots(2, 4, figsize=(10, 5))
     for i in range(len(energies) - 1):

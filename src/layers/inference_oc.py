@@ -45,7 +45,8 @@ def create_and_store_graph_output(
     pids_charged=None,
     pred_pid=None,
     pred_xyz_track=None,
-    number_of_fakes=None
+    number_of_fakes=None,
+    extra_features=None
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -210,6 +211,7 @@ def create_and_store_graph_output(
                 save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging",
                 number_of_fakes=number_of_fakes,
                 number_of_fake_showers_total=number_of_fake_showers_total1,
+                extra_features=extra_features # To help with the debugging of the fakes
             )
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
@@ -353,7 +355,8 @@ def generate_showers_data_frame(
     save_plots_to_folder="",
     pred_ref_pt=None,
     number_of_fake_showers_total=None,
-    number_of_fakes=None
+    number_of_fakes=None,
+    extra_features=None
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -458,7 +461,9 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind_] = e_pred_showers[index_matches]
-   
+    n_extra_features = 6 # n nodes, 5 highest betas
+    matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
+    matched_extra_features = matched_extra_features.to(e_pred_showers.device)
 
     if pandora:
         matched_es_cali = matched_es.clone()
@@ -496,6 +501,8 @@ def generate_showers_data_frame(
                     + number_of_showers]
                 matched_ref_pt[row_ind_] = pred_ref_pt[number_of_showers_total : number_of_showers_total + number_of_showers]
                 matched_pid[row_ind_] = pred_pid[number_of_showers_total : number_of_showers_total + number_of_showers]
+                if not pandora:
+                    matched_extra_features[row_ind_] = extra_features[number_of_showers_total : number_of_showers_total + number_of_showers]
             if shap:
                 matched_shap_vals[row_ind_.cpu()] = shap_vals[index_matches.cpu()]
                 matched_ec_x[row_ind_.cpu()] = ec_x[index_matches.cpu()]
@@ -547,6 +554,7 @@ def generate_showers_data_frame(
             fakes_pid_pred = pred_pid[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
             fake_showers_e_reco = e_reco_showers[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
             fakes_positions = fakes_positions.to(e_pred_showers.device)
+            fakes_extra_features = extra_features[-number_of_fakes:][number_of_fake_showers_total:number_of_fake_showers_total+number_of_fake_showers]
             fake_showers_e_cali = fake_showers_e_cali.to(e_pred_showers.device)
             fakes_pid_pred = fakes_pid_pred.to(e_pred_showers.device)
             fake_showers_e_reco = fake_showers_e_reco.to(e_pred_showers.device)
@@ -612,6 +620,7 @@ def generate_showers_data_frame(
             e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
             e_pred_pid = torch.cat((matched_pid, fakes_pid_pred), dim=0)
             e_pred_ref_pt = torch.cat((matched_ref_pt, fakes_positions), dim=0)
+            extra_features_all = torch.cat((matched_extra_features, fakes_extra_features), dim=0)
         if pandora:
             e_pred_cali_pfo = torch.cat(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
@@ -702,6 +711,7 @@ def generate_showers_data_frame(
                 )  # Otherwise it doesn't work nicely with Pandas DataFrames
                 d["pred_pid_matched"] = pred_pid1.tolist()
                 d["pred_ref_pt_matched"] = pred_ref_pt1.tolist()
+                d["matched_extra_features"] = extra_features_all.detach().cpu().tolist()
         """if shap:
             print("Adding ec_x and shap_values to the DataFrame")
             d["ec_x"] = ec_x_t

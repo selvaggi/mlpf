@@ -74,3 +74,29 @@ def get_post_clustering_features(graphs_new, sum_e, add_hit_chis=False):
                             per_graph_e_hits_hcal_dispersion,
                             sum_e, num_tracks]).T
         )  # nan_to_num due to division by zero when there is zero tracks
+
+
+def get_extra_features(graphs_new, betas):
+    '''
+    Obtain extra graph-level features for debugging of the fakes
+    '''
+    batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
+    batch_idx = []
+    batch_bounds = []
+    topk_highest_betas = []
+    for i, n in enumerate(batch_num_nodes):
+        batch_idx.extend([i] * n)
+        batch_bounds.append(n)
+    batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+    #betas = torch.sigmoid(graphs_new.ndata["h"][:, -1])
+    n_highest_betas = 5
+    for i in range(len(batch_num_nodes)):
+        betas_i = betas[batch_idx == i]
+        topk_betas = torch.topk(betas_i, n_highest_betas)
+        if len(topk_betas.values) < n_highest_betas:
+            topk_betas = torch.cat([topk_betas.values, torch.zeros(n_highest_betas - len(topk_betas.values))])
+        topk_highest_betas.append(topk_betas.values)
+    topk_highest_betas = torch.stack(topk_highest_betas)
+    # Concat with batch_num_nodes
+    features = torch.cat([batch_num_nodes.view(-1, 1), topk_highest_betas], dim=1)
+    return features

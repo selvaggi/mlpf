@@ -7,6 +7,7 @@ import sys
 from time import time
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
+from jinja2.ext import extract_from_ast
 from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
@@ -23,6 +24,7 @@ from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_fo
 
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
+    get_extra_features,
     calculate_eta,
     calculate_phi,
 )
@@ -374,7 +376,8 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr,
             pred_pid,
             features_charged_no_nan,
-            number_of_fakes
+            number_of_fakes,
+            extra_features
         ) = self.clustering_and_global_features(g, x, y, add_fakes=self.args.predict)
         # print("   -----  Charged idx:", charged_idx, " Neutral idx:", neutral_idx)
         charged_energies = self.charged_prediction(
@@ -460,6 +463,7 @@ class ExampleWrapper(L.LightningModule):
                 "neutrals_idx": neutral_idx.flatten(),
                 "charged_idx": charged_idx.flatten(),
                 "pred_ref_pt": pred_ref_pt,
+                "extra_features": extra_features
             }
             if len(self.pids_charged) or len(self.pids_neutral):
                 pred_energy_corr["pred_PID"] = pred_pid
@@ -601,6 +605,7 @@ class ExampleWrapper(L.LightningModule):
         graphs_sum_features = graphs_sum_features[batch_idx]
         # append the new features to "h" (graphs_sum_features)
         shape0 = graphs_new.ndata["h"].shape
+        betas = torch.sigmoid(graphs_new.ndata["h"][:, -1])
         graphs_new.ndata["h"] = torch.cat(
             (graphs_new.ndata["h"], graphs_sum_features), dim=1
         )
@@ -609,6 +614,7 @@ class ExampleWrapper(L.LightningModule):
         graphs_high_level_features = get_post_clustering_features(
             graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
         )
+        extra_features = get_extra_features(graphs_new, betas)
         pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
             graphs_new.ndata["h"].device
         )
@@ -693,7 +699,8 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr,
             pred_pid,
             features_charged_no_nan,
-            number_of_fakes
+            number_of_fakes,
+            extra_features
         )
 
     def build_attention_mask(self, g):
@@ -741,14 +748,14 @@ class ExampleWrapper(L.LightningModule):
             (model_output, e_cor, _, _) = result
         if self.args.regress_pos:
             dic = e_cor
-            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt = (
+            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt, extra_features = (
                 e_cor["pred_energy_corr"],
                 e_cor["pred_pos"],
                 e_cor["neutrals_idx"],
                 e_cor["charged_idx"],
                 e_cor["pred_ref_pt"],
+                e_cor["extra_features"]
                 #e_cor["pred_pos_avg"],
-
             )
             if len(self.pids_charged):
                 charged_PID_pred = dic["charged_PID_pred"]
@@ -958,7 +965,7 @@ class ExampleWrapper(L.LightningModule):
                     pid_true_matched,
                     e_true_corr_daughters,
                     coords_true,
-                    num_fakes
+                    num_fakes,
                 ) = result
             if self.args.regress_pos:
                 if len(self.pids_charged):
@@ -977,7 +984,7 @@ class ExampleWrapper(L.LightningModule):
                     #if self.args.PID_4_class:
                     #    neutral_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in neutral_PID_true])
                 pred_pid = e_cor["pred_PID"]
-                e_cor, pred_pos, pred_ref_pt = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["pred_ref_pt"]
+                e_cor, pred_pos, pred_ref_pt, extra_features = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["pred_ref_pt"], e_cor["extra_features"]
                 #pid_list = np.zeros_like(e_cor)
             else:
                 pred_pos = None
@@ -1061,6 +1068,7 @@ class ExampleWrapper(L.LightningModule):
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,
                 number_of_fakes=num_fakes,
+                extra_features=extra_features
             )
             # self.df_showers.append(df_batch)
             self.df_showers_pandora.append(df_batch_pandora)
