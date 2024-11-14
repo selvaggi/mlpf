@@ -13,7 +13,7 @@ import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
-    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, plot_cm_per_energy
 )
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
@@ -38,17 +38,20 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 # Is there a problem with storing direction information with Pandora?
 # /eos/user/g/gkrzmanc/2024/Sept24/Eval_Hss_test_Neutrals_Avg_direction_1file
+
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved"
-                    , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
+parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved",
+                    default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
+
+
 args = parser.parse_args()
 if all_E:
     PATH_store = (
         #"/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID"
-        args.path
+        os.path.join(args.path, "corrected_pid_classes")
+        #args.path
     )
-
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     PATH_store_individual_plots = os.path.join(PATH_store, "individual_plots")
@@ -87,6 +90,20 @@ def filter_df(df):
     df = df[(df.pid != 11) & (df.pid != 22) ]
     return df
 
+pid_correction_track = {0: 0, 1: 1, 2: 1, 3: 0}
+pid_correction_no_track = {0: 3, 1: 2, 2: 2, 3: 3}
+
+def apply_class_correction(sd_hgb):
+    # apply the correction to the class according to pid_correction_track and pid_correction_no_track
+    # track
+    #sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_pid_matched.apply(lambda x: pid_correction_track.get(x, np.nan))
+    sd_hgb.loc[sd_hgb.is_track_in_cluster==1, "pred_pid_matched"] = sd_hgb.loc[sd_hgb.is_track_in_cluster==1, "pred_pid_matched"].apply(lambda x: pid_correction_track.get(x, np.nan))
+    # no track
+    #sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched = sd_hgb[sd_hgb.is_track_in_cluster==0].pred_pid_matched.apply(lambda x: pid_correction_no_track.get(x, np.nan))
+    sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"] = sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"].apply(lambda x: pid_correction_no_track.get(x, np.nan))
+    return sd_hgb
+
+
 def main():
     df_list = []
     matched_all = {}
@@ -97,11 +114,12 @@ def main():
         #print("!!!! Taking the sum of the hits for the energy !!!!")
         # sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
-        sd_hgb[sd_hgb.pred_pid_matched == 3].calibrated_E = sd_hgb[sd_hgb.pred_pid_matched == 3].pred_showers_E
+        sd_hgb = apply_class_correction(sd_hgb)
+        #sd_hgb[sd_hgb.pred_pid_matched == 3].calibrated_E = sd_hgb[sd_hgb.pred_pid_matched == 3].pred_showers_E
+        sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "calibrated_E"] = sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "pred_showers_E"]
         # set GT energy for 130, 2112, 22
-        #
         ##sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
-        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==2112))]
+        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgcalibrated_E)) & ((sd_hgb.pid==2112))]
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==2112))]
         #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E) & (sd_hgb.pred_pid_matched==3)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E) & (sd_hgb.pred_pid_matched==3)]
@@ -129,6 +147,7 @@ def main():
     # filter the df based on where decay type is 0
     ranges = [[0, 5000]]   # Ranges of the displacement to make the plots from, in cm
     fig, ax = plt.subplots(4, 5, figsize=(22, 22*4/5)) # The overview figure of efficiencies
+    plot_cm_per_energy(df_list[0], sd_pandora, PATH_store_detailed_plots, PATH_store_individual_plots)
     plot_efficiency_all(sd_pandora, df_list, PATH_store_individual_plots, labels, ax=ax)
     reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
     plot_confusion_matrix(df_list[0], PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])
@@ -155,8 +174,8 @@ def main():
         bins = np.linspace(0, 0.25, 50)
         ax.hist(x, bins=bins)
         #ax.set_yscale("log")
-        fig.show()
-        idx_pick_reco = np.where(x > 0.25)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
+        fig.savefig(os.path.join(PATH_store_individual_plots, "track_momentum_norm.pdf"))
+        idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
         sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb_filtered[sd_hgb_filtered.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
         print("Range", range, ": Finished collection of data and started plotting")
         e_ranges = [[0, 5], [5, 15], [15, 50]]

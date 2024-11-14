@@ -41,7 +41,7 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
     if log_scale:
         bins_fakes = np.exp(np.arange(np.log(0.1), np.log(80), 0.3))
     else:
-        bins_fakes = np.linspace(0, 51, 8)
+        bins_fakes = [0, 5, 15, 35, 50]
     fake_rate = []
     energy_fakes = []
     fake_percent_energy = []
@@ -186,6 +186,9 @@ def calculate_response(matched, pandora, log_scale=False):
 
 
 def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
+    #mpv, std = obtain_MPV_and_68(e_over_reco, bins_per_binned_E)
+    #return mpv, std, None, None
+
     hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
     # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
     def gaus(X, C, X_mean, sigma):
@@ -221,7 +224,7 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
     # sigma_over_E_error = errors[2] / param_optimised[1]
     return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]
 
-def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.0001):
+def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.001):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
     MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
