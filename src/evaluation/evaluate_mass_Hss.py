@@ -15,6 +15,7 @@ from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
     plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, plot_cm_per_energy
 )
+from src.utils.inference.track_cluster_eff_plots import plot_track_assignation_eval
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
 import torch
@@ -130,6 +131,8 @@ def main():
     sd_pandora, matched_pandora = open_mlpf_dataframe(
         os.path.join(dir_top, path_pandora), neutrals_only
     )
+
+    plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
     #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
     decay_type = get_decay_type(sd_hgb)
     decay_type_pandora = get_decay_type(sd_pandora)
