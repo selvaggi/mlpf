@@ -156,7 +156,7 @@ def create_and_store_graph_output(
         # torch.save(
         #     dic,
         #     path_save
-        #     + "/graphs/"
+        #     + "/graphs_1311/"
         #     + str(local_rank)
         #     + "_"
         #     + str(step)
@@ -331,6 +331,49 @@ def log_efficiency(df, pandora=False, clustering=False):
         wandb.log({"efficiency validation": eff})
 
 
+def remove_labels_of_double_showers(labels, g):
+    is_track_per_shower = scatter_add(1*(g.ndata["hit_type"] == 1), labels).int()
+    e_hits_sum = scatter_add(g.ndata["e_hits"].view(-1), labels.view(-1).long()).int()
+    mask_tracks = g.ndata["hit_type"]==1
+    for i, label_i in enumerate(torch.unique(labels)):
+        if is_track_per_shower[i]==2:
+            if label_i>0:
+            #if there are two tracks
+                sum_pred_2 = e_hits_sum[i]
+                mask_labels_i = labels == label_i
+                mask_label_i_and_is_track = mask_labels_i*mask_tracks
+                tracks_E = g.ndata['h'][:,-1][mask_label_i_and_is_track]
+                chi_tracks = g.ndata['chi_squared_tracks'][mask_label_i_and_is_track]
+                ind_min_E = torch.argmax(torch.abs(tracks_E - sum_pred_2))
+                ind_min_chi = torch.argmax(chi_tracks)
+
+                # calc distance track cluster:
+
+                mask_hit_type_t1 = g.ndata["hit_type"][mask_labels_i]==2
+                mask_hit_type_t2 = g.ndata["hit_type"][mask_labels_i]==1
+                mask_all = mask_hit_type_t1
+                # the other error could come from no hits in the ECAL for a cluster
+                index_sorted = torch.argsort(g.ndata["radial_distance"][mask_labels_i][mask_hit_type_t1])
+                mask_sorted_ind = index_sorted<10
+                mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i][mask_all][mask_sorted_ind], dim=0)
+
+                pos_track = g.ndata["pos_hits_xyz"][mask_labels_i][mask_hit_type_t2]
+                distance_track_cluster = torch.norm(pos_track-mean_pos_cluster, dim=1)/1000
+                ind_max_dtc = torch.argmax(distance_track_cluster)
+                if torch.min(distance_track_cluster)<0.4:
+                    ind_min = ind_max_dtc
+                elif ind_min_E == ind_min_chi:
+                    ind_min = ind_min_E
+                # if the chi tracks are very similar pick the lowest E diff
+                elif torch.max(chi_tracks-torch.min(chi_tracks))<2:
+                    ind_min = ind_min_E
+                else:
+                    ind_min = ind_min_chi
+                ind_change = torch.argwhere(mask_label_i_and_is_track)[ind_min]
+                labels[ind_change]=0
+    return labels
+
+
 def generate_showers_data_frame(
     labels,
     dic,
@@ -415,6 +458,10 @@ def generate_showers_data_frame(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
+    is_track_in_MC = scatter_add(
+        1*(dic["graph"].ndata["hit_type"].view(-1)==1),
+        dic["graph"].ndata["particle_number"].long(),
+    )
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     if torch.sum(particle_ids == 0) > 0:
@@ -433,7 +480,9 @@ def generate_showers_data_frame(
     vertex = dic["part_true"].vertex.to(e_pred_showers.device)
     pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
-    is_track_per_shower = scatter_add((dic["graph"].ndata["hit_type"] == 1), labels).int()
+    if not pandora:
+        labels = remove_labels_of_double_showers(labels, dic["graph"])
+    is_track_per_shower = scatter_add(1*(dic["graph"].ndata["hit_type"] == 1), labels).int()
     is_track = torch.zeros(energy_t.shape).to(e_pred_showers.device)
     if shap:
         matched_shap_vals = torch.zeros((energy_t.shape[0], ec_x.shape[1])) * (
@@ -507,7 +556,7 @@ def generate_showers_data_frame(
             number_of_showers_total = number_of_showers_total + number_of_showers
     
     # match the tracks to the particle
-    tracks_label = scatter_add((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels).int()
+    tracks_label = scatter_max((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels)[0].int()
     tracks_label = tracks_label-1
     tracks_label[tracks_label<0]=0
     tracks_label = torch.tensor(tracks_label)
@@ -607,6 +656,7 @@ def generate_showers_data_frame(
             dim=0,
         )
         e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
+        is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_showers_e_truw), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
@@ -676,6 +726,7 @@ def generate_showers_data_frame(
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
+                "is_track_in_MC": is_track_in_MC.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
         else:
@@ -692,6 +743,7 @@ def generate_showers_data_frame(
                 * number_in_batch,
                 "is_track_in_cluster": is_track.detach().cpu(),
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
+                "is_track_in_MC": is_track_in_MC.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
             if pred_pos is not None:
