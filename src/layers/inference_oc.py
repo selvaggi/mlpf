@@ -458,7 +458,6 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind_] = e_pred_showers[index_matches]
-
    
 
     if pandora:

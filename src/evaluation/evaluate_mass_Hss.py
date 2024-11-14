@@ -41,17 +41,17 @@ ML_pid = True       # Use the PID from the ML classification head (electron/CH/N
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved"
-                    , default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
+parser.add_argument("--path", type=str, help="Path to the folder with the training in which checkpoints are saved",
+                    default="/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss_300files")
+
 
 args = parser.parse_args()
 if all_E:
     PATH_store = (
         #"/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID"
-        os.path.join(args.path, "reprod_plots_without_change")
+        os.path.join(args.path, "corrected_pid_classes")
         #args.path
     )
-
     if not os.path.exists(PATH_store):
         os.makedirs(PATH_store)
     PATH_store_individual_plots = os.path.join(PATH_store, "individual_plots")
@@ -114,11 +114,12 @@ def main():
         #print("!!!! Taking the sum of the hits for the energy !!!!")
         # sd_hgb = renumber_batch_idx(sd_hgb[(sd_hgb.pid==22) | (pd.isna(sd_hgb.pid))])
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==22)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==22))]
-        sd_hgb[sd_hgb.pred_pid_matched == 3].calibrated_E = sd_hgb[sd_hgb.pred_pid_matched == 3].pred_showers_E
+        sd_hgb = apply_class_correction(sd_hgb)
+        #sd_hgb[sd_hgb.pred_pid_matched == 3].calibrated_E = sd_hgb[sd_hgb.pred_pid_matched == 3].pred_showers_E
+        sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "calibrated_E"] = sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "pred_showers_E"]
         # set GT energy for 130, 2112, 22
-        #
         ##sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
-        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==2112))]
+        #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.true_showers_E[(~np.isnan(sd_hgcalibrated_E)) & ((sd_hgb.pid==2112))]
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==130)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==130))]
         #sd_hgb.calibrated_E[(~np.isnan(sd_hgb.calibrated_E)) & (sd_hgb.pid==2112)] = sd_hgb.pred_showers_E[(~np.isnan(sd_hgb.calibrated_E)) & ((sd_hgb.pid==2112))]
         #sd_hgb.calibrated_E[~np.isnan(sd_hgb.calibrated_E) & (sd_hgb.pred_pid_matched==3)] = sd_hgb.reco_showers_E[~np.isnan(sd_hgb.calibrated_E) & (sd_hgb.pred_pid_matched==3)]

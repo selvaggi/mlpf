@@ -121,8 +121,8 @@ def safeint(x, default_val=0):
 
 def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
     # reco showers> 0 does not consider showers that are in the event but do not contribute energy to the total in the event
-    df = df[((df.reco_showers_E>0))]
-
+    #df = df[((df.reco_showers_E>0) | (pd.isna(df.pid)))]
+    df = df[df.reco_showers_E != 0.0]
     true_e = torch.Tensor(df.true_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
@@ -466,13 +466,14 @@ def plot_mass_resolution(event_res_dic, PATH_store):
         event_res_dic["var_energy_over_true_pandora"], 4)
     mean_e_over_true, sigma_e_over_true = round(event_res_dic["mean_energy_over_true"], 4), round(
         event_res_dic["var_energy_over_true"], 4)
+    ax[1].hist(event_res_dic["energy_over_true"], bins=bins, histtype="step",
+               label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color="red",
+               density=True)
     ax[1].hist(event_res_dic["energy_over_true_pandora"], bins=bins, histtype="step",
                       label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
                                                                          sigma_e_over_true_pandora), color="blue",
                       density=True)
-    ax[1].hist(event_res_dic["energy_over_true"], bins=bins, histtype="step",
-                      label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color="red",
-                      density=True)
+
     ax[1].grid(1)
     ax[1].set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
     ax[1].legend()
