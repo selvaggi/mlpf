@@ -1635,6 +1635,58 @@ def plot_per_energy_resolution(
                 plot_label2=True,
             )
 
+def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
+    evt = get_response_for_event_energy(
+        sd_pandora, sd_hgb, perfect_pid=False, mass_zero=False, ML_pid=True
+    )
+
+    def fake_energy_frac(df):
+        is_pandora = "pandora_calibrated_pfo" in df.columns
+        fakes = pd.isna(df.pid)
+        if is_pandora:
+            col = "pandora_calibrated_pfo"
+        else:
+            col = "calibrated_E"
+        return df[fakes][col].sum() / df.true_showers_E.sum()
+
+    def missed_energy_frac(df):
+        is_pandora = "pandora_calibrated_pfo" in df.columns
+        missed = pd.isna(df.pred_showers_E) | (df.pred_showers_E == 0)
+        if is_pandora:
+            col = "pandora_calibrated_pfo"
+        else:
+            col = "calibrated_E"
+        return df[missed].true_showers_E.sum() / df.true_showers_E.sum()
+
+    filt_regions = [[0, 0.75], [1.1, 1.5]]
+    matplotlib.rcParams["font.size"] = 13
+    fig, ax = plt.subplots(len(filt_regions), 2, figsize=(8, 4 * (len(filt_regions))))
+
+    for i, item in enumerate(filt_regions):
+        filt = np.where((model < item[1]) * (model > item[0]))[0]
+        fake_energy_frac_distr = [fake_energy_frac(sd_hgb[sd_hgb.number_batch == q]) for q in filt]
+        missed_energy_frac_distr = [missed_energy_frac(sd_hgb[sd_hgb.number_batch == q]) for q in filt]
+        fake_energy_frac_distr_pandora = [fake_energy_frac(sd_pandora[sd_pandora.number_batch == q]) for q in filt]
+        missed_energy_frac_distr_pandora = [missed_energy_frac(sd_pandora[sd_pandora.number_batch == q]) for q in filt]
+        ax[i, 0].hist(fake_energy_frac_distr, bins=np.linspace(0, 1, 100), histtype="step", label="ML", color="red")
+        ax[i, 0].hist(fake_energy_frac_distr_pandora, bins=np.linspace(0, 1, 100), histtype="step", label="Pandora",
+                      color="blue")
+        ax[i, 0].set_yscale("log")
+        ax[i, 0].legend()
+        ax[i, 0].grid()
+        ax[i, 1].hist(missed_energy_frac_distr, bins=np.linspace(0, 1, 100), histtype="step", label="ML", color="red")
+        ax[i, 1].hist(missed_energy_frac_distr_pandora, bins=np.linspace(0, 1, 100), histtype="step", label="Pandora",
+                      color="blue")
+        ax[i, 1].set_yscale("log")
+        ax[i, 1].legend()
+        ax[i, 1].grid()
+        ax[i, 0].set_title(f"Model in [{item[0]:.2f},{item[1]:.2f}] - fake energy frac.")
+        ax[i, 1].set_title(f"Model in [{item[0]:.2f},{item[1]:.2f}] - missed energy frac.")
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(path_store, "fake_and_missed_energy_regions.pdf"))
+
+
 def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)

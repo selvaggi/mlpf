@@ -11,7 +11,7 @@ import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
-    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, plot_cm_per_energy
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, plot_cm_per_energy, plot_fake_and_missed_energy_regions
 )
 from src.utils.inference.track_cluster_eff_plots import plot_track_assignation_eval
 from src.utils.inference.event_Ks import get_decay_type
@@ -75,9 +75,10 @@ sd_pandora, matched_pandora = open_mlpf_dataframe(os.path.join(dir_top, path_pan
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
 
 
-#plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
+plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
 analyze_fakes(sd_pandora, sd_hgb, PATH_store_detailed_plots)
 pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
+plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_detailed_plots)
 # drop nan values
 mask_nan = np.isnan(pandora_vertex).any(axis=1)
 pandora_vertex = pandora_vertex[~mask_nan]
