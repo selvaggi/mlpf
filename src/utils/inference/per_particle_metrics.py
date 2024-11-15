@@ -502,7 +502,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
                                           bbox_transform=ax.transData,
                                           borderpad=0)
                     # each label should always have the same color, i.e. 130-> purple etc.
-                    ax_inset.pie(counts, labels=unique, autopct="%1.1f%%", textprops={'fontsize': 5})
+                    ax_inset.pie(counts, labels=unique, textprops={'fontsize': 5})
     class_names_true = ["e", "CH", "NH", "gamma", "fake"]
     class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
     if not add_pie_charts:
@@ -639,8 +639,8 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
                                           borderpad=0)
                     percentage_counts = counts / np.sum(counts) * 100
                     # move categories less than 0.5% into 'other'
-                    unique = np.array([x if y > 1 else "other" for x, y in zip(unique, percentage_counts)])
-                    counts = np.array([y if y > 1 else np.sum(counts[percentage_counts < 1]) for y in counts])
+                    unique = np.array([x if y >= 1 else "other" for x, y in zip(unique, percentage_counts)])
+                    counts = np.array([y if y >= 1 else np.sum(counts[percentage_counts < 1]) for y in counts])
                     # fix - now 'other' repeats too many times
                     unique1, counts1 = [], []
                     for u, c in zip(unique, counts):
@@ -649,7 +649,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
                             counts1.append(c)
                         else:
                             pass
-                    ax_inset.pie(counts1, labels=unique1, autopct="%1.1f%%", textprops={'fontsize': 10})
+                    ax_inset.pie(counts1, labels=unique1, textprops={'fontsize': 10})
     class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
     class_names_true = ["e", "CH", "NH", "gamma", "fake"]
 
@@ -812,9 +812,9 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
         colors = ["blue", "red", "green", "purple"]
         #pid_model = [pid_names[int(x)] for x in pid_model]
         #pid_pandora.index = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora.index]
-        ax[0, i].pie(pid_pandora, labels=pid_pandora.index, autopct="%1.1f%%")
+        ax[0, i].pie(pid_pandora, labels=pid_pandora.index)
         ax[0, i].set_title(f"Pandora [{energies[i]}, {energies[i + 1]}] GeV")
-        ax[1, i].pie(pid_model, labels=pid_model.index, autopct="%1.1f%%")
+        ax[1, i].pie(pid_model, labels=pid_model.index)
         ax[1, i].set_title(f"Model [{energies[i]}, {energies[i + 1]}] GeV")
         # plot the PID distribution for nonfakes
         #nonfakes_pandora_i = nonfakes_pandora[(nonfakes_pandora.pred_showers_E > energies[i]) & (nonfakes_pandora.pred_showers_E < energies[i + 1])]
@@ -864,6 +864,53 @@ def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store)
     fig.tight_layout()
     fig.savefig(os.path.join(path_store_summary_plots, "confusion_matrix_per_energy.pdf"))
 
+
+def quick_plot_mass(matched_, matched_pandora, path_store):
+    evt = get_response_for_event_energy(
+        matched_pandora, matched_, perfect_pid=0, mass_zero=0, ML_pid=1
+    )
+    plot_mass_resolution(evt, path_store)
+    print("Saved mass resolution")
+    bins_mass = np.linspace(0, 2, 200)
+    energy_bins = [[0, 1], [1, 10], [10, 100]]
+    matplotlib.rcParams.update({'font.size': 11})
+    for bin in energy_bins:
+        filter_pandora = (matched_pandora.true_showers_E > bin[0]) & (matched_pandora.true_showers_E < bin[1])
+        filter_model = (matched_.true_showers_E > bin[0]) & (matched_.true_showers_E < bin[1])
+        (massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model,
+         frac_E_pandora, frac_E_model_true, frac_E_pandora_true,
+         pid_true_over_true) = get_mass_contribution_per_PID(matched_pandora[filter_pandora],
+                                                             matched_[filter_model],
+                                                             ML_pid=1,
+                                                             perfect_pid=0,
+                                                             mass_zero=0)
+        figs_mass_hist, axs_mass_hist = plt.subplots(6, 3, figsize=(8, 15)) # also plot fraction of the whole event energy
+        for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
+            axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
+            axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue",
+                                     density=True)
+            axs_mass_hist[i, 1].grid(1)
+            axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid} / E true, {pid}")
+            axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
+            axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue", density=True)
+            binsE = np.linspace(0, 1.0, 100)
+            axs_mass_hist[i, 0].legend()
+            axs_mass_hist[i, 1].legend()
+            axs_mass_hist[i, 2].grid(1)
+            axs_mass_hist[i, 2].set_title(f"Pred. {pid} contr. to pred. evt. E")
+            axs_mass_hist[i, 2].set_xlabel(f"Pred. E {pid} / Pred. E")
+            axs_mass_hist[i, 2].hist(frac_E_model[pid], bins=binsE, histtype="step", label="ML", color="red", density=True)
+            axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue",
+                                     density=True)
+            axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green",
+                                     density=True)
+            axs_mass_hist[i, 2].legend()
+            axs_mass_hist[i, 0].set_yscale("log")
+            axs_mass_hist[i, 1].set_yscale("log")
+            axs_mass_hist[i, 2].set_yscale("log")
+        figs_mass_hist.tight_layout()
+        figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
+
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False, PATH_store_detailed_plots=None
 ):
@@ -875,14 +922,20 @@ def plot_per_energy_resolution2_multiple(
     figs_theta_res, axs_theta_res = {}, {} # theta resolution
     figs_resolution_pxyz, axs_resolution_pxyz = {}, {} # px, py, pz resolution
     figs_response_pxyz, axs_response_pxyz = {}, {} # px, py, pz response
-    figs_mass_hist, axs_mass_hist = plt.subplots(6, 4, figsize=(8, 15)) # also plot fraction of the whole event energy
     # distribution at some energy slice for each particle (the little histogram plots)
     # colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
     colors = {
         "ML": "red",
     }
     plot_pandora, plot_baseline = True, True
-    massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model, frac_E_pandora, frac_E_model_true, frac_E_pandora_true, pid_true_over_true = get_mass_contribution_per_PID(matched_pandora, matched_all["ML"], ML_pid=ML_pid, perfect_pid=perfect_pid, mass_zero=mass_zero)
+    figs_mass_hist, axs_mass_hist = plt.subplots(6, 3, figsize=(8, 15)) # also plot fraction of the whole event energy
+    (massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model,
+     frac_E_pandora, frac_E_model_true, frac_E_pandora_true,
+     pid_true_over_true) = get_mass_contribution_per_PID(matched_pandora,
+                                                         matched_all["ML"],
+                                                         ML_pid=1,
+                                                         perfect_pid=0,
+                                                         mass_zero=0)
     bins_mass = np.linspace(0, 2, 200)
     for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
         figs_theta_res[pid], axs_theta_res[pid] = plt.subplots(1, 1, figsize=(7, 7))
@@ -924,27 +977,16 @@ def plot_per_energy_resolution2_multiple(
         axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
         axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
         axs_mass_hist[i, 2].legend()
-        axs_mass_hist[i, 3].grid(1)
-        axs_mass_hist[i, 3].set_title(f"Pred. {pid} contr. to true evt. E")
-        axs_mass_hist[i, 3].set_xlabel(f"Pred. E {pid} / True E")
-        axs_mass_hist[i, 3].hist(frac_E_model_true[pid], bins=binsE, histtype="step", label="ML", color="red", density=True)
-        axs_mass_hist[i, 3].hist(frac_E_pandora_true[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
-        axs_mass_hist[i, 3].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
-        axs_mass_hist[i, 3].legend()
-        axs_mass_hist[i, 2].set_yscale("log")
-        axs_mass_hist[i, 3].set_yscale("log")
     event_res_dic = {} # Event energy resolution
     figs_mass_hist.tight_layout()
-    # Path(os.path.join(PATH_store, "mass_hist")).mkdir(parents=True, exist_ok=True)
     figs_mass_hist.savefig(
         os.path.join(PATH_store_detailed_plots, f"mass_breakdown_by_PID.pdf"),
         bbox_inches="tight",
     )
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(7, 7))
-
     for key in matched_all:
         matched_ = matched_all[key]
-        ##mask = matched_["calibration_factor"] > 0
+        #mask = matched_["calibration_factor"] > 0
         #matched_ = matched_[mask]
         if tracks:
             tracks_label = "tracks"
@@ -1661,7 +1703,7 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
         return df[missed].true_showers_E.sum() / df.true_showers_E.sum()
 
     filt_regions = [[0, 0.75], [1.1, 1.5]]
-    matplotlib.rcParams["font.size"] = 13
+    matplotlib.rcParams["font.size"] = 10
     fig, ax = plt.subplots(len(filt_regions), 2, figsize=(8, 4 * (len(filt_regions))))
 
     for i, item in enumerate(filt_regions):
@@ -2115,21 +2157,12 @@ def calculate_eta(x, y, z):
     return -torch.log(torch.tan(theta / 2))
 
 from copy import copy
+import plotly
+import plotly.graph_objs as go
+import plotly.express as px
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
     # Plot the event with Plotly. Compare ML and Pandora reconstructed with truth
-    # Also plot Eta-Phi (a bit easier debugging)
-    # df = df[(df.pid == 2112.0) | (pd.isna(df.pid)) | (df.pid == 130.0)]  # We are debugging photons now!
-    # y_filt = np.where((y.pid.flatten() == 2112.0) + (y.pid.flatten() == 130.0))[0]
-    # y = copy(y)
-    # y.mask(y_filt)
-    # if len(df) == 0:
-    #     return
-    return
-    import plotly
-    import plotly.graph_objs as go
-    import plotly.express as px
-    # arrows from 0,0,0 to df.true_pos and the hover text should be the true energy (df.true_showers_E)
     fig = go.Figure()
     # scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
     # list of 20 random colors

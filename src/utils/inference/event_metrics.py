@@ -317,7 +317,8 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         ret += [None]
     return ret
 
-def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True):
+def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True, PID_categories=False):
+    # PID_categories: whether to report in terms of categories e, CH, NH, gamma
     # get the mass contributions to event energy and event mass per PID
     mass_over_true = {}
     mass_over_true_pandora = {}

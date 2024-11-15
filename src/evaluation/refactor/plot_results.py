@@ -132,7 +132,7 @@ if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
 plot_per_energy_resolution2_multiple(
     sd_pandora,
-    {"ML": sd_pandora},
+    {"ML": sd_hgb},
     current_dir,
     tracks=True,
     perfect_pid=False,

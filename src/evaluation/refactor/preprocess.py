@@ -44,37 +44,34 @@ def remove_fakes(df):
 
 def ablation_study(df, column):
     # Replace all except the column in df with ground truth - to study only the effect of a single column on the results
+    print("Setting everything except column", column, "to GT")
     is_pandora = "pandora_calibrated_pfo" in df.columns
     assert column in ["E", "p", "pid"]
     fakes = pd.isna(df.pid)
     missed = pd.isna(df.pred_showers_E)
+    index = (~fakes) & (~missed)
     if column == "E":
         if is_pandora:
-            #df.loc[(~fakes) & (~missed), "pandora_calibrated_pfo"] = df.loc[~fakes, "true_showers_E"]
-            df.loc[(~fakes) & (~missed), "pandora_calibrated_pos"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            df.loc[(~fakes) & (~missed), "pandora_pid"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true
+            df.loc[index, "pandora_calibrated_pos"] = df.loc[index, "true_pos"]  # set pxyz to true
+            df.loc[index, "pandora_pid"] = df.loc[index, "pid"]#.map(pid_conversion_dict)  # set pxyz to true
         else:
-            #df.loc[(~fakes) & (~missed), "calibrated_E"] = df.loc[~fakes, "true_showers_E"] # set E to true
-            df.loc[(~fakes) & (~missed), "pred_pos_matched"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            df.loc[(~fakes) & (~missed), "pred_pid_matched"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true]
+            df.loc[index, "pred_pos_matched"] = df.loc[index, "true_pos"]  # set pxyz to true
+            df.loc[index, "pred_pid_matched"] = df.loc[index, "pid"].map(pid_conversion_dict)  # set pxyz to true]
     elif column == "p":
         if is_pandora:
-            df.loc[(~fakes) & (~missed), "pandora_calibrated_pfo"] = df.loc[~fakes, "true_showers_E"]
-            #df.loc[(~fakes) & (~missed), "pandora_calibrated_pos"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            df.loc[(~fakes) & (~missed), "pandora_pid"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true
+            df.loc[index, "pandora_calibrated_pfo"] = df.loc[index, "true_showers_E"]
+            df.loc[index, "pandora_pid"] = df.loc[index, "pid"]#.map(pid_conversion_dict)  # set pxyz to true
         else:
-            df.loc[(~fakes) & (~missed), "calibrated_E"] = df.loc[~fakes, "true_showers_E"] # set E to true
-            #df.loc[(~fakes) & (~missed), "pred_pos_matched"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            df.loc[(~fakes) & (~missed), "pred_pid_matched"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true]
+            df.loc[index, "calibrated_E"] = df.loc[index, "true_showers_E"] # set E to true
+            df.loc[index, "pred_pid_matched"] = df.loc[index, "pid"].map(pid_conversion_dict)  # set pxyz to true]
     elif column == "pid":
         if is_pandora:
-            df.loc[(~fakes) & (~missed), "pandora_calibrated_pfo"] = df.loc[~fakes, "true_showers_E"]
-            df.loc[(~fakes) & (~missed), "pandora_calibrated_pos"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            #df.loc[(~fakes) & (~missed), "pandora_pid"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true
+            df.loc[index, "pandora_calibrated_pfo"] = df.loc[index, "true_showers_E"]
+            df.loc[index, "pandora_calibrated_pos"] = df.loc[index, "true_pos"]  # set pxyz to true
         else:
-            df.loc[(~fakes) & (~missed), "calibrated_E"] = df.loc[~fakes, "true_showers_E"] # set E to true
-            df.loc[(~fakes) & (~missed), "pred_pos_matched"] = df.loc[~fakes, "true_pos"]  # set pxyz to true
-            #df.loc[(~fakes) & (~missed), "pred_pid_matched"] = df.loc[~fakes, "pid"].map(pid_conversion_dict)  # set pxyz to true]
+            df.loc[index, "calibrated_E"] = df.loc[index, "true_showers_E"] # set E to true
+            df.loc[index, "pred_pos_matched"] = df.loc[index, "true_pos"]  # set pxyz to true
+    print("Done")
     return df
 def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
     # names: list of scripts to do on data
@@ -84,12 +81,41 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
     sd_pandora = sd_pandora[sd_pandora.reco_showers_E != 0.0]
     if "class_correction" in names:
         sd_hgb = apply_class_correction(sd_hgb)
-    sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "calibrated_E"] = sd_hgb.loc[
-        sd_hgb.pred_pid_matched == 3, "pred_showers_E"] # correct photons
+    if "no_correct_reco_photons" in names:
+        print("Leaving photons predicted energies as they are")
+    elif "reco_correct_gt_photons" in names:
+        sd_hgb.loc[sd_hgb.pid == 22, "calibrated_E"] = sd_hgb.loc[
+            sd_hgb.pid == 22, "reco_showers_E"]
+    else:
+        sd_hgb.loc[sd_hgb.pred_pid_matched == 3, "calibrated_E"] = sd_hgb.loc[
+            sd_hgb.pred_pid_matched == 3, "pred_showers_E"] # Correct photons
     if "beta_correction" in names:
         sd_hgb = apply_beta_correction(sd_hgb)
     if "remove_fakes" in names:
         sd_hgb = remove_fakes(sd_hgb)
         sd_pandora = remove_fakes(sd_pandora)
+    if "ablation_study_E" in names:
+        sd_hgb = ablation_study(sd_hgb, "E")
+        sd_pandora = ablation_study(sd_pandora, "E")
+    if "ablation_study_p" in names:
+        sd_hgb = ablation_study(sd_hgb, "p")
+        sd_pandora = ablation_study(sd_pandora, "p")
+    if "ablation_study_pid" in names:
+        sd_hgb = ablation_study(sd_hgb, "pid")
+        sd_pandora = ablation_study(sd_pandora, "pid")
+    if "take_out_gt_photons" in names:
+        print("Take out GT photons")
+        sd_hgb = sd_hgb[sd_hgb.pid != 22]
+        sd_pandora = sd_pandora[sd_pandora.pid != 22]
+    if "take_out_pred_photons" in names:
+        print("Take out predicted photons")
+        sd_hgb = sd_hgb[sd_hgb.pred_pid_matched != 3]
+        sd_pandora = sd_pandora[sd_pandora.pandora_pid != 22]
+    #if "remove_weird_tracks" in names:
+    #    x = sd_hgb.pred_ref_pt_matched.values
+    #    x = np.stack(x)
+    #    x = np.linalg.norm(x, axis=1)
+    #    idx_pick_reco = (x > 0.15) & ((sd_hgb.is_track_in_cluster == 1).values)
+    #    # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
+    #    sd_hgb.loc[idx_pick_reco, "calibrated_E"] = sd_hgb.loc[idx_pick_reco, "pred_showers_E"]
     return renumber_batch_idx(sd_hgb), renumber_batch_idx(sd_pandora)
-
