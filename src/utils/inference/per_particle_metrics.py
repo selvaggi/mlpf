@@ -1639,6 +1639,8 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
     evt = get_response_for_event_energy(
         sd_pandora, sd_hgb, perfect_pid=False, mass_zero=False, ML_pid=True
     )
+    model = evt["mass_over_true_model"]
+    pand = evt["mass_over_true_pandora"]
 
     def fake_energy_frac(df):
         is_pandora = "pandora_calibrated_pfo" in df.columns
