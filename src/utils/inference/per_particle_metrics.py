@@ -469,10 +469,11 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
-    class_true = sd_hgb1["pid_4_class_true"].values
-    class_pred = sd_hgb1["pred_pid_matched"].values
-    n_classes = class_pred[~np.isnan(class_pred)].max() + 1
+    class_true = np.array(sd_hgb1["pid_4_class_true"].values)
+    class_pred = np.array(sd_hgb1["pred_pid_matched"].values)
+    n_classes = class_true[~np.isnan(class_true)].max() + 1
     class_nan = n_classes # For 'fake' and 'missed'
+    assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0
     pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
     no_nan_filter = np.ones_like(class_true, dtype=bool)
@@ -605,13 +606,15 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     class_pred = np.array(sd_pandora.pandora_pid.values)
     #allowed_pids =  sorted(sd_pandora.pandora_pid.dropna().unique())
     #all_pids = [0] + [int(x) for x in allowed_pids]
-
     #class_true[~np.isin(class_true, allowed_pids)] = 0 # 0 = "other" class
     pids_true = sd_pandora["pid"].values
     is_trk = sd_pandora.is_track_in_cluster.values
     #class_true = np.array([nanindex(x, all_pids) for x in class_true])
     #class_pred = np.array([nanindex(x, all_pids) for x in class_pred])
-    max_class = max(list(pandora_to_our_mapping.keys()))
+    max_class = max(list(our_to_pandora_mapping.keys()))
+    assert max_class + 1 == 4
+    assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0 # Maybe the pid_conversion_dict is not fully up-to-date?
+
     class_true = np.array([pid_conversion_dict.get(x, max_class+1) for x in class_true])
     class_pred = np.array([pandora_to_our_mapping.get(x, max_class+1) for x in class_pred])
     #no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
@@ -864,6 +867,18 @@ def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store)
     fig.tight_layout()
     fig.savefig(os.path.join(path_store_summary_plots, "confusion_matrix_per_energy.pdf"))
 
+def plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, path_store, ax):
+    # Plot confusion matrix for each energy bin, but on an external plot
+    # Ax should be as follows: ax[i, 0]: CM by energy; ax[i, 1]: CM-Pandora by energy
+    energies = [0, 1, 10, 100]
+    for i in range(len(energies) - 1):
+        cond = ((sd_hgb.true_showers_E > energies[i]) & (sd_hgb.true_showers_E < energies[i + 1])) | (np.isnan(sd_hgb.pid) & ((sd_hgb.pred_showers_E > energies[i]) & (sd_hgb.pred_showers_E < energies[i + 1])))
+        sd_hgb_i = sd_hgb[cond]
+        cond_pandora = ((sd_pandora.true_showers_E > energies[i]) & (sd_pandora.true_showers_E < energies[i + 1])) |  ((np.isnan(sd_pandora.pid)) & ((sd_pandora.pred_showers_E > energies[i]) & (sd_pandora.pred_showers_E < energies[i + 1])))
+        sd_pandora_i = sd_pandora[cond_pandora]
+        suffix = "[{},{}] GeV".format(energies[i], energies[i + 1])
+        plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=False, ax=ax[i, 0], suffix=suffix)
+        plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[i, 1], suffix=suffix)
 
 def quick_plot_mass(matched_, matched_pandora, path_store):
     evt = get_response_for_event_energy(
@@ -886,13 +901,15 @@ def quick_plot_mass(matched_, matched_pandora, path_store):
                                                              mass_zero=0)
         figs_mass_hist, axs_mass_hist = plt.subplots(6, 3, figsize=(8, 15)) # also plot fraction of the whole event energy
         for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
-            axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
+            axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
+                                     density=True)
             axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue",
                                      density=True)
             axs_mass_hist[i, 1].grid(1)
             axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid} / E true, {pid}")
             axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
-            axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue", density=True)
+            axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue",
+                                     density=True)
             binsE = np.linspace(0, 1.0, 100)
             axs_mass_hist[i, 0].legend()
             axs_mass_hist[i, 1].legend()
@@ -900,16 +917,58 @@ def quick_plot_mass(matched_, matched_pandora, path_store):
             axs_mass_hist[i, 2].set_title(f"Pred. {pid} contr. to pred. evt. E")
             axs_mass_hist[i, 2].set_xlabel(f"Pred. E {pid} / Pred. E")
             axs_mass_hist[i, 2].hist(frac_E_model[pid], bins=binsE, histtype="step", label="ML", color="red", density=True)
-            axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue",
-                                     density=True)
-            axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green",
-                                     density=True)
+            axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
+            axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
             axs_mass_hist[i, 2].legend()
             axs_mass_hist[i, 0].set_yscale("log")
             axs_mass_hist[i, 1].set_yscale("log")
             axs_mass_hist[i, 2].set_yscale("log")
         figs_mass_hist.tight_layout()
         figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
+        for bin in energy_bins:
+            filter_pandora = (matched_pandora.true_showers_E > bin[0]) & (matched_pandora.true_showers_E < bin[1])
+            filter_model = (matched_.true_showers_E > bin[0]) & (matched_.true_showers_E < bin[1])
+            filter_pandora_pred = (matched_pandora.pandora_calibrated_pfo > bin[0]) & (matched_pandora.pandora_calibrated_pfo < bin[1])
+            filter_model_pred = (matched_.calibrated_E > bin[0]) & (matched_.calibrated_E < bin[1])
+            (massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model,
+             frac_E_pandora, frac_E_model_true, frac_E_pandora_true,
+             pid_true_over_true) = get_mass_contribution_per_PID(matched_pandora[filter_pandora],
+                                                                 matched_[filter_model],
+                                                                 ML_pid=1,
+                                                                 perfect_pid=0,
+                                                                 mass_zero=0)
+            figs_mass_hist_cat, axs_mass_hist_cat = plt.subplots(4, 3, figsize=(8, 15))  # e, CH, NH, gamma
+            for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
+                axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
+                                         density=True)
+                axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora",
+                                         color="blue",
+                                         density=True)
+                axs_mass_hist[i, 1].grid(1)
+                axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid} / E true, {pid}")
+                axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
+                                         density=True)
+                axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora",
+                                         color="blue",
+                                         density=True)
+                binsE = np.linspace(0, 1.0, 100)
+                axs_mass_hist[i, 0].legend()
+                axs_mass_hist[i, 1].legend()
+                axs_mass_hist[i, 2].grid(1)
+                axs_mass_hist[i, 2].set_title(f"Pred. {pid} contr. to pred. evt. E")
+                axs_mass_hist[i, 2].set_xlabel(f"Pred. E {pid} / Pred. E")
+                axs_mass_hist[i, 2].hist(frac_E_model[pid], bins=binsE, histtype="step", label="ML", color="red",
+                                         density=True)
+                axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora",
+                                         color="blue", density=True)
+                axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth",
+                                         color="green", density=True)
+                axs_mass_hist[i, 2].legend()
+                axs_mass_hist[i, 0].set_yscale("log")
+                axs_mass_hist[i, 1].set_yscale("log")
+                axs_mass_hist[i, 2].set_yscale("log")
+            figs_mass_hist.tight_layout()
+            figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
 
 def plot_per_energy_resolution2_multiple(
     matched_pandora, matched_all, PATH_store, tracks=False, perfect_pid=False, mass_zero=False, ML_pid=False, PATH_store_detailed_plots=None
@@ -977,6 +1036,9 @@ def plot_per_energy_resolution2_multiple(
         axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
         axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
         axs_mass_hist[i, 2].legend()
+        axs_mass_hist[i, 0].set_yscale("log")
+        axs_mass_hist[i, 1].set_yscale("log")
+        axs_mass_hist[i, 2].set_yscale("log")
     event_res_dic = {} # Event energy resolution
     figs_mass_hist.tight_layout()
     figs_mass_hist.savefig(
@@ -2991,7 +3053,7 @@ def plot_one_label(
             ax[1].set_ylim([0, ymax])
         ax[0].set_xlim([0, 55])
         ax[1].set_xlim([0, 55])
-        ylabel = r"$\frac{\sigma_{E_{reco}}}{\langle E_{reco} \rangle}$"
+        ylabel = r"$\frac{\sigma_{E}}{\langle E} \rangle}$"
         ax[0].set_ylabel(ylabel, fontsize=30)
         ax[1].set_ylabel(ylabel, fontsize=30)
     else:

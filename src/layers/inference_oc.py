@@ -338,19 +338,23 @@ def remove_labels_of_double_showers(labels, g):
     e_hits_sum = scatter_add(g.ndata["e_hits"].view(-1), labels.view(-1).long()).int()
     mask_tracks = g.ndata["hit_type"]==1
     for i, label_i in enumerate(torch.unique(labels)):
-        if is_track_per_shower[i]==2:
+        if is_track_per_shower[label_i]==2:
             if label_i>0:
             #if there are two tracks
-                sum_pred_2 = e_hits_sum[i]
+                sum_pred_2 = e_hits_sum[label_i]
                 mask_labels_i = labels == label_i
-                mask_label_i_and_is_track = mask_labels_i*mask_tracks
+                mask_label_i_and_is_track = mask_labels_i * mask_tracks
+                if not mask_label_i_and_is_track.sum()==2:
+                    print("Error")
+                    print(mask_label_i_and_is_track.tolist(), mask_label_i_and_is_track.sum())
+                    print(label_i)
+                    print(sum_pred_2)
+                assert mask_label_i_and_is_track.sum()==2
                 tracks_E = g.ndata['h'][:,-1][mask_label_i_and_is_track]
                 chi_tracks = g.ndata['chi_squared_tracks'][mask_label_i_and_is_track]
                 ind_min_E = torch.argmax(torch.abs(tracks_E - sum_pred_2))
                 ind_min_chi = torch.argmax(chi_tracks)
-
-                # calc distance track cluster:
-
+                # Calc distance track cluster:
                 mask_hit_type_t1 = g.ndata["hit_type"][mask_labels_i]==2
                 mask_hit_type_t2 = g.ndata["hit_type"][mask_labels_i]==1
                 mask_all = mask_hit_type_t1
