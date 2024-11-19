@@ -330,12 +330,14 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
     pid_pandora_over_true = {}
     pid_true_over_true = {}
     for pid in [11,130,2112,22,2212,211]:
-        mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result = calculate_event_mass_resolution(matched_pandora[matched_pandora.pid==pid],
+        filt_pandora = matched_pandora.pid==pid
+        filt_model = matched_.pid==pid
+        mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result = calculate_event_mass_resolution(matched_pandora[filt_pandora],
                                                                                                                         True,
                                                                                                                         perfect_pid=perfect_pid,
                                                                                                                         mass_zero=mass_zero,
                                                                                                                         ML_pid=ML_pid)
-        mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true_result = calculate_event_mass_resolution(matched_[matched_.pid==pid], False,
+        mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true_result = calculate_event_mass_resolution(matched_[filt_model], False,
                                                                                                         perfect_pid=perfect_pid,
                                                                                                         mass_zero=mass_zero,
                                                                                                         ML_pid=ML_pid)
