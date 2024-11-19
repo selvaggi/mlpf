@@ -10,10 +10,12 @@ import matplotlib.pyplot as plt
 
 def track_cluser_eff_(sd_hgb):
     bins = [0, 5, 15,  51]
+    pids_with_tracks = []
     track_cluser_eff = []
     track_cluster_bad_assignation = []
     neutrals_with_tracks = []
     for i in range(len(bins) - 1):
+        current_pids_with_tracks = {} # e.g. 11 -> 50% have tracks
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
         mask_above = sd_hgb["true_showers_E"] <= bin_i1
@@ -24,7 +26,6 @@ def track_cluser_eff_(sd_hgb):
         correct_track_found = correct_track_found[~np.isnan(correct_track_found)]>0
         correct_track_found_percent = np.mean(correct_track_found)
         track_cluser_eff.append(correct_track_found_percent)
-
         track_found = (sd_hgb["is_track_correct"][mask].values+1*(sd_hgb["is_track_in_cluster"][mask].values>0))==1
         track_in_MC = sd_hgb["is_track_in_MC"][mask].values
         track_found_ = (track_found[~np.isnan(track_in_MC)]>0)*(track_in_MC[~np.isnan(track_in_MC)]>0)
@@ -35,8 +36,13 @@ def track_cluser_eff_(sd_hgb):
         track_in_MC = sd_hgb["is_track_in_MC"][mask].values
         track_found = (track_found[~np.isnan(track_in_MC)]>0)*(track_in_MC[~np.isnan(track_in_MC)]==0)
         track_found_percent = np.mean(track_found)
+        for pid in sd_hgb.pid[mask].unique():
+            mask_pid = sd_hgb.pid[mask] == pid
+            track_in_MC = sd_hgb["is_track_in_MC"][mask].values[mask_pid]
+            current_pids_with_tracks[pid] = np.mean(track_in_MC>0)*100
         neutrals_with_tracks.append(track_found_percent)
-
+        pids_with_tracks.append(current_pids_with_tracks)
+        print("Energy range ", bin_i, bin_i1, " - % of each PID that have MC track:", current_pids_with_tracks)
     return track_cluser_eff, track_cluster_bad_assignation, neutrals_with_tracks
 
 

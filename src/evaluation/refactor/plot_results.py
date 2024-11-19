@@ -12,7 +12,8 @@ from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
     plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes,
-    plot_cm_per_energy, plot_fake_and_missed_energy_regions, quick_plot_mass
+    plot_cm_per_energy, plot_fake_and_missed_energy_regions, quick_plot_mass,
+    plot_cm_per_energy_on_overview
 )
 from src.utils.inference.track_cluster_eff_plots import plot_track_assignation_eval
 from src.utils.inference.event_Ks import get_decay_type
@@ -95,17 +96,22 @@ displacement_pandora = np.linalg.norm(pandora_vertex, axis=1)
 displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)'''
 
 # Filter the df based on where decay type is 0
-fig, ax = plt.subplots(4, 5, figsize=(22, 22*4/5)) # The overview figure of efficiencies
+#plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_individual_plots)
+fig, ax = plt.subplots(4, 8, figsize=(25, 25 * 4 / 8)) # The overview figure of efficiencies
 plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_detailed_plots, PATH_store_individual_plots)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax)
+plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 4:6])
 reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
-plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])
-plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 3])
-plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, 4], ax1=ax[1, 4], ax2=ax[2, 4])
-plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, 4])
-x_position = 3 / 5  # Normalize the position of the line between the 3rd and 4th columns
-fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
-fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
+column_cm_full = 6
+column_cm_full_p = 7
+plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, ax=ax[0, column_cm_full], ax1=ax[1, column_cm_full], ax2=ax[2, column_cm_full])
+plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, column_cm_full])
+plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, column_cm_full_p], ax1=ax[1, column_cm_full_p], ax2=ax[2, column_cm_full_p])
+plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, column_cm_full_p])
+x_positions = [4 / 8, 6 / 8]
+for x_position in x_positions:
+    fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
+    fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
 fig.tight_layout()
 fig.savefig(os.path.join(PATH_store_detailed_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
 

@@ -1798,36 +1798,36 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
     kaons_dic = create_eff_dic_pandora(sd_pandora, 130)
-    fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=22)
-    fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
-                   "fake_percent_energy_p": fakes_dic_p[2]}
-    photons_dic.update(fakes_dic_p)
-    fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=11)
-    fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
-                   "fake_percent_energy_p": fakes_dic_p[2]}
-    electrons_dic.update(fakes_dic_p)
-    fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=211)
-    fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
-                   "fake_percent_energy_p": fakes_dic_p[2]}
-    pions_dic.update(fakes_dic_p)
-    fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=130)
-    fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],"fake_percent_energy_p": fakes_dic_p[2]}
-    kaons_dic.update(fakes_dic_p)
+    #fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=22)
+    #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
+    #               "fake_percent_energy_p": fakes_dic_p[2], "fake_energy_reco_p": fakes_dic_p[3]}
+    #photons_dic.update(fakes_dic_p)
+    #fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=11)
+    #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
+    #               "fake_percent_energy_p": fakes_dic_p[2]}
+    #electrons_dic.update(fakes_dic_p)
+    #fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=211)
+    #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
+    #               "fake_percent_energy_p": fakes_dic_p[2]}
+    #pions_dic.update(fakes_dic_p)
+    #fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=130)
+    #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],"fake_percent_energy_p": fakes_dic_p[2]}
+    #kaons_dic.update(fakes_dic_p)
     for var_i, sd_hgb in enumerate(df_list):
         photons_dic = create_eff_dic(photons_dic, sd_hgb, 22, var_i=var_i)
-        fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=22)
-        photons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
+        #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=22)
+        #photons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #photons_dic.update(create_fakes_dic(photons_dic, sd_hgb, 22, var_i))
         electrons_dic = create_eff_dic(electrons_dic, sd_hgb, 11, var_i=var_i)
-        fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=11)
-        electrons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
+        #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=11)
+        #electrons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #electrons_dic.update(create_fakes_dic(electrons_dic, sd_hgb, 11, var_i))
         pions_dic = create_eff_dic(pions_dic, sd_hgb, 211, var_i=var_i)
-        fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=211)
-        pions_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
+        #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=211)
+        #pions_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         kaons_dic = create_eff_dic(kaons_dic, sd_hgb, 130, var_i=var_i) # NH
-        fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=130)
-        kaons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
+        #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=130)
+        #kaons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #kaons_dic.update(create_fakes_dic(kaons_dic, sd_hgb, 130, var_i))
         #plot_eff_and_fakes( # Doesn't look super nice
         #    "Electromagnetic",
@@ -1859,6 +1859,15 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
         PATH_store,
         labels,
         ax=ax[0, 2]
+    )
+    plot_fakes_E(
+        "Electromagnetic",
+        photons_dic,
+        "Photons",
+        PATH_store,
+        labels,
+        ax=ax[0, 3],
+        reco="reco_"
     )
     '''plot_fakes(
         "Electromagnetic",
@@ -1899,6 +1908,15 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
             labels,
             ax=ax[3, 2]
         )
+        plot_fakes_E(
+            "Electromagnetic",
+            electrons_dic,
+            "Electrons",
+            PATH_store,
+            labels,
+            ax=ax[3, 3],
+            reco="reco_"
+        )
     if len(pions_dic["eff_p"]) > 0:
         plot_eff(
             "Hadronic",
@@ -1923,6 +1941,15 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
             PATH_store,
             labels,
             ax=ax[1, 2]
+        )
+        plot_fakes_E(
+            "Hadronic",
+            pions_dic,
+            "Charged hadrons",
+            PATH_store,
+            labels,
+            ax=ax[1, 3],
+            reco="reco_"
         )
     if len(kaons_dic["eff_p"]) > 0:
         plot_eff(
@@ -1949,6 +1976,16 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
             labels,
             ax=ax[2, 2]
         )
+        plot_fakes_E(
+            "Hadronic",
+            kaons_dic,
+            "Neutral hadrons",
+            PATH_store,
+            labels,
+            ax=ax[2, 3],
+            reco="reco_"
+
+        )
 
 def create_eff_dic_pandora(matched_pandora, id):
     pids_pandora = np.abs(matched_pandora["pid"].values)
@@ -1957,13 +1994,14 @@ def create_eff_dic_pandora(matched_pandora, id):
     mask_id_true = matched_pandora.pid.isin(id_group)
     #df_id_pandora = matched_pandora[mask_id]
     eff_p, energy_eff_p = calculate_eff(matched_pandora[mask_id_true], False, pandora=True)
-    fakes_p, energy_fakes_p, fake_percent_energy = calculate_fakes(matched_pandora, None, False, pandora=True, id=id)
+    fakes_p, energy_fakes_p, fake_percent_energy, fake_percent_reco = calculate_fakes(matched_pandora, None, False, pandora=True, id=id)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
     photons_dic["energy_eff_p"] = energy_eff_p
     photons_dic["fakes_p"] = fakes_p
     photons_dic["energy_fakes_p"] = energy_fakes_p
     photons_dic["fake_percent_energy_p"] = fake_percent_energy
+    photons_dic["fake_percent_energy_reco_p"] = fake_percent_reco
     return photons_dic
 
 def create_eff_dic(photons_dic, matched_, id, var_i):
@@ -1973,12 +2011,13 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
     mask_id = matched_.pred_pid_matched.isin(id_group)
     mask_id_gt = matched_.pid.isin(id_group)
     eff, energy_eff = calculate_eff(matched_[mask_id_gt], False)
-    fakes, energy_fakes, fake_percent_energy = calculate_fakes(matched_, None, False, pandora=False, id=id)
+    fakes, energy_fakes, fake_percent_energy, fake_percent_reco = calculate_fakes(matched_, None, False, pandora=False, id=id)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
     photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
     photons_dic["fake_percent_energy_" + str(var_i)] = fake_percent_energy
+    photons_dic["fake_percent_energy_reco_" + str(var_i)] = fake_percent_reco
     return photons_dic
 
 def create_fakes_dic(photons_dic, matched_, id, var_i):
@@ -1987,7 +2026,7 @@ def create_fakes_dic(photons_dic, matched_, id, var_i):
     our_to_pandora_mapping
     df_id = matched_[mask_id]
     eff, energy_eff = calculate_eff(df_id, False)
-    fakes, energy_fakes, fake_percent_energy = calculate_fakes(df_id, None, False, pandora=False, id=id)
+    fakes, energy_fakes, fake_percent_energy, fake_percent_reco = calculate_fakes(df_id, None, False, pandora=False, id=id)
     photons_dic["eff_" + str(var_i)] = eff
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
@@ -2114,7 +2153,7 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
     )
 
 
-def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None):
+def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco=""): # Set reco to 'reco_'
     colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
     markers = ["x", "*", "x", "d", ".", "s"]
     savefig = ax is None
@@ -2122,26 +2161,29 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None):
         fig, ax = plt.subplots()
     j = 0
     ax.set_xlabel("Energy [GeV]")
-    ax.set_ylabel("Fake energy rate")
+    if "reco" in reco:
+        ax.set_ylabel("Fake reco energy rate")
+    else:
+        ax.set_ylabel("Fake energy rate")
     # ax[row_i, j].set_xscale("log")
     ax.set_title(label1)
     ax.grid()
     for i in range(0, len(labels)):
         ax.plot(photons_dic["energy_fakes_" + str(i)],
-            photons_dic["fake_percent_energy_" + str(i)], "--", color=colors_list[0])
+            photons_dic["fake_percent_energy_" + reco + str(i)], "--", color=colors_list[0])
         ax.scatter(
             photons_dic["energy_fakes_" + str(i)],
-            photons_dic["fake_percent_energy_" + str(i)],
+            photons_dic["fake_percent_energy_" + reco + str(i)],
             label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
             marker=markers[i],
             color=colors_list[0],
             s=50,
         )
     ax.plot(photons_dic["energy_fakes_p"],
-        photons_dic["fake_percent_energy_p"], "--", color=colors_list[2])
+        photons_dic["fake_percent_energy_" + reco + "p"], "--", color=colors_list[2])
     ax.scatter(
         photons_dic["energy_fakes_p"],
-        photons_dic["fake_percent_energy_p"],
+        photons_dic["fake_percent_energy_" + reco + "p"],
         facecolors=colors_list[2],
         edgecolors=colors_list[2],
         label="Pandora",
@@ -2157,11 +2199,11 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None):
     ax.set_xscale("log")
     if savefig:
         fig.savefig(
-            os.path.join(PATH_store, "Fake_Energy_Rate_"  + label1 + ".pdf"),
+            os.path.join(PATH_store, "Fake_Energy_Rate_"  + reco + label1 + ".pdf"),
             bbox_inches="tight",
         )
-    else:
-        plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None)
+    #else:
+    #    plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None)
 
 def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
     colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
