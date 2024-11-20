@@ -45,6 +45,7 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
     fake_rate = []
     energy_fakes = []
     fake_percent_energy = []
+    fake_percent_reco_energy = []
     id_our = pandora_to_our_mapping[id]
     for i in range(len(bins_fakes) - 1):
         bin_i = bins_fakes[i]
@@ -59,7 +60,9 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
             non_fakes_mask = ~np.isnan(sd.pid)[mask]
             fakes_mask = np.isnan(sd.pid)[mask]
             energy_in_fakes = np.sum(sd.pandora_calibrated_pfo[mask].values[fakes_mask])
+            reco_in_fakes = np.sum(sd.pred_showers_E[mask].values[fakes_mask])
             total_E_meas = np.sum(sd.pandora_calibrated_pfo.values[mask])
+            total_E_reco = np.sum(sd.pred_showers_E.values[mask])
             total_showers = len(sd.pred_showers_E.values[mask]) # The true showers
         else:
             mask_above = sd.pred_showers_E.values <= bin_i1
@@ -72,14 +75,18 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
             total_showers = sum(~np.isnan(sd.pred_showers_E.values[mask]))
             fakes_mask = np.isnan(sd.pid)[mask]
             energy_in_fakes = np.sum(sd.calibrated_E[mask].values[fakes_mask])
+            reco_in_fakes = np.sum(sd.pred_showers_E[mask].values[fakes_mask])
+
             #non_fakes_mask = ~np.isnan(sd.pid)[mask]
             total_E_meas = np.sum(sd.calibrated_E.values[mask])
+            total_E_reco = np.sum(sd.pred_showers_E.values[mask])
         if total_showers > 0:
             # print(fakes, np.mean(sd.pred_energy_hits_raw[mask]))
             fake_rate.append(fakes / total_showers)
             energy_fakes.append((bin_i1 + bin_i) / 2)
             fake_percent_energy.append(energy_in_fakes / total_E_meas)
-    return fake_rate, energy_fakes, fake_percent_energy
+            fake_percent_reco_energy.append(reco_in_fakes / total_E_reco)
+    return fake_rate, energy_fakes, fake_percent_energy, fake_percent_reco_energy
 
 
 def calculate_response(matched, pandora, log_scale=False):

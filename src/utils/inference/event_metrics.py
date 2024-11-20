@@ -9,6 +9,8 @@ import torch
 from src.utils.inference.inference_metrics import get_sigma_gaussian
 from torch_scatter import scatter_sum, scatter_mean
 import os
+from src.utils.pid_conversion import our_to_pandora_mapping, pandora_to_our_mapping
+
 
 def plot_per_event_metrics(sd, sd_pandora, PATH_store=None):
     (
@@ -317,7 +319,69 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         ret += [None]
     return ret
 
-def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True, PID_categories=False):
+def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True, energy_bins=None):
+    # PID_categories: Report in terms of categories e, CH, NH, gamma
+    mass_over_true = {}
+    mass_over_true_pandora = {}
+    pid_model_over_pred = {}
+    pid_pandora_over_pred = {}
+    pid_model_over_true = {}
+    pid_pandora_over_true = {}
+    pid_true_over_true = {}
+    E_over_true = {}
+    E_over_true_pandora = {}
+
+    for pid in [0, 1, 2, 3]:
+        filt_pandora_pred = matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid])
+        filt_model_pred = matched_.pred_pid_matched == pid
+        filt_model_true = matched_.pid_4_class_true == pid
+        filt_pandora_true = matched_pandora.pid_4_class_true == pid
+        if energy_bins is not None:
+            filt_pandora_pred = filt_pandora_pred & (matched_pandora.pandora_calibrated_pfo > energy_bins[0]) & (matched_pandora.pandora_calibrated_pfo < energy_bins[1])
+            filt_model_pred = filt_model_pred & (matched_.calibrated_E > energy_bins[0]) & (matched_.calibrated_E < energy_bins[1])
+            filt_model_true = filt_model_true & (matched_.true_showers_E > energy_bins[0]) & (matched_.true_showers_E < energy_bins[1])
+            filt_pandora_true = filt_pandora_true & (matched_pandora.true_showers_E > energy_bins[0]) & (matched_pandora.true_showers_E < energy_bins[1])
+        _, _, distr_mass_p, _, _, _, _ = calculate_event_mass_resolution(matched_pandora[filt_pandora_pred],
+                                                                        True,
+                                                                        perfect_pid=perfect_pid,
+                                                                        mass_zero=mass_zero,
+                                                                        ML_pid=ML_pid)
+        _, _, distr_mass, _, _, _, _ = calculate_event_mass_resolution(matched_[filt_model_pred],
+                                                                       False,
+                                                                        perfect_pid=perfect_pid,
+                                                                        mass_zero=mass_zero,
+                                                                        ML_pid=ML_pid)
+        dimsize = int(matched_.number_batch.max() + 1)
+        assert dimsize == matched_pandora.number_batch.max() + 1
+        E_model = torch.nan_to_num(torch.tensor(matched_.calibrated_E.values))
+        E_pandora = torch.nan_to_num(torch.tensor(matched_pandora.pandora_calibrated_pfo.values))
+        E_true = torch.nan_to_num(torch.tensor(matched_.true_showers_E.values))
+        E_model_PID = torch.nan_to_num(torch.tensor(matched_[filt_model_pred].calibrated_E.values))
+        E_pandora_PID = torch.nan_to_num(torch.tensor(matched_pandora[filt_pandora_pred].pandora_calibrated_pfo.values))
+        E_PID_true = torch.nan_to_num(torch.tensor(matched_[filt_model_true].true_showers_E.values))
+        event_energy_PID_true = scatter_sum(E_PID_true, torch.tensor(matched_[filt_model_true].number_batch.values).long(), dim_size=int(dimsize))
+        event_energy_true = scatter_sum(E_true, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
+        event_energy_pred = scatter_sum(E_model, torch.tensor(matched_.number_batch.values).long(), dim_size=int(dimsize))
+        event_energy_pred_pandora = scatter_sum(E_pandora, torch.tensor(matched_pandora.number_batch.values).long(), dim_size=dimsize)
+        event_energy_pred_PID = scatter_sum(E_model_PID, torch.tensor(matched_[filt_model_pred].number_batch.values).long(), dim_size=dimsize)
+        event_energy_pred_pandora_PID = scatter_sum(E_pandora_PID, torch.tensor(matched_pandora[filt_pandora_pred].number_batch.values).long(), dim_size=dimsize)
+        # event_energy_pred_PID / event_energy_pred, event_energy_pred_pandora_PID / event_energy_pred_pandora, event_energy_pred_PID / event_energy_true, event_energy_pred_pandora_PID / event_energy_true
+        pid_model_over_pred_result = event_energy_pred_PID / event_energy_pred
+        pid_pandora_over_pred_result = event_energy_pred_pandora_PID / event_energy_pred_pandora
+        pid_model_over_true_result = event_energy_pred_PID / event_energy_true
+        pid_pandora_over_true_result = event_energy_pred_pandora_PID / event_energy_true
+        mass_over_true[pid] = distr_mass
+        mass_over_true_pandora[pid] = distr_mass_p
+        pid_model_over_pred[pid] = pid_model_over_pred_result
+        pid_pandora_over_pred[pid] = pid_pandora_over_pred_result
+        pid_model_over_true[pid] = pid_model_over_true_result
+        pid_pandora_over_true[pid] = pid_pandora_over_true_result
+        pid_true_over_true[pid] = event_energy_PID_true / event_energy_true
+        E_over_true_pandora[pid] = event_energy_pred_pandora_PID / event_energy_PID_true
+        E_over_true[pid] = event_energy_pred_PID / event_energy_PID_true
+    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_true, pid_pandora_over_true, pid_true_over_true
+
+def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True):
     # PID_categories: whether to report in terms of categories e, CH, NH, gamma
     # get the mass contributions to event energy and event mass per PID
     mass_over_true = {}
