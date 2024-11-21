@@ -89,7 +89,7 @@ def get_extra_features(graphs_new, betas):
         batch_bounds.append(n)
     batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
     #betas = torch.sigmoid(graphs_new.ndata["h"][:, -1])
-    n_highest_betas = 5
+    n_highest_betas = 1
     for i in range(len(batch_num_nodes)):
         betas_i = betas[batch_idx == i]
         topk_betas = torch.topk(betas_i, n_highest_betas)

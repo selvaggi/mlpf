@@ -114,26 +114,41 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
     if "take_out_pred_photons_0_1" in names:
         print("Take out predicted photons [0,1 GeV]")
         mask_energy = sd_hgb.calibrated_E < 1.0
+        if "take_out_fakes_only" in names:
+            print("Fakes only!")
+            mask_energy = mask_energy & (pd.isna(sd_hgb.pid))
         mask = mask_energy & (sd_hgb.pred_pid_matched == 3)
         sd_hgb = sd_hgb[~mask]
         mask_energy_p = sd_pandora.reco_showers_E < 1.0
+        if "take_out_fakes_only" in names:
+            mask_energy_p = mask_energy_p & (pd.isna(sd_pandora.pid))
         mask_p = mask_energy_p & (sd_pandora.pandora_pid == 22)
         sd_pandora = sd_pandora[~mask_p]
     if "take_out_pred_photons_1_10" in names:
         print("Take out predicted photons [1,10 GeV]")
         mask_energy = (sd_hgb.calibrated_E < 10) & (sd_hgb.calibrated_E > 1.0)
+        if "take_out_fakes_only" in names:
+            print("Fakes only!")
+            mask_energy = mask_energy & (pd.isna(sd_hgb.pid))
         mask = mask_energy & (sd_hgb.pred_pid_matched == 3)
         sd_hgb = sd_hgb[~mask]
-        mask_energy_p = (sd_pandora.reco_showers_E < 10) & (sd_pandora.reco_showers_E > 1.0)
+        mask_energy_p = (sd_pandora.pandora_calibrated_pfo < 10) & (sd_pandora.pandora_calibrated_pfo > 1.0)
         mask_p = mask_energy_p & (sd_pandora.pandora_pid == 22)
+        if "take_out_fakes_only" in names:
+            mask_p = mask_p & (pd.isna(sd_pandora.pid))
         sd_pandora = sd_pandora[~mask_p]
     if "take_out_pred_photons_10_100" in names:
         print("Take out predicted photons [10,100 GeV]")
         mask_energy = (sd_hgb.calibrated_E < 100) & (sd_hgb.calibrated_E > 10)
+        if "take_out_fakes_only" in names:
+            print("Fakes only!")
+            mask_energy = mask_energy & (pd.isna(sd_hgb.pid))
         mask = mask_energy & (sd_hgb.pred_pid_matched == 3)
         sd_hgb = sd_hgb[~mask]
-        mask_energy_p = (sd_pandora.reco_showers_E < 100) & (sd_pandora.reco_showers_E > 10)
+        mask_energy_p = (sd_pandora.pandora_calibrated_pfo < 100) & (sd_pandora.pandora_calibrated_pfo > 10)
         mask_p = mask_energy_p & (sd_pandora.pandora_pid == 22)
+        if "take_out_fakes_only" in names:
+            mask_p = mask_p & (pd.isna(sd_pandora.pid))
         sd_pandora = sd_pandora[~mask_p]
     #if "remove_weird_tracks" in names:
     #    x = sd_hgb.pred_ref_pt_matched.values

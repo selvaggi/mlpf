@@ -1,7 +1,8 @@
 
 import matplotlib
 import sys
-from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist
+from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist, \
+    plot_mass_contribution_per_category, plot_mass_contribution_per_PID
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
@@ -61,11 +62,11 @@ sys.stdout = Logger()
 sys.stderr = Logger("err.txt")
 
 PATH_store_individual_plots = os.path.join(PATH_store, "individual_plots")
-PATH_store_detailed_plots = os.path.join(PATH_store, "summary_plots")
+PATH_store_summary_plots = os.path.join(PATH_store, "summary_plots")
 if not os.path.exists(PATH_store_individual_plots):
     os.makedirs(PATH_store_individual_plots)
-if not os.path.exists(PATH_store_detailed_plots):
-    os.makedirs(PATH_store_detailed_plots)
+if not os.path.exists(PATH_store_summary_plots):
+    os.makedirs(PATH_store_summary_plots)
 path_ML = "showers_df_evaluation/0_0_None_hdbscan.pt"
 path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
 dir_top = args.path
@@ -77,12 +78,19 @@ sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.sp
 
 
 if args.mass_only:
-    quick_plot_mass(sd_hgb, sd_pandora, PATH_store_detailed_plots)
+    quick_plot_mass(sd_hgb, sd_pandora, PATH_store_summary_plots)
     sys.exit(0)
 
+plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots)
+plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[0, 1])
+plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[1, 10])
+plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[10, 100])
+plot_mass_contribution_per_PID(sd_hgb, sd_pandora, PATH_store_summary_plots)
+
+#plot_per_energy_resolution(sd_hgb, sd_pandora, PATH_store_detailed_plots)
 #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
-analyze_fakes(sd_pandora, sd_hgb, PATH_store_detailed_plots)
-plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_detailed_plots)
+analyze_fakes(sd_pandora, sd_hgb, PATH_store_summary_plots)
+plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_summary_plots)
 
 pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
 
@@ -97,8 +105,8 @@ displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)'''
 
 # Filter the df based on where decay type is 0
 #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_individual_plots)
-fig, ax = plt.subplots(4, 8, figsize=(25, 25 * 4 / 8)) # The overview figure of efficiencies
-plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_detailed_plots, PATH_store_individual_plots)
+fig, ax = plt.subplots(4, 8, figsize=(28, 28 * 4 / 8))  # The overview figure of efficiencies
+plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax)
 plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 4:6])
 reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
@@ -113,8 +121,7 @@ for x_position in x_positions:
     fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
     fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
 fig.tight_layout()
-fig.savefig(os.path.join(PATH_store_detailed_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
-
+fig.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
 x = sd_hgb.pred_ref_pt_matched[sd_hgb.is_track_in_cluster==1].values
 x = np.stack(x)
 x = np.linalg.norm(x, axis=1)
@@ -126,9 +133,8 @@ x = np.linalg.norm(x, axis=1)
 idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
 sd_hgb[sd_hgb.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
 e_ranges = [[0, 5], [5, 15], [15, 50]]
-
 current_dir = PATH_store_individual_plots
-current_dir_detailed = PATH_store_detailed_plots
+current_dir_detailed = PATH_store_summary_plots
 #else:
 #current_dir =  os.path.join(PATH_store_individual_plots, "plots_range_" + str(range[0]) + "_" + str(range[1]))
 #current_dir_detailed = os.path.join(PATH_store_detailed_plots, "plots_range_" + str(range[0]) + "_" + str(range[1]))

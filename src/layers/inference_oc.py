@@ -208,7 +208,7 @@ def create_and_store_graph_output(
                 pred_pos=pred_pos,
                 pred_ref_pt=pred_ref_pt,
                 pred_pid=pred_pid,
-                save_plots_to_folder=path_save + "/ML_Model_evt_plots_debugging",
+                save_plots_to_folder=path_save + "/ML_",
                 number_of_fakes=number_of_fakes,
                 number_of_fake_showers_total=number_of_fake_showers_total1,
                 extra_features=extra_features # To help with the debugging of the fakes
@@ -229,7 +229,7 @@ def create_and_store_graph_output(
                     step=step,
                     number_in_batch=total_number_events,
                     tracks=tracks,
-                    save_plots_to_folder=path_save + "/Pandora_evt_plots_debugging",
+                    save_plots_to_folder=path_save + "/Pandora",
                 )
                 if df_event_pandora is not None and type(df_event_pandora) is not tuple:
                     df_list_pandora.append(df_event_pandora)
@@ -514,7 +514,7 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind_] = e_pred_showers[index_matches]
-    n_extra_features = 6 # n nodes, 5 highest betas
+    n_extra_features = 2# n nodes, 1 highest betas
     matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
     matched_extra_features = matched_extra_features.to(e_pred_showers.device)
 
@@ -777,30 +777,35 @@ def generate_showers_data_frame(
             d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
+        event_list = [1, 2, 3, 4, 5] # Fill with the list of selected events that we want to investigate
         if save_plots_to_folder:
+            fakes = set(torch.arange(0, row_ind.max(), 1).tolist()) - set(row_ind.tolist())
+
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
-                if len(df[df.number_batch == evt]):
+                continue
+                if evt in event_list and df[df.number_batch == evt]:
                     # Random string
-                    rndstr = generate_random_string(5)
+                    if not pandora:
+                        plot_event(
+                            df[df.number_batch == evt],
+                            pandora,
+                            save_plots_to_folder + "GT_" + str(evt),
+                            graph=dic["graph"].to("cpu"),
+                            y=dic["part_true"],
+                            labels=dic["graph"].ndata["particle_number"].long(),
+                            is_track_in_cluster=df.is_track_in_cluster
+                        )
                     plot_event(
                         df[df.number_batch == evt],
                         pandora,
-                        save_plots_to_folder + str(evt) + rndstr,
-                        graph=dic["graph"].to("cpu"),
-                        y=dic["part_true"],
-                        labels=dic["graph"].ndata["particle_number"].long(),
-                        is_track_in_cluster=df.is_track_in_cluster
-                    )
-                    '''plot_event(
-                        df[df.number_batch == evt],
-                        pandora,
-                        save_plots_to_folder + "_CLUSTERING_" + str(evt) + rndstr,
+                        save_plots_to_folder + "clustering_" + str(evt),
                         graph=dic["graph"].to("cpu"),
                         y=dic["part_true"],
                         labels=labels.detach().cpu(),
                         is_track_in_cluster=df.is_track_in_cluster
-                    )'''
+                    )
+
         if number_of_showers_total is None:
             return df
         else:
@@ -1007,7 +1012,7 @@ def clustering_obtain_labels(X, betas, device):
         clustering = clustering_ordered + 1
     else:
         clustering = clustering_ordered
-    clustering = torch.Tensor(clustering.view(-1)).long().to(device)
+    clustering = clustering.view(-1).long().to(device)
     return clustering
 
 

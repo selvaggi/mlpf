@@ -635,6 +635,12 @@ parser.add_argument(
     action="store_true",
     help="Classify into electron, CH, NH, gamma - both for charged and neutral.",
 )
+parser.add_argument(
+    "--restrict_PID_charge",
+    default=False,
+    action="store_true",
+    help="If turned on, it will only classify clusters with a track into charged particles and clusters without a track into neutral particles.",
+)
 
 parser.add_argument(
     "--balance-pid-classes",

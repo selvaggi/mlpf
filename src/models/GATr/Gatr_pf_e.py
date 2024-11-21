@@ -186,11 +186,11 @@ class ExampleWrapper(L.LightningModule):
                 num_global_features = 14
                 print("this is the model for charged")
                 if len(self.args.classify_pid_charged):
-                    self.pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")] + [0]
+                    self.pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")]
                 else:
                     self.pids_charged = []
                 if len(self.args.classify_pid_neutral):
-                    self.pids_neutral = [int(x) for x in self.args.classify_pid_neutral.split(",")] + [0]
+                    self.pids_neutral = [int(x) for x in self.args.classify_pid_neutral.split(",")]
                 else:
                     self.pids_neutral = []
                 if len(self.pids_charged):
@@ -198,10 +198,12 @@ class ExampleWrapper(L.LightningModule):
                 if len(self.pids_neutral):
                     print("Also running classification for neutral particles", self.pids_neutral)
                 #if self.args.PID_4_class:
-                self.pids_charged = [0, 1, 2, 3] # electron, CH, NH, gamma
-                self.pids_neutral = [0, 1, 2, 3] # electron, CH, NH, gamma
+                self.pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+                self.pids_neutral = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+                if self.args.restrict_PID_charge:
+                    self.pids_charged = [0, 1]
+                    self.pids_neutral = [2, 3]
                 self.pid_conversion_dict = pid_conversion_dict
-                # TODO: fix the unknown particles!
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
@@ -294,7 +296,6 @@ class ExampleWrapper(L.LightningModule):
         # if self.trainer.is_global_zero and step_count % 500 == 0:
         #     g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
         #     PlotCoordinates(
-
         #         g,
         #         path="input_coords",
         #         outdir=self.args.model_prefix,
@@ -764,6 +765,7 @@ class ExampleWrapper(L.LightningModule):
                 charged_PID_true_onehot = torch.zeros(
                     len(charged_PID_true), len(self.pids_charged)
                 )
+                mask_charged = torch.ones(len(charged_PID_true))
                 if not self.args.PID_4_class:
                     for i in range(len(charged_PID_true)):
                         if charged_PID_true[i] in self.pids_charged:
@@ -772,7 +774,12 @@ class ExampleWrapper(L.LightningModule):
                             charged_PID_true_onehot[i, -1] = 1
                 else:
                     for i in range(len(charged_PID_true)):
-                        charged_PID_true_onehot[i, self.pid_conversion_dict.get(charged_PID_true[i], 3)] = 1
+                        true_idx = self.pid_conversion_dict.get(charged_PID_true[i], 3)
+                        if true_idx not in self.pids_charged:
+                            # Nonsense example - don't train on this one
+                            mask_charged[i] = 0
+                        else:
+                            charged_PID_true_onehot[i, self.pids_charged.index(true_idx)] = 1
                         if charged_PID_true[i] not in self.pid_conversion_dict:
                             print("Unknown PID", charged_PID_true[i])
                 charged_PID_true_onehot = charged_PID_true_onehot.clone().to(dic["charged_idx"].device)
@@ -786,6 +793,7 @@ class ExampleWrapper(L.LightningModule):
                 neutral_PID_true_onehot = torch.zeros(
                     len(neutral_PID_true), len(self.pids_neutral)
                 )
+                mask_neutral = torch.ones(len(neutral_PID_true))
                 if not self.args.PID_4_class:
                     for i in range(len(neutral_PID_true)):
                         if neutral_PID_true[i] in self.pids_neutral:
@@ -794,7 +802,11 @@ class ExampleWrapper(L.LightningModule):
                             neutral_PID_true_onehot[i, -1] = 1
                 else:
                     for i in range(len(neutral_PID_true)):
-                        neutral_PID_true_onehot[i, self.pid_conversion_dict.get(neutral_PID_true[i], 3)] = 1
+                        true_idx = self.pid_conversion_dict.get(neutral_PID_true[i], 3)
+                        if true_idx not in self.pids_neutral:
+                            mask_neutral[i] = 0
+                        else:
+                            neutral_PID_true_onehot[i, self.pids_neutral.index(true_idx)] = 1
                         if neutral_PID_true[i] not in self.pid_conversion_dict:
                             print("Unknown PID", neutral_PID_true[i])
                 neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
@@ -841,7 +853,7 @@ class ExampleWrapper(L.LightningModule):
                 )
                 loss_charged = torch.nn.L1Loss()(
                     pred_pos[charged_idx], true_pos[charged_idx]
-                ) # just for logging
+                ) # Just for logging
                 # wandb.log(
                 #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
                 # )
@@ -858,8 +870,9 @@ class ExampleWrapper(L.LightningModule):
                     else:
                         weights = torch.tensor([1, 1, 1, 1]).to(charged_PID_pred.device)
                     if len(charged_PID_pred):
+                        mask_charged = mask_charged.bool()
                         loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-                            charged_PID_pred, charged_PID_true_onehot
+                            charged_PID_pred[mask_charged], charged_PID_true_onehot[mask_charged]
                         )
                     else:
                         loss_charged_pid = 0
@@ -873,10 +886,11 @@ class ExampleWrapper(L.LightningModule):
                         weights = 1 / weights # Maybe choose something else?
                         print("Neutral class weights:", weights)
                     else:
-                        weights = torch.tensor([1, 1, 1, 1]).to(charged_PID_pred.device)
+                        weights = torch.ones(len(self.pids_neutral)).to(charged_PID_pred.device)
                     if len(neutral_PID_pred):
+                        mask_neutral = mask_neutral.bool()
                         loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-                            neutral_PID_pred, neutral_PID_true_onehot
+                            neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
                         )
                     else:
                         loss_neutral_pid = 0
@@ -885,7 +899,7 @@ class ExampleWrapper(L.LightningModule):
             # loss_EC=torch.nn.L1Loss()(e_cor * e_sum_hits, e_true_corr_daughters)
             # wandb.log({"loss_EC": loss_EC})
             loss = loss + loss_EC
-            #loss = loss_EC_neutrals
+            # loss = loss_EC
             if self.args.save_features:
                 cluster_features_path = os.path.join(
                     self.args.model_prefix, "cluster_features"
@@ -911,7 +925,6 @@ class ExampleWrapper(L.LightningModule):
         misc_time_start = time()
         if self.trainer.is_global_zero:
             log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
-        
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
         del model_output
