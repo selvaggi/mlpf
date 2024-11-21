@@ -29,7 +29,7 @@ from src.utils.post_clustering_features import (
     calculate_phi,
 )
 from src.models.energy_correction_NN import (
-    ECNetWrapperGNNGlobalFeaturesSeparate,
+    EnergyCorrection,
     PickPAtDCA,
     AverageHitsP,
     ECNetWrapperAvg
@@ -152,7 +152,7 @@ class ExampleWrapper(L.LightningModule):
                 if self.args.add_track_chis:
                     in_features += 1
                 num_global_features = 14
-                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                self.ec_model_wrapper_charged = EnergyCorrection(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=in_features,
@@ -160,7 +160,7 @@ class ExampleWrapper(L.LightningModule):
                     gnn=True,
                     pos_regression=self.args.regress_pos,
                 )
-                self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
+                self.ec_model_wrapper_neutral = EnergyCorrection(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=in_features,
@@ -207,7 +207,7 @@ class ExampleWrapper(L.LightningModule):
                 out_f = 1
                 if self.args.regress_pos:
                     out_f += 3
-                self.ec_model_wrapper_charged = ECNetWrapperGNNGlobalFeaturesSeparate(
+                self.ec_model_wrapper_charged = EnergyCorrection(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=20,
@@ -224,7 +224,7 @@ class ExampleWrapper(L.LightningModule):
                     neutral_thrust_axis=False,
                     predict=self.args.predict
                 )
-                self.ec_model_wrapper_neutral = ECNetWrapperGNNGlobalFeaturesSeparate(
+                self.ec_model_wrapper_neutral = EnergyCorrection(
                     device=dev,
                     in_features_global=num_global_features,
                     in_features_gnn=20,
@@ -263,7 +263,7 @@ class ExampleWrapper(L.LightningModule):
                     # this is if it's dnn
                     num_global_features = 14
                     self.ec_model_wrapper_charged = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(
+                        EnergyCorrection(
                             device=dev,
                             in_features_global=num_global_features,
                             in_features_gnn=18,
@@ -275,7 +275,7 @@ class ExampleWrapper(L.LightningModule):
                     )
                     # self.pos_dca = PickPAtDCA()
                     self.ec_model_wrapper_neutral = (
-                        ECNetWrapperGNNGlobalFeaturesSeparate(
+                        EnergyCorrection(
                             device=dev,
                             in_features_global=num_global_features,
                             in_features_gnn=18,
