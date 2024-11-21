@@ -105,7 +105,7 @@ displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)'''
 
 # Filter the df based on where decay type is 0
 #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_individual_plots)
-fig, ax = plt.subplots(4, 8, figsize=(25, 25 * 4 / 8))  # The overview figure of efficiencies
+fig, ax = plt.subplots(4, 8, figsize=(28, 28 * 4 / 8))  # The overview figure of efficiencies
 plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax)
 plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 4:6])

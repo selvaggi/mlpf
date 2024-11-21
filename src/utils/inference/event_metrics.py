@@ -155,8 +155,9 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         )
         true_vect[mask_nan_true] = 0
     if perfect_pid or mass_zero or ML_pid:
-        pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
-        pred_vect[np.isnan(pred_vect)] = 0
+        if len(pred_vect) > 0:
+            pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
+            pred_vect[np.isnan(pred_vect)] = 0
         if ML_pid:
             if pandora:
                 print("Using Pandora provided PID for Pandora")
@@ -178,9 +179,8 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
     pred_E_jet = scatter_sum(torch.tensor(pred_E), batch_idx)
     true_jet_p = torch.norm(true_jet_vect, dim=1)  # This is actually momentum resolution
     pred_jet_p = torch.norm(pred_jet_vect, dim=1)
-    mass_true = torch.sqrt(torch.abs(true_E_jet ** 2) - true_jet_p ** 2)
-    mass_pred_p = torch.sqrt(
-        torch.abs(pred_E_jet ** 2) - pred_jet_p ** 2)  ## TODO: fix the nan values in pred_jet_p!!!!!
+    mass_true = torch.sqrt((true_E_jet ** 2).abs() - true_jet_p ** 2)
+    mass_pred_p = torch.sqrt(torch.abs(pred_E_jet ** 2) - pred_jet_p ** 2)
     # replace nans in these with 0
     mass_over_true_p = mass_pred_p / mass_true
     E_over_true = pred_E_jet / true_E_jet
@@ -346,11 +346,14 @@ def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=Fa
                                                                         perfect_pid=perfect_pid,
                                                                         mass_zero=mass_zero,
                                                                         ML_pid=ML_pid)
-        _, _, distr_mass, _, _, _, _ = calculate_event_mass_resolution(matched_[filt_model_pred],
-                                                                       False,
-                                                                        perfect_pid=perfect_pid,
-                                                                        mass_zero=mass_zero,
-                                                                        ML_pid=ML_pid)
+        if filt_model_pred.sum() > 0:
+            _, _, distr_mass, _, _, _, _ = calculate_event_mass_resolution(matched_[filt_model_pred],
+                                                                           False,
+                                                                            perfect_pid=perfect_pid,
+                                                                            mass_zero=mass_zero,
+                                                                            ML_pid=ML_pid)
+        else:
+            distr_mass = torch.tensor([])
         dimsize = int(matched_.number_batch.max() + 1)
         assert dimsize == matched_pandora.number_batch.max() + 1
         E_model = torch.nan_to_num(torch.tensor(matched_.calibrated_E.values))

@@ -743,7 +743,7 @@ class ExampleWrapper(L.LightningModule):
             (model_output, e_cor, _, _) = result
         if self.args.regress_pos:
             dic = e_cor
-            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt = (
+            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt, extra_features = (
                 e_cor["pred_energy_corr"],
                 e_cor["pred_pos"],
                 e_cor["neutrals_idx"],
