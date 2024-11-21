@@ -17,6 +17,75 @@ from src.dataset.dataset import SimpleIterDataset
 from src.utils.import_tools import import_module
 from src.dataset.functions_graph import graph_batch_func
 
+def set_gpus(args):
+    if args.gpus:
+        gpus = [int(i) for i in args.gpus.split(",")]
+        dev = torch.device(gpus[0])
+        print("Using GPUs:", gpus)
+    else:
+        print("No GPUs flag provided - Setting GPUs to [0]")
+        gpus = [0]
+        dev = torch.device(gpus[0])
+        raise Exception("Please provide GPU number")
+    return gpus, dev
+
+
+
+def get_gpu_dev(args):
+    if args.gpus != "":
+        accelerator = "gpu"
+        devices = args.gpus
+    else:
+        accelerator = 0
+        devices = 0
+    return accelerator, devices
+# TODO change this to use it from config file
+def model_setup(args, data_config):
+    """
+    Loads the model
+    :param args:
+    :param data_config:
+    :return: model, model_info, network_module, network_options
+    """
+    network_module = import_module(args.network_config, name="_network_module")
+    network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
+
+    if args.gpus:
+        gpus = [int(i) for i in args.gpus.split(",")]  # ?
+        dev = torch.device(gpus[0])
+        print("using GPUs:", gpus)
+    else:
+        gpus = None
+        local_rank = 0
+        dev = torch.device("cpu")
+    model, model_info = network_module.get_model(
+        data_config, args=args, dev=dev, **network_options
+    )
+    return model.mod
+
+
+def get_samples_steps_per_epoch(args):
+    if args.samples_per_epoch is not None:
+        if args.steps_per_epoch is None:
+            args.steps_per_epoch = args.samples_per_epoch // args.batch_size
+        else:
+            raise RuntimeError(
+                "Please use either `--steps-per-epoch` or `--samples-per-epoch`, but not both!"
+            )
+    if args.samples_per_epoch_val is not None:
+        if args.steps_per_epoch_val is None:
+            args.steps_per_epoch_val = args.samples_per_epoch_val // args.batch_size
+        else:
+            raise RuntimeError(
+                "Please use either `--steps-per-epoch-val` or `--samples-per-epoch-val`, but not both!"
+            )
+    if args.steps_per_epoch_val is None and args.steps_per_epoch is not None:
+        args.steps_per_epoch_val = round(
+            args.steps_per_epoch * (1 - args.train_val_split) / args.train_val_split
+        )
+    if args.steps_per_epoch_val is not None and args.steps_per_epoch_val < 0:
+        args.steps_per_epoch_val = None
+    return args
 
 def to_filelist(args, mode="train"):
     if mode == "train":
@@ -45,7 +114,8 @@ def to_filelist(args, mode="train"):
 
     if args.local_rank is not None:
         if mode == "train":
-            local_world_size = 4  # int(os.environ['LOCAL_WORLD_SIZE'])
+            gpus_list, _ = set_gpus(args)
+            local_world_size = len(gpus_list)  # int(os.environ['LOCAL_WORLD_SIZE'])
             new_file_dict = {}
             for name, files in file_dict.items():
                 new_files = files[args.local_rank :: local_world_size]
@@ -174,10 +244,7 @@ def train_load(args):
         synthetic_npart_max=maxp,
     )
 
-    if args.class_edges:
-        collator_func = graph_batch_func_edges
-    else:
-        collator_func = graph_batch_func
+    collator_func = graph_batch_func
     # train_data_arg = train_data
     # val_data_arg = val_data
     # if args.train_cap == 1:
