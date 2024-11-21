@@ -5,15 +5,12 @@ from torch_scatter import scatter_add, scatter_sum, scatter_mean
 from sklearn.preprocessing import StandardScaler
 from torch_scatter import scatter_sum
 from src.dataset.functions_data import (
-    get_ratios,
     find_mask_no_energy,
     find_cluster_id,
-    get_particle_features,
     get_hit_features,
     calculate_distance_to_boundary,
-    concatenate_Particles_GT,
-    create_noise_label
 )
+from src.dataset.functions_particles import get_particle_features, concatenate_Particles_GT
 import time
 
 def create_inputs_from_table(
@@ -226,12 +223,10 @@ def create_graph(
     config=None,
     n_noise=0,
 ):
-    
     graph_empty = False
     hits_only = config.graph_config.get(
         "only_hits", False
-    )  # Whether to only include hits in the graph
-    # standardize_coords = config.graph_config.get("standardize_coords", False)
+    )  
     extended_coords = config.graph_config.get("extended_coords", False)
     prediction = config.graph_config.get("prediction", False)
     hit_chis = config.graph_config.get("hit_chis_track", False)
@@ -276,7 +271,7 @@ def create_graph(
             connections_list
         ) = result
         if noise_class:
-            mask_loopers, mask_particles = create_noise_label(
+            mask_loopers, mask_particles =  (
             e_hits, hit_particle_link, y_data_graph, cluster_id
             )
             hit_particle_link[mask_loopers] = -1
@@ -284,28 +279,27 @@ def create_graph(
 
             cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
            
-
-        graph_coordinates = pos_xyz_hits  # / 3330  # divide by detector size
+        # build graph
+        graph_coordinates = pos_xyz_hits 
         graph_empty = False
         g = dgl.graph(([], []))
         g.add_nodes(graph_coordinates.shape[0])
         if hits_only == False:
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-            )  # dims = 8
+            )  
         else:
             hit_features_graph = torch.cat(
                 (graph_coordinates, hit_type_one_hot, e_hits, p_hits), dim=1
-            )  # dims = 9
+            )  
         
+        # fill graph features
         g.ndata["h"] = hit_features_graph
         g.ndata["pos_hits_xyz"] = pos_xyz_hits
         g.ndata["pos_pxpypz"] = pos_pxpypz
         g = calculate_distance_to_boundary(g)
         g.ndata["hit_type"] = hit_type
-        g.ndata[
-            "e_hits"
-        ] = e_hits  # if no tracks this is e and if there are tracks this fills the tracks e values with p
+        g.ndata["e_hits"] = e_hits  
         if hit_chis:
             g.ndata["chi_squared_tracks"] = chi_squared_tracks
         g.ndata["particle_number"] = cluster_id
@@ -383,9 +377,10 @@ def make_bad_tracks_noise_tracks(g):
         #then index 1 is at 0 
         mean_pos_cluster = mean_pos_cluster[1:,:]
         particle_track = particle_track-1
-    if mean_pos_cluster.shape[0] == torch.unique(g.ndata["particle_number"]).shape:
-        distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
-        bad_tracks = distance_track_cluster>0.21
-        index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
-        g.ndata["particle_number"][index_bad_tracks]= 0 
+    # if mean_pos_cluster.shape[0] == torch.unique(g.ndata["particle_number"]).shape:
+    distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+
+    bad_tracks = distance_track_cluster>0.21
+    index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
+    g.ndata["particle_number"][index_bad_tracks]= 0 
     return g
