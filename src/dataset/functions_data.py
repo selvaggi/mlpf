@@ -5,7 +5,7 @@ from torch_scatter import scatter_add, scatter_sum
 from sklearn.preprocessing import StandardScaler
 from torch_scatter import scatter_sum
 from src.dataset.utils_hits import CachedIndexList, get_number_of_daughters, get_ratios, get_number_hits, modify_index_link_for_gamma_e, get_e_reco
-
+from src.dataset.functions_particles import Particles_GT
 def find_mask_no_energy(
     hit_particle_link,
     hit_type_a,

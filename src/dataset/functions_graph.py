@@ -11,6 +11,7 @@ from src.dataset.functions_data import (
     calculate_distance_to_boundary,
 )
 from src.dataset.functions_particles import get_particle_features, concatenate_Particles_GT
+from src.dataset.utils_hits import create_noise_label
 import time
 
 def create_inputs_from_table(
@@ -271,7 +272,7 @@ def create_graph(
             connections_list
         ) = result
         if noise_class:
-            mask_loopers, mask_particles =  (
+            mask_loopers, mask_particles = create_noise_label(
             e_hits, hit_particle_link, y_data_graph, cluster_id
             )
             hit_particle_link[mask_loopers] = -1
@@ -370,17 +371,29 @@ def make_bad_tracks_noise_tracks(g):
     mask_all = mask_hit_type_t1
     # the other error could come from no hits in the ECAL for a cluster
     mean_pos_cluster = scatter_mean(g.ndata["pos_hits_xyz"][mask_all], g.ndata["particle_number"][mask_all].long().view(-1), dim=0)
-   
+    mean_pos_cluster_all = []
+
     pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
     particle_track = g.ndata["particle_number"][mask_hit_type_t2]
-    if  torch.sum(g.ndata["particle_number"] == 0)==0:
-        #then index 1 is at 0 
-        mean_pos_cluster = mean_pos_cluster[1:,:]
-        particle_track = particle_track-1
-    # if mean_pos_cluster.shape[0] == torch.unique(g.ndata["particle_number"]).shape:
-    distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+    if len(particle_track)>0:
+        for i in particle_track:
+            if i ==0:
+                mean_pos_cluster_all.append(torch.zeros((1,3)).view(-1,3))
+            else:
+                mask_labels_i = g.ndata["particle_number"] ==i
+                mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
+                mean_pos_cluster_all.append(mean_pos_cluster.view(-1,3))
+        mean_pos_cluster_all = torch.cat(mean_pos_cluster_all, dim=0)
+        # if  torch.sum(g.ndata["particle_number"] == 0)==0:
+        #     #then index 1 is at 0 
+        #     mean_pos_cluster = mean_pos_cluster[1:,:]
+        #     particle_track = particle_track-1
+        # if mean_pos_cluster.shape[0]> torch.max(particle_track):
+        #     distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+        distance_track_cluster = torch.norm(mean_pos_cluster_all-pos_track,dim=1)/1000
 
-    bad_tracks = distance_track_cluster>0.21
-    index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
-    g.ndata["particle_number"][index_bad_tracks]= 0 
+        bad_tracks = distance_track_cluster>0.21
+        index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
+        
+        g.ndata["particle_number"][index_bad_tracks]= 0 
     return g

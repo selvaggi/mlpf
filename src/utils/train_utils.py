@@ -40,6 +40,7 @@ def get_gpu_dev(args):
         devices = 0
     return accelerator, devices
 # TODO change this to use it from config file
+
 def model_setup(args, data_config):
     """
     Loads the model
@@ -660,82 +661,82 @@ def optim(args, model, device):
     return opt, scheduler
 
 
-def model_setup(args, data_config):
-    """
-    Loads the model
-    :param args:
-    :param data_config:
-    :return: model, model_info, network_module, network_options
-    """
-    network_module = import_module(args.network_config, name="_network_module")
-    network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
-    if args.export_onnx:
-        network_options["for_inference"] = True
-    if args.use_amp:
-        network_options["use_amp"] = True
-    if args.clustering_loss_only:
-        network_options["output_dim"] = args.clustering_space_dim + 1
-    else:
-        network_options["output_dim"] = args.clustering_space_dim + 28
-    network_options["input_dim"] = 9 + args.n_noise
-    network_options.update(data_config.custom_model_kwargs)
-    if args.use_heads:
-        network_options["separate_heads"] = True
-    _logger.info("Network options: %s" % str(network_options))
-    if args.gpus:
-        gpus = [int(i) for i in args.gpus.split(",")]  # ?
-        dev = torch.device(gpus[0])
-    else:
-        gpus = None
-        local_rank = 0
-        dev = torch.device("cpu")
-    model, model_info = network_module.get_model(
-        data_config, args=args, dev=dev, **network_options
-    )
+# def model_setup(args, data_config):
+#     """
+#     Loads the model
+#     :param args:
+#     :param data_config:
+#     :return: model, model_info, network_module, network_options
+#     """
+#     network_module = import_module(args.network_config, name="_network_module")
+#     network_options = {k: ast.literal_eval(v) for k, v in args.network_option}
+#     if args.export_onnx:
+#         network_options["for_inference"] = True
+#     if args.use_amp:
+#         network_options["use_amp"] = True
+#     if args.clustering_loss_only:
+#         network_options["output_dim"] = args.clustering_space_dim + 1
+#     else:
+#         network_options["output_dim"] = args.clustering_space_dim + 28
+#     network_options["input_dim"] = 9 + args.n_noise
+#     network_options.update(data_config.custom_model_kwargs)
+#     if args.use_heads:
+#         network_options["separate_heads"] = True
+#     _logger.info("Network options: %s" % str(network_options))
+#     if args.gpus:
+#         gpus = [int(i) for i in args.gpus.split(",")]  # ?
+#         dev = torch.device(gpus[0])
+#     else:
+#         gpus = None
+#         local_rank = 0
+#         dev = torch.device("cpu")
+#     model, model_info = network_module.get_model(
+#         data_config, args=args, dev=dev, **network_options
+#     )
 
-    if args.freeze_core:
-        model.mod.freeze("core")
-        print("Frozen core parameters")
-    if args.freeze_beta:
-        model.mod.freeze("beta")
-        print("Frozen beta parameters")
-        assert model.mod.beta_weight == 1.0
-        model.mod.beta_weight = 0.0
-    if args.beta_zeros:
-        model.mod.beta_exp_weight = 1.0
-        print("Set beta_exp_weight to 1.0")
-    if args.freeze_coords:
-        model.mod.freeze("coords")
-        print("Frozen coordinates parameters")
-    if args.load_model_weights:
-        print("Loading model state from %s" % args.load_model_weights)
-        model_state = torch.load(args.load_model_weights, map_location="cpu")
-        model_dict = model.state_dict()
-        model_state = {k: v for k, v in model_state.items() if k in model_dict}
-        model_dict.update(model_state)
-        missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
-        _logger.info(
-            "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
-            % (args.load_model_weights, missing_keys, unexpected_keys)
-        )
-        if args.copy_core_for_beta:
-            model.mod.create_separate_beta_core()
-            print("Created separate beta core")
-    # _logger.info(model)
-    # flops(model, model_info) # commented before it adds lodel to gpu
-    # loss function
-    try:
-        loss_func = network_module.get_loss(data_config, **network_options)
-        _logger.info(
-            "Using loss function %s with options %s" % (loss_func, network_options)
-        )
-    except AttributeError:
-        loss_func = torch.nn.CrossEntropyLoss()
-        _logger.warning(
-            "Loss function not defined in %s. Will use `torch.nn.CrossEntropyLoss()` by default.",
-            args.network_config,
-        )
-    return model, model_info, loss_func
+#     if args.freeze_core:
+#         model.mod.freeze("core")
+#         print("Frozen core parameters")
+#     if args.freeze_beta:
+#         model.mod.freeze("beta")
+#         print("Frozen beta parameters")
+#         assert model.mod.beta_weight == 1.0
+#         model.mod.beta_weight = 0.0
+#     if args.beta_zeros:
+#         model.mod.beta_exp_weight = 1.0
+#         print("Set beta_exp_weight to 1.0")
+#     if args.freeze_coords:
+#         model.mod.freeze("coords")
+#         print("Frozen coordinates parameters")
+#     if args.load_model_weights:
+#         print("Loading model state from %s" % args.load_model_weights)
+#         model_state = torch.load(args.load_model_weights, map_location="cpu")
+#         model_dict = model.state_dict()
+#         model_state = {k: v for k, v in model_state.items() if k in model_dict}
+#         model_dict.update(model_state)
+#         missing_keys, unexpected_keys = model.load_state_dict(model_state, strict=False)
+#         _logger.info(
+#             "Model initialized with weights from %s\n ... Missing: %s\n ... Unexpected: %s"
+#             % (args.load_model_weights, missing_keys, unexpected_keys)
+#         )
+#         if args.copy_core_for_beta:
+#             model.mod.create_separate_beta_core()
+#             print("Created separate beta core")
+#     # _logger.info(model)
+#     # flops(model, model_info) # commented before it adds lodel to gpu
+#     # loss function
+#     try:
+#         loss_func = network_module.get_loss(data_config, **network_options)
+#         _logger.info(
+#             "Using loss function %s with options %s" % (loss_func, network_options)
+#         )
+#     except AttributeError:
+#         loss_func = torch.nn.CrossEntropyLoss()
+#         _logger.warning(
+#             "Loss function not defined in %s. Will use `torch.nn.CrossEntropyLoss()` by default.",
+#             args.network_config,
+#         )
+#     return model, model_info, loss_func
 
 
 def iotest(args, data_loader):

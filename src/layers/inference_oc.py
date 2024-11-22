@@ -6,7 +6,7 @@ import os
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
-from src.dataset.functions_data import CachedIndexList, spherical_to_cartesian
+from src.dataset.utils_hits import CachedIndexList
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 import pandas as pd
@@ -469,6 +469,8 @@ def generate_showers_data_frame(
         1*(dic["graph"].ndata["hit_type"].view(-1)==1),
         dic["graph"].ndata["particle_number"].long(),
     )
+    distance_to_cluster_all = distance_to_cluster_track(dic, is_track_in_MC)
+     
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     if torch.sum(particle_ids == 0) > 0:
@@ -517,7 +519,6 @@ def generate_showers_data_frame(
     n_extra_features = 2# n nodes, 1 highest betas
     matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
     matched_extra_features = matched_extra_features.to(e_pred_showers.device)
-
     if pandora:
         matched_es_cali = matched_es.clone()
         matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
@@ -636,18 +637,19 @@ def generate_showers_data_frame(
         fakes_positions_t = torch.zeros((fake_showers_e.shape[0], 3)) * (torch.nan)
         if not pandora:
             number_of_fake_showers_total = number_of_fake_showers_total + number_of_fake_showers
-        """if shap:
-            fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
-                torch.nan
-            )
-            fake_showers_ec_x_t = torch.zeros((fake_showers_e.shape[0], ec_x_t.shape[1])) * (
-                torch.nan
-            )
-            #fake_showers_shap_vals = fake_showers_shap_vals.to(e_pred_showers.device)
-            #fake_showers_ec_x_t = fake_showers_ec_x_t.to(e_pred_showers.device)
-            shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
-            ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
-        """
+        # """if shap:
+        #     fake_showers_shap_vals = torch.zeros((fake_showers_e.shape[0], shap_vals_t.shape[1])) * (
+        #         torch.nan
+        #     )
+        #     fake_showers_ec_x_t = torch.zeros((fake_showers_e.shape[0], ec_x_t.shape[1])) * (
+        #         torch.nan
+        #     )
+        #     #fake_showers_shap_vals = fake_showers_shap_vals.to(e_pred_showers.device)
+        #     #fake_showers_ec_x_t = fake_showers_ec_x_t.to(e_pred_showers.device)
+        #     shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
+        #     ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
+        # """
+        
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
@@ -668,6 +670,7 @@ def generate_showers_data_frame(
         )
         e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
         is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_showers_e_truw), dim=0)
+        distance_to_cluster_MC = torch.cat((distance_to_cluster_all[1:], fake_showers_showers_e_truw), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
@@ -686,7 +689,6 @@ def generate_showers_data_frame(
             calibration_factor = torch.cat(
                 (calibration_per_shower, fake_showers_e_cali_factor), dim=0
             )
-
         if shap:
             # pad
             matched_shap_vals = torch.cat(
@@ -739,6 +741,7 @@ def generate_showers_data_frame(
                 "is_track_in_cluster": is_track.detach().cpu(),
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "is_track_in_MC": is_track_in_MC.detach().cpu(),
+                "distance_to_cluster_MC":distance_to_cluster_MC.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
         else:
@@ -756,6 +759,7 @@ def generate_showers_data_frame(
                 "is_track_in_cluster": is_track.detach().cpu(),
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "is_track_in_MC": is_track_in_MC.detach().cpu(),
+                "distance_to_cluster_MC":distance_to_cluster_MC.detach().cpu(),
                 "vertex": vertex.detach().cpu().tolist()
             }
             if pred_pos is not None:
@@ -1068,3 +1072,42 @@ def get_labels_pandora(tracks, dic, device):
     cluster_id = map(lambda x: map_from.index(x), labels_pandora.detach().cpu().numpy())
     labels_pandora = torch.Tensor(list(cluster_id)).long().to(device)
     return labels_pandora
+
+
+def distance_to_cluster_track(dic, is_track_in_MC):
+    
+    g = dic["graph"]
+    mask_hit_type_t1 = g.ndata["hit_type"]==2
+    mask_hit_type_t2 = g.ndata["hit_type"]==1
+    pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
+    particle_track = g.ndata["particle_number"][mask_hit_type_t2]
+    if len(particle_track)>0:
+        mean_pos_cluster_all = []
+        for i in particle_track:
+            if i ==0:
+                mean_pos_cluster_all.append(torch.zeros((1,3)).view(-1,3))
+            else:
+                mask_labels_i = g.ndata["particle_number"] ==i
+                mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
+                mean_pos_cluster_all.append(mean_pos_cluster.view(-1,3))
+        mean_pos_cluster_all = torch.cat(mean_pos_cluster_all, dim=0)
+        # if  torch.sum(g.ndata["particle_number"] == 0)==0:
+        #     #then index 1 is at 0 
+        #     mean_pos_cluster = mean_pos_cluster[1:,:]
+        #     particle_track = particle_track-1
+        # if mean_pos_cluster.shape[0]> torch.max(particle_track):
+        #     distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+        distance_track_cluster = torch.norm(mean_pos_cluster_all-pos_track,dim=1)/1000
+        if len(particle_track)>len(torch.unique(particle_track)):
+            distance_track_cluster_unique =[]
+            for i in torch.unique(particle_track):
+                mask_tracks = particle_track == i
+                distance_track_cluster_unique.append(torch.min(distance_track_cluster[mask_tracks]).view(-1))
+            distance_track_cluster_unique= torch.cat(distance_track_cluster_unique, dim=0)
+            unique_particle_track = torch.unique(particle_track)
+        else:
+            distance_track_cluster_unique = distance_track_cluster
+            unique_particle_track = particle_track
+    distance_to_cluster_all = is_track_in_MC.clone().float()
+    distance_to_cluster_all[unique_particle_track.long()] = distance_track_cluster_unique
+    return distance_to_cluster_all
