@@ -6,6 +6,8 @@ import os
 from sklearn.cluster import DBSCAN, HDBSCAN
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 import numpy as np
+from src.dataset.functions_data import CachedIndexList
+from src.dataset.config_main.functions_data import spherical_to_cartesian
 from src.dataset.utils_hits import CachedIndexList
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
@@ -470,7 +472,7 @@ def generate_showers_data_frame(
         dic["graph"].ndata["particle_number"].long(),
     )
     distance_to_cluster_all = distance_to_cluster_track(dic, is_track_in_MC)
-     
+
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
     if torch.sum(particle_ids == 0) > 0:
@@ -648,7 +650,7 @@ def generate_showers_data_frame(
         #     shap_vals_t = torch.cat((torch.tensor(shap_vals_t), fake_showers_shap_vals), dim=0)
         #     ec_x_t = torch.cat((torch.tensor(ec_x_t), fake_showers_ec_x_t), dim=0)
         # """
-        
+
         fake_showers_showers_e_truw = fake_showers_showers_e_truw.to(
             e_pred_showers.device
         )
@@ -1074,7 +1076,7 @@ def get_labels_pandora(tracks, dic, device):
 
 
 def distance_to_cluster_track(dic, is_track_in_MC):
-    
+
     g = dic["graph"]
     mask_hit_type_t1 = g.ndata["hit_type"]==2
     mask_hit_type_t2 = g.ndata["hit_type"]==1
@@ -1091,7 +1093,7 @@ def distance_to_cluster_track(dic, is_track_in_MC):
                 mean_pos_cluster_all.append(mean_pos_cluster.view(-1,3))
         mean_pos_cluster_all = torch.cat(mean_pos_cluster_all, dim=0)
         # if  torch.sum(g.ndata["particle_number"] == 0)==0:
-        #     #then index 1 is at 0 
+        #     #then index 1 is at 0
         #     mean_pos_cluster = mean_pos_cluster[1:,:]
         #     particle_track = particle_track-1
         # if mean_pos_cluster.shape[0]> torch.max(particle_track):

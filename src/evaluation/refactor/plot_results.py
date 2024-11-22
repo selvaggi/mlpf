@@ -75,8 +75,72 @@ path_hgcal = os.path.join(dir_top, path_ML)
 sd_hgb, _ = open_mlpf_dataframe(path_hgcal, False)
 sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
+'''
+ch = sd_hgb[sd_hgb.pred_pid_matched == 1]
+ch_le = ch[ch.calibrated_E < 5.0]
+cluster_E = ch_le.pred_showers_E
+track_E = ch_le.calibrated_E
+fakes_mask = pd.isna(ch_le.pid)
+dist_trk = np.linalg.norm(np.stack(ch_le.pred_ref_pt_matched.values), axis=1)
+ch_le_filter = ch_le[dist_trk<0.21]
+
+fig, ax = plt.subplots()
+diff_E_truth = ch_le.true_showers_E - track_E
+diff_E_truth_filter = ch_le_filter.true_showers_E - ch_le_filter.calibrated_E
+bins = np.linspace(-7, 7, 100)
+ax.hist(diff_E_truth, bins=bins, histtype="step", label="nofilter")
+ax.hist(diff_E_truth_filter, bins=bins, histtype="step", label="filter")
+ax.legend()
+ax.set_yscale("log")
+fig.show()
 
 
+
+fig, ax = plt.subplots()
+diff_E = cluster_E - track_E
+bins = np.linspace(-7, 7, 100)
+ax.hist(diff_E[fakes_mask], bins=bins, histtype="step", label="Fakes")
+ax.hist(diff_E[~fakes_mask], bins=bins, histtype="step", label="Matched")
+ax.legend()
+ax.set_yscale("log")
+fig.show()
+
+fig, ax = plt.subplots()
+bins = np.linspace(0, 2, 100)
+ax.hist(dist_trk[ch_le.is_track_correct>=1.0], bins=bins, histtype="step", label="Is track correct")
+ax.hist(dist_trk[ch_le.is_track_correct==0.0], bins=bins, histtype="step", label="Track not correct")
+ax.legend()
+ax.set_yscale("log")
+fig.show()
+
+
+diff_E_truth = ch_le.true_showers_E - track_E
+diff_E_hits_truth = ch_le.true_showers_E - cluster_E
+
+fig, ax = plt.subplots()
+bins = np.linspace(-7, 7, 100)
+ax.hist(diff_E_truth[ch_le.is_track_correct>=1.0], bins=bins, histtype="step", label="Is track correct >= 1")
+ax.hist(diff_E_truth[ch_le.is_track_correct==0.0], bins=bins, histtype="step", label="Track not correct")
+ax.legend()
+ax.set_yscale("log")
+ax.set_xlabel("$E_{true}-E_{pred}$")
+fig.show()
+
+bad_energy = diff_E_truth.abs() > 1.25
+print("Frac bad energy", bad_energy.sum() / len(bad_energy))
+fig, ax = plt.subplots()
+bins=np.linspace(-5, 5, 100)
+diff_E_truth_1 = ch_le.true_showers_E - track_E
+diff_E_truth_1[bad_energy] = diff_E_hits_truth[bad_energy]
+ax.hist(diff_E_truth_1, bins=bins, histtype="step", label="Correct")
+ax.hist(diff_E_truth, bins=bins, histtype="step", label="No correct")
+#ax.hist(diff_E_truth, bins=bins, histtype="step")
+#ax.hist(diff_E_hits_truth, bins=bins, histtype="step")
+ax.legend()
+ax.set_yscale("log")
+fig.show()
+
+'''
 if args.mass_only:
     quick_plot_mass(sd_hgb, sd_pandora, PATH_store_summary_plots)
     sys.exit(0)
@@ -130,8 +194,8 @@ x = np.linalg.norm(x, axis=1)
 #bins = np.linspace(0, 0.25, 50)
 #ax.hist(x, bins=bins)
 #fig.savefig(os.path.join(PATH_store_individual_plots, "track_momentum_norm.pdf"))
-idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
-sd_hgb[sd_hgb.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
+#idx_pick_reco = np.where(x > 0.15)[0]  # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
+#sd_hgb[sd_hgb.is_track_in_cluster==1].calibrated_E.iloc[idx_pick_reco] = sd_hgb[sd_hgb.is_track_in_cluster==1].pred_showers_E.iloc[idx_pick_reco]
 e_ranges = [[0, 5], [5, 15], [15, 50]]
 current_dir = PATH_store_individual_plots
 current_dir_detailed = PATH_store_summary_plots
