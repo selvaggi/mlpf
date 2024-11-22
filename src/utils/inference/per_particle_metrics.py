@@ -921,6 +921,7 @@ def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
             axs_mass_hist[i, 2].grid(1)
             axs_mass_hist[i, 2].set_title(f"Pred. {pid} contr. to pred. evt. E")
             axs_mass_hist[i, 2].set_xlabel(f"Pred. E {pid} / Pred. E")
+            axs_mass_hist[i, 0].set_xlabel(f"Pred. m {pid} / Pred. m")
             axs_mass_hist[i, 2].hist(frac_E_model[pid], bins=binsE, histtype="step", label="ML", color="red", density=True)
             axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
             axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
@@ -930,7 +931,7 @@ def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
             axs_mass_hist[i, 2].set_yscale("log")
         figs_mass_hist.tight_layout()
         figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
-        matplotlib.rcParams["font.size"] = old_fontsize
+        #matplotlib.rcParams["font.size"] = old_fontsize
 
 def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, energy_bins=None):
     old_fontsize = matplotlib.rcParams["font.size"]

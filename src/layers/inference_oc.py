@@ -570,7 +570,6 @@ def generate_showers_data_frame(
     tracks_label = scatter_max((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels)[0].int()
     tracks_label = tracks_label-1
     tracks_label[tracks_label<0]=0
-    tracks_label = torch.tensor(tracks_label)
     matched_es_tracks = torch.zeros_like(energy_t) * (torch.nan)
     matched_es_tracks_1 = torch.zeros_like(energy_t) * (torch.nan)
     matched_es_tracks[row_ind_]=row_ind_.float()

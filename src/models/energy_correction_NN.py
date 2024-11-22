@@ -3,6 +3,7 @@
     The model taken from notebooks/13_NNs.py
     At first the model is fixed and the weights are loaded from earlier training
 """
+import wandb
 from xformers.ops.fmha import BlockDiagonalMask
 from gatr.interface import (
     embed_point,
@@ -11,11 +12,21 @@ from gatr.interface import (
     embed_scalar,
     extract_scalar
 )
-import numpy as np
+from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+from torch_scatter import scatter_add, scatter_mean
+from src.utils.post_clustering_features import (
+    get_post_clustering_features,
+    get_extra_features,
+    calculate_eta,
+    calculate_phi,
+)
+from src.utils.save_features import save_features
 
+import os
+from time import time
+import numpy as np
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 import pickle
-
 from copy import deepcopy
 import shap
 import torch
@@ -23,13 +34,15 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from src.models.thrust_axis import Thrust, hits_xyz_to_momenta, LR, weighted_least_squares_line
+from src.utils.pid_conversion import pid_conversion_dict
 from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean, scatter_sum
 from gatr import GATr
 import dgl
 
+
 class Net(nn.Module):
-    def __init__(self, in_features=13, out_features=1, return_raw=False):
+    def __init__(self, in_features=13, out_features=1, return_raw=True):
         super(Net, self).__init__()
         self.out_features = out_features
         self.return_raw = return_raw
@@ -75,9 +88,7 @@ class CPU_Unpickler(pickle.Unpickler):
         else:
             return super().find_class(module, name)
 
-class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
-    # use the GNN+NN model for energy correction
-    # This one concatenates GNN features to the global features
+class EnergyCorrectionWrapper(torch.nn.Module):
     def __init__(
         self,
         device,
@@ -97,10 +108,14 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         neutral_PCA=False,
         neutral_thrust_axis=True,
         simple_p_GNN=False,
-        predict=True
+        predict=True,
+        args=None
     ):
-        super(ECNetWrapperGNNGlobalFeaturesSeparate, self).__init__()
+        super(EnergyCorrectionWrapper, self).__init__()
+        if not charged:
+            self.ec_model_wrapper_neutral_avg = ECNetWrapperAvg()
         self.charged = charged
+        self.args = args
         self.predict_arg = predict
         self.simple_p_GNN = simple_p_GNN
         self.neutral_avg = neutral_avg
@@ -115,32 +130,10 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         self.ignore_global_features_for_p = ignore_global_features_for_p
         if self.charged:
             self.ignore_global_features_for_p = False
-        if self.ignore_global_features_for_p:
-            if not self.simple_p_GNN:
-                self.gatr_p = GATr(
-                    in_mv_channels=1,
-                    out_mv_channels=1,
-                    hidden_mv_channels=4,
-                    in_s_channels=3,
-                    out_s_channels=None,
-                    hidden_s_channels=4,
-                    num_blocks=3,
-                    attention=SelfAttentionConfig(),  # Use default parameters for attention...
-                    mlp=MLPConfig(),  # Use default parameters for MLP
-                )
-            else:
-                self.gnn_p = GAT(
-                    in_features_gnn,
-                    out_channels=16,
-                    heads=4,
-                    concat=True,
-                    hidden_channels=64,
-                    num_layers=3)
-            #if not self.neutral_avg:
-            self.model_p = Net(16, 3, return_raw=True)
         if not self.charged:
             self.model = Net(
-                in_features=out_features_gnn + in_features_global, out_features=out_f
+                in_features=out_features_gnn + in_features_global, out_features=out_f,
+                return_raw=True
             )
             self.model.explainer_mode = False
         # use a GAT
@@ -193,6 +186,55 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         self.NeutralPCA = NeutralPCA()
         self.ThrustAxis = ThrustAxis()
 
+    def charged_prediction(self, graphs_new, charged_idx, graphs_high_level_features):
+        # Prediction for charged particles
+        unbatched = dgl.unbatch(graphs_new)
+        if len(charged_idx) > 0:
+            charged_graphs = dgl.batch([unbatched[i] for i in charged_idx])
+            charged_energies = self.predict(
+                graphs_high_level_features,
+                charged_graphs,
+                explain=self.args.explain_ec,
+            )
+        else:
+            if not self.args.regress_pos:
+                charged_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+            else:
+                charged_energies = [
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                ]
+            if len(self.pids_charged):
+                charged_energies += [torch.tensor([]).to(graphs_new.ndata["h"].device)]
+        return charged_energies
+
+    def neutral_prediction(self, graphs_new, neutral_idx, features_neutral_no_nan):
+        unbatched = dgl.unbatch(graphs_new)
+        if len(neutral_idx) > 0:
+            neutral_graphs = dgl.batch([unbatched[i] for i in neutral_idx])
+            neutral_energies = self.predict(
+                features_neutral_no_nan,
+                neutral_graphs,
+                explain=self.args.explain_ec,
+            )
+            neutral_pxyz_avg = self.ec_model_wrapper_neutral_avg.predict(
+                features_neutral_no_nan,
+                neutral_graphs,
+                explain=self.args.explain_ec,
+            )[1]
+        else:
+            if not self.args.regress_pos:
+                neutral_energies = torch.tensor([]).to(graphs_new.ndata["h"].device)
+            else:
+                neutral_energies = [
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                    torch.tensor([]).to(graphs_new.ndata["h"].device),
+                        ]
+            if len(self.pids_neutral):
+                neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
+        return neutral_energies, neutral_pxyz_avg
     def predict(self, x_global_features, graphs_new=None, explain=False):
         """
         Forward, named 'predict' for compatibility reasons
@@ -200,7 +242,6 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
         :param graphs_new:
         :return:
         """
-        use_full_mv = True  # Whether to use the full multivector to regress E and p or just sth else
         if graphs_new is not None and self.gnn is not None:
             batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
             batch_idx = []
@@ -234,110 +275,45 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             embedded_outputs_per_batch = scatter_sum(
                 embedded_outputs[:, 0, :], batch_idx, dim=0
             )
-            # energy = torch.clamp(extract_scalar(embedded_outputs), min=0).flatten()
-            # if self.pos_regression:
-            #    return energy, p_vectors
-            # return energy
-            if use_full_mv:
-                #padding = torch.randn(x_global_features.shape[0], 16).to(
-                #    p_vectors_per_batch.device
-                #)
-                model_x = torch.cat(
-                    [x_global_features, embedded_outputs_per_batch], dim=1
-                )
-                if self.ignore_global_features_for_p:
-                    if self.simple_p_GNN:
-                        output = self.gnn_p(x, edge_index)
-                        output = scatter_mean(output, batch_idx, dim=0)
-                        res_pxyz = self.model_p(output)
-                    else:
-                        embedded_outputs_p, _ = self.gatr_p(
-                            embedded_inputs, scalars=extra_scalars, attention_mask=mask
-                        )
-                        #p_vectors_p = extract_translation(embedded_outputs_p)
-                        embedded_outputs_per_batch_p = scatter_sum(
-                            embedded_outputs_p[:, 0, :], batch_idx, dim=0
-                        )
-                        #res_pxyz = scatter_sum(
-                        #    p_vectors_p[:, 0, :], batch_idx, dim=0
-                        #)
-                        res_pxyz = self.model_p(embedded_outputs_per_batch_p)
-            else:
-                padding = torch.randn(x_global_features.shape[0], 16).to(
-                    p_vectors_per_batch.device
-                )
-                model_x = torch.cat([x_global_features, padding], dim=1).to(
-                    self.model.model[0].weight.device
-                )
+            model_x = torch.cat(
+                [x_global_features, embedded_outputs_per_batch], dim=1
+            )
         else:
             # not using GATr features
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(
                 x_global_features.device
             )
-        if not self.use_gatr:
-            model_x = torch.cat([x_global_features, gnn_output], dim=1).to(
-                self.model.model[0].weight.device
-            )
-            ''' if explain:
-                assert not self.use_gatr
-                print("explain")
-                # take a selection of 10% or 50 samples to get typical feature values
-                print(model_x.shape)
-                n_samples = min(50, int(0.2 * model_x.shape[0]))
-                model_exp = deepcopy(self.model)
-                model_exp.to("cpu")
-                model_exp.explainer_mode = True
-                with torch.no_grad():
-                    for parameter in model_exp.model.parameters():
-                        parameter.requires_grad = False
-                    explainer = shap.KernelExplainer(
-                        model_exp, model_x[:n_samples].detach().cpu().numpy()
-                    )
-                    
-                    shap_vals = explainer.shap_values(
-                        model_x.detach().cpu().numpy(), nsamples=200
-            )
-            return self.model(model_x).flatten(), shap_vals, model_x.detach().cpu()'''
+        #if not self.use_gatr:
+        #    model_x = torch.cat([x_global_features, gnn_output], dim=1).to(
+        #        self.model.model[0].weight.device
+        #    )
         if not self.charged:
+            # Predict energy for neutrals using the neural network
             res = self.model(model_x)
         if self.pid_channels > 1:
-            if (torch.isnan(model_x).sum()):
-                print("Nans in model_x!!!", model_x)
-            if (torch.isnan(self.PID_head.weight).sum()):
-                print("Nans in PID head!!!")
             pid_pred = self.PID_head(model_x)
-            if torch.isnan(pid_pred).any():
-                print("PID prediction contains nans")
         else:
             pid_pred = None
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos, ref_pt_pred = self.PickPAtDCA.predict(x_global_features, graphs_new)
-                #if self.predict_arg:
-                #print("Using norm for E")
                 E = torch.norm(pos, dim=1)
-                #else:
-                #    print("Using model result for E")
-                #    E = torch.clamp(res.flatten(), min=0, max=None)
                 if self.unit_p:
                     pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
-                #print("Charged PID_pred", pid_pred)
-                # if model_x contains nans, print sth?
                 return E, pos, pid_pred, ref_pt_pred
             else:
-                E_pred, p_pred = res[0], res[1]
+                E_pred = res[:, 0]
                 E_pred = torch.clamp(E_pred, min=0, max=None)
                 _, _, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
                 if self.neutral_avg:
                     _, p_pred, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
-                    #E_pred = x_global_features[:, 6] # For the photons, just take the energy
                 elif self.neutral_PCA:
                     _, p_pred, ref_pt_pred = self.NeutralPCA.predict(x_global_features, graphs_new)
                 elif self.neutral_thrust_axis:
                     _, p_pred, ref_pt_pred = self.ThrustAxis.predict(x_global_features, graphs_new)
                 else:
-                    if self.ignore_global_features_for_p:
-                        p_pred = res_pxyz  # Temporarily discard the pxyz output of the E prediction head
+                    p_pred = res[:, 1:4]
+                    raise NotImplementedError
                 if self.unit_p:
                     p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
                 return E_pred, p_pred, pid_pred, ref_pt_pred
@@ -348,7 +324,7 @@ class ECNetWrapperGNNGlobalFeaturesSeparate(torch.nn.Module):
             # if self.use_gatr and not use_full_mv:
             #     p = p_vectors_per_batch
             # return E, p
-            return torch.clamp(res.flatten(), min=0, max=None)
+            return torch.clamp(res[:, 0], min=0, max=None)
     @staticmethod
     def obtain_batch_numbers(g):
         graphs_eval = dgl.unbatch(g)
@@ -616,3 +592,692 @@ def pick_lowest_chi_squared(pxpypz, chi_s, batch_idx, xyz_nodes):
             p_direction.append(pxpypz[mask].view(-1, 3))
             track_xyz.append(xyz_nodes[mask].view(-1, 3))
     return torch.concat(p_direction, dim=0), torch.stack(track_xyz)[:, 0]
+
+
+class EnergyCorrection():
+    def __init__(self, main_model):
+        #super(EnergyCorrection, self).__init__()
+        self.args = main_model.args
+        self.get_PID_categories(main_model)
+        self.get_energy_correction(main_model)
+        self.pid_conversion_dict = pid_conversion_dict
+        self.main_model = main_model
+    def get_PID_categories(self, main_model):
+        assert main_model.args.add_track_chis
+        if len(main_model.args.classify_pid_charged):
+            pids_charged = [int(x) for x in self.args.classify_pid_charged.split(",")]
+        else:
+            pids_charged = []
+        if len(self.args.classify_pid_neutral):
+            pids_neutral = [int(x) for x in self.args.classify_pid_neutral.split(",")]
+        else:
+            pids_neutral = []
+        if len(pids_charged):
+            print("Also running classification for charged particles", self.pids_charged)
+        if len(pids_neutral):
+            print("Also running classification for neutral particles", self.pids_neutral)
+        pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+        pids_neutral = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+        if self.args.restrict_PID_charge:
+            print("Restricting PID classification to match charge")
+            pids_charged = [0, 1]
+            pids_neutral = [2, 3]
+        self.pids_charged = pids_charged
+        self.pids_neutral = pids_neutral
+
+    def get_energy_correction(self, main_model):
+        # To be called by the model to initialize the energy correction modules
+        ckpt_neutral = main_model.args.ckpt_neutral
+        ckpt_charged = main_model.args.ckpt_charged
+        dev = main_model.dev
+        num_global_features = 14
+        self.model_charged = EnergyCorrectionWrapper(
+            device=dev,
+            in_features_global=num_global_features,
+            in_features_gnn=20,
+            ckpt_file=ckpt_charged,
+            gnn=True,
+            gatr=True,
+            pos_regression=self.args.regress_pos,
+            charged=True,
+            pid_channels=len(self.pids_charged),
+            unit_p=self.args.regress_unit_p,
+            out_f=1,
+            neutral_avg=False,
+            neutral_PCA=False,
+            neutral_thrust_axis=False,
+            args=self.args
+        )
+        self.model_neutral = EnergyCorrectionWrapper(
+            device=dev,
+            in_features_global=num_global_features,
+            in_features_gnn=20,
+            ckpt_file=ckpt_neutral,
+            gnn=True,
+            gatr=True,
+            pos_regression=self.args.regress_pos,
+            pid_channels=len(self.pids_neutral),
+            unit_p=self.args.regress_unit_p,
+            out_f=4,  # To change to 1 for new models!!!!
+            neutral_avg=True,
+            neutral_PCA=False,
+            neutral_thrust_axis=False,
+            predict=self.args.predict,
+            args=self.args
+        )
+
+    def clustering_and_global_features(self, g, x, y, add_fakes=True):
+        time_matching_start = time()
+        # Match graphs
+        (
+            graphs_new, # Contains both fakes and true showers
+            true_new, # FOR THE MATCHED SHOWERS
+            sum_e, # FOR THE MATCHED + FAKE SHOWERS
+            true_pid, # FOR THE MATCHED SHOWERS
+            e_true_corr_daughters, # FOR THE MATCHED SHOWERS
+            true_coords, # FOR THE MATCHED SHOWERS
+            number_of_fakes
+        ) = obtain_clustering_for_matched_showers(
+            g,
+            x,
+            y,
+            self.main_model.trainer.global_rank,
+            use_gt_clusters=self.args.use_gt_clusters,
+            add_fakes=add_fakes,
+        )
+        time_matching_end = time()
+        # wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
+        batch_num_nodes = graphs_new.batch_num_nodes()
+        batch_idx = []
+        for i, n in enumerate(batch_num_nodes):
+            batch_idx.extend([i] * n)
+        batch_idx = torch.tensor(batch_idx).to(self.main_model.device)
+        graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
+        # TODO: add global features to each node here
+        graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
+        # now multiply graphs_sum_features so the shapes match
+        graphs_sum_features = graphs_sum_features[batch_idx]
+        # append the new features to "h" (graphs_sum_features)
+        shape0 = graphs_new.ndata["h"].shape
+        betas = torch.sigmoid(graphs_new.ndata["h"][:, -1])
+        graphs_new.ndata["h"] = torch.cat(
+            (graphs_new.ndata["h"], graphs_sum_features), dim=1
+        )
+        assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
+        # print("Also computing graph-level features")
+        graphs_high_level_features = get_post_clustering_features(
+            graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
+        )
+        extra_features = get_extra_features(graphs_new, betas)
+        pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
+            graphs_new.ndata["h"].device
+        )
+        if self.args.regress_pos:
+            pred_pos = torch.ones((graphs_high_level_features.shape[0], 3)).to(
+                graphs_new.ndata["h"].device
+            )
+            pred_pid = torch.ones((graphs_high_level_features.shape[0])).to(
+                graphs_new.ndata["h"].device
+            ).long()
+        else:
+            pred_pos = None
+            pred_pid = torch.ones((graphs_high_level_features.shape[0])).to(
+                graphs_new.ndata["h"].device
+            ).long()
+        node_features_avg = scatter_mean(graphs_new.ndata["h"], batch_idx, dim=0)[
+            :, 0:3
+        ]
+        # energy-weighted node_features_avg
+        # node_features_avg = scatter_sum(
+        #    graphs_new.ndata["h"][:, 0:3] * graphs_new.ndata["h"][:, 3].view(-1, 1),
+        #    batch_idx,
+        #    dim=0,
+        # )
+        # node_features_avg = node_features_avg[:, 0:3]
+        weights = graphs_new.ndata["h"][:, 7].view(-1, 1)  # Energies as the weights
+        normalizations = scatter_add(weights, batch_idx, dim=0)
+        # normalizations1 = torch.ones_like(weights)
+        normalizations1 = normalizations[batch_idx]
+        weights = weights / normalizations1
+        # node_features_avg = scatter_add(
+        #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
+        # )[: , 0:3]
+        # node_features_avg = node_features_avg / normalizations
+        eta, phi = calculate_eta(
+            node_features_avg[:, 0],
+            node_features_avg[:, 1],
+            node_features_avg[:, 2],
+        ), calculate_phi(node_features_avg[:, 0], node_features_avg[:, 1])
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, node_features_avg), dim=1
+        )
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, eta.view(-1, 1)), dim=1
+        )
+        graphs_high_level_features = torch.cat(
+            (graphs_high_level_features, phi.view(-1, 1)), dim=1
+        )
+        # print("Computed graph-level features")
+        # print("Shape", graphs_high_level_features.shape)
+        # pred_energy_corr = self.GatedGCNNet(graphs_high_level_features)
+        num_tracks = graphs_high_level_features[:, 7]
+        charged_idx = torch.where(num_tracks >= 1)[0]
+        neutral_idx = torch.where(num_tracks < 1)[0]
+        # assert their union is the whole set
+        assert len(charged_idx) + len(neutral_idx) == len(num_tracks)
+        # assert (num_tracks > 1).sum() == 0
+        # if (num_tracks > 1).sum() > 0:
+        #    print("! Particles with more than one track !")
+        #    print((num_tracks > 1).sum().item(), "out of", len(num_tracks))
+        assert (
+            graphs_high_level_features.shape[0] == graphs_new.batch_num_nodes().shape[0]
+        )
+        features_neutral_no_nan = graphs_high_level_features[neutral_idx]
+        features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+        features_charged_no_nan = graphs_high_level_features[charged_idx]
+        features_charged_no_nan[features_charged_no_nan != features_charged_no_nan] = 0
+        # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
+        return (
+            graphs_new,
+            graphs_high_level_features,
+            charged_idx,
+            neutral_idx,
+            features_neutral_no_nan,
+            sum_e,
+            pred_pos,
+            true_new,
+            true_pid,
+            true_coords,
+            batch_idx,
+            e_true_corr_daughters,
+            pred_energy_corr,
+            pred_pid,
+            features_charged_no_nan,
+            number_of_fakes,
+            extra_features
+        )
+
+    def forward_correction(self, g, x, y, return_train):
+        time_matching_start = time()
+        (
+            graphs_new,
+            graphs_high_level_features,
+            charged_idx,
+            neutral_idx,
+            features_neutral_no_nan,
+            sum_e,
+            pred_pos,
+            true_new,
+            true_pid,
+            true_coords,
+            batch_idx,
+            e_true_corr_daughters,
+            pred_energy_corr,
+            pred_pid,
+            features_charged_no_nan,
+            number_of_fakes,
+            extra_features
+        ) = self.clustering_and_global_features(g, x, y, add_fakes=self.args.predict)
+        charged_energies = self.model_charged.charged_prediction(
+            graphs_new, charged_idx, features_charged_no_nan
+        )
+        neutral_energies, neutral_pxyz_avg = self.model_neutral.neutral_prediction(
+            graphs_new, neutral_idx, features_neutral_no_nan
+        )
+        if self.args.regress_pos:
+            if len(self.pids_charged):
+                charged_energies, charged_positions, charged_PID_pred, charged_ref_pt_pred = charged_energies # charged_pxyz_pred: we are also storing the xyz of the track, to see the effect of the weirdly fitted tracks on the results
+            else:
+                charged_energies, charged_positions, _ = charged_energies
+            if len(self.pids_neutral):
+                neutral_energies, neutral_positions, neutral_PID_pred, neutral_ref_pt_pred = neutral_energies
+            else:
+                neutral_energies, neutral_positions, _ = neutral_energies
+        if self.args.explain_ec:
+            assert not self.args.regress_pos, "not implemented"
+            (
+                charged_energies,
+                charged_energies_shap_vals,
+                charged_energies_ec_x,
+            ) = charged_energies
+            (
+                neutral_energies,
+                neutral_energies_shap_vals,
+                neutral_energies_ec_x,
+            ) = neutral_energies
+            shap_vals = (
+                torch.ones(
+                    graphs_high_level_features.shape[0],
+                    charged_energies_shap_vals[0].shape[1],
+                )
+                .to(graphs_new.ndata["h"].device)
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            ec_x = torch.zeros(
+                graphs_high_level_features.shape[0],
+                charged_energies_ec_x.shape[1],
+            )
+            shap_vals[charged_idx.detach().cpu().numpy()] = charged_energies_shap_vals[
+                0
+            ]
+            shap_vals[neutral_idx.detach().cpu().numpy()] = neutral_energies_shap_vals[
+                0
+            ]
+            ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
+            ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
+        # dummy loss to make it work without complaining about not using params in loss
+        pred_energy_corr[charged_idx.flatten()] = (
+            charged_energies #/ sum_e.flatten()[charged_idx.flatten()]
+        )
+        pred_energy_corr[neutral_idx.flatten()] = (
+            neutral_energies #/ sum_e.flatten()[neutral_idx.flatten()]
+        )
+        if len(self.pids_charged):
+            if len(charged_idx):
+                charged_PID_pred1 = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu().detach(), axis=1)]
+            else:
+                charged_PID_pred1 = []
+            pred_pid[charged_idx.flatten()] = torch.tensor(charged_PID_pred1).long().to(charged_idx.device)
+        if len(self.pids_neutral):
+            if len(neutral_idx):
+                neutral_PID_pred1 = np.array(self.pids_neutral)[np.argmax(neutral_PID_pred.cpu().detach(), axis=1)]
+            else:
+                neutral_PID_pred1 = []
+            pred_pid[neutral_idx.flatten()] = torch.tensor(neutral_PID_pred1).long().to(neutral_idx.device)
+        pred_energy_corr[pred_energy_corr < 0] = 0.0
+        if self.args.regress_pos:
+            pred_ref_pt = torch.ones_like(pred_pos)
+            if len(charged_idx):
+                pred_ref_pt[charged_idx.flatten()] = charged_ref_pt_pred.to(pred_ref_pt.device)
+                pred_pos[charged_idx.flatten()] = charged_positions.float().to(pred_pos.device)
+            if len(neutral_idx):
+                pred_ref_pt[neutral_idx.flatten()] = neutral_ref_pt_pred.to(neutral_idx.device)
+                pred_pos[neutral_idx.flatten()] = neutral_positions.to(neutral_idx.device).float()
+            pred_energy_corr = {
+                "pred_energy_corr": pred_energy_corr,
+                "pred_pos": pred_pos,
+                "neutrals_idx": neutral_idx.flatten(),
+                "charged_idx": charged_idx.flatten(),
+                "pred_ref_pt": pred_ref_pt,
+                "extra_features": extra_features
+            }
+            if len(self.pids_charged) or len(self.pids_neutral):
+                pred_energy_corr["pred_PID"] = pred_pid
+                pred_energy_corr["charged_PID_pred"] = charged_PID_pred
+                pred_energy_corr["neutral_PID_pred"] = neutral_PID_pred
+
+        if return_train:
+            return (
+                x,
+                pred_energy_corr,
+                true_new,
+                sum_e,
+                true_pid,
+                true_new,
+                true_coords,
+                number_of_fakes
+            )
+        else:
+            if self.args.explain_ec:
+                return (
+                    x,
+                    pred_energy_corr,
+                    true_new,
+                    sum_e,
+                    graphs_new,
+                    batch_idx,
+                    graphs_high_level_features,
+                    true_pid,
+                    e_true_corr_daughters,
+                    shap_vals,
+                    ec_x,
+                    number_of_fakes
+                )
+            return (
+                x,
+                pred_energy_corr,
+                true_new,
+                sum_e,
+                graphs_new,
+                batch_idx,
+                graphs_high_level_features,
+                true_pid,
+                e_true_corr_daughters,
+                true_coords,
+                number_of_fakes
+            )
+    @staticmethod
+    def criterion(ypred, ytrue, step):
+        return F.l1_loss(ypred, ytrue)
+
+    def get_loss(self, batch_g, y, result):
+        (
+            model_output,
+            e_cor,
+            e_true,
+            e_sum_hits,
+            new_graphs,
+            batch_id,
+            graph_level_features,
+            pid_true_matched,
+            e_true_corr_daughters,
+            part_coords_matched,
+            num_fakes
+        ) = result
+        if self.args.regress_pos:
+            dic = e_cor
+            e_cor, pred_pos, neutral_idx, charged_idx, pred_ref_pt, extra_features = (
+                e_cor["pred_energy_corr"],
+                e_cor["pred_pos"],
+                e_cor["neutrals_idx"],
+                e_cor["charged_idx"],
+                e_cor["pred_ref_pt"],
+                e_cor["extra_features"]
+                #e_cor["pred_pos_avg"],
+            )
+            if len(self.pids_charged):
+                charged_PID_pred = dic["charged_PID_pred"]
+                charged_PID_true = np.array(pid_true_matched)[dic["charged_idx"].cpu().tolist()]
+                # one-hot encoded
+                charged_PID_true_onehot = torch.zeros(
+                    len(charged_PID_true), len(self.pids_charged)
+                )
+                mask_charged = torch.ones(len(charged_PID_true))
+                if not self.args.PID_4_class:
+                    for i in range(len(charged_PID_true)):
+                        if charged_PID_true[i] in self.pids_charged:
+                            charged_PID_true_onehot[i, self.pids_charged.index(charged_PID_true[i])] = 1
+                        else:
+                            charged_PID_true_onehot[i, -1] = 1
+                else:
+                    for i in range(len(charged_PID_true)):
+                        true_idx = self.pid_conversion_dict.get(charged_PID_true[i], 3)
+                        if true_idx not in self.pids_charged:
+                            # Nonsense example - don't train on this one
+                            mask_charged[i] = 0
+                        else:
+                            charged_PID_true_onehot[i, self.pids_charged.index(true_idx)] = 1
+                        if charged_PID_true[i] not in self.pid_conversion_dict:
+                            print("Unknown PID", charged_PID_true[i])
+                charged_PID_true_onehot = charged_PID_true_onehot.clone().to(dic["charged_idx"].device)
+            if len(self.pids_neutral):
+                neutral_PID_pred = dic["neutral_PID_pred"]
+                neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
+                if type(neutral_PID_true) == np.float64:
+                    neutral_PID_true = [neutral_PID_true]
+                # One-hot encoded
+                #print("NeutralPIDTrue", neutral_PID_true, "PidsNeutral", self.pids_neutral, "NeutralIdx", neutral_idx)
+                neutral_PID_true_onehot = torch.zeros(
+                    len(neutral_PID_true), len(self.pids_neutral)
+                )
+                mask_neutral = torch.ones(len(neutral_PID_true))
+                if not self.args.PID_4_class:
+                    for i in range(len(neutral_PID_true)):
+                        if neutral_PID_true[i] in self.pids_neutral:
+                            neutral_PID_true_onehot[i, self.pids_neutral.index(neutral_PID_true[i])] = 1
+                        else:
+                            neutral_PID_true_onehot[i, -1] = 1
+                else:
+                    for i in range(len(neutral_PID_true)):
+                        true_idx = self.pid_conversion_dict.get(neutral_PID_true[i], 3)
+                        if true_idx not in self.pids_neutral:
+                            mask_neutral[i] = 0
+                        else:
+                            neutral_PID_true_onehot[i, self.pids_neutral.index(true_idx)] = 1
+                        if neutral_PID_true[i] not in self.pid_conversion_dict:
+                            print("Unknown PID", neutral_PID_true[i])
+                neutral_PID_true_onehot = neutral_PID_true_onehot.to(neutral_idx.device)
+        if self.args.correction:
+            if self.args.explain_ec:
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                    shap_vals,
+                    ec_x,
+                    num_fakes
+                ) = result
+            else:
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                    coords_true,
+                    num_fakes,
+                ) = result
+            if self.args.regress_pos:
+                if len(self.pids_charged):
+                    charged_PID_pred = e_cor["charged_PID_pred"]
+                    # charged_PID_pred =  np.array(self.pids_charged + [0])[np.argmax(charged_PID_pred.cpu(), axis=1)]
+                    charged_idx = e_cor["charged_idx"]
+                    # charged_PID_true = np.array(pid_true_matched)[charged_idx.cpu()]
+                    # if self.args.PID_4_class:
+                    #    charged_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in charged_PID_true])
+                    # pid_list[charged_idx] = charged_PID_pred
+                if len(self.pids_neutral):
+                    neutral_idx = e_cor["neutrals_idx"]
+                    # neutral_PID_pred = e_cor["neutral_PID_pred"]
+                    # neutral_PID_pred = np.array(self.pids_neutral + [0])[np.argmax(neutral_PID_pred.cpu(), axis=1)]
+                    # neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
+                    # if self.args.PID_4_class:
+                    #    neutral_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in neutral_PID_true])
+                pred_pid = e_cor["pred_PID"]
+                e_cor, pred_pos, pred_ref_pt, extra_features = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
+                    "pred_ref_pt"], e_cor["extra_features"]
+                # pid_list = np.zeros_like(e_cor)
+            else:
+                pred_pos = None
+                pred_ref_pt = None
+                e_cor = None
+                pred_pid = None
+            loss_ll = 0
+            e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
+        else:
+            model_output, e_cor1, loss_ll = result[0], result[1], result[2]
+            loss_ll = 0
+            e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
+            e_cor = e_cor1
+            pred_pos = None
+            pred_pid = None
+            pred_ref_pt = None
+            if self.args.explain_ec:
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                    shap_vals,
+                    ec_x,
+                    num_fakes
+                ) = result
+            else:
+                (
+                    model_output,
+                    e_cor,
+                    e_true,
+                    e_sum_hits,
+                    new_graphs,
+                    batch_id,
+                    graph_level_features,
+                    pid_true_matched,
+                    e_true_corr_daughters,
+                    coords_true,
+                    num_fakes,
+                ) = result
+            if self.args.regress_pos:
+                if len(self.pids_charged):
+                    charged_PID_pred = e_cor["charged_PID_pred"]
+                    #charged_PID_pred =  np.array(self.pids_charged + [0])[np.argmax(charged_PID_pred.cpu(), axis=1)]
+                    charged_idx = e_cor["charged_idx"]
+                    #charged_PID_true = np.array(pid_true_matched)[charged_idx.cpu()]
+                    #if self.args.PID_4_class:
+                    #    charged_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in charged_PID_true])
+                    #pid_list[charged_idx] = charged_PID_pred
+                if len(self.pids_neutral):
+                    neutral_idx = e_cor["neutrals_idx"]
+                    #neutral_PID_pred = e_cor["neutral_PID_pred"]
+                    #neutral_PID_pred = np.array(self.pids_neutral + [0])[np.argmax(neutral_PID_pred.cpu(), axis=1)]
+                    #neutral_PID_true = np.array(pid_true_matched)[neutral_idx.cpu()]
+                    #if self.args.PID_4_class:
+                    #    neutral_PID_true = np.array([self.pid_conversion_dict.get(x, 3) for x in neutral_PID_true])
+                pred_pid = e_cor["pred_PID"]
+                e_cor, pred_pos, pred_ref_pt, extra_features = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor["pred_ref_pt"], e_cor["extra_features"]
+                #pid_list = np.zeros_like(e_cor)
+            else:
+                pred_pos = None
+                pred_ref_pt = None
+                e_cor = None
+                pred_pid=None
+            loss_ll = 0
+            e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
+        step = self.main_model.trainer.global_step
+        loss_EC = self.criterion(e_cor, e_true_corr_daughters, step)
+        if self.args.regress_pos:
+            true_pos = torch.tensor(part_coords_matched).to(pred_pos.device)
+            if self.args.regress_unit_p:
+                true_pos = (true_pos / torch.norm(true_pos, dim=1).view(-1, 1)).clone()
+                pred_pos = (pred_pos / torch.norm(pred_pos, dim=1).view(-1, 1)).clone()
+            # loss_pos = torch.nn.L1Loss()(pred_pos, true_pos)
+            loss_pos = 1 - ((torch.nn.CosineSimilarity()(pred_pos, true_pos)).mean())
+            charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
+            # loss_pos_charged = torch.nn.L1Loss()(pred_pos[charged_idx], true_pos[charged_idx])
+            # loss_pos_neutrals = torch.nn.L1Loss()(pred_pos[neutral_idx], true_pos[neutral_idx])
+            loss_EC_neutrals = torch.nn.L1Loss()(
+                e_cor[neutral_idx], e_true[neutral_idx]
+            )
+            # charged idx is e_cor indices minus neutral idx
+            charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
+            loss_pos_neutrals = torch.nn.L1Loss()(
+                pred_pos[neutral_idx], true_pos[neutral_idx]
+            )
+            loss_charged = torch.nn.L1Loss()(
+                pred_pos[charged_idx], true_pos[charged_idx]
+            )  # just for logging
+            # wandb.log(
+            #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
+            # )
+            wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged,
+                       "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged})
+            # print("Loss pxyz neutrals", loss_pos_neutrals)
+            if len(self.pids_charged):
+                if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:
+                    # Batch size must be big enough
+                    weights = charged_PID_true_onehot.sum(dim=0)
+                    weights[weights == 0] = 1  # to avoid issues
+                    weights = 1 / weights  # maybe choose something else?
+                    print("Charged class weights:", weights)
+                else:
+                    weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
+                if len(charged_PID_pred):
+                    mask_charged = mask_charged.bool()
+                    loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
+                        charged_PID_pred[mask_charged], charged_PID_true_onehot[mask_charged]
+                    )
+                else:
+                    loss_charged_pid = 0
+                wandb.log({"loss_charged_pid": loss_charged_pid})
+            if len(self.pids_neutral):
+                if self.args.balance_pid_classes and neutral_PID_true_onehot.shape[0] > 20:
+                    # Batch size must be big enough
+                    weights = neutral_PID_true_onehot.sum(dim=0)
+                    weights[weights == 0] = 1  # To avoid issues
+                    weights = 1 / weights  # Maybe choose something else?
+                    print("Neutral class weights:", weights)
+                else:
+                    weights = torch.ones(len(self.pids_neutral)).to(charged_PID_pred.device)
+                if len(neutral_PID_pred):
+                    mask_neutral = mask_neutral.bool()
+                    loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
+                        neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
+                    )
+                else:
+                    loss_neutral_pid = 0
+                wandb.log({"loss_neutral_pid": loss_neutral_pid})
+        if self.args.save_features:
+            cluster_features_path = os.path.join(
+                self.args.model_prefix, "cluster_features"
+            )
+            if not os.path.exists(cluster_features_path):
+                os.makedirs(cluster_features_path)
+            save_features(
+                cluster_features_path,
+                {
+                    "x": graph_level_features.detach().cpu(),
+                    # """ "xyz_covariance_matrix": covariances.cpu(),"""
+                    "e_true": e_true.detach().cpu(),
+                    "e_reco": e_cor.detach().cpu(),
+                    "true_e_corr": (e_true / e_sum_hits - 1).detach().cpu(),
+                    "e_true_corrected_daughters": e_true_corr_daughters.detach().cpu(),
+                    # "node_features_avg": scatter_mean(
+                    #    batch_g.ndata["h"], batch_idx, dim=0
+                    # ),  # graph-averaged node features
+                    "coords_y": part_coords_matched,
+                    "pid_y": pid_true_matched,
+                },
+            )
+        return loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid
+
+    def get_validation_step_outputs(self, batch_g, y, result):
+        if self.args.explain_ec:
+            (
+                model_output,
+                e_cor,
+                e_true,
+                e_sum_hits,
+                new_graphs,
+                batch_id,
+                graph_level_features,
+                pid_true_matched,
+                e_true_corr_daughters,
+                shap_vals,
+                ec_x,
+                num_fakes
+            ) = result
+        else:
+            (
+                model_output,
+                e_cor,
+                e_true,
+                e_sum_hits,
+                new_graphs,
+                batch_id,
+                graph_level_features,
+                pid_true_matched,
+                e_true_corr_daughters,
+                coords_true,
+                num_fakes,
+            ) = result
+        if self.args.regress_pos:
+            if len(self.pids_charged):
+                charged_PID_pred = e_cor["charged_PID_pred"]
+                charged_idx = e_cor["charged_idx"]
+            if len(self.pids_neutral):
+                neutral_idx = e_cor["neutrals_idx"]
+            pred_pid = e_cor["pred_PID"]
+            e_cor, pred_pos, pred_ref_pt, extra_features = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
+                "pred_ref_pt"], e_cor["extra_features"]
+        else:
+            pred_pos = None
+            pred_ref_pt = None
+            e_cor = None
+            pred_pid = None
+        return e_cor, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features
