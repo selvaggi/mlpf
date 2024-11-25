@@ -36,7 +36,6 @@ new_variables:
    hit_mask: ak.ones_like(hit_e)
    part_mask: ak.ones_like(part_p)
    hit_e_nn: hit_e
-   hit_type_nn: hit_type
    part_p1: part_p
    part_theta1: part_theta
    part_phi1: part_phi
@@ -109,7 +108,7 @@ inputs:
       length: 25000
       pad_mode: wrap
       vars:
-         - [hit_type_nn, null] #0
+         - [hit_type, null] #0
          - [hit_e_nn, null] #1
          # #labels
          # - [part_p1, null]  #2
