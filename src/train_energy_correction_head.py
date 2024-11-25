@@ -1,25 +1,12 @@
-import sys
-sys.path.extend("/afs/cern.ch/work/g/gkrzmanc/mlpf_2024")
-
-import wandb
-import numpy as np
+# Compact training script to train a simple NN
 import mplhep as hep
 import wandb
-
 hep.style.use("CMS")
 import matplotlib
-
 matplotlib.rc('font', size=13)
-
-# %%
 import os
-import os
-
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 from PIL import Image
-
-os.environ.get("LD_LIBRARY_PATH")
-# %%
 import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -28,7 +15,6 @@ import pickle
 import numpy as np
 import torch
 import argparse
-
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
@@ -81,14 +67,9 @@ def get_eval_fig(ytrue, ypred, step, criterion, p=None):
     ax[0].set_ylabel("Predicted energy")
     ax[0].set_xlabel("True energy")
     acceptable_loss = 1e-2
-    #rages = [[0, 6], [6, 12], [12, 18], [18, 24], [24, 30], [30, 36], [36, 42], [42, 48], [48, 54], [54, 60]]
     rages = [[0, 5], [5, 15], [15, 35], [35, 50]]
     for i, r in enumerate(rages):
         mask = (ytrue >= r[0]) & (ytrue < r[1])
-        # % BELOW ACCEPTABLE LOSS
-        #frac = torch.mean((((ypred[mask] - ytrue[mask]).abs() < acceptable_loss)))*100
-        #print(frac)
-        #print(torch.mean(((ypred[mask] - ytrue[mask]).abs() < acceptable_loss).float()).item())
         frac = torch.mean(((ypred[mask] - ytrue[mask]).abs() < acceptable_loss).float())
         # if is nan, change to 0
         if torch.isnan(frac):
@@ -214,16 +195,6 @@ def get_split(ds, overfit=False):
         return xtrain[:100], xtest[:100], ytrain[:100], ytest[:100], energiestrain[:100], energiestest[:100], pid_train[:100], pid_test[:100]
     return xtrain, xtest, ytrain, ytest, energiestrain, energiestest, pid_train, pid_test, pos_train, pos_test # 8,9 are pos train and pos test
 
-'''
-def get_gb():
-    # from sklearn.ensemble import GradientBoostingRegressor
-    # model = GradientBoostingRegressor(verbose=1, max_depth=7, n_estimators=1000)
-    # model = catboost.CatBoostRegressor(iterations=1000, depth=6, learning_rate=0.1, loss_function='RMSE', verbose=True, task_type="GPU", devices=DEVICE)
-    # xgboost model
-    model = xgboost.XGBRegressor(n_estimators=1000, max_depth=7, learning_rate=0.05, verbosity=1,
-                                 tree_method="gpu_hist", gpu_id=DEVICE)
-    return model
-'''
 
 
 # %%
@@ -253,7 +224,6 @@ def get_std68(theHist, bin_edges, percentage=0.683, epsilon=0.01):
                     low = points[i][0]
                     high = points[j][0]
                     width = wx
-
     return 0.5 * (high - low), low, high
 
 
@@ -267,7 +237,7 @@ def mean_without_outliers(data):
     mean = np.mean(trimmed_arr)
     return mean
 
-def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(-1, 5, 0.01), epsilon=0.01):
+def obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E=np.arange(0, 3, 1e-3), epsilon=0.01):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
     # MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
@@ -315,9 +285,9 @@ def obtain_MPV_and_68(data_for_hist, *args, **kwargs):
     bins_per_binned_E = np.arange(0, 2, 1e-3)
     if len(data_for_hist) == 0:
         return 0, 0, 0, 0
-    response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
-    #return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
-    return response, resolution, 0, 0
+    #response, resolution = get_sigma_gaussian(np.nan_to_num(data_for_hist), bins_per_binned_E)
+    return obtain_MPV_and_68_raw(data_for_hist, bins_per_binned_E)
+    #return response, resolution, 0, 0
 
 # %%
 def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pids, e_track, n_track, neutral=False):
@@ -733,17 +703,11 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 result = model.fit(split[0].numpy(), split[4].numpy(), pids_onehot)
         else:
             result = model.fit(split[0].numpy(), split[4].numpy(), eval_callback=eval_callback)
-        # print("Fitted model:", result)
-        # validation
         epred = model.predict(split[1].numpy())
         ytrue = split[3]
         ysum = split[1][:, 6]
         ypred = epred / ysum - 1
         energies = split[5]
-        #if save_to_folder is not None:
-        #    fig = get_eval_fig(ytrue, ypred, 0, lambda x, y, z: 0, p=split[1][:, 3])
-        #    fig.savefig(os.path.join(save_to_folder, "eval.pdf"))
-        #    fig.clf()
         return ytrue, epred, energies, split[1], model, split, result
         # log scatterplots of validation results per energy
 
@@ -763,83 +727,12 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
     yt, yp, en, _, model, split, lossfn = main(ds=ds, train_energy_regression=energy_regression, train_only_on_PIDs=PIDs,
                                                remove_sum_e=remove_sum_e, use_model=use_model, patience=patience, save_to_folder=save_to_folder,
                                                wandb_log_name = wandb_log_name)
-    # import shap
-    # import numpy as np
-    # te = shap.TreeExplainer(model)
-    # shap_vals_r = te.shap_values(np.array(split[1]))
+
     x_names = ["ecal_E", "hcal_E", "num_hits", "track_p", "ecal_dispersion", "hcal_dispersion", "sum_e", "num_tracks"]
     h_names = ["hit_x_avg", "hit_y_avg", "hit_z_avg", "eta", "phi"]
-    # shap.summary_plot(shap_vals_r, split[1], feature_names=x_names + h_names, use_log_scale=True, show=False)
-    # plt.show()
-    #results = {}
-    #for pid in PIDs:
-        #fig, upper, lower, x = get_charged_response_resol_plot_for_PID(pid, yt, yp, en, model, split,
-        #                                                               neutral=is_pid_neutral(pid))
-        #results[pid] = [fig, upper, lower, x, model]
-        #if  wandb_log_name is not None:
-        #    try:
-        #        wandb.log({"fig_" + wandb_log_name: fig})
-        ##    except:
-        #        print("Could not log fig")
-    #return results, lossfn
     return model
 
-#all_pids = [22,130,2112]
-#all_pids = [211, -211, 2212, -2212]
 
 model = get_plots(all_pids, energy_regression=True, patience=args.patience,
                                   save_to_folder=os.path.join(prefix, "intermediate_plots"),
                                   wandb_log_name="loss_train_all")
-fig, ax = plt.subplots()
-ax.plot(list(range(len(result_all[1]))), result_all[1])
-ax.set_yscale("log")
-ax.set_xlabel("Batch")
-ax.set_ylabel("Loss")
-fig.savefig(prefix + "train_all_loss.pdf")
-fig.clf()
-
-for pid in all_pids:
-    model = plots_all[pid][4].model.model
-    pickle.dump(model.model.model, open(prefix + "NN_model_all_{}.pkl".format(pid), "wb"))
-    fig = plots_all[pid][0]
-    fig.savefig(prefix + "NN_train_all_{}.pdf".format(pid))
-    plots = [plots_all[pid][1], plots_all[pid][2]]
-    pickle.dump(plots, open(prefix + "plots_train_all_{}.pkl".format(pid), "wb"))
-    wandb.log("final_plot_" + str(pid), fig)
-
-'''
-for pid in all_pids:
-    results_per_pid[pid], lossfn = get_plots([pid], energy_regression=True, patience=args.patience,
-                                             save_to_folder=os.path.join(prefix, "intermediate_plots_" + str(pid)),
-                                             wandb_log_name="loss_train_{}".format(pid))
-    fig = results_per_pid[pid][pid][0]
-    model = results_per_pid[pid][pid][4].model.model
-    plots = [results_per_pid[pid][pid][1], results_per_pid[pid][pid][2]]
-    pickle.dump(model, open(prefix + "plots_{}.pkl".format(pid), "wb"))
-    pickle.dump(model, open(prefix + "NN_model_{}.pkl".format(pid), "wb"))
-    fig.savefig(prefix + "PID_" + str(pid) + ".pdf")
-    fig, ax = plt.subplots()
-    ax.plot(list(range(len(lossfn[1]))), lossfn[1])
-    ax.set_yscale("log")
-    ax.set_xlabel("Batch")
-    ax.set_ylabel("Loss")
-    fig.savefig(prefix + "PID_" + str(pid) + "_loss.pdf")
-    fig.clf()
-
-'''
-
-'''
-for pid in all_pids:
-    plots = [results_per_pid[pid][pid][1], results_per_pid[pid][pid][2]]
-    pickle.dump(model, open(prefix + "plots_{}.pkl".format(pid), "wb"))
-
-'''
-
-'''
-#print("Pickling")
-#import pickle
-#pickle.dump(results_per_pid, open(prefix + "results_per_pid_NN.pkl", "wb"))
-#pickle.dump(plots_all, open(prefix + "results_all_NN.pkl", "wb"))
-#print("Pickled!")
-'''
-
