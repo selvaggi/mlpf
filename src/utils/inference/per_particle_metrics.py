@@ -474,6 +474,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     class_pred = np.array(sd_hgb1["pred_pid_matched"].values)
     n_classes = class_true[~np.isnan(class_true)].max() + 1
     class_nan = n_classes # For 'fake' and 'missed'
+    is_muons = n_classes == 5
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0
     pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
@@ -505,8 +506,12 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
                                           borderpad=0)
                     # each label should always have the same color, i.e. 130-> purple etc.
                     ax_inset.pie(counts, labels=unique, textprops={'fontsize': 5})
-    class_names_true = ["e", "CH", "NH", "gamma", "fake"]
-    class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
+    if not is_muons:
+        class_names_true = ["e", "CH", "NH", "gamma", "fake"]
+        class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
+    else:
+        class_names_true = ["e", "CH", "NH", "gamma", "mu", "fake"]
+        class_names_pred = ["e", "CH", "NH", "gamma", "mu", "missed"]
     if not add_pie_charts:
         row_sums = cm.sum(axis=1, keepdims=True)
         cm_percent = cm / row_sums * 100  # Get percentages per row
@@ -545,8 +550,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     cm = confusion_matrix(class_true[f], class_pred[f])
     cm1 = confusion_matrix(class_true[f1], class_pred[f1])
     # plot cm
-    class_names_true = ["e", "CH", "NH", "gamma", "fake"]
-    class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
     savefigs = ax1 is None
     if ax1 is None:
         fig, ax1 = plt.subplots()
@@ -613,7 +616,8 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     #class_true = np.array([nanindex(x, all_pids) for x in class_true])
     #class_pred = np.array([nanindex(x, all_pids) for x in class_pred])
     max_class = max(list(our_to_pandora_mapping.keys()))
-    assert max_class + 1 == 4
+    assert max_class + 1 in [4, 5]
+    is_muons = max_class == 4
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0 # Maybe the pid_conversion_dict is not fully up-to-date?
 
     class_true = np.array([pid_conversion_dict.get(x, max_class+1) for x in class_true])
@@ -654,8 +658,12 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
                         else:
                             pass
                     ax_inset.pie(counts1, labels=unique1, textprops={'fontsize': 10})
-    class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
-    class_names_true = ["e", "CH", "NH", "gamma", "fake"]
+    if is_muons:
+        class_names_pred = ["e", "CH", "NH", "gamma", "mu", "missed"]
+        class_names_true = ["e", "CH", "NH", "gamma", "mu", "fake"]
+    else:
+        class_names_pred = ["e", "CH", "NH", "gamma", "missed"]
+        class_names_true = ["e", "CH", "NH", "gamma", "fake"]
 
     if not add_pie_charts:
         # Calculate percentages
@@ -806,14 +814,14 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
         fakes_pandora_i = fakes_pandora[(fakes_pandora.pred_showers_E > energies[i]) & (fakes_pandora.pred_showers_E < energies[i + 1])]
         fakes_model_i = fakes_model[(fakes_model.pred_showers_E > energies[i]) & (fakes_model.pred_showers_E < energies[i + 1])]
         # plot the PID distribution for fakes
-        pid_names = ["e", "CH", "NH", "gamma"]
+        pid_names = ["e", "CH", "NH", "gamma", "mu"]
         pid_model = fakes_model_i.pred_pid_matched.values
         pid_pandora = fakes_pandora_i.pandora_pid.values
         pid_pandora = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora]
         pid_model = [pid_names[int(x)] for x in pid_model]
         pid_model = pd.value_counts(pid_model)
         pid_pandora = pd.value_counts(pid_pandora)
-        colors = ["blue", "red", "green", "purple"]
+        colors = ["blue", "red", "green", "purple", "orange"]
         #pid_model = [pid_names[int(x)] for x in pid_model]
         #pid_pandora.index = [pid_names[pandora_to_our_mapping[int(x)]] for x in pid_pandora.index]
         ax[0, i].pie(pid_pandora, labels=pid_pandora.index)
@@ -950,7 +958,7 @@ def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, e
                                  color="blue",
                                  density=True)
         axs_mass_hist[i, 1].grid(1)
-        pid_text = {0: "e", 1: "CH", 2: "NH", 3: "gamma"}.get(pid)
+        pid_text = {0: "e", 1: "CH", 2: "NH", 3: "gamma", 4: "mu"}.get(pid)
         axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid_text} / E true, {pid_text}")
         axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
                                  density=True)

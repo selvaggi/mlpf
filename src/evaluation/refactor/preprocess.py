@@ -15,8 +15,8 @@ def renumber_batch_idx(df):
     df.number_batch = new_batch_idx
     return df
 
-pid_correction_track = {0: 0, 1: 1, 2: 1, 3: 0}
-pid_correction_no_track = {0: 3, 1: 2, 2: 2, 3: 3}
+pid_correction_track = {0: 0, 1: 1, 2: 1, 3: 0, 4: 4}
+pid_correction_no_track = {0: 3, 1: 2, 2: 2, 3: 3, 4: 3}
 
 def apply_class_correction(sd_hgb):
     # apply the correction to the class according to pid_correction_track and pid_correction_no_track

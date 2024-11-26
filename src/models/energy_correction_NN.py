@@ -659,7 +659,7 @@ class EnergyCorrection():
             pos_regression=self.args.regress_pos,
             pid_channels=len(self.pids_neutral),
             unit_p=self.args.regress_unit_p,
-            out_f=1,  # To change to 1 for new models!!!!
+            out_f=4,  # To change to 1 for new models!!!!
             neutral_avg=True,
             neutral_PCA=False,
             neutral_thrust_axis=False,
