@@ -159,7 +159,7 @@ def create_and_store_graph_output(
         # torch.save(
         #     dic,
         #     path_save
-        #     + "/graphs_1311/"
+        #     + "/graphs/"
         #     + str(local_rank)
         #     + "_"
         #     + str(step)
@@ -551,7 +551,6 @@ def generate_showers_data_frame(
             # if len(row_ind) and len(index_matches):
             #     assert row_ind.max() < len(is_track)
             #     assert index_matches.max() < len(is_track_per_shower)
-            is_track[row_ind_] = is_track_per_shower[index_matches].float()
             if pred_pos is not None:
                 matched_positions[row_ind_] = pred_pos[number_of_showers_total : number_of_showers_total
                     + number_of_showers]
@@ -567,7 +566,8 @@ def generate_showers_data_frame(
                 number_of_showers_total : number_of_showers_total + number_of_showers
             ]
             number_of_showers_total = number_of_showers_total + number_of_showers
-    
+        is_track[row_ind_] = is_track_per_shower[index_matches].float()
+
     # match the tracks to the particle
     tracks_label = scatter_max((dic["graph"].ndata["hit_type"] == 1)*(dic["graph"].ndata["particle_number"]), labels)[0].int()
     tracks_label = tracks_label-1
@@ -1086,7 +1086,7 @@ def distance_to_cluster_track(dic, is_track_in_MC):
         mean_pos_cluster_all = []
         for i in particle_track:
             if i ==0:
-                mean_pos_cluster_all.append(torch.zeros((1,3)).view(-1,3))
+                mean_pos_cluster_all.append(torch.zeros((1,3)).view(-1,3).to(particle_track.device))
             else:
                 mask_labels_i = g.ndata["particle_number"] ==i
                 mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
