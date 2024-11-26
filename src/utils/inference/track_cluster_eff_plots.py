@@ -47,9 +47,43 @@ def track_cluser_eff_(sd_hgb):
 
 
 def plot_track_assignation_eval(sd_hgb, sd_hgb_p, path):
+    matplotlib.rcParams["font.size"] = 11
     track_cluser_eff, track_cluster_bad_assignation, neutrals_with_tracks = track_cluser_eff_(sd_hgb)
     track_cluser_eff_p, track_cluster_bad_assignation_p, neutrals_with_tracks_p = track_cluser_eff_(sd_hgb_p)
-    fig_distr, ax_distr = plt.subplots(3,2,figsize=(10, 15))
+    # Put ML and pandora on the same histogram
+    fig_distr, ax_distr = plt.subplots(3, 1, figsize=(3, 7))
+    # Define x-axis labels and positions
+    categories = ["[0, 5] GeV", "[5, 15] GeV", "[15, 51] GeV"]
+    x = np.arange(len(categories))  # Positions for the groups
+    width = 0.35  # Width of the bars
+
+    # Create subplots
+    fig_distr, ax_distr = plt.subplots(3, 1, figsize=(6, 10))
+
+    # Plot for track_cluser_eff
+    ax_distr[0].bar(x - width / 2, track_cluser_eff, width, label="ML", color="red")
+    ax_distr[0].bar(x + width / 2, track_cluser_eff_p, width, label="Pandora", color="blue")
+    ax_distr[0].set_title("track_cluser_eff")
+    ax_distr[0].set_xticks(x)
+    ax_distr[0].set_xticklabels(categories)
+    ax_distr[0].legend()
+
+    # Plot for track_cluster_bad_assignation
+    ax_distr[1].bar(x - width / 2, track_cluster_bad_assignation, width, label="ML", color="red")
+    ax_distr[1].bar(x + width / 2, track_cluster_bad_assignation_p, width, label="Pandora", color="blue")
+    ax_distr[1].set_title("track_cluster_bad_assignation")
+    ax_distr[1].set_xticks(x)
+    ax_distr[1].set_xticklabels(categories)
+    ax_distr[1].legend()
+
+    # Plot for neutrals_with_tracks
+    ax_distr[2].bar(x - width / 2, neutrals_with_tracks, width, label="ML", color="red")
+    ax_distr[2].bar(x + width / 2, neutrals_with_tracks_p, width, label="Pandora", color="blue")
+    ax_distr[2].set_title("neutrals_with_tracks")
+    ax_distr[2].set_xticks(x)
+    ax_distr[2].set_xticklabels(categories)
+    ax_distr[2].legend()
+    '''fig_distr, ax_distr = plt.subplots(3,2,figsize=(8, 12))
     ax_distr[0,0].bar(["[0,5]", "[5,15]",  "[15,51]"], track_cluser_eff,  label="ML")
     ax_distr[0,1].bar(["[0,5]", "[5,15]",  "[15,51]"], track_cluser_eff_p,  label="Pandora")
     ax_distr[0,0].set_title("track_cluser_eff")
@@ -58,5 +92,6 @@ def plot_track_assignation_eval(sd_hgb, sd_hgb_p, path):
     ax_distr[1,0].set_title("track_cluster_bad_assignation")
     ax_distr[2,0].bar(["[0,5]", "[5,15]",  "[15,51]"], neutrals_with_tracks,  label="ML")
     ax_distr[2,1].bar(["[0,5]", "[5,15]",  "[15,51]"], neutrals_with_tracks_p,  label="Pandora")
-    ax_distr[2,0].set_title("neutrals_with_tracks")
+    ax_distr[2,0].set_title("neutrals_with_tracks")'''
+    fig_distr.tight_layout()
     fig_distr.savefig(os.path.join(path, "track_cluster_eval.pdf"), bbox_inches="tight")

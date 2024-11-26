@@ -157,4 +157,22 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
     #    idx_pick_reco = (x > 0.15) & ((sd_hgb.is_track_in_cluster == 1).values)
     #    # If the track is super far away, pick the reco energy instead of the track energy (weird bad track)
     #    sd_hgb.loc[idx_pick_reco, "calibrated_E"] = sd_hgb.loc[idx_pick_reco, "pred_showers_E"]
+    if "filt_LE_CH" in names:
+        print("Filtering low-energy CH")
+        dist_trk = np.linalg.norm(np.stack(sd_hgb.pred_ref_pt_matched.values), axis=1)
+        ch_le_filter = (dist_trk >= 0.21) & (sd_hgb.pred_pid_matched == 1) & (sd_hgb.calibrated_E < 5.0)
+        # remove ch_le_filter
+        # this doesn't work! try another way?
+        sd_hgb.loc[ch_le_filter, "calibrated_E"] = np.nan
+        sd_hgb.loc[ch_le_filter, "pred_showers_E"] = np.nan
+        sd_hgb.loc[ch_le_filter, "pred_pos"] = np.nan
+        sd_hgb.loc[ch_le_filter, "pred_pid_matched"] = np.nan
+        sd_hgb.loc[ch_le_filter, "pred_ref_pt_matched"] = np.nan
+    if "replace_LE_CH" in names:
+        print("Filtering low-energy CH - replacing the track with sum of the hits")
+        dist_trk = np.linalg.norm(np.stack(sd_hgb.pred_ref_pt_matched.values), axis=1)
+        ch_le_filter = (dist_trk >= 0.21) & (sd_hgb.pred_pid_matched == 1) & (sd_hgb.calibrated_E < 5.0)
+        # remove ch_le_filter
+        #sd_hgb[ch_le_filter].calibrated_E = sd_hgb[ch_le_filter].pred_showers_E
+        sd_hgb.loc[ch_le_filter, "calibrated_E"] = sd_hgb.loc[ch_le_filter, "pred_showers_E"]
     return renumber_batch_idx(sd_hgb), renumber_batch_idx(sd_pandora)
