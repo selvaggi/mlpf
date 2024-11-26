@@ -163,7 +163,7 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
         ch_le_filter = (dist_trk >= 0.21) & (sd_hgb.pred_pid_matched == 1) & (sd_hgb.calibrated_E < 5.0)
         # remove ch_le_filter
         # this doesn't work! try another way?
-        sd_hgb.loc[ch_le_filter, "calibrated_E"] =  np.nan
+        sd_hgb.loc[ch_le_filter, "calibrated_E"] = np.nan
         sd_hgb.loc[ch_le_filter, "pred_showers_E"] = np.nan
         sd_hgb.loc[ch_le_filter, "pred_pos"] = np.nan
         sd_hgb.loc[ch_le_filter, "pred_pid_matched"] = np.nan
