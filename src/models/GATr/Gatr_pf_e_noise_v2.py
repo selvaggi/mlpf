@@ -658,6 +658,7 @@ class ExampleWrapper(L.LightningModule):
         assert (
             graphs_high_level_features.shape[0] == graphs_new.batch_num_nodes().shape[0]
         )
+        print('shape', graphs_high_level_features.shape)
         features_neutral_no_nan = graphs_high_level_features[neutral_idx]
         features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
         # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":

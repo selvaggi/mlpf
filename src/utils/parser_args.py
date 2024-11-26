@@ -633,7 +633,7 @@ parser.add_argument(
     "--PID-4-class",
     default=False,
     action="store_true",
-    help="Classify into electron, CH, NH, gamma - both for charged and neutral.",
+    help="Classify into electron, CH, NH, gamma - both for charged and neutral. Also adds a muon class if config.muons == true.",
 )
 parser.add_argument(
     "--restrict_PID_charge",

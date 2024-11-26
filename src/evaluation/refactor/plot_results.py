@@ -141,10 +141,12 @@ ax.set_yscale("log")
 fig.show()
 
 '''
+
+plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_summary_plots)
+
 if args.mass_only:
     quick_plot_mass(sd_hgb, sd_pandora, PATH_store_summary_plots)
     sys.exit(0)
-
 plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots)
 plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[0, 1])
 plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[1, 10])
@@ -152,7 +154,6 @@ plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots
 plot_mass_contribution_per_PID(sd_hgb, sd_pandora, PATH_store_summary_plots)
 
 #plot_per_energy_resolution(sd_hgb, sd_pandora, PATH_store_detailed_plots)
-#plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
 analyze_fakes(sd_pandora, sd_hgb, PATH_store_summary_plots)
 plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_summary_plots)
 

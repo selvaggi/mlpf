@@ -48,7 +48,8 @@ def create_and_store_graph_output(
     pred_pid=None,
     pred_xyz_track=None,
     number_of_fakes=None,
-    extra_features=None
+    extra_features=None,
+    fakes_labels=None
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -213,7 +214,8 @@ def create_and_store_graph_output(
                 save_plots_to_folder=path_save + "/ML_",
                 number_of_fakes=number_of_fakes,
                 number_of_fake_showers_total=number_of_fake_showers_total1,
-                extra_features=extra_features # To help with the debugging of the fakes
+                extra_features=extra_features, # To help with the debugging of the fakes
+                #fakes_labels=fakes_labels
             )
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
@@ -405,7 +407,7 @@ def generate_showers_data_frame(
     pred_ref_pt=None,
     number_of_fake_showers_total=None,
     number_of_fakes=None,
-    extra_features=None
+    extra_features=None,
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
@@ -472,6 +474,7 @@ def generate_showers_data_frame(
         dic["graph"].ndata["particle_number"].long(),
     )
     distance_to_cluster_all = distance_to_cluster_track(dic, is_track_in_MC)
+    distances, number_of_tracks = distance_to_true_cluster_of_track(dic, labels)
 
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
@@ -592,6 +595,9 @@ def generate_showers_data_frame(
         )  # This takes into account that the class 0 for pandora and for dbscan is noise
         mask = pred_showers != -1
         number_of_fake_showers = mask.sum()
+        fakes_labels = torch.where(mask)[0]
+        fake_showers_distance_to_cluster = distances[fakes_labels.cpu()]
+        fake_showers_num_tracks = number_of_tracks[fakes_labels.cpu()]
         fakes_in_event = mask.sum()
         fake_showers_e = e_pred_showers[mask]
         if e_corr is None or pandora:
@@ -670,8 +676,8 @@ def generate_showers_data_frame(
             dim=0,
         )
         e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
-        is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_showers_e_truw), dim=0)
-        distance_to_cluster_MC = torch.cat((distance_to_cluster_all[1:], fake_showers_showers_e_truw), dim=0)
+        is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_num_tracks.to(e_reco.device)), dim=0)
+        distance_to_cluster_MC = torch.cat((distance_to_cluster_all[1:], fake_showers_distance_to_cluster.to(e_reco.device)), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
@@ -784,8 +790,6 @@ def generate_showers_data_frame(
         df = pd.DataFrame(data=d)
         event_list = [1, 2, 3, 4, 5] # Fill with the list of selected events that we want to investigate
         if save_plots_to_folder:
-            fakes = set(torch.arange(0, row_ind.max(), 1).tolist()) - set(row_ind.tolist())
-
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
                 continue
@@ -1074,6 +1078,30 @@ def get_labels_pandora(tracks, dic, device):
     labels_pandora = torch.Tensor(list(cluster_id)).long().to(device)
     return labels_pandora
 
+def distance_to_true_cluster_of_track(dic, labels):
+    # For each cluster, get distance from the track to the cluster of the true MC particle that the track otherwise belongs to.
+    # Also returns the number of tracks in the MC cluster that the track belongs to.
+    g = dic["graph"]
+    mask_hit_type_t2 = g.ndata["hit_type"] == 1
+    distances = torch.zeros(len(labels.unique())).float()
+    number_of_tracks = torch.zeros(len(labels.unique())).int()
+    # labels should be a list of labels for each particle
+    for i, label in enumerate(labels.unique()):
+        mask_labels_i = labels == label
+        mask  = mask_labels_i * mask_hit_type_t2
+        if mask.sum() == 0:
+            continue
+        pos_track = g.ndata["pos_hits_xyz"][mask][0]
+        if pos_track.shape[0] == 0:
+            continue
+        true_part_idx_track = g.ndata["particle_number"][mask_labels_i * mask_hit_type_t2][0].int()
+        mask_labels_i_true = g.ndata["particle_number"] == true_part_idx_track
+        mean_pos_cluster_true = torch.mean(
+            g.ndata["pos_hits_xyz"][mask_labels_i_true], dim=0
+        )
+        number_of_tracks[i] = torch.sum(mask_labels_i_true * mask_hit_type_t2)
+        distances[i] = torch.norm(mean_pos_cluster_true - pos_track) / 3300
+    return distances, number_of_tracks
 
 def distance_to_cluster_track(dic, is_track_in_MC):
 
@@ -1109,6 +1137,8 @@ def distance_to_cluster_track(dic, is_track_in_MC):
         else:
             distance_track_cluster_unique = distance_track_cluster
             unique_particle_track = particle_track
-    distance_to_cluster_all = is_track_in_MC.clone().float()
-    distance_to_cluster_all[unique_particle_track.long()] = distance_track_cluster_unique
-    return distance_to_cluster_all
+        distance_to_cluster_all = is_track_in_MC.clone().float()
+        distance_to_cluster_all[unique_particle_track.long()] = distance_track_cluster_unique
+        return distance_to_cluster_all
+    else:
+        return is_track_in_MC.clone().float()

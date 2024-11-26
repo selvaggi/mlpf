@@ -81,6 +81,7 @@ class ExampleWrapper(L.LightningModule):
         blocks=10,
         hidden_mv_channels=16,
         hidden_s_channels=64,
+        config=None
     ):
         super().__init__()
         self.strict_loading = False
@@ -93,6 +94,7 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
         self.args = args
         self.dev = dev
+        self.config = config
         self.gatr = GATr(
             in_mv_channels=1,
             out_mv_channels=1,
@@ -274,7 +276,7 @@ class ExampleWrapper(L.LightningModule):
             model_output = result[0]
             outputs = self.energy_correction.get_validation_step_outputs(batch_g, y, result)
             loss_ll = 0
-            e_cor1, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features = outputs
+            e_cor1, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features, fakes_labels = outputs
             e_cor = e_cor1
         #################################################################
         else:
@@ -283,7 +285,7 @@ class ExampleWrapper(L.LightningModule):
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
             e_cor = e_cor1
             pred_pos = None
-            pred_pid=None
+            pred_pid = None
             pred_ref_pt = None
             num_fakes = None
             extra_features = None
@@ -353,7 +355,8 @@ class ExampleWrapper(L.LightningModule):
                 pids_neutral=self.pids_neutral,
                 pids_charged=self.pids_charged,
                 number_of_fakes=num_fakes,
-                extra_features=extra_features
+                extra_features=extra_features,
+                fakes_labels=fakes_labels
             )
             self.df_showers_pandora.append(df_batch_pandora)
             print("Appending another batch", len(df_batch1))

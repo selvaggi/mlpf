@@ -88,9 +88,8 @@ for dataset in args.datasets.split(","):
             else:
                 Path(current_folder_path).mkdir(parents=True, exist_ok=True)
                 print(f"Running evaluation for {ckpt_file}")
-                file = datasets[dataset]["eval"] + "pf_tree_{0..300}.root"
-                print("Files:", files)
-                cmd = eval_cmd.format(model_prefix=current_folder_path, gpu=gpu, ckpt_file=ckpt_file, files=file)
+                file = [datasets[dataset]["eval"] + r"pf_tree_{}.root".format(x) for x in range(10)]
+                cmd = eval_cmd.format(model_prefix=current_folder_path, gpu=gpu, ckpt_file=ckpt_file, files=" ".join(file))
                 cmdargs = cmd.split()
                 proc = subprocess.Popen(cmdargs, stdout=subprocess.PIPE, shell=False)
                 (out, err) = proc.communicate()
@@ -135,6 +134,8 @@ for dataset in args.datasets.split(","):
                 print("Plotting done")
                 with open(os.path.join(current_folder_path, "plotting_done.txt"), "w") as f:
                     f.write("1")
+            if args.latest_only:
+                break
         time.sleep(pause)
         if time.time() - os.path.getmtime(os.path.join(args.path, files[-1])) > timeout:
             print("No new files found in the last 8 hrs, stopping")

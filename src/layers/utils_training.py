@@ -222,5 +222,6 @@ def obtain_clustering_for_matched_showers(
         y_pids_matched,
         e_true_corr_daughters,
         y_coords_matched,
-        number_of_fakes
+        number_of_fakes,
+        fakes_idx
     )

@@ -50,7 +50,7 @@ args = parser.parse_args()
 if all_E:
     PATH_store = (
         #"/eos/home-g/gkrzmanc/results/2024/eval_clustering_plus_model_epoch4_Hss/model_PID"
-        os.path.join(args.path, "corrected_pid_classes")
+        os.path.join(args.path, "corrected_pid_classes_fix_no_beta_corr")
         #args.path
     )
     if not os.path.exists(PATH_store):
@@ -104,6 +104,15 @@ def apply_class_correction(sd_hgb):
     sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"] = sd_hgb.loc[sd_hgb.is_track_in_cluster==0, "pred_pid_matched"].apply(lambda x: pid_correction_no_track.get(x, np.nan))
     return sd_hgb
 
+def apply_beta_correction(sd_hgb):
+    highest_beta = np.stack(sd_hgb.matched_extra_features.values)[:, 1]
+    filter = (np.isnan(highest_beta)) | (highest_beta >= 0.05) | (highest_beta <= 0.03)
+    cali_E = sd_hgb[~filter].calibrated_E
+    fakes = pd.isna(sd_hgb[~filter].pid)
+    print("E stored in cut off fakes:", cali_E[fakes].sum())
+    print("E stored in cut off matched particles:", cali_E[~fakes].sum()) # we can play a bit with this and see where the optimal cutoff is...
+    sd_hgb = sd_hgb[filter]
+    return sd_hgb
 
 def main():
     df_list = []
@@ -132,10 +141,9 @@ def main():
         os.path.join(dir_top, path_pandora), neutrals_only
     )
 
-    plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
-    #sd_pandora = renumber_batch_idx(sd_pandora[(sd_pandora.pid == 22) | (pd.isna(sd_pandora.pid))])
-    decay_type = get_decay_type(sd_hgb)
-    decay_type_pandora = get_decay_type(sd_pandora)
+    #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
+    analyze_fakes(sd_pandora, df_list[0], PATH_store_detailed_plots)
+    sd_hgb = apply_beta_correction(sd_hgb)
     print("!!! Filtering !!!")
     # Plot distance from (0,0,0) for the matched particles
     pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
@@ -205,7 +213,7 @@ def main():
         if not os.path.exists(current_dir_detailed):
             os.makedirs(current_dir_detailed)
         #plot_per_energy_resolution(sd_pandora_filtered, sd_hgb_filtered, dir_reco)
-        analyze_fakes(sd_pandora_filtered, sd_hgb_filtered, PATH_store_detailed_plots)
+
         plot_per_energy_resolution2_multiple(
             sd_pandora_filtered,
             {"ML": sd_hgb_filtered},

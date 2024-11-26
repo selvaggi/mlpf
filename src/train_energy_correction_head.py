@@ -314,18 +314,20 @@ def get_charged_response_resol_plot_for_PID(pid, e_true, e_pred, e_sum_hits, pid
             continue
         bins_x.append(0.5 * (e_thresholds[i] + e_thresholds[i - 1]))
         filt_energy = (e_true < e_thresholds[i]) & (e_true >= e_thresholds[i - 1])
-        mpv, s68, lo, hi = obtain_MPV_and_68(frac_pred[filt_energy & track_filter],
+        mpv, s68 = get_sigma_gaussian(frac_pred[filt_energy & track_filter],
                                              bins_per_binned_E=np.arange(0, 5, binsize))
         mpvs_model.append(mpv)
         s68s_model.append(s68)
-        mpv, s68, lo, hi = obtain_MPV_and_68(frac_track[filt_energy & track_filter].clip(max=5),
+        mpv, s68 = get_sigma_gaussian(frac_track[filt_energy & track_filter].clip(max=5),
                                              bins_per_binned_E=np.arange(0, 5, binsize))
         mpvs_pandora.append(mpv)
         s68s_pandora.append(s68)
-        mpv, s68, _, _ = obtain_MPV_and_68(frac_e_sum[filt_energy & track_filter],
+        mpv, s68 = get_sigma_gaussian(frac_e_sum[filt_energy & track_filter],
                                            bins_per_binned_E=np.arange(0, 5, binsize))
         mpvs_sum_hits.append(mpv)
         s68s_sum_hits.append(s68)
+        print("MPV sum hits", mpvs_sum_hits)
+        print("s68 sum hits", s68s_sum_hits)
 
 
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True,
@@ -358,7 +360,7 @@ def calculate_eta(x, y, z):
     theta = np.arctan2(np.sqrt(x ** 2 + y ** 2), z)
     return -np.log(np.tan(theta / 2))
 
-def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_channels=0):
+def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_channels=0, muons=0):
     # pytorch impl. of a neural network
     import torch
     import torch.nn as nn
@@ -371,7 +373,7 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             self.n_gnn_feat = args.gnn_features_placeholders
             self.model = nn.ModuleList([
                 #nn.BatchNorm1d(13),
-                nn.Linear(14 + args.gnn_features_placeholders, 64),
+                nn.Linear(14 + args.gnn_features_placeholders + muons, 64),
                 nn.ReLU(),
                 nn.Linear(64, 64),
                 #nn.BatchNorm1d(64),
@@ -579,7 +581,8 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         pid_channels = 0
     if args.regress_pos:
         pid_channels = 3
-    model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels)
+    muons = split[0].shape[1] == 15
+    model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels, muons=muons)
     print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
@@ -650,8 +653,8 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
                 #deltar_avg_hits = torch.sum((pos_avg_hits - pos_true) ** 2, dim=1).sqrt()
                 deltar_pred = torch.sum((torch.tensor(pos_pred) - pos_true) ** 2, dim=1).sqrt()
             pids = split[7].detach().cpu()
-            print("etrue", split[5])
-            print("e_pred", e_pred)
+            print("etrue", split[5].flatten())
+            print("e_pred", e_pred.flatten())
             wandb.log({"validation_energy_loss": torch.nn.L1Loss()(split[5], torch.tensor(e_pred).flatten())})
 
             for _pid in all_pids:
@@ -734,5 +737,5 @@ def get_plots(PIDs, energy_regression=False, remove_sum_e=False, use_model="grad
 
 
 model = get_plots(all_pids, energy_regression=True, patience=args.patience,
-                                  save_to_folder=os.path.join(prefix, "intermediate_plots"),
+                                  save_to_folder=os.path.join(prefix, "training_energy_correction_head"),
                                   wandb_log_name="loss_train_all")

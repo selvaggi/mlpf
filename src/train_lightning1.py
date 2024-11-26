@@ -35,8 +35,8 @@ def main():
         train_loader, val_loader, data_config, train_input_names = train_load(args)
     else:
         test_loaders, data_config = test_load(args)
-
-    # set up model 
+    args.is_muons = data_config.graph_config.get("muons", False)
+    # Set up model
     model = model_setup(args, data_config)
     gpus, dev = set_gpus(args)
 

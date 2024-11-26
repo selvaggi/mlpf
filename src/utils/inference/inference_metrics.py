@@ -193,11 +193,11 @@ def calculate_response(matched, pandora, log_scale=False):
     )
 
 
-def get_sigma_gaussian(e_over_reco, bins_per_binned_E):
+def get_sigma_gaussian(e_over_reco, bins_per_binned_E, epsilon=0.01):
     #mpv, std = obtain_MPV_and_68(e_over_reco, bins_per_binned_E)
     #return mpv, std, None, None
     hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
-    mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E)
+    mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E, epsilon=epsilon)
     return mu, sigma_over_mu, 0,0
     # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
     def gaus(X, C, X_mean, sigma):

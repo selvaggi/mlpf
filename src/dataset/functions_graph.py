@@ -233,6 +233,7 @@ def create_graph(
     hit_chis = config.graph_config.get("hit_chis_track", False)
     pos_pxpy = config.graph_config.get("pos_pxpy", False)
     is_Ks = config.graph_config.get("ks", False)
+    is_muons = config.graph_config.get("muons", False)
     noise_class = config.graph_config.get("noise", False)
     
     result = create_inputs_from_table(
