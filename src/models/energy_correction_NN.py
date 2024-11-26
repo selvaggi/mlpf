@@ -1,6 +1,6 @@
 """
     PID predict energy correction
-    The model taken from notebooks/13_NNs.py
+    The model taken from notebooks/train_energy_correction_head.py
     At first the model is fixed and the weights are loaded from earlier training
 """
 import wandb
@@ -250,7 +250,6 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 batch_idx.extend([i] * n)
                 batch_bounds.append(n)
             batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
-            node_global_features = x_global_features
             x = graphs_new.ndata["h"]
             edge_index = torch.stack(graphs_new.edges())
             hits_points = graphs_new.ndata["h"][:, 0:3]
@@ -418,8 +417,6 @@ class PickPAtDCA(torch.nn.Module):
             batch_idx[filt],
             graphs_new.ndata["h"][filt, :3]
         )
-        xyz_hits_calo = graphs_new.ndata["h"][filt_hits, :3]
-        E_hits_calo = graphs_new.ndata["h"][filt_hits, 8]
         # Barycenters of clusters of hits
         xyz_hits = graphs_new.ndata["h"][:, :3]
         E_hits = graphs_new.ndata["h"][:, 8]
@@ -616,12 +613,14 @@ class EnergyCorrection():
             print("Also running classification for charged particles", self.pids_charged)
         if len(pids_neutral):
             print("Also running classification for neutral particles", self.pids_neutral)
-        pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+        pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon
         pids_neutral = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
         if self.args.restrict_PID_charge:
             print("Restricting PID classification to match charge")
             pids_charged = [0, 1]
             pids_neutral = [2, 3]
+        if self.args.is_muons:
+            pids_charged += [4]
         self.pids_charged = pids_charged
         self.pids_neutral = pids_neutral
 
@@ -631,6 +630,8 @@ class EnergyCorrection():
         ckpt_charged = main_model.args.ckpt_charged
         dev = main_model.dev
         num_global_features = 14
+        if main_model.args.is_muons:
+            num_global_features += 1 # for the muon calorimeter hits
         self.model_charged = EnergyCorrectionWrapper(
             device=dev,
             in_features_global=num_global_features,
@@ -658,7 +659,7 @@ class EnergyCorrection():
             pos_regression=self.args.regress_pos,
             pid_channels=len(self.pids_neutral),
             unit_p=self.args.regress_unit_p,
-            out_f=4,  # To change to 1 for new models!!!!
+            out_f=1,  # To change to 1 for new models!!!!
             neutral_avg=True,
             neutral_PCA=False,
             neutral_thrust_axis=False,
@@ -676,7 +677,8 @@ class EnergyCorrection():
             true_pid, # FOR THE MATCHED SHOWERS
             e_true_corr_daughters, # FOR THE MATCHED SHOWERS
             true_coords, # FOR THE MATCHED SHOWERS
-            number_of_fakes
+            number_of_fakes,
+            fakes_idx
         ) = obtain_clustering_for_matched_showers(
             g,
             x,
@@ -706,7 +708,7 @@ class EnergyCorrection():
         assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
         # print("Also computing graph-level features")
         graphs_high_level_features = get_post_clustering_features(
-            graphs_new, sum_e, add_hit_chis=self.args.add_track_chis
+            graphs_new, sum_e, is_muons=self.main_model.args.is_muons, add_hit_chis=self.args.add_track_chis
         )
         extra_features = get_extra_features(graphs_new, betas)
         pred_energy_corr = torch.ones(graphs_high_level_features.shape[0]).to(
@@ -794,7 +796,8 @@ class EnergyCorrection():
             pred_pid,
             features_charged_no_nan,
             number_of_fakes,
-            extra_features
+            extra_features,
+            fakes_idx
         )
 
     def forward_correction(self, g, x, y, return_train):
@@ -816,7 +819,8 @@ class EnergyCorrection():
             pred_pid,
             features_charged_no_nan,
             number_of_fakes,
-            extra_features
+            extra_features,
+            fakes_idx
         ) = self.clustering_and_global_features(g, x, y, add_fakes=self.args.predict)
         charged_energies = self.model_charged.charged_prediction(
             graphs_new, charged_idx, features_charged_no_nan
@@ -901,7 +905,8 @@ class EnergyCorrection():
                 "neutrals_idx": neutral_idx.flatten(),
                 "charged_idx": charged_idx.flatten(),
                 "pred_ref_pt": pred_ref_pt,
-                "extra_features": extra_features
+                "extra_features": extra_features,
+                "fakes_labels": fakes_idx
             }
             if len(self.pids_charged) or len(self.pids_neutral):
                 pred_energy_corr["pred_PID"] = pred_pid
@@ -1273,11 +1278,13 @@ class EnergyCorrection():
             if len(self.pids_neutral):
                 neutral_idx = e_cor["neutrals_idx"]
             pred_pid = e_cor["pred_PID"]
-            e_cor, pred_pos, pred_ref_pt, extra_features = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
-                "pred_ref_pt"], e_cor["extra_features"]
+            e_cor, pred_pos, pred_ref_pt, extra_features, fakes_labels = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
+                "pred_ref_pt"], e_cor["extra_features"], e_cor["fakes_labels"]
         else:
             pred_pos = None
             pred_ref_pt = None
             e_cor = None
             pred_pid = None
-        return e_cor, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features
+            extra_features = None
+            fakes_labels = None
+        return e_cor, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features, fakes_labels
