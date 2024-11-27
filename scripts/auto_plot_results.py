@@ -7,8 +7,8 @@ import time
 import subprocess
 from pathlib import Path
 
-timeout = 3600 * 8 # After 8 hr of no new checkpoints, stop the script
-pause = 20 # Check every 20 secs for new files
+timeout = 3600 * 8  # After 8 hr of no new checkpoints, stop the script
+pause = 20  # Check every 20 secs for new files
 
 dataset_prefix = "/eos/experiment/fcc/ee/datasets/mlpf/CLD/"
 datasets = {
@@ -21,6 +21,11 @@ datasets = {
         {
             "train": os.path.join(dataset_prefix, "train/gun_log_dr_020_050_v2_201124/"),
             "eval": os.path.join(dataset_prefix, "eval/gun_log_dr_020_050_v2_201124/")
+        },
+    "dr_05":
+        {
+            "train": "",
+            "eval": os.path.join(dataset_prefix, "eval/gun_dr_050_v3_251124/")
         }
 }
 
@@ -29,6 +34,7 @@ parser.add_argument("--path", type=str, help="Path to the folder with the traini
 parser.add_argument("--gpu", type=int, help="GPU to use for the evaluation")
 parser.add_argument("--latest-only", action="store_true", help="Only evaluate the latest checkpoint")
 parser.add_argument("--datasets", type=str, help="Datasets to evaluate on, comma-separated")
+parser.add_argument("--n-files", type=int, default=50, help="Number of files to evaluate on")
 #parser.add_argument("--redo", action="store_true", help="Redo the evaluation for all checkpoints, even if they are already saved")
 #parser.add_argument("--redo-plots", action="store_true", help="Redo the plots, even if they are already saved")
 
@@ -66,17 +72,16 @@ eval_cmd = """/home/gkrzmanc/gatr/bin/python -m src.train_lightning1 --data-test
 plotting_cmds = [""" /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction,filt_LE_CH --output_dir filt_LE_CH_400bins_epsilon005  --mass-only """,
                  """ /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction --output_dir mass_plots_400bins_epsilon005 """]
 
-
-for dataset in args.datasets.split(","):
-    while True:
+while True:
+    for dataset in args.datasets.split(","):
         files = os.listdir(args.path)
         files = [f for f in files if f.endswith(".ckpt")]
         files.sort(key=lambda x: os.path.getmtime(os.path.join(args.path, x)))
         #if args.latest_only:
         #    #files = [files[-1]]
-        files = ["_epoch=0_step=8000.ckpt"]
+        #files = ["_epoch=0_step=8000.ckpt"]
         if len(files) == 0:
-            print("No files found, waiting...")
+            print("No files found for dataset {}, waiting...".format(dataset))
             time.sleep(pause)
             continue
         for f in files:
@@ -90,7 +95,7 @@ for dataset in args.datasets.split(","):
             else:
                 Path(current_folder_path).mkdir(parents=True, exist_ok=True)
                 print(f"Running evaluation for {ckpt_file}")
-                file = [datasets[dataset]["eval"] + r"pf_tree_{}.root".format(x) for x in range(50)]
+                file = [datasets[dataset]["eval"] + r"pf_tree_{}.root".format(x) for x in range(args.n_files)]
                 cmd = eval_cmd.format(model_prefix=current_folder_path, gpu=gpu, ckpt_file=ckpt_file, files=" ".join(file))
                 cmdargs = cmd.split()
                 proc = subprocess.Popen(cmdargs, stdout=subprocess.PIPE, shell=False)
