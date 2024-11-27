@@ -411,6 +411,8 @@ def generate_showers_data_frame(
 ):
     shap = shap_vals is not None
     e_pred_showers = scatter_add(dic["graph"].ndata["e_hits"].view(-1), labels)
+    e_pred_showers_ecal = scatter_add(1*(dic["graph"].ndata["hit_type"].view(-1)==2), labels)
+    e_pred_showers_hcal = scatter_add(1*(dic["graph"].ndata["hit_type"].view(-1)==3), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(
             dic["graph"].ndata["pandora_cluster_energy"].view(-1), labels
@@ -508,6 +510,8 @@ def generate_showers_data_frame(
     index_matches = col_ind + 1
     index_matches = index_matches.to(e_pred_showers.device).long()
     matched_es = torch.zeros_like(energy_t) * (torch.nan)
+    matched_ECAL = torch.zeros_like(energy_t) * (torch.nan)
+    matched_HCAL = torch.zeros_like(energy_t) * (torch.nan)
     matched_positions = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
     matched_positions = matched_positions.to(e_pred_showers.device)
     matched_ref_pt = torch.zeros((energy_t.shape[0], 3)) * (torch.nan)
@@ -521,6 +525,13 @@ def generate_showers_data_frame(
     matched_ref_pts_pfo = matched_ref_pts_pfo.to(e_pred_showers.device)
     matched_es = matched_es.to(e_pred_showers.device)
     matched_es[row_ind_] = e_pred_showers[index_matches]
+
+    matched_ECAL = matched_ECAL.to(e_pred_showers.device)
+    matched_ECAL[row_ind_] = 1.0*e_pred_showers_ecal[index_matches]
+    matched_HCAL = matched_HCAL.to(e_pred_showers.device)
+    matched_HCAL[row_ind_] = 1.0*e_pred_showers_hcal[index_matches]
+
+
     n_extra_features = 2# n nodes, 1 highest betas
     matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
     matched_extra_features = matched_extra_features.to(e_pred_showers.device)
@@ -600,6 +611,8 @@ def generate_showers_data_frame(
         fake_showers_num_tracks = number_of_tracks[fakes_labels.cpu()]
         fakes_in_event = mask.sum()
         fake_showers_e = e_pred_showers[mask]
+        fake_showers_e_hcal = e_pred_showers_hcal[mask]
+        fake_showers_e_ecal = e_pred_showers_ecal[mask]
         if e_corr is None or pandora:
             fake_showers_e_cali = e_pred_showers_cali[mask]
             # fakes_positions = dic["graph"].ndata["coords"][mask]
@@ -679,6 +692,8 @@ def generate_showers_data_frame(
         is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_num_tracks.to(e_reco.device)), dim=0)
         distance_to_cluster_MC = torch.cat((distance_to_cluster_all[1:], fake_showers_distance_to_cluster.to(e_reco.device)), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
+        e_pred_ECAL =  torch.cat((matched_ECAL, fake_showers_e_ecal), dim=0)
+        e_pred_HCAL =  torch.cat((matched_HCAL, fake_showers_e_hcal), dim=0)
         e_pred_cali = torch.cat((matched_es_cali, fake_showers_e_cali), dim=0)
         if pred_pos is not None:
             e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
@@ -749,7 +764,9 @@ def generate_showers_data_frame(
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "is_track_in_MC": is_track_in_MC.detach().cpu(),
                 "distance_to_cluster_MC":distance_to_cluster_MC.detach().cpu(),
-                "vertex": vertex.detach().cpu().tolist()
+                "vertex": vertex.detach().cpu().tolist(), 
+                "ECAL_hits": e_pred_ECAL.detach().cpu(),
+                "HCAL_hits": e_pred_HCAL.detach().cpu(),
             }
         else:
             d = {
@@ -767,7 +784,9 @@ def generate_showers_data_frame(
                 "is_track_correct":matched_es_tracks_1.detach().cpu(),
                 "is_track_in_MC": is_track_in_MC.detach().cpu(),
                 "distance_to_cluster_MC":distance_to_cluster_MC.detach().cpu(),
-                "vertex": vertex.detach().cpu().tolist()
+                "vertex": vertex.detach().cpu().tolist(), 
+                "ECAL_hits": e_pred_ECAL.detach().cpu(),
+                "HCAL_hits": e_pred_HCAL.detach().cpu(),
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
