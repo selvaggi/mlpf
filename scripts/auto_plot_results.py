@@ -63,16 +63,18 @@ os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH", "") + ":" + script_path
 #eval_cmd = """/home/gkrzmanc/gatr/bin/python -m src.train_lightning1 --data-test /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4002.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4003.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4004.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4005.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4006.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4007.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4008.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4009.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4010.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4011.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4012.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4013.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4014.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4015.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4016.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4017.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4018.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4019.root /eos/experiment/fcc/ee/datasets/mlpf/CLD/train/011024_Hcard_eval/pf_tree_4020.root --data-config config_files/config_hits_track_v1.yaml -clust -clust_dim 3 --network-config src/models/wrapper/example_mode_gatr_e.py --model-prefix {model_prefix} --wandb-displayname evalHss_reprod_clust_only_newmodel_Clustering2810 --num-workers 0 --gpus {gpu} --batch-size 8 --start-lr 1e-3 --num-epochs 100 --optimizer ranger --fetch-step 0.1 --condensation --log-wandb --wandb-projectname mlpf_debug_eval --wandb-entity fcc_ml --frac_cluster_loss 0 --qmin 1 --use-average-cc-pos 0.99 --lr-scheduler reduceplateau --tracks --correction --ec-model gatr-neutrals --regress-pos --add-track-chis --load-model-weights  {ckpt_file}  --freeze-clustering --predict --regress-unit-p --PID-4-class"""
 eval_cmd = """/home/gkrzmanc/gatr/bin/python -m src.train_lightning1 --data-test {files}  --data-config config_files/config_hits_track_v4.yaml -clust -clust_dim 3 --network-config src/models/wrapper/example_mode_gatr_e.py --model-prefix {model_prefix} --wandb-displayname Eval_with_auto_plot_results --num-workers 0 --gpus {gpu} --batch-size 8  --start-lr 1e-3 --num-epochs 100 --optimizer ranger --fetch-step 0.1 --condensation --log-wandb --wandb-projectname mlpf_debug_eval --wandb-entity fcc_ml --frac_cluster_loss 0 --qmin 1 --use-average-cc-pos 0.99 --lr-scheduler reduceplateau --tracks --correction --ec-model gatr-neutrals --regress-pos --add-track-chis --load-model-weights  {ckpt_file}  --freeze-clustering --predict  --regress-unit-p --PID-4-class --restrict_PID_charge """
 #plotting_cmd = """ /home/gkrzmanc/gatr/bin/python src/evaluation/evaluate_mass_Hss.py --path {path} """
-plotting_cmds = [""" /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction,filt_LE_CH --output_dir filt_LE_CH_400bins_epsilon005 --mass-only""",
-                 """ /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction --output_dir mass_plots_400bins_epsilon005 --mass-only"""]
+plotting_cmds = [""" /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction,filt_LE_CH --output_dir filt_LE_CH_400bins_epsilon005  --mass-only """,
+                 """ /home/gkrzmanc/gatr/bin/python src/evaluation/refactor/plot_results.py --path {path} --preprocess class_correction --output_dir mass_plots_400bins_epsilon005 """]
+
 
 for dataset in args.datasets.split(","):
     while True:
         files = os.listdir(args.path)
         files = [f for f in files if f.endswith(".ckpt")]
         files.sort(key=lambda x: os.path.getmtime(os.path.join(args.path, x)))
-        if args.latest_only:
-            files = [files[-1]]
+        #if args.latest_only:
+        #    #files = [files[-1]]
+        files = ["_epoch=0_step=8000.ckpt"]
         if len(files) == 0:
             print("No files found, waiting...")
             time.sleep(pause)
@@ -88,7 +90,7 @@ for dataset in args.datasets.split(","):
             else:
                 Path(current_folder_path).mkdir(parents=True, exist_ok=True)
                 print(f"Running evaluation for {ckpt_file}")
-                file = [datasets[dataset]["eval"] + r"pf_tree_{}.root".format(x) for x in range(10)]
+                file = [datasets[dataset]["eval"] + r"pf_tree_{}.root".format(x) for x in range(50)]
                 cmd = eval_cmd.format(model_prefix=current_folder_path, gpu=gpu, ckpt_file=ckpt_file, files=" ".join(file))
                 cmdargs = cmd.split()
                 proc = subprocess.Popen(cmdargs, stdout=subprocess.PIPE, shell=False)

@@ -631,7 +631,7 @@ class EnergyCorrection():
         dev = main_model.dev
         num_global_features = 14
         if main_model.args.is_muons:
-            num_global_features += 1 # for the muon calorimeter hits
+            num_global_features += 2 # for the muon calorimeter hits and the number of muon hits
         self.model_charged = EnergyCorrectionWrapper(
             device=dev,
             in_features_global=num_global_features,
@@ -659,7 +659,7 @@ class EnergyCorrection():
             pos_regression=self.args.regress_pos,
             pid_channels=len(self.pids_neutral),
             unit_p=self.args.regress_unit_p,
-            out_f=1,  # To change to 1 for new models!!!!
+            out_f=4,  # To change to 1 for new models!!!!
             neutral_avg=True,
             neutral_PCA=False,
             neutral_thrust_axis=False,
@@ -1192,6 +1192,8 @@ class EnergyCorrection():
                     print("Charged class weights:", weights)
                 else:
                     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
+                    if self.args.is_muons:
+                        weights[-1] = 5
                 if len(charged_PID_pred):
                     mask_charged = mask_charged.bool()
                     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(

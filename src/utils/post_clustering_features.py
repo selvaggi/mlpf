@@ -26,6 +26,7 @@ def get_post_clustering_features(graphs_new, sum_e, is_muons=False, add_hit_chis
         muon_hits = graphs_new.ndata["h"][:, 7]
         filter_muon = torch.where(muon_hits)[0]
         per_graph_e_hits_muon = scatter_sum(e_hits[filter_muon], batch_idx[filter_muon], dim_size=batch_idx.max() + 1)
+        per_graph_n_hits_muon = scatter_sum((e_hits[filter_muon] > 0).type(torch.int), batch_idx[filter_muon], dim_size=batch_idx.max() + 1)
     ecal_hits = graphs_new.ndata["h"][:, 5]
     filter_ecal = torch.where(ecal_hits)[0]
     hcal_hits = graphs_new.ndata["h"][:, 6]
@@ -56,7 +57,8 @@ def get_post_clustering_features(graphs_new, sum_e, is_muons=False, add_hit_chis
                                 per_graph_e_hits_ecal_dispersion,
                                 per_graph_e_hits_hcal_dispersion,
                                 sum_e, num_tracks, torch.clamp(chis_tracks, -5, 5),
-                                per_graph_e_hits_muon / sum_e,
+                                per_graph_e_hits_muon,
+                                per_graph_n_hits_muon
                              ]).T
             )
 

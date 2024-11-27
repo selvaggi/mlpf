@@ -142,6 +142,10 @@ fig.show()
 
 '''
 
+
+fakes_LE_CH = (pd.isna(sd_hgb.pid)) & (sd_hgb.calibrated_E < 5.0) & (sd_hgb.pred_pid_matched == 1)
+
+
 plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_summary_plots)
 
 if args.mass_only:
