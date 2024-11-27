@@ -124,6 +124,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self.neutral_PCA = neutral_PCA
         self.neutral_thrust_axis = neutral_thrust_axis
         self.use_gatr = gatr
+        self.separate_pid_gatr = args.separate_PID_GATr
         print("pos_regression", self.pos_regression)
         # if pos_regression:
         #     out_f += 3
@@ -153,6 +154,19 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 # self.lin_e = nn.Linear(4, 1)
                 self.gnn = "gatr"
                 # self.lin_final_exp = nn.Linear(16, 4) # e, pxpypz
+                if self.separate_pid_gatr and not self.charged:
+                    print("Separate PID GATr")
+                    self.gatr_pid = GATr(
+                        in_mv_channels=1,
+                        out_mv_channels=1,
+                        hidden_mv_channels=4,
+                        in_s_channels=3,
+                        out_s_channels=None,
+                        hidden_s_channels=4,
+                        num_blocks=3,
+                        attention=SelfAttentionConfig(),  # Use default parameters for attention
+                        mlp=MLPConfig(),  # Use default parameters for MLP
+                    )
             else:
                 self.gnn = GAT(
                     in_features_gnn,
@@ -277,6 +291,21 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             model_x = torch.cat(
                 [x_global_features, embedded_outputs_per_batch], dim=1
             )
+            if self.separate_pid_gatr and not self.charged:
+                embedded_outputs, _ = self.gatr_pid(
+                    embedded_inputs, scalars=extra_scalars, attention_mask=mask
+                )
+                p_vectors = extract_translation(embedded_outputs)
+                p_vectors = p_vectors[:, 0, :]
+                p_vectors_per_batch = scatter_mean(p_vectors, batch_idx, dim=0)
+                embedded_outputs_per_batch1 = scatter_sum(
+                    embedded_outputs[:, 0, :], batch_idx, dim=0
+                )
+                model_x_pid = torch.cat(
+                    [x_global_features, embedded_outputs_per_batch1], dim=1
+                )
+            else:
+                model_x_pid = model_x
         else:
             # not using GATr features
             gnn_output = torch.randn(x_global_features.shape[0], 32).to(
@@ -290,7 +319,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             # Predict energy for neutrals using the neural network
             res = self.model(model_x)
         if self.pid_channels > 1:
-            pid_pred = self.PID_head(model_x)
+            pid_pred = self.PID_head(model_x_pid)
         else:
             pid_pred = None
         if self.pos_regression:
@@ -1193,7 +1222,7 @@ class EnergyCorrection():
                 else:
                     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
                     if self.args.is_muons:
-                        weights[-1] = 5
+                        weights[-1] = 10
                 if len(charged_PID_pred):
                     mask_charged = mask_charged.bool()
                     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(

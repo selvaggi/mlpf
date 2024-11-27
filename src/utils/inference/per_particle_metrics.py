@@ -617,9 +617,8 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     #class_pred = np.array([nanindex(x, all_pids) for x in class_pred])
     max_class = max(list(our_to_pandora_mapping.keys()))
     assert max_class + 1 in [4, 5]
-    is_muons = max_class == 4
+    is_muons = max_class + 1 == 5
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0 # Maybe the pid_conversion_dict is not fully up-to-date?
-
     class_true = np.array([pid_conversion_dict.get(x, max_class+1) for x in class_true])
     class_pred = np.array([pandora_to_our_mapping.get(x, max_class+1) for x in class_pred])
     #no_nan_filter = ~np.isnan(class_pred) & ~np.isnan(class_true)
@@ -2288,6 +2287,7 @@ import plotly.express as px
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
     # Plot the event with Plotly. Compare ML and Pandora reconstructed with truth
+    return
     fig = go.Figure()
     # scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
     # list of 20 random colors
