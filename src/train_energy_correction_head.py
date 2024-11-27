@@ -581,7 +581,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         pid_channels = 0
     if args.regress_pos:
         pid_channels = 3
-    muons = split[0].shape[1] == 15
+    muons = 2*int(split[0].shape[1] == 16)
     model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels, muons=muons)
     print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":

@@ -788,12 +788,12 @@ def generate_showers_data_frame(
             d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
-        event_list = [1, 2, 3, 4, 5] # Fill with the list of selected events that we want to investigate
+        event_list = [40] # Fill with the list of selected events that we want to investigate
         if save_plots_to_folder:
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
-                continue
-                if evt in event_list and df[df.number_batch == evt]:
+                if evt in event_list and len(df[df.number_batch == evt]):
+                    print("Here")
                     # Random string
                     if not pandora:
                         plot_event(
