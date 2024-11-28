@@ -644,6 +644,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--n-layers-PID-head",
+    default=1,
+    type=int,
+    help="Number of layers in the PID head. Default: just one linear probe",
+)
+
+parser.add_argument(
     "--restrict_PID_charge",
     default=False,
     action="store_true",
