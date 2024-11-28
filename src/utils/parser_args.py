@@ -635,6 +635,14 @@ parser.add_argument(
     action="store_true",
     help="Classify into electron, CH, NH, gamma - both for charged and neutral. Also adds a muon class if config.muons == true.",
 )
+
+parser.add_argument(
+    "--separate-PID-GATr",
+    default=False,
+    action="store_true",
+    help="Use a separate GATr for PID. Otherwise, the GATr is shared with energy correction.",
+)
+
 parser.add_argument(
     "--restrict_PID_charge",
     default=False,
