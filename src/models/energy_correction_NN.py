@@ -219,7 +219,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                 ]
-            if len(self.pids_charged):
+            if self.pid_channels:
                 charged_energies += [torch.tensor([]).to(graphs_new.ndata["h"].device)]
         return charged_energies
 
@@ -246,7 +246,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                         ]
-            if len(self.pids_neutral):
+            if self.pid_channels:
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
         return neutral_energies, neutral_pxyz_avg
     def predict(self, x_global_features, graphs_new=None, explain=False):
