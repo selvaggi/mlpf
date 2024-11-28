@@ -104,6 +104,12 @@ def obtain_clustering_for_matched_showers(
             )
             row_ind = torch.Tensor(row_ind).to(model_output.device).long()
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
+        
+            if torch.sum(particle_ids == 0) > 0:
+                row_ind_ = row_ind - 1
+            else:
+                # if there is no zero then index 0 corresponds to particle 1.
+                row_ind_ = row_ind
             index_matches = col_ind + 1
             index_matches = index_matches.to(model_output.device).long()
             """
@@ -166,10 +172,10 @@ def obtain_clustering_for_matched_showers(
                     energy_t_corr_daughters = dic["part_true"].E_corrected.to(
                         model_output.device
                     )
-                    true_energy_shower = energy_t[row_ind[j]]
-                    y_pids_matched.append(y.pid[row_ind[j]].item())
-                    y_coords_matched.append(y.coord[row_ind[j]].detach().cpu().numpy())
-                    energy_true_daughters.append(energy_t_corr_daughters[row_ind[j]])
+                    true_energy_shower = energy_t[row_ind_[j]]
+                    y_pids_matched.append(y.pid[row_ind_[j]].item())
+                    y_coords_matched.append(y.coord[row_ind_[j]].detach().cpu().numpy())
+                    energy_true_daughters.append(energy_t_corr_daughters[row_ind_[j]])
                     reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
                     graphs_showers_matched.append(g)
                     true_energy_showers.append(true_energy_shower.view(-1))
