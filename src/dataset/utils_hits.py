@@ -6,6 +6,26 @@ from sklearn.preprocessing import StandardScaler
 from torch_scatter import scatter_sum
 
 
+def create_noise_tracks(index_bad_tracks, hit_particle_link, y, cluster_id):
+    unique_p_numbers = torch.unique(cluster_id)
+    list_remove = torch.unique(hit_particle_link[index_bad_tracks])
+
+    if len(list_remove) > 0:
+        mask = torch.tensor(np.full((len(cluster_id)), False, dtype=bool))
+        for p in list_remove:
+            mask1 = cluster_id == p
+            mask = mask1 + mask
+    else:
+        mask = torch.tensor(np.full((len(cluster_id)), False, dtype=bool))
+    list_p = unique_p_numbers
+    if len(list_remove) > 0:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+        for p in list_remove:
+            mask_particles1 = list_p == p
+            mask_particles = mask_particles1 + mask_particles
+    else:
+        mask_particles = torch.tensor(np.full((len(list_p)), False, dtype=bool))
+    return mask.to(bool), ~mask_particles.to(bool)
 
 def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
     unique_p_numbers = torch.unique(cluster_id)
