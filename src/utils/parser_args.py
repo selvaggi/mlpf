@@ -279,6 +279,12 @@ parser.add_argument(
     help="number of threads to load the dataset; memory consumption and disk access load increases (~linearly) with this numbers",
 )
 parser.add_argument(
+    "--prefetch-factor",
+    type=int,
+    default=1,
+    help="How many items to prefetch in the dataloaders. Should be about the same order of magnitude as batch size for optimal performance.",
+)
+parser.add_argument(
     "--predict",
     action="store_true",
     default=False,

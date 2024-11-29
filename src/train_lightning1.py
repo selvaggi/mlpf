@@ -20,6 +20,7 @@ from src.utils.load_pretrained_models import load_train_model, load_test_model
 from src.utils.callbacks import get_callbacks, get_callbacks_eval
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ["TORCH_USE_CUDA_DSA"] = "1"
+from lightning.pytorch.profilers import AdvancedProfiler
 
 
 
@@ -39,7 +40,7 @@ def main():
     # Set up model
     model = model_setup(args, data_config)
     gpus, dev = set_gpus(args)
-
+    #profiler = AdvancedProfiler(dirpath=".", filename="perf_logs_28112024")
     # start logger
     wandb_logger = WandbLogger(
         project=args.wandb_projectname,
@@ -55,7 +56,6 @@ def main():
             model = load_train_model(args, dev)
         
         callbacks = get_callbacks(args)
-       
         trainer = L.Trainer(
             callbacks=callbacks,
             accelerator="gpu",
