@@ -2289,6 +2289,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 
 def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None, pid_filter=[], color_hittype=True):
+    return
     fig = go.Figure()
     color_list = px.colors.qualitative.Light24 + px.colors.qualitative.Dark24 + px.colors.qualitative.Plotly
     if graph is not None:

@@ -66,6 +66,7 @@ def main():
             strategy="ddp",
             limit_train_batches=10000,
             limit_val_batches=20,
+            #profiler=profiler
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
