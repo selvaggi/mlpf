@@ -1233,8 +1233,6 @@ class EnergyCorrection():
                     print("Charged class weights:", weights)
                 else:
                     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
-                    if self.args.is_muons:
-                        weights[-1] = 10
                 if len(charged_PID_pred):
                     mask_charged = mask_charged.bool()
                     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
