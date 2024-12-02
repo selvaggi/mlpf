@@ -252,6 +252,9 @@ def train_load(args):
     #    train_data_arg = [next(iter(train_data_arg))]
     # if args.val_cap == 1:
     #    val_data_arg = [next(iter(val_data_arg))]
+    prefetch_factor = None
+    if args.num_workers > 0:
+        prefetch_factor = args.prefetch_factor
     train_loader = DataLoader(
         train_data,
         batch_size=args.batch_size,
@@ -259,7 +262,8 @@ def train_load(args):
         pin_memory=True,
         num_workers=min(args.num_workers, int(len(train_files) * args.file_fraction)),
         collate_fn=collator_func,
-        persistent_workers=args.num_workers > 0 and args.steps_per_epoch is not None,
+        persistent_workers=False,
+        prefetch_factor=prefetch_factor
     )
     val_loader = DataLoader(
         val_data,
@@ -270,6 +274,7 @@ def train_load(args):
         num_workers=min(args.num_workers, int(len(val_files) * args.file_fraction)),
         persistent_workers=args.num_workers > 0
         and args.steps_per_epoch_val is not None,
+        prefetch_factor=prefetch_factor
     )
 
     data_config = train_data.config

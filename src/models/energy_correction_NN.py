@@ -125,6 +125,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self.neutral_thrust_axis = neutral_thrust_axis
         self.use_gatr = gatr
         self.separate_pid_gatr = args.separate_PID_GATr
+        self.n_layers_pid_head = args.n_layers_PID_head
         print("pos_regression", self.pos_regression)
         # if pos_regression:
         #     out_f += 3
@@ -219,7 +220,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                 ]
-            if len(self.pids_charged):
+            if self.pid_channels:
                 charged_energies += [torch.tensor([]).to(graphs_new.ndata["h"].device)]
         return charged_energies
 
@@ -246,7 +247,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                     torch.tensor([]).to(graphs_new.ndata["h"].device),
                         ]
-            if len(self.pids_neutral):
+            if self.pid_channels:
                 neutral_energies += [ torch.tensor([]).to(graphs_new.ndata["h"].device) ]
         return neutral_energies, neutral_pxyz_avg
     def predict(self, x_global_features, graphs_new=None, explain=False):
@@ -771,7 +772,7 @@ class EnergyCorrection():
         normalizations1 = normalizations[batch_idx]
         weights = weights / normalizations1
         # node_features_avg = scatter_add(
-        #    graphs_new.ndata["h"]*weights , batch_idx, dim=0
+        #    graphs_new.ndata["h"]*weights, batch_idx, dim=0
         # )[: , 0:3]
         # node_features_avg = node_features_avg / normalizations
         eta, phi = calculate_eta(
@@ -1198,6 +1199,14 @@ class EnergyCorrection():
             loss_EC_neutrals = torch.nn.L1Loss()(
                 e_cor[neutral_idx], e_true[neutral_idx]
             )
+            filt_neutrons = (e_true[neutral_idx] < 5).cpu() & (torch.tensor(pid_true_matched)[neutral_idx.cpu()] == 2112)
+            loss_EC_neutrons = torch.nn.L1Loss()(
+                e_cor[neutral_idx][filt_neutrons].detach().cpu(), e_true[neutral_idx][filt_neutrons].detach().cpu()
+            )
+            filt_KL = (e_true[neutral_idx] < 5).cpu() & (torch.tensor(pid_true_matched)[neutral_idx.cpu()] == 130)
+            loss_EC_KL = torch.nn.L1Loss()(
+                e_cor[neutral_idx][filt_KL].detach().cpu(), e_true[neutral_idx][filt_KL].detach().cpu()
+            )
             # charged idx is e_cor indices minus neutral idx
             charged_idx = np.array(sorted(list(set(range(len(e_cor))) - set(neutral_idx))))
             loss_pos_neutrals = torch.nn.L1Loss()(
@@ -1209,8 +1218,11 @@ class EnergyCorrection():
             # wandb.log(
             #     {"loss_pxyz": loss_pos, "loss_pxyz_neutrals": loss_pos_neutrals}
             # )
-            wandb.log({"loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged,
-                       "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged})
+            wandb.log({
+                "loss_EC_neutrals": loss_EC_neutrals, "loss_EC_charged": loss_charged,
+                "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_charged,
+                "loss_EC_KL": loss_EC_KL, "loss_EC_neutrons": loss_EC_neutrons
+            })
             # print("Loss pxyz neutrals", loss_pos_neutrals)
             if len(self.pids_charged):
                 if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:

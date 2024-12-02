@@ -1,21 +1,15 @@
 import numpy as np
 import matplotlib
 import os
-from pydantic.v1 import NoneIsAllowedError
 from src.layers.obtain_statistics import stacked_hist_plot
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from src.utils.pid_conversion import our_to_pandora_mapping, pandora_to_our_mapping, pid_conversion_dict
 import pandas as pd
 import matplotlib.pyplot as plt
-import multiprocessing
 from src.utils.inference.inference_metrics import obtain_MPV_and_68
 import concurrent.futures
-import time
 from src.utils.inference.inference_metrics import calculate_eff, calculate_fakes
 import torch
-import plotly
-import plotly.graph_objs as go
-import plotly.express as px
 from pathlib import Path
 import seaborn as sns
 from scipy.optimize import curve_fit
@@ -470,11 +464,14 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
-    class_true = np.array(sd_hgb1["pid_4_class_true"].values)
-    class_pred = np.array(sd_hgb1["pred_pid_matched"].values)
+    class_true = np.array(sd_hgb1["pid_4_class_true"].values).astype(int)
+    class_pred = np.array(sd_hgb1["pred_pid_matched"].values).astype(int)
     n_classes = class_true[~np.isnan(class_true)].max() + 1
+    n_classes_pred = class_pred[~np.isnan(class_pred)].max() + 1
+    n_classes = max(n_classes, n_classes_pred)
     class_nan = n_classes # For 'fake' and 'missed'
     is_muons = n_classes == 5
+    print("Unique classes", set(list(class_true)), set(list(class_pred)))
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0
     pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
@@ -484,7 +481,10 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     class_true[np.isnan(class_true)] = class_nan
     class_pred[np.isnan(class_pred)] = class_nan
     from sklearn.metrics import confusion_matrix
-    cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
+    print("1", set(list(class_true)), set(list(class_pred)))
+    cm = confusion_matrix(class_true, class_pred, labels=list(range(n_classes + 1)))
+    assert cm.shape[0] == cm.shape[1]
+    assert cm.shape[0] == n_classes + 1
     savefigs = ax is None
     # Plot cm
     # Add pie charts
@@ -532,6 +532,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
         # now plot just the ticks on the plot without the CM
         ax.set_xticks(np.arange(cm.shape[1]) + 0.5, minor=False)
         ax.set_yticks(np.arange(cm.shape[0]) + 0.5, minor=False)
+        print("Class names pred:", class_names_pred, "cm.shape", cm.shape)
         ax.set_xticklabels(class_names_pred, minor=False)
         ax.set_yticklabels(class_names_true, minor=False)
         ax.grid(False)
@@ -767,9 +768,9 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     nonfakes_model = matched_all[~pd.isna(matched_all.true_showers_E)]
     # energy bins:
     fakes_model_extra_f = np.stack(fakes_model.matched_extra_features.values)
+    highest_beta = fakes_model_extra_f[:, 1]
     nonfakes_model_extra_f = np.stack(nonfakes_model.matched_extra_features.values)
     energies = [0, 5, 15, 35, 50]
-    highest_beta = fakes_model_extra_f[:, 1]
     filt_model_fakes = (np.isnan(highest_beta)) | (highest_beta >= 0.05) | (highest_beta <= 0.03)
     fakes_filt = fakes_model[~filt_model_fakes]
     highest_beta = nonfakes_model_extra_f[:, 1]
@@ -913,6 +914,8 @@ def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
                                                              mass_zero=0)
         figs_mass_hist, axs_mass_hist = plt.subplots(6, 3, figsize=(8, 15)) # also plot fraction of the whole event energy
         for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
+            if pid not in massPID or pid not in massPIDpandora:
+                continue
             axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
                                      density=True)
             axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue",
@@ -2285,21 +2288,21 @@ import plotly
 import plotly.graph_objs as go
 import plotly.express as px
 
-def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None):
-    # Plot the event with Plotly. Compare ML and Pandora reconstructed with truth
-    return
+def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None, is_track_in_cluster=None, pid_filter=[], color_hittype=True):
     fig = go.Figure()
-    # scale = 1.  # Size of the direction vector, to make it easier to see it with the hits
-    # list of 20 random colors
-    # color_list = px.colors.qualitative.Plotly # This is only 10, not enough
     color_list = px.colors.qualitative.Light24 + px.colors.qualitative.Dark24 + px.colors.qualitative.Plotly
-    #ref_pt = np.array(df.vertex.values.tolist())
-
     if graph is not None:
         sum_hits = scatter_sum(
             graph.ndata["e_hits"].flatten(), graph.ndata["particle_number"].long()
         )
         hit_pos = graph.ndata["pos_hits_xyz"].numpy()
+        mask = torch.ones(len(hit_pos))
+        if len(pid_filter):
+            pid_list = y.pid.flatten().int()
+            pids = graph.ndata["particle_number"].long()
+            pids = torch.tensor([pid_list[i-1] for i in pids])
+            mask = torch.isin(pids, torch.tensor(pid_filter).int())
+            assert len(mask) == len(hit_pos)
         scale = np.mean(np.linalg.norm(hit_pos, axis=1))
         truepos = np.array(df.true_pos.values.tolist()) * scale
         #truepos = truepos[~np.isnan(truepos[:, 0])]
@@ -2310,23 +2313,39 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         #    vertices = y.vertex
         # fig.add_trace(go.Scatter3d(x=hit_pos[:, 0], y=hit_pos[:, 1], z=hit_pos[:, 2], mode='markers', color=graph.ndata["particle_number"], name='hits'))
         # fix this: color by particle number (it is an array of size [0,0,0,0,1,1,1,2,2,2...]
+        energies = y.E_corrected.flatten()
+        hit_types=graph.ndata["hit_type"]
         ht = [
-            f"part. {int(i)}, sum_hits={sum_hits[i]:.2f}"
-            for i in graph.ndata["particle_number"].long().tolist()
+            f"part. {int(i)}, sum_hits={sum_hits[i]:.2f}, E={energies[i-1]:.2f}, hit_type={hit_types[n].item()}"
+            for n, i in enumerate(graph.ndata["particle_number"].long().tolist())
         ]
         if labels is not None:
             has_track = scatter_sum(graph.ndata["h"][:, 8], labels.long().cpu())
             #if has_track.sum() == 0.0:
-            #    return   # filter ! ! ! Only plot those with tracks
-            pids = df.pid.values
+            #    return   # Filter !!! Only plot those with tracks
+            # pids = df.pid.values
             ht_clusters = [f"cluster {i}, has_track={has_track[i]}" for i in labels]
             ht = zip(ht, ht_clusters)
             ht = [f"{a}, {b}" for a, b in ht]
-        c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]
+
+        def get_from_list(lst, i):
+            if i < len(lst):
+                return lst[i]
+            else:
+                return "gray"
         if labels is not None:
-            c = [color_list[int(i.item())] for i in labels]
+            c = [get_from_list(color_list, i) for i in labels]
+        if color_hittype:
+            c = [color_list[int(i.item())] for i in graph.ndata["hit_type"]]
+        else:
+            c = [color_list[int(i.item())] for i in graph.ndata["particle_number"]]
+
         if pandora:
             c = [color_list[int(i.item())] for i in graph.ndata["pandora_cluster"]]
+
+        hit_pos = hit_pos[mask]
+        ht = [ht[i] for i in range(len(ht)) if mask[i]]
+
         fig.add_trace(
             go.Scatter3d(
                 x=hit_pos[:, 0],
@@ -2405,19 +2424,20 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
                             hovertext=hovertext,
                         )
                     )
-                plot_single_arrow(
-                    fig,
-                    vectors[i] / 5,
-                    hovertext=f"track {track_p[i]} , pxpypz={vf[i]}",
-                    init_pt=trks[i],
-                )  # a bit smaller
-                if pos_at_vertex is not None:
+                if False:
                     plot_single_arrow(
                         fig,
-                        pos_at_vertex[i],
-                        hovertext=f"track at DCA {ps_vertex[i]}, px,py,pz={pos_at_vertex[i]}",
-                        init_pt=[0, 0, 0],
-                    )
+                        vectors[i] / 5,
+                        hovertext=f"track {track_p[i]} , pxpypz={vf[i]}",
+                        init_pt=trks[i],
+                    )  # a bit smaller
+                    if pos_at_vertex is not None:
+                        plot_single_arrow(
+                            fig,
+                            pos_at_vertex[i],
+                            hovertext=f"track at DCA {ps_vertex[i]}, px,py,pz={pos_at_vertex[i]}",
+                            init_pt=[0, 0, 0],
+                        )
         # Color this by graph.ndata["particle_number"]
     # Get the norm of vertices
     displacement = np.linalg.norm(vertices, axis=1)
@@ -2497,81 +2517,85 @@ def plot_event(df, pandora=True, output_dir="", graph=None, y=None, labels=None,
         #v = [0, 0, 0]  # Do an average of the hits for plotting this
         #v = vertices[i]
         # ... Add lines ...
-        fig.add_trace(
-            go.Scatter3d(
-                x=ref_pt[mask][:, 0] + predpos[:, 0],
-                y=ref_pt[mask][:, 1] + predpos[:, 1],
-                z=ref_pt[mask][:, 2] + predpos[:, 2],
-                mode="markers",
-                marker=dict(size=4, color="red"),
-                name="ML",
-                hovertext=df.calibrated_E.values,
-            )
-        )
-        for i in range(len(predpos)):
-            v = ref_pt[i]
+        if False:
             fig.add_trace(
                 go.Scatter3d(
-                    x=[v[0], v[0] + predpos[i, 0]],
-                    y=[v[1], v[1] + predpos[i, 1]],
-                    z=[v[2], v[2] + predpos[i, 2]],
-                    mode="lines",
-                    line=dict(color="red", width=1),
+                    x=ref_pt[mask][:, 0] + predpos[:, 0],
+                    y=ref_pt[mask][:, 1] + predpos[:, 1],
+                    z=ref_pt[mask][:, 2] + predpos[:, 2],
+                    mode="markers",
+                    marker=dict(size=4, color="red"),
+                    name="ML",
+                    hovertext=df.calibrated_E.values,
                 )
-    )
+            )
+            for i in range(len(predpos)):
+                v = ref_pt[i]
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[v[0], v[0] + predpos[i, 0]],
+                        y=[v[1], v[1] + predpos[i, 1]],
+                        z=[v[2], v[2] + predpos[i, 2]],
+                        mode="lines",
+                        line=dict(color="red", width=1),
+                    )
+        )
     # Plot GT (but translate it according to the Pandora or ML reference pt)
     # Add lines from (0, 0, 0) to these points...
     truepos_norm = truepos / np.linalg.norm(truepos, axis=1).reshape(-1, 1)  # From vertex!
     truepos_norm_from_ref_pt = truepos_norm# - GT_translation
     truepos_norm_from_ref_pt /= np.linalg.norm(truepos_norm_from_ref_pt, axis=1).reshape(-1, 1)
     truepos_norm_from_ref_pt *= scale
-    fig.add_trace(
-        go.Scatter3d(
-            x=ref_pt[:, 0] + truepos_norm_from_ref_pt[:, 0],
-            y=ref_pt[:, 1] + truepos_norm_from_ref_pt[:, 1],
-            z=ref_pt[:, 2] + truepos_norm_from_ref_pt[:, 2],
-            mode="markers",
-            marker=dict(size=4, color=[color_list[c] for c in col]),
-            name="ground truth",
-            hovertext=ht,
-            hoverinfo="text",
-        )
-    )
-    # Also plot a dotted black line for each vertex from vertex to the true position
-    for i in range(len(truepos[mask])):
-        v = ref_pt[i]
+    if False:
         fig.add_trace(
             go.Scatter3d(
-                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
-                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
-                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
-                mode="lines",
-                line=dict(color="blue", width=1),
+                x=ref_pt[:, 0] + truepos_norm_from_ref_pt[:, 0],
+                y=ref_pt[:, 1] + truepos_norm_from_ref_pt[:, 1],
+                z=ref_pt[:, 2] + truepos_norm_from_ref_pt[:, 2],
+                mode="markers",
+                marker=dict(size=4, color=[color_list[c] for c in col]),
+                name="ground truth",
+                hovertext=ht,
+                hoverinfo="text",
             )
         )
-        v = vertices[mask][i]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
-                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
-                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
-                mode="lines",
-                line=dict(color="black", width=2),
+    if False:
+        # ignore this block for now and just look at the hits
+        # Also plot a dotted black line for each vertex from vertex to the true position
+        for i in range(len(truepos[mask])):
+            v = ref_pt[i]
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                    y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                    z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                    mode="lines",
+                    line=dict(color="blue", width=1),
+                )
             )
-        )
-        v = [0, 0, 0]
-        fig.add_trace(
-            go.Scatter3d(
-                x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
-                y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
-                z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
-                mode="lines",
-                line=dict(color="gray", width=2),
+            v = vertices[mask][i]
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                    y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                    z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                    mode="lines",
+                    line=dict(color="black", width=2),
+                )
             )
-        )
-    assert output_dir != ""
-    if "25.0" in output_dir:
-        print("26")
+            v = [0, 0, 0]
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[v[0], v[0] + truepos_norm_from_ref_pt[i, 0]],
+                    y=[v[1], v[1] + truepos_norm_from_ref_pt[i, 1]],
+                    z=[v[2], v[2] + truepos_norm_from_ref_pt[i, 2]],
+                    mode="lines",
+                    line=dict(color="gray", width=2),
+                )
+            )
+        assert output_dir != ""
+        if "25.0" in output_dir:
+            print("26")
     plotly.offline.plot(fig, filename=output_dir + "event.html")
     # also plot a png for big events which cannot be rendered fast
     fig.write_image(output_dir + "event.png")
