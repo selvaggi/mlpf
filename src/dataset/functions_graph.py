@@ -422,5 +422,7 @@ def make_bad_tracks_noise_tracks(g):
         bad_tracks = (distance_track_cluster>0.21)+(angles<0.9998)
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         
-        g.ndata["particle_number"][index_bad_tracks]= 0 
+        g.ndata["particle_number"][index_bad_tracks]= 0
+    else:
+        index_bad_tracks = []
     return g, index_bad_tracks
