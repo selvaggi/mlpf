@@ -173,10 +173,11 @@ def get_hit_features(
         pandora_ref_point = None
         pandora_pid = None
     # hit type
+    # t0 = time.time()
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
-
+    # t1 = time.time()
     (
         hit_particle_link,
         hit_link_modified,
@@ -184,9 +185,10 @@ def get_hit_features(
     ) = modify_index_link_for_gamma_e(
         hit_type_feature, hit_particle_link, daughters, output, number_part, is_Ks
     )
-
+    # t2 = time.time()
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-
+    # t3 = time.time()
+    # wandb.log({"time_hit_type_feature": t1-t0, "time_modify_index_link_for_gamma_e": t2-t1, "time_find_cluster_id": t3-t2})
     # position, e, p
     pos_xyz_hits = torch.permute(
         torch.tensor(output["pf_points"][0:3, 0:number_hits]), (1, 0)
@@ -195,7 +197,7 @@ def get_hit_features(
         torch.tensor(output["pf_features"][0:2, 0:number_hits]), (1, 0)
     )  # removed theta, phi
     p_hits = pf_features_hits[:, 0].unsqueeze(1)
-    p_hits[p_hits == -1] = 0  # correct p  of Hcal hits to be 0
+    p_hits[p_hits == -1] = 0  # correct p of Hcal hits to be 0
     e_hits = pf_features_hits[:, 1].unsqueeze(1)
     e_hits[e_hits == -1] = 0  # correct the energy of the tracks to be 0
     if pos_pxpy:

@@ -255,7 +255,7 @@ class ExampleWrapper(L.LightningModule):
         del losses
         # final_time = time()
         # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
-        # wandb.log({"training_step_time": final_time - initial_time})
+        # wandb.log({"training_step_time": final_time - initial_time, "loss_time_inside_training": loss_time_end - loss_time_start})
         return loss
 
     def validation_step(self, batch, batch_idx):
