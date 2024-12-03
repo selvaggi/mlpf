@@ -182,7 +182,17 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             self.gnn = None
         self.pid_channels = pid_channels
         if pid_channels > 1: # 1 is just the 'other' category
-            self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels)   # Additional head for PID classification
+            n_layers = self.n_layers_pid_head
+            if n_layers == 1:
+                self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels)   # Additional head for PID classification
+            else:
+                self.PID_head = nn.ModuleList()
+                self.PID_head.append(nn.Linear(out_features_gnn + in_features_global, 64))
+                for i in range(n_layers - 1):
+                    self.PID_head.append(nn.Linear(64, 64))
+                    self.PID_head.append(nn.ReLU())
+                self.PID_head.append(nn.Linear(64, pid_channels))
+                self.PID_head = nn.Sequential(*self.PID_head)
             self.PID_head.to(device)
         if ckpt_file is not None and ckpt_file != "" and not self.charged:
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
@@ -191,7 +201,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 # if self.use_gatr:
                 #     self.gatr = CPU_Unpickler(f).load()
             print("Loaded energy correction model weights from ECNetWrapperGNNGlobalFeaturesSeparate", ckpt_file)
-    
+
         else:
             print("Not loading energy correction model weights")
         if not self.charged:
@@ -1233,8 +1243,6 @@ class EnergyCorrection():
                     print("Charged class weights:", weights)
                 else:
                     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
-                    if self.args.is_muons:
-                        weights[-1] = 10
                 if len(charged_PID_pred):
                     mask_charged = mask_charged.bool()
                     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(

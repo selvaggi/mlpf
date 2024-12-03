@@ -233,7 +233,10 @@ class _SimpleIter(object):
                 self.cursor = 0
                 i = self.indices[self.cursor]
             self.cursor += 1
+            # t0 = time.time()
             data, graph_empty = self.get_data(i)
+            # t1 = time.time()
+            # wandb.log({"time_to_get_data": t1 - t0})
         return data
 
     def _try_get_next(self, init=False):
@@ -285,9 +288,12 @@ class _SimpleIter(object):
         # inputs
         X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
         if not self.synthetic:
+            # t0 = time.time()
             [g, features_partnn], graph_empty = create_graph(
                 X, self._data_config, n_noise=self.n_noise
             )
+            # t1 = time.time()
+            # wandb.log({"time_to_create_graph": t1 - t0})
         else:
             npart_min, npart_max = self.synthetic_npart_min, self.synthetic_npart_max
             [g, features_partnn], graph_empty = create_graph_synthetic(

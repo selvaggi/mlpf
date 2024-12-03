@@ -236,7 +236,7 @@ def create_graph(
     is_Ks = config.graph_config.get("ks", False)
     is_muons = config.graph_config.get("muons", False)
     noise_class = config.graph_config.get("noise", False)
-    
+    # t0 = time.time()
     result = create_inputs_from_table(
         output,
         hits_only=hits_only,
@@ -245,6 +245,8 @@ def create_graph(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
+    # t1 = time.time()
+    # wandb.log({"time_create_inputs_from_table": t1-t0})
    
     if len(result) == 1:
         graph_empty = True
@@ -273,15 +275,16 @@ def create_graph(
             hit_type_one_hot,
             connections_list
         ) = result
-       
+        # t0 = time.time()
         mask_loopers, mask_particles = create_noise_label(
         e_hits, hit_particle_link, y_data_graph, cluster_id
         )
         hit_particle_link[mask_loopers] = -1
         y_data_graph.mask(mask_particles)
-
+        # t1 = time.time()
         cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-           
+        # t2 = time.time()
+        # wandb.log({"time_create_noise_label": t1-t0, "time_find_cluster_id": t2-t1})
         # build graph
         graph_coordinates = pos_xyz_hits 
         graph_empty = False
@@ -338,9 +341,9 @@ def create_graph(
     if graph_empty:
         return [g, y_data_graph], graph_empty
     # print("graph_empty",graph_empty)
-
+    # t0 = time.time()
     g = store_track_at_vertex_at_track_at_calo(g)
-
+    # t1 = time.time()
     # if noise_class:
     g = make_bad_tracks_noise_tracks(g)
     # if torch.sum(scatter_count(g.ndata["particle_number"])[1:]==0)>0:
@@ -353,7 +356,8 @@ def create_graph(
     #     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
     #     g.ndata["particle_number_nomap"] = hit_particle_link
     #     g.ndata["particle_number"] = cluster_id
-
+    # t2 = time.time()
+    # wandb.log({"time_store_track_at_vertex_at_track_at_calo": t1-t0, "time_make_bad_tracks_noise_tracks": t2-t1})
     return [g, y_data_graph], graph_empty
 
 
