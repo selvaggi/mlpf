@@ -30,8 +30,7 @@ def create_inputs_from_table(
     """
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
-
-
+    # t0 = time.time()
     (
         pos_xyz_hits,
         pos_pxpypz,
@@ -60,10 +59,13 @@ def create_inputs_from_table(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
+    # t1 = time.time()
     # features particles
     y_data_graph = get_particle_features(
         unique_list_particles, output, prediction, connection_list
     )
+    # t2 = time.time()
+    # wandb.log({"time_get_hit_features": t1 - t0, "time_get_particle_features": t2 - t1})
     assert len(y_data_graph) == len(unique_list_particles)
     # remove particles that have no energy, no hits or only track hits
     mask_hits, mask_particles = find_mask_no_energy(
