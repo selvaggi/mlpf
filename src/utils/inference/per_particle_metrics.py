@@ -464,8 +464,8 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
-    class_true = np.array(sd_hgb1["pid_4_class_true"].values).astype(int)
-    class_pred = np.array(sd_hgb1["pred_pid_matched"].values).astype(int)
+    class_true = np.array(sd_hgb1["pid_4_class_true"].values)
+    class_pred = np.array(sd_hgb1["pred_pid_matched"].values)
     n_classes = class_true[~np.isnan(class_true)].max() + 1
     n_classes_pred = class_pred[~np.isnan(class_pred)].max() + 1
     n_classes = max(n_classes, n_classes_pred)
@@ -481,10 +481,12 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     class_true[np.isnan(class_true)] = class_nan
     class_pred[np.isnan(class_pred)] = class_nan
     from sklearn.metrics import confusion_matrix
-    print("1", set(list(class_true)), set(list(class_pred)))
-    cm = confusion_matrix(class_true, class_pred, labels=list(range(n_classes + 1)))
-    assert cm.shape[0] == cm.shape[1]
-    assert cm.shape[0] == n_classes + 1
+    #print("1", set(list(class_true)), set(list(class_pred)))
+    cm = confusion_matrix(class_true, class_pred)#, labels=list(range(n_classes + 1)))
+    if cm.shape[0] < n_classes + 1:
+        cm = np.pad(cm, ((0, n_classes + 1 - cm.shape[0]), (0, n_classes + 1 - cm.shape[1]))) # for the GT clustering
+    #assert cm.shape[0] == cm.shape[1]
+    #assert cm.shape[0] == n_classes + 1
     savefigs = ax is None
     # Plot cm
     # Add pie charts
@@ -529,7 +531,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
                         ha="center", va="center", color="0.8",
                         fontsize=9)
     else:
-        # now plot just the ticks on the plot without the CM
+        # Now plot just the ticks on the plot without the CM
         ax.set_xticks(np.arange(cm.shape[1]) + 0.5, minor=False)
         ax.set_yticks(np.arange(cm.shape[0]) + 0.5, minor=False)
         print("Class names pred:", class_names_pred, "cm.shape", cm.shape)
@@ -616,9 +618,10 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     is_trk = sd_pandora.is_track_in_cluster.values
     #class_true = np.array([nanindex(x, all_pids) for x in class_true])
     #class_pred = np.array([nanindex(x, all_pids) for x in class_pred])
-    max_class = max(list(our_to_pandora_mapping.keys()))
-    assert max_class + 1 in [4, 5]
-    is_muons = max_class + 1 == 5
+    class_true_no_nan = np.array([pid_conversion_dict[x] for x in class_true[~np.isnan(class_true)]])
+    max_class = class_true_no_nan.max()
+    assert max_class in [3, 4]
+    is_muons = max_class == 4
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0 # Maybe the pid_conversion_dict is not fully up-to-date?
     class_true = np.array([pid_conversion_dict.get(x, max_class+1) for x in class_true])
     class_pred = np.array([pandora_to_our_mapping.get(x, max_class+1) for x in class_pred])
