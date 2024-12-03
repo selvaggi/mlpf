@@ -192,7 +192,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     self.PID_head.append(nn.Linear(64, 64))
                     self.PID_head.append(nn.ReLU())
                 self.PID_head.append(nn.Linear(64, pid_channels))
-            self.PID_head = nn.Sequential(*self.PID_head)
+                self.PID_head = nn.Sequential(*self.PID_head)
             self.PID_head.to(device)
         if ckpt_file is not None and ckpt_file != "" and not self.charged:
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
