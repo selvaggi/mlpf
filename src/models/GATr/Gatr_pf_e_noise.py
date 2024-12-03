@@ -460,7 +460,7 @@ class ExampleWrapper(L.LightningModule):
         #     T_max=int(7900*3), # for now for testing
         #     eta_min=1e-6,
         # )
-        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(7900*3), fixed_lr=1e-6 ) #10000
+        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(9000*3), fixed_lr=1e-6 ) #10000
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
