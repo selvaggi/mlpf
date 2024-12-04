@@ -661,6 +661,8 @@ class EnergyCorrection():
             pids_neutral = [2, 3]
         if self.args.is_muons:
             pids_charged += [4]
+            if not self.args.restrict_PID_charge:
+                pids_neutral += [4]
         self.pids_charged = pids_charged
         self.pids_neutral = pids_neutral
 
@@ -1265,6 +1267,8 @@ class EnergyCorrection():
                     loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
                         neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
                     )
+                    print("Neutral PID pred:\n", neutral_PID_pred[mask_neutral][:4])
+                    print("Neutral PID true:\n", neutral_PID_true_onehot[mask_neutral][:4])
                 else:
                     loss_neutral_pid = 0
                 wandb.log({"loss_neutral_pid": loss_neutral_pid})
