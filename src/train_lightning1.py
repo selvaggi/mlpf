@@ -64,9 +64,8 @@ def main():
             logger=wandb_logger,
             max_epochs=args.num_epochs,
             strategy="ddp",
-            limit_train_batches=10000,
-            limit_val_batches=20,
-            #profiler=profiler
+            limit_train_batches=9000,
+            limit_val_batches=50,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)

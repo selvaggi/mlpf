@@ -345,7 +345,7 @@ def create_graph(
     g = store_track_at_vertex_at_track_at_calo(g)
     # t1 = time.time()
     # if noise_class:
-    g, index_bad_tracks = make_bad_tracks_noise_tracks(g)
+    g = make_bad_tracks_noise_tracks(g)
     # if torch.sum(scatter_count(g.ndata["particle_number"])[1:]==0)>0:
     #     print("here")
     #     hit_particle_link = g.ndata["particle_number_nomap"]
@@ -426,7 +426,5 @@ def make_bad_tracks_noise_tracks(g):
         bad_tracks = (distance_track_cluster>0.21)+(angles<0.9998)
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         
-        g.ndata["particle_number"][index_bad_tracks]= 0
-    else:
-        index_bad_tracks = []
-    return g, index_bad_tracks
+        g.ndata["particle_number"][index_bad_tracks]= 0 
+    return g
