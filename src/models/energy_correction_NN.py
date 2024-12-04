@@ -469,8 +469,9 @@ class PickPAtDCA(torch.nn.Module):
 
 class AverageHitsP(torch.nn.Module):
     # Same layout of the module as the GNN one, but just computes the average of the hits. Try to compare this + ML clustering with Pandora
-    def __init__(self):
+    def __init__(self, ecal_only=False):
         super(AverageHitsP, self).__init__()
+        self.ecal_only = ecal_only
     def predict(self, x_global_features, graphs_new=None, explain=False):
         """
         Forward, named 'predict' for compatibility reasons
@@ -482,12 +483,23 @@ class AverageHitsP(torch.nn.Module):
         batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
         batch_idx = []
         batch_bounds = []
+        if self.ecal_only:
+            mask_ecal_only = [] # whether to consider only ECAL or ECAL+HCAL
         for i, n in enumerate(batch_num_nodes):
             batch_idx.extend([i] * n)
             batch_bounds.append(n)
+            if self.ecal_only:
+                n_ecal_hits = (graphs_new.ndata["h"][batch_idx == i, 3] > 0).sum()
+                n_hcal_hits = (graphs_new.ndata["h"][batch_idx == i, 4] > 0).sum()
+                for _ in range(n):
+                    mask_ecal_only.append(n_ecal_hits / (n_hcal_hits + n_ecal_hits))
+        mask_ecal_only = torch.tensor(mask_ecal_only).round().int().bool().to(graphs_new.device)
         batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
         xyz_hits = graphs_new.ndata["h"][:, :3]
         E_hits = graphs_new.ndata["h"][:, 8]
+        if self.ecal_only:
+            hcal_hits = graphs_new.ndata["h"][:, 4] > 0
+            E_hits[mask_ecal_only & (hcal_hits)] = 0
         weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
         E_total = scatter_sum(E_hits, batch_idx, dim=0)
         p_direction = weighted_avg_hits / E_total.unsqueeze(1)
@@ -778,11 +790,7 @@ class EnergyCorrection():
         #    dim=0,
         # )
         # node_features_avg = node_features_avg[:, 0:3]
-        weights = graphs_new.ndata["h"][:, 7].view(-1, 1)  # Energies as the weights
-        normalizations = scatter_add(weights, batch_idx, dim=0)
         # normalizations1 = torch.ones_like(weights)
-        normalizations1 = normalizations[batch_idx]
-        weights = weights / normalizations1
         # node_features_avg = scatter_add(
         #    graphs_new.ndata["h"]*weights, batch_idx, dim=0
         # )[: , 0:3]
