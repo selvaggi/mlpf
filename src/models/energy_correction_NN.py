@@ -207,7 +207,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         if not self.charged:
             self.model.to(device)
         self.PickPAtDCA = PickPAtDCA()
-        self.AvgHits = AverageHitsP()
+        self.AvgHits = AverageHitsP(ecal_only=True)
         self.NeutralPCA = NeutralPCA()
         self.ThrustAxis = ThrustAxis()
 
@@ -388,7 +388,7 @@ class ECNetWrapperAvg(torch.nn.Module):
     # This one concatenates GNN features to the global features
     def __init__(self):
         super(ECNetWrapperAvg, self).__init__()
-        self.AvgHits = AverageHitsP()
+        self.AvgHits = AverageHitsP(ecal_only=True)
 
     def predict(self, x_global_features, graphs_new=None, explain=False):
         """
@@ -488,13 +488,17 @@ class AverageHitsP(torch.nn.Module):
         for i, n in enumerate(batch_num_nodes):
             batch_idx.extend([i] * n)
             batch_bounds.append(n)
+        batch_idx = np.array(batch_idx)
+        for i in range(len(np.unique(batch_idx))):
             if self.ecal_only:
-                n_ecal_hits = (graphs_new.ndata["h"][batch_idx == i, 3] > 0).sum()
-                n_hcal_hits = (graphs_new.ndata["h"][batch_idx == i, 4] > 0).sum()
-                for _ in range(n):
-                    mask_ecal_only.append(n_ecal_hits / (n_hcal_hits + n_ecal_hits))
-        mask_ecal_only = torch.tensor(mask_ecal_only).round().int().bool().to(graphs_new.device)
+                n_ecal_hits = (graphs_new.ndata["h"][batch_idx == i, 5] > 0).sum()
+                n_hcal_hits = (graphs_new.ndata["h"][batch_idx == i, 6] > 0).sum()
+                if self.ecal_only:
+                    for _ in range(batch_num_nodes[i]):
+                        mask_ecal_only.append((n_ecal_hits / (n_hcal_hits + n_ecal_hits)).item())
         batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
+        if self.ecal_only:
+            mask_ecal_only = torch.tensor(mask_ecal_only).round().int().bool().to(graphs_new.device)
         xyz_hits = graphs_new.ndata["h"][:, :3]
         E_hits = graphs_new.ndata["h"][:, 8]
         if self.ecal_only:
