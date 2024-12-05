@@ -131,7 +131,7 @@ def calc_LV_Lbeta(
     # print("n_hits_per_object", n_hits_per_object)
     batch_object = batch_cluster[is_object]
     n_objects = is_object.sum()
-
+ 
     assert object_index.size() == (n_hits_sig,)
     assert is_object.size() == (n_clusters,)
     assert torch.all(n_hits_per_object > 0)
@@ -279,105 +279,72 @@ def calc_LV_Lbeta(
         # tracks = g.ndata["hit_type"][is_sig]==1
         # hit_type[tracks] = 250
         # total_sum_hits_types = scatter_add(hit_type.view(-1), object_index)
-        V_attractive = q[is_sig].unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+
+        weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
+        total_sum_weights = scatter_add(weights.view(-1), object_index)
+        V_attractive = (weights*q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
         assert V_attractive.size() == (n_hits_sig, n_objects)
-        #! each shower is account for separately
         V_attractive = V_attractive.sum(dim=0)  # K objects
-        #! divide by the number of accounted points
-      
-        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
+        # V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
+        V_attractive = V_attractive.view(-1) / (total_sum_weights.view(-1) + 1e-3)
+
+
         # V_attractive = V_attractive.view(-1) / (total_sum_hits_types.view(-1) + 1e-3)
         # L_V_attractive = torch.mean(V_attractive)
-
         ## multiply by a weight that depends on the energy of the shower:
-        e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
-        weight_att = torch.exp(e_hits/10)  
-        # print("e_hits", e_hits)
-        # print("weight_att", weight_att)
-        L_V_attractive = torch.sum(V_attractive*weight_att)
-        # L_V_attractive = torch.mean(V_attractive)
-        L_V_attractive = L_V_attractive / torch.sum(weight_att)
-
+        # e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
+        # weight_att = torch.exp(e_hits/6)   # form the calculations of the energy distribution 
+        # L_V_attractive = torch.sum(V_attractive*weight_att)
+        # L_V_attractive = L_V_attractive / torch.sum(weight_att)
+        
+        L_V_attractive = torch.mean(V_attractive)
         L_V_attractive_2 = torch.sum(V_attractive)
     elif loss_type == "vrepweighted":
-        if tracking:
-            # weight the vtx hits inside the shower
-            V_attractive = (
-                g.ndata["weights"][is_sig].unsqueeze(-1)
-                * q[is_sig].unsqueeze(-1)
-                * q_alpha.unsqueeze(0)
-                * norms_att
-            )
-            assert V_attractive.size() == (n_hits_sig, n_objects)
-            V_attractive = V_attractive.sum(dim=0)  # K objects
+        
+        # # weight per hit per shower to compensate for ecal hcal unbalance in hadronic showers
+        weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
 
-            L_V_attractive = torch.mean(V_attractive.view(-1))
-        else:
-            # # weight per hit per shower to compensate for ecal hcal unbalance in hadronic showers
-            # ecal_hits = scatter_add(
-            #     1 * (g.ndata["hit_type"][is_sig] == 2), object_index
-            # )
-            # hcal_hits = scatter_add(
-            #     1 * (g.ndata["hit_type"][is_sig] == 3), object_index
-            # )
-            # weights = torch.ones_like(g.ndata["hit_type"][is_sig])
-            # weight_ecal_per_object = 1.0 * ecal_hits.clone() + 1
-            # weight_hcal_per_object = 1.0 * ecal_hits.clone() + 1
-            # mask = (ecal_hits > 2) * (hcal_hits > 2)
-            # weight_ecal_per_object[mask] = (ecal_hits + hcal_hits)[mask] / (
-            #     2 * ecal_hits
-            # )[mask]
-            # weight_hcal_per_object[mask] = (ecal_hits + hcal_hits)[mask] / (
-            #     2 * hcal_hits
-            # )[mask]
-            # weights[g.ndata["hit_type"][is_sig] == 2] = weight_ecal_per_object[
-            #     object_index
-            # ]
-            # weights[g.ndata["hit_type"][is_sig] == 3] = weight_hcal_per_object[
-            #     object_index
-            # ]
+        # # weight with an energy log of the hits
+        # e_hits = g.ndata["e_hits"][is_sig].view(-1)
+        # p_hits = g.ndata["h"][:, -1][is_sig].view(-1)
+        # log_scale_s = torch.log(e_hits + p_hits) + 10
+        # e_sum_hits = scatter_add(log_scale_s, object_index)
+        # # need to take out the weight of alpha otherwise it won't add up to 1
+        # e_sum_hits = e_sum_hits - (log_scale_s[index_alpha])
+        # e_rel = (log_scale_s) / e_sum_hits[object_index]
 
-            # # weight with an energy log of the hits
-            # e_hits = g.ndata["e_hits"][is_sig].view(-1)
-            # p_hits = g.ndata["h"][:, -1][is_sig].view(-1)
-            # log_scale_s = torch.log(e_hits + p_hits) + 10
-            # e_sum_hits = scatter_add(log_scale_s, object_index)
-            # # need to take out the weight of alpha otherwise it won't add up to 1
-            # e_sum_hits = e_sum_hits - (log_scale_s[index_alpha])
-            # e_rel = (log_scale_s) / e_sum_hits[object_index]
+        # weight of the hit depending on the radial distance:
+        # this weight should help to seed
+        # weight_radial_distance = torch.exp(
+        #     -g.ndata["radial_distance"][is_sig] / 100
+        # )
+        # weight_per_object = scatter_add(weight_radial_distance, object_index)
+        # weight_radial_distance = (
+        #     weight_radial_distance / weight_per_object[object_index]
+        # )
 
-            # weight of the hit depending on the radial distance:
-            # this weight should help to seed
-            # weight_radial_distance = torch.exp(
-            #     -g.ndata["radial_distance"][is_sig] / 100
-            # )
-            # weight_per_object = scatter_add(weight_radial_distance, object_index)
-            # weight_radial_distance = (
-            #     weight_radial_distance / weight_per_object[object_index]
-            # )
+        V_attractive = (
+            q[is_sig].unsqueeze(-1)  ## weight_radial_distance.unsqueeze(-1)
+            * q_alpha.unsqueeze(0)
+            * norms_att
+        )
 
-            V_attractive = (
-                q[is_sig].unsqueeze(-1)  ## weight_radial_distance.unsqueeze(-1)
-                * q_alpha.unsqueeze(0)
-                * norms_att
-            )
-
-            # weight modified showers with a higher weight
-            modified_showers = scatter_max(g.ndata["hit_link_modified"], object_index)[
-                0
-            ]
-            n_modified = torch.sum(modified_showers)
-            weight_modified = len(modified_showers) / (2 * n_modified)
-            weight_unmodified = len(modified_showers) / (
-                2 * (len(modified_showers) - n_modified)
-            )
-            modified_showers[modified_showers > 0] = weight_modified
-            modified_showers[modified_showers == 0] = weight_unmodified
-            assert V_attractive.size() == (n_hits_sig, n_objects)
-            V_attractive = V_attractive.sum(dim=0)  # K objects
-            L_V_attractive = torch.sum(
-                modified_showers.view(-1) * V_attractive.view(-1)
-            ) / len(modified_showers)
+        # weight modified showers with a higher weight
+        modified_showers = scatter_max(g.ndata["hit_link_modified"], object_index)[
+            0
+        ]
+        n_modified = torch.sum(modified_showers)
+        weight_modified = len(modified_showers) / (2 * n_modified)
+        weight_unmodified = len(modified_showers) / (
+            2 * (len(modified_showers) - n_modified)
+        )
+        modified_showers[modified_showers > 0] = weight_modified
+        modified_showers[modified_showers == 0] = weight_unmodified
+        assert V_attractive.size() == (n_hits_sig, n_objects)
+        V_attractive = V_attractive.sum(dim=0)  # K objects
+        L_V_attractive = torch.sum(
+            modified_showers.view(-1) * V_attractive.view(-1)
+        ) / len(modified_showers)
     else:
         # Final potential term
         # (n_sig_hits, 1) * (1, n_objects) * (n_sig_hits, n_objects)
@@ -1224,3 +1191,49 @@ def object_condensation_loss2(
     loss = 1 * a[0] + a[1]  
       
     return loss, a
+
+
+def calculate_weights_for_class_hit_type(g, object_index, is_sig):
+    ecal_hits = scatter_add(
+    1 * (g.ndata["hit_type"] == 2)[is_sig], object_index.long()
+    )
+    hcal_hits = scatter_add(
+        1 * (g.ndata["hit_type"] == 3)[is_sig], object_index.long()
+    )
+    track_hits = scatter_add(
+        1 * (g.ndata["hit_type"] == 1)[is_sig], object_index.long()
+    )
+    muon_hits = scatter_add(
+        1 * (g.ndata["hit_type"] == 4)[is_sig], object_index.long()
+    )
+    number_classes = 1*(ecal_hits>0)+1*(hcal_hits>0)+1*(track_hits>0)+1*(muon_hits>0)
+    weights = 1.0 * torch.ones_like(g.ndata["hit_type"][is_sig])
+    weight_ecal_per_object = 1.0 * torch.ones_like(ecal_hits)
+    weight_hcal_per_object = 1.0 *  torch.ones_like(ecal_hits)
+    weight_track_per_object = 1.0 * torch.ones_like(ecal_hits)
+    weight_muon_per_object = 1.0 *  torch.ones_like(ecal_hits)
+    weight_ecal_per_object = (ecal_hits + hcal_hits+track_hits+muon_hits) / (
+        number_classes * ecal_hits
+    )
+    weight_hcal_per_object = (ecal_hits + hcal_hits+track_hits+muon_hits) / (
+        number_classes* hcal_hits
+    )
+    weight_track_per_object = (ecal_hits + hcal_hits+track_hits+muon_hits) / (
+        number_classes* track_hits
+    )
+    weight_muon_per_object = (ecal_hits + hcal_hits+track_hits+muon_hits) / (
+        number_classes* muon_hits
+    )
+    weights[g.ndata["hit_type"][is_sig] == 2] = weight_ecal_per_object[
+    object_index[g.ndata["hit_type"][is_sig] == 2].long()
+    ]
+    weights[g.ndata["hit_type"][is_sig] == 3] = weight_hcal_per_object[
+        object_index[g.ndata["hit_type"][is_sig] == 3].long()]
+    weights[g.ndata["hit_type"][is_sig] == 1] = weight_track_per_object[
+        object_index[g.ndata["hit_type"][is_sig] == 1].long()]
+
+    weights[g.ndata["hit_type"][is_sig] == 4] = weight_muon_per_object[
+        object_index[g.ndata["hit_type"][is_sig] == 4].long()]
+    weights = weights
+
+    return weights

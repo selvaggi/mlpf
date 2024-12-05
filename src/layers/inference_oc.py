@@ -607,14 +607,18 @@ def generate_showers_data_frame(
             -1
         )  # This takes into account that the class 0 for pandora and for dbscan is noise
         mask = pred_showers != -1
-        number_of_fake_showers = mask.sum()
-        fakes_labels = torch.where(mask)[0]
-        fake_showers_distance_to_cluster = distances[fakes_labels.cpu()]
-        fake_showers_num_tracks = number_of_tracks[fakes_labels.cpu()]
         fakes_in_event = mask.sum()
         fake_showers_e = e_pred_showers[mask]
         fake_showers_e_hcal = e_pred_showers_hcal[mask]
         fake_showers_e_ecal = e_pred_showers_ecal[mask]
+        number_of_fake_showers = mask.sum()
+        # mask is the labels which have not been matched
+        all_labels = labels.unique().to(e_pred_showers.device)
+        number_of_fake_showers = mask.sum()
+        fakes_labels = torch.where(mask)[0].to(e_pred_showers.device)
+        fake_showers_distance_to_cluster = distances[fakes_labels.cpu()]
+        fake_showers_num_tracks = number_of_tracks[fakes_labels.cpu()]
+
         if e_corr is None or pandora:
             fake_showers_e_cali = e_pred_showers_cali[mask]
             # fakes_positions = dic["graph"].ndata["coords"][mask]
@@ -1103,8 +1107,12 @@ def distance_to_true_cluster_of_track(dic, labels):
     # Also returns the number of tracks in the MC cluster that the track belongs to.
     g = dic["graph"]
     mask_hit_type_t2 = g.ndata["hit_type"] == 1
-    distances = torch.zeros(len(labels.unique())).float()
-    number_of_tracks = torch.zeros(len(labels.unique())).int()
+    if torch.sum(labels.unique()==0) == 0:
+        distances = torch.zeros(len(labels.unique())+1).float().to(labels.device)
+        number_of_tracks = torch.zeros(len(labels.unique())+1).int()
+    else:
+        distances = torch.zeros(len(labels.unique())).float().to(labels.device)
+        number_of_tracks = torch.zeros(len(labels.unique())).int()
     # labels should be a list of labels for each particle
     for i, label in enumerate(labels.unique()):
         mask_labels_i = labels == label
@@ -1119,8 +1127,8 @@ def distance_to_true_cluster_of_track(dic, labels):
         mean_pos_cluster_true = torch.mean(
             g.ndata["pos_hits_xyz"][mask_labels_i_true], dim=0
         )
-        number_of_tracks[i] = torch.sum(mask_labels_i_true * mask_hit_type_t2)
-        distances[i] = torch.norm(mean_pos_cluster_true - pos_track) / 3300
+        number_of_tracks[label] = torch.sum(mask_labels_i_true * mask_hit_type_t2)
+        distances[label] = torch.norm(mean_pos_cluster_true - pos_track) / 3300
     return distances, number_of_tracks
 
 def distance_to_cluster_track(dic, is_track_in_MC):
