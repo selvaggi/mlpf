@@ -502,7 +502,7 @@ class AverageHitsP(torch.nn.Module):
         xyz_hits = graphs_new.ndata["h"][:, :3]
         E_hits = graphs_new.ndata["h"][:, 8]
         if self.ecal_only:
-            hcal_hits = graphs_new.ndata["h"][:, 4] > 0
+            hcal_hits = graphs_new.ndata["h"][:, 6] > 0
             E_hits[mask_ecal_only & (hcal_hits)] = 0
         weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
         E_total = scatter_sum(E_hits, batch_idx, dim=0)
