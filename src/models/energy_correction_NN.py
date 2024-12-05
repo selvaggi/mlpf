@@ -498,7 +498,9 @@ class AverageHitsP(torch.nn.Module):
                         mask_ecal_only.append((n_ecal_hits / (n_hcal_hits + n_ecal_hits)).item())
         batch_idx = torch.tensor(batch_idx).to(graphs_new.device)
         if self.ecal_only:
-            mask_ecal_only = torch.tensor(mask_ecal_only).round().int().bool().to(graphs_new.device)
+            mask_ecal_only = torch.tensor(mask_ecal_only)  # round().int().bool().to(graphs_new.device)
+            mask_ecal_only = (mask_ecal_only > 0.05).int().bool().to(graphs_new.device)
+            #mask_ecal_only=torch.zeros(len(mask_ecal_only)).bool().to(graphs_new.device)
         xyz_hits = graphs_new.ndata["h"][:, :3]
         E_hits = graphs_new.ndata["h"][:, 8]
         if self.ecal_only:

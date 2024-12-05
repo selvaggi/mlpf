@@ -158,7 +158,7 @@ plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots
 plot_mass_contribution_per_PID(sd_hgb, sd_pandora, PATH_store_summary_plots)
 
 #plot_per_energy_resolution(sd_hgb, sd_pandora, PATH_store_detailed_plots)
-analyze_fakes(sd_pandora, sd_hgb, PATH_store_summary_plots)
+#analyze_fakes(sd_pandora, sd_hgb, PATH_store_summary_plots)
 plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_summary_plots)
 
 pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
@@ -174,9 +174,12 @@ displacement_hgb = np.linalg.norm(hgb_vertex, axis=1)'''
 
 # Filter the df based on where decay type is 0
 #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_individual_plots)
-fig, ax = plt.subplots(4, 8, figsize=(28, 28 * 4 / 8))  # The overview figure of efficiencies
+fig, ax = plt.subplots(4, 8, figsize=(28, 28 * 4 / 8))  # The overview figure of efficiencies #
+fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
 plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax)
+plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax_eff)
+
 plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 4:6])
 reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
 column_cm_full = 6
@@ -190,6 +193,8 @@ for x_position in x_positions:
     fig.subplots_adjust(wspace=0.5, hspace=0.5)  # Adjust spacing if necessary
     fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
 fig.tight_layout()
+fig_eff.tight_layout()
+fig_eff.savefig(os.path.join(PATH_store_individual_plots, "overview_Efficiency_FakeRate.pdf"))
 fig.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
 x = sd_hgb.pred_ref_pt_matched[sd_hgb.is_track_in_cluster==1].values
 x = np.stack(x)
