@@ -1200,7 +1200,7 @@ def calculate_weights_for_class_hit_type(g, object_index, is_sig):
     hcal_hits = scatter_add(
         1 * (g.ndata["hit_type"] == 3)[is_sig], object_index.long()
     )
-    mask = (hcal_hits<10).bool()*(ecal_hits>0).bool()
+    mask = (hcal_hits<10).bool()*(ecal_hits>0).bool()*(hcal_hits>0).bool()
     hcal_hits[mask]=ecal_hits[mask].long()
     track_hits = scatter_add(
         1 * (g.ndata["hit_type"] == 1)[is_sig], object_index.long()
