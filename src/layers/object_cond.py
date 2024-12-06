@@ -1256,8 +1256,9 @@ def calculate_delta_MC(y, batch_g):
     batch_id = y.batch_number
     df_list = []
     for i in range(0, len(graphs)):
-        mask = batch_id == 0
+        mask = batch_id == i
         y_i = y.mask(mask)
+
         pseudorapidity = -torch.log(torch.tan(y_i.angle[:,0] / 2))
         phi = y_i.angle[:,1]
         x1 = torch.cat((pseudorapidity.view(-1, 1), phi.view(-1, 1)), dim=1)
