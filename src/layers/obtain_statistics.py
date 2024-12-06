@@ -87,7 +87,7 @@ def save_stat_dict(stat_dict, path):
     path = path + "/stat_dict.pt"
     torch.save(stat_dict, path)
 
-def stacked_hist_plot(lst, lst_pandora, path_store, title, title_no_latex, ax=None):
+def stacked_hist_plot(lst, lst_pandora, path_store, title, title_no_latex, ax=None, narrow=False):
     # lst is a list of arrays. plot them in a stacked histogram with the same X-axis
     savefigs = ax is None
     if savefigs:
@@ -96,10 +96,12 @@ def stacked_hist_plot(lst, lst_pandora, path_store, title, title_no_latex, ax=No
         #    ax = [ax]
     binsE = [0, 5, 15, 35, 51]
     for i in range(len(lst)):
-        if i == 0:
+        if i == 0 or i == 1:
             bins = np.linspace(-0.1, 0.1, 300)
         else:
             bins = np.linspace(-0.1, 0.1, 300)
+            if narrow:
+                bins = np.linspace(-0.025, 0.025, 300)
         ax[i].hist(lst[i], bins, histtype="step", label="ML", color="red", density=True)
         if i < len(lst_pandora):
             ax[i].hist(lst_pandora[i], bins, histtype="step", label="Pandora", color="blue", density=True)
