@@ -193,12 +193,14 @@ def calculate_response(matched, pandora, log_scale=False):
     )
 
 
-def get_sigma_gaussian(e_over_reco, bins_per_binned_E, epsilon=0.01):
+def get_sigma_gaussian(e_over_reco, bins_per_binned_E, epsilon=0.01, return_gaussian=False, return_divided=True):
     #mpv, std = obtain_MPV_and_68(e_over_reco, bins_per_binned_E)
     #return mpv, std, None, None
     hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
-    mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E, epsilon=epsilon)
-    return mu, sigma_over_mu, 0,0
+
+    if not return_gaussian:
+        mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E, epsilon=epsilon)
+        return mu, sigma_over_mu, 0,0
     # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
     def gaus(X, C, X_mean, sigma):
         return C * exp(-((X - X_mean) ** 2) / (2 * sigma**2))
@@ -231,13 +233,17 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E, epsilon=0.01):
     #assert param_optimised[2] >= 0
     errors = np.sqrt(np.diag(param_covariance_matrix))
     # sigma_over_E_error = errors[2] / param_optimised[1]
-    return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]
+    if return_divided:
+        return param_optimised[1], param_optimised[2] / param_optimised[1], errors[1], errors[2] / param_optimised[1]
+    return param_optimised[1], param_optimised[2], errors[1], errors[2] / param_optimised[1]
 
-def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01):
+def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01, no_divide=False):
     hist, bin_edges = np.histogram(data_for_hist, bins=bins_per_binned_E, density=True)
     ind_max_hist = np.argmax(hist)
     MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
     std68, low, high = get_std68(hist, bin_edges, epsilon=epsilon)
+    if no_divide:
+        return MPV, std68
     return MPV, std68 / MPV
 
 
