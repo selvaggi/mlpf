@@ -399,7 +399,7 @@ def calc_LV_Lbeta(
         V_repulsive2 = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep2
         L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
         delta_MC = calculate_delta_MC(y, g)
-        weight_track = 1/(delta_MC+0.001)
+        weight_track = 1/(delta_MC+0.001).to(L_V_repulsive2.device)
         L_V_repulsive2 = torch.sum(L_V_repulsive2 * weight_track.view(-1))/torch.sum(weight_track)
 
 
@@ -1255,10 +1255,12 @@ def calculate_delta_MC(y, batch_g):
     graphs = dgl.unbatch(batch_g)
     batch_id = y.batch_number
     df_list = []
+    device = batch_id.device
     for i in range(0, len(graphs)):
         mask = batch_id == i
-        y_i = y.mask(mask)
-
+        y1 = y.copy()
+        y1.mask(mask.view(-1))
+        y_i = y1
         pseudorapidity = -torch.log(torch.tan(y_i.angle[:,0] / 2))
         phi = y_i.angle[:,1]
         x1 = torch.cat((pseudorapidity.view(-1, 1), phi.view(-1, 1)), dim=1)
@@ -1268,7 +1270,7 @@ def calculate_delta_MC(y, batch_g):
         if shape_d>1:
             delta_MC = values[:, 1]
         else:
-            delta_MC = torch.ones((shape_d,1)).view(-1).to(y_i.device)
+            delta_MC = torch.ones((shape_d,1)).view(-1).to(device)
         df_list.append(delta_MC)
     delta_MC = torch.cat(df_list)
     return delta_MC

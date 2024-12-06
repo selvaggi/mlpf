@@ -124,9 +124,9 @@ class Particles_GT:
             if getattr(self, k) is not None:
                 if type(getattr(self, k)) == list:
                     if getattr(self, k)[0] is not None:
-                        setattr(self, k, getattr(self, k)[mask.view(-1)])
+                        setattr(self, k, getattr(self, k)[mask])
                 else:
-                    setattr(self, k, getattr(self, k)[mask.view(-1)])
+                    setattr(self, k, getattr(self, k)[mask])
 
     def copy(self):
         obj = type(self).__new__(self.__class__)
