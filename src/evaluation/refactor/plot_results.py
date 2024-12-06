@@ -194,7 +194,7 @@ for x_position in x_positions:
     fig.add_artist(plt.Line2D([x_position, x_position], [0, 1], color="black", linewidth=2, transform=fig.transFigure))
 fig.tight_layout()
 fig_eff.tight_layout()
-fig_eff.savefig(os.path.join(PATH_store_individual_plots, "overview_Efficiency_FakeRate.pdf"))
+fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
 fig.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
 x = sd_hgb.pred_ref_pt_matched[sd_hgb.is_track_in_cluster==1].values
 x = np.stack(x)
