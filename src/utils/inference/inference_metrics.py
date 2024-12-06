@@ -6,6 +6,7 @@ from scipy import stats
 from scipy.optimize import curve_fit
 from scipy import asarray as ar, exp
 from src.utils.pid_conversion import our_to_pandora_mapping, pandora_to_our_mapping
+import pandas as pd
 
 def calculate_eff(sd, log_scale=False, pandora=False):
     if log_scale:
@@ -96,10 +97,8 @@ def calculate_response(matched, pandora, log_scale=False):
         bins = np.arange(0, 51, 2)
 
     bins_plot_histogram = [5, 6, 10, 20]
-    if pandora:
-        bins_per_binned_E = np.arange(0, 3, 0.001)
-    else:
-        bins_per_binned_E = np.arange(0, 3, 0.001)
+    bins_per_binned_E = np.arange(0, 3, 0.001)
+
     mean = []
     variance_om = []
     mean_true_rec = []
@@ -242,6 +241,11 @@ def obtain_MPV_and_68(data_for_hist, bins_per_binned_E, epsilon=0.01, no_divide=
     ind_max_hist = np.argmax(hist)
     MPV = (bin_edges[ind_max_hist] + bin_edges[ind_max_hist + 1]) / 2
     std68, low, high = get_std68(hist, bin_edges, epsilon=epsilon)
+    if std68 == 0.4 and low == 0.2 and high == 1.0:
+        # It didn't fit correctly as it's too close to a delta function
+        if type(data_for_hist) == pd.Series:
+            data_for_hist = data_for_hist.values
+        MPV, std68 = torch.mean(torch.tensor(data_for_hist)).item(), torch.std(torch.tensor(data_for_hist)).item()
     if no_divide:
         return MPV, std68
     return MPV, std68 / MPV
