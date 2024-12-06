@@ -9,6 +9,7 @@ from src.dataset.functions_data import (
     find_cluster_id,
     get_hit_features,
     calculate_distance_to_boundary,
+    find_mask_no_energy_close_particles
 )
 from src.dataset.functions_particles import get_particle_features, concatenate_Particles_GT
 from src.dataset.utils_hits import create_noise_label, create_noise_tracks
@@ -28,6 +29,7 @@ def create_inputs_from_table(
     Returns:
         _type_: all information to construct a graph
     """
+    remove_close_particles = True
     graph_empty = False
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
@@ -69,7 +71,19 @@ def create_inputs_from_table(
         y_data_graph = get_particle_features(
             unique_list_particles, output, prediction, connection_list
         )
-
+        if remove_close_particles:
+            mask_hits, mask_particles = find_mask_no_energy_close_particles(
+                cluster_id,
+                hit_type_feature,
+                e_hits,
+                y_data_graph,
+                daughters,
+                prediction,
+                is_Ks=is_Ks,
+            )
+            
+            cluster_id, unique_list_particles = find_cluster_id(hit_particle_link[~mask_hits])
+            y_data_graph.mask(~mask_particles)
         if not is_Ks:
             mask_hits, mask_particles = find_mask_no_energy(
                 cluster_id,
@@ -85,7 +99,7 @@ def create_inputs_from_table(
             y_data_graph.mask(~mask_particles)
        
         if prediction:
-            if is_Ks:
+            if is_Ks and not remove_close_particles:
                 result = [
                     y_data_graph,  # y_data_graph[~mask_particles],
                     p_hits,
@@ -116,13 +130,14 @@ def create_inputs_from_table(
                     pos_pxpypz[~mask_hits],
                     pandora_cluster[~mask_hits],
                     pandora_cluster_energy[~mask_hits],
-                    pandora_mom,
-                    pandora_ref_point,
-                    pandora_pid, 
+                    pandora_mom[~mask_hits],
+                    pandora_ref_point[~mask_hits],
+                    pandora_pid[~mask_hits], 
                     pfo_energy[~mask_hits],
                     pandora_pfo_link[~mask_hits],
                     hit_type_feature[~mask_hits],
                     hit_link_modified[~mask_hits],
+                    daughters[~mask_hits],
                 ]
         else:
        
@@ -153,18 +168,19 @@ def create_inputs_from_table(
                 result_mod,
             ]
         if hit_chis:
-            if not is_Ks:
-                result.append(
-                    chi_squared_tracks[~mask_hits],
-                )
-            else:
+            if is_Ks and not remove_close_particles:
                 result.append(
                         chi_squared_tracks,
                     )
+            else:
+                result.append(
+                    chi_squared_tracks[~mask_hits],
+                )
+                
         else:
             result.append(None)
 
-        if is_Ks:
+        if is_Ks and not remove_close_particles:
             hit_type = hit_type_feature
         else:
             hit_type = hit_type_feature[~mask_hits]
@@ -190,7 +206,7 @@ def create_inputs_from_table(
             #         # else:
             #         #     result[i] = result[i][hit_mask]
             #         result[i] = result[i][hit_mask]
-            if is_Ks:
+            if is_Ks and not remove_close_particles:
                 hit_type_one_hot = torch.nn.functional.one_hot(
                     hit_type_feature, num_classes=5
                 )

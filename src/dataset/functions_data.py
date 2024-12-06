@@ -3,6 +3,64 @@ import torch
 import dgl
 from torch_scatter import scatter_add
 from src.dataset.utils_hits import CachedIndexList, get_number_of_daughters, get_ratios, get_number_hits, modify_index_link_for_gamma_e, get_e_reco
+
+
+def calculate_delta_MC(y):
+    y1 = y
+    y_i = y1
+    pseudorapidity = -torch.log(torch.tan(y_i.angle[:,0] / 2))
+    phi = y_i.angle[:,1]
+    x1 = torch.cat((pseudorapidity.view(-1, 1), phi.view(-1, 1)), dim=1)
+    distance_matrix = torch.cdist(x1, x1, p=2)
+    shape_d = distance_matrix.shape[0]
+    values, _ = torch.sort(distance_matrix, dim=1)
+    if shape_d>1:
+        delta_MC = values[:, 1]
+    else:
+        delta_MC = torch.ones((shape_d,1)).view(-1)
+    return delta_MC
+
+def find_mask_no_energy_close_particles(
+    hit_particle_link,
+    hit_type_a,
+    hit_energies,
+    y,
+    daughters,
+    predict=False,
+    is_Ks=False,
+):
+    
+    list_p = np.unique(hit_particle_link)
+    list_remove = []
+    delta_MC = calculate_delta_MC(y)
+    for index, p in enumerate(list_p):
+        mask = hit_particle_link == p
+        hit_types = np.unique(hit_type_a[mask])
+        if (
+            delta_MC[index]<0.1
+        ):
+            list_remove.append(p)
+    if len(list_remove) > 0:
+        mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
+        for p in list_remove:
+            mask1 = hit_particle_link == p
+            mask = mask1 + mask
+
+    else:
+        mask = np.full((len(hit_particle_link)), False, dtype=bool)
+
+    if len(list_remove) > 0:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+        for p in list_remove:
+            mask_particles1 = list_p == p
+            mask_particles = mask_particles1 + mask_particles
+
+    else:
+        mask_particles = np.full((len(list_p)), False, dtype=bool)
+    return mask, mask_particles
+
+
+
 def find_mask_no_energy(
     hit_particle_link,
     hit_type_a,
