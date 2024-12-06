@@ -541,7 +541,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("Confusion Matrix" + suffix)
+    ax.set_title("ML PID with GT clusters " + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -697,7 +697,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("Pandora Confusion Matrix" + suffix)
+    ax.set_title("Pandora " + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -975,6 +975,11 @@ def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, e
         axs_mass_hist[i, 0].set_title(pid_text)
         axs_mass_hist[i, 1].set_title(pid_text)
         binsE = np.linspace(0, 1.0, 100)
+        if energy_bins is not None and (energy_bins[0] == 0.0 and energy_bins[1] == 1.0):
+            # [0, 1] GeV
+            binsE=np.linspace(0, 0.15, 100)
+        elif energy_bins is not None and (energy_bins[0] == 1.0 and energy_bins[1] == 10.0):
+            binsE=np.linspace(0, 0.8, 100)
         axs_mass_hist[i, 0].legend()
         axs_mass_hist[i, 1].legend()
         axs_mass_hist[i, 2].grid(1)
@@ -1051,6 +1056,7 @@ def plot_per_energy_resolution2_multiple(
         # same with energy into [i, 1]
         axs_mass_hist[i, 1].grid(1)
         #axs_mass_hist[i, 1].set_title(f"{pid} contribution to E")
+        axs_mass_hist[i, 0].set_xlabel(f"m pred., {pid} / m true, {pid}")
         axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid} / E true, {pid}")
         axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red", density=True)
         axs_mass_hist[i, 1].hist(EPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora", color="blue", density=True)
@@ -1271,7 +1277,7 @@ def plot_per_energy_resolution2_multiple(
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
                 fig_phi, ax_phi = plt.subplots(len(PIDs), 4, figsize=(len(PIDs)*2, 10))
                 fig_theta, ax_theta = plt.subplots(len(PIDs), 4, figsize=(len(PIDs)*2, 10))
-                fig_all_angles, ax_all_angles = plt.subplots(5, 2, figsize=(8, 14)) # For the total energy resolution
+                fig_all_angles, ax_all_angles = plt.subplots(5, 2, figsize=(8, 14))  # For the total energy resolution
                 for j, angle in enumerate(["theta", "phi"]):
                     if len(photons_dic["distr_phi"]) > 0:
                         stacked_hist_plot(photons_dic["distr_phi"], photons_dic["distr_phi_pandora"], PATH_store, r"Photons $\Phi$", "Photons_Phi", ax=ax_phi[PIDs.index(22)])
@@ -2923,13 +2929,17 @@ def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title="", ax=None)
             bbox_inches="tight",
         )
 
-def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, title):
+def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, title, distr_model_reco=None):
     if type(distr_model) == torch.Tensor:
         distr_model = distr_model.numpy()
         distr_pandora = distr_pandora.numpy()
+        if distr_model_reco is not None:
+            distr_model_reco = distr_model_reco.numpy()
     else:
         distr_model = distr_model.values
         distr_pandora = distr_pandora.values
+        if distr_model_reco is not None:
+            distr_model_reco = distr_model_reco.values
     max_distr_model = np.max(distr_model)
     max_distr_pandora = np.max(distr_pandora)
     # remove everything higher than 2.0 and note the fraction of such events
@@ -2954,7 +2964,9 @@ def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, titl
         sigma = (photons_dic["variance_om_reco"][i]) * mu
         mu_pandora = photons_dic["mean_p_reco"][i]
         sigma_pandora = (photons_dic["variance_om_p_reco"][i]) * mu
-
+        #if distr_model_reco is not None:
+        #    #mu_baseline = photons_dic["mean_baseline"][i]
+        #    #sigma_baseline = (photons_dic["variance_om_baseline"][i]) * mu_baseline
     ax_distr[i].hist(
         distr_model,
         bins=np.arange(0, 3, 1e-2),
@@ -2973,6 +2985,15 @@ def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, titl
         histtype="step",
         density=True
     )
+    if distr_model_reco is not None:
+        ax_distr[i].hist(
+            distr_pandora,
+            bins=np.arange(0, 3, 1e-2),
+            color="black",
+            label=r"Baseline $\mu={} \sigma / \mu={}$",
+            histtype="step",
+            density=True
+        )
     # ALSO PLOT MU AND SIGMA #
     ax_distr[i].axvline(mu, color="red", linestyle="-", ymin=0.95, ymax=1.0)
     ax_distr[i].axvline(
@@ -3049,6 +3070,7 @@ def plot_one_label(
     for i in range(len(photons_dic["energy_resolutions" + reco])):
         distr_model = photons_dic["distributions_model"][i]
         distr_pandora = photons_dic["distributions_pandora"][i]
+        distr_model_reco = photons_dic["distributions_model_reco"][i]
         plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, label1 + f" {photons_dic['energy_resolutions'][i]:.2f} GeV " + " (EC)")
         distr_model = photons_dic["distributions_model_reco"][i]
         distr_pandora = photons_dic["distributions_pandora_reco"][i]
@@ -3272,8 +3294,8 @@ def plot_histograms(
 def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, neutrons, protons, path):
     dics = [electrons_dic, hadrons_dic, neutrons, photons_dic, protons, hadrons_dic2]
     pids = ["11", "130", "2112", "22", "2212", "211"]
-    pid_names = {"11": "electons", "130": "K long", "2112": "neutrons", "22": "photons", "211": "Pions", "2212": "protons"}
-    fig_distr, ax_distr = plt.subplots(6, 2, figsize=(10, 20))
+    pid_names = {"11": "$e^\pm$", "130": "$K_L$", "2112": "Neutrons", "22": "$\gamma$", "211": "$\pi^\pm$", "2212": "Protons"}
+    fig_distr, ax_distr = plt.subplots(6, 4, figsize=(15*4/6, 15))
     for i, dic in enumerate(dics):
         ax_distr[i, 0].plot(dic["energy_resolutions_p"], dic["variance_om_p_reco"] / dic["energy_resolutions_p"], ".--", c="blue", label="Pandora")
         ax_distr[i, 0].plot(dic["energy_resolutions"], dic["variance_om_reco"] / dic["energy_resolutions"], ".--", c="red", label="ML")
@@ -3286,11 +3308,36 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
         ax_distr[i, 1].plot(dic["energy_resolutions"], dic["variance_om"] / dic["energy_resolutions"], ".--", c="red", label="ML")
         ax_distr[i, 1].plot(dic["energy_resolutions"], dic["variance_om_baseline"] / dic["energy_resolutions"], ".--", c="k", label="Baseline")
         ax_distr[i, 1].set_xlabel("Energy [GeV]", fontsize=12)
-        ax_distr[i, 1].set_title("Energy resolution " + pids[i])
+        ax_distr[i, 1].set_title(pid_names[pids[i]])
         ax_distr[i, 1].set_ylabel("$\sigma_E / E$")
         ax_distr[i, 0].set_ylabel("$\sigma_{E_{reco}} / E_{reco}$")
         ax_distr[i, 1].grid()
         ax_distr[i, 1].legend()
-        ax_distr[i, 1].set_title(pids[i])
+    for j, angle in enumerate(["theta", "phi"]):
+        if len(photons_dic["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("22"), j+2]
+            plot_sigma_angle_vs_energy(photons_dic, path, "photons", angle, "Photons", ax=ax_angle)
+            ax_angle.grid(1)
+        if len(neutrons["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("2112"), j+2]
+            plot_sigma_angle_vs_energy(neutrons, path, "neutrons", angle, "Neutrons", ax=ax_angle)
+            ax_angle.grid(1)
+        if len(hadrons_dic["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("130"), j+2]
+            plot_sigma_angle_vs_energy(hadrons_dic, path, "KL", angle, "$K_L$", ax=ax_angle)
+            ax_angle.grid(1)
+        if len(hadrons_dic2["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("211"), j+2]
+            plot_sigma_angle_vs_energy(hadrons_dic2, path, "Pions", angle, "$\pi^\pm$", ax=ax_angle)
+            ax_angle.grid(1)
+        if len(electrons_dic["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("11"), j+2]
+            plot_sigma_angle_vs_energy(electrons_dic, path, "electrons", angle, "$e^\pm$", ax=ax_angle)
+            ax_angle.grid(1)
+        if len(protons["distr_phi"]) > 0:
+            ax_angle = ax_distr[pids.index("2212"), j+2]
+            plot_sigma_angle_vs_energy(protons, path, "protons", angle, "Protons", ax=ax_angle)
+            ax_angle.grid(1)
     fig_distr.tight_layout()
     fig_distr.savefig(path, bbox_inches="tight")
+

@@ -199,7 +199,7 @@ def get_sigma_gaussian(e_over_reco, bins_per_binned_E, epsilon=0.01, return_gaus
     hist, bin_edges = np.histogram(e_over_reco, bins=bins_per_binned_E, density=True)
 
     if not return_gaussian:
-        mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E, epsilon=epsilon)
+        mu, sigma_over_mu = obtain_MPV_and_68(e_over_reco, bins_per_binned_E, epsilon=epsilon, no_divide=not return_divided)
         return mu, sigma_over_mu, 0,0
     # Calculating the Gaussian PDF values given Gaussian parameters and random variable X
     def gaus(X, C, X_mean, sigma):
