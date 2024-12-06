@@ -26,6 +26,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
     # particle_coord are just features 10, 11, 12
     if features_particles.shape[1] == 16: # Using config with part_pxyz and part_vertex_xyz
         #print("Using config with part_pxyz and part_vertex_xyz")
+        particle_coord_angle = features_particles[:,0:2]
         particle_coord = features_particles[:, 10:13]
         vertex_coord = features_particles[:, 13:16]
         # normalize particle coords
@@ -37,6 +38,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         #    normalized=True,
         #)
     else:
+        particle_coord_angle  = features_particles[:,0:2]
         particle_coord = spherical_to_cartesian(
             features_particles[:, 1],
             features_particles[:, 0],  # theta and phi are mixed!!!
@@ -50,6 +52,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
     y_pid = features_particles[:, 4].view(-1).unsqueeze(1)
     if prediction:
         y_data_graph = Particles_GT(
+            particle_coord_angle, 
             particle_coord,
             y_energy,
             y_mom,
@@ -62,6 +65,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
         )
     else:
         y_data_graph = Particles_GT(
+            particle_coord_angle,
             particle_coord,
             y_energy,
             y_mom,
@@ -77,6 +81,7 @@ def get_particle_features(unique_list_particles, output, prediction, connection_
 class Particles_GT:
     def __init__(
         self,
+        particle_coord_angle, 
         coordinates,
         energy,
         momentum,
@@ -89,6 +94,7 @@ class Particles_GT:
         energy_corrected=None,
         vertex=None,
     ):
+        self.angle = particle_coord_angle
         self.coord = coordinates
         self.E = energy
         self.E_corrected = energy
@@ -156,6 +162,8 @@ class Particles_GT:
 
 def concatenate_Particles_GT(list_of_Particles_GT):
     list_coord = [p[1].coord for p in list_of_Particles_GT]
+    list_angle = [p[1].angle for p in list_of_Particles_GT]
+    list_angle = torch.cat(list_angle, dim=0)
     list_vertex = [p[1].vertex for p in list_of_Particles_GT]
     list_coord = torch.cat(list_coord, dim=0)
     list_E = [p[1].E for p in list_of_Particles_GT]
@@ -180,6 +188,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
         list_dec_track = None
     batch_number = add_batch_number(list_of_Particles_GT)
     return Particles_GT(
+        list_angle, 
         list_coord,
         list_E,
         list_m,
