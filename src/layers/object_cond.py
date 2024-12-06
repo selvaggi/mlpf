@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch_scatter import scatter_max, scatter_add, scatter_mean
 from src.layers.loss_fill_space_torch import LLFillSpace
-
+import dgl
 
 def safe_index(arr, index):
     # One-hot index (or zero if it's not in the array)
@@ -288,6 +288,7 @@ def calc_LV_Lbeta(
         # V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
         V_attractive = V_attractive.view(-1) / (total_sum_weights.view(-1) + 1e-3)
 
+        #the other weight to give to the shower should be how close it is to another MC particle
 
         # V_attractive = V_attractive.view(-1) / (total_sum_hits_types.view(-1) + 1e-3)
         # L_V_attractive = torch.mean(V_attractive)
@@ -393,8 +394,15 @@ def calc_LV_Lbeta(
         L_V_repulsive = L_V_repulsive.view(
             -1
         ) / number_of_repulsive_terms_per_object.view(-1)
+
+
         V_repulsive2 = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep2
         L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
+        delta_MC = calculate_delta_MC(y, g)
+        weight_track = 1/(delta_MC+0.001)
+        L_V_repulsive2 = torch.sum(L_V_repulsive2 * weight_track.view(-1))/torch.sum(weight_track)
+
+
 
         L_V_repulsive2 = L_V_repulsive2.view(-1)
         L_V_attractive_2 = L_V_attractive_2.view(-1)
@@ -419,7 +427,7 @@ def calc_LV_Lbeta(
             ) / len(modified_showers)
         else:
             L_V_repulsive = torch.mean(L_V_repulsive)
-            L_V_repulsive2 = torch.mean(L_V_repulsive2)
+            # L_V_repulsive2 = torch.mean(L_V_repulsive2)
     else:
         L_V_repulsive = (
             scatter_add(V_repulsive.sum(dim=0), batch_object)
@@ -1239,3 +1247,27 @@ def calculate_weights_for_class_hit_type(g, object_index, is_sig):
     weights = weights
 
     return weights
+
+
+
+
+def calculate_delta_MC(y, batch_g):
+    graphs = dgl.unbatch(batch_g)
+    batch_id = y.batch_number
+    df_list = []
+    for i in range(0, len(graphs)):
+        mask = batch_id == 0
+        y_i = y.mask(mask)
+        pseudorapidity = -torch.log(torch.tan(y_i.angle[:,0] / 2))
+        phi = y_i.angle[:,1]
+        x1 = torch.cat((pseudorapidity.view(-1, 1), phi.view(-1, 1)), dim=1)
+        distance_matrix = torch.cdist(x1, x1, p=2)
+        shape_d = distance_matrix.shape[0]
+        values, _ = torch.sort(distance_matrix, dim=1)
+        if shape_d>1:
+            delta_MC = values[:, 1]
+        else:
+            delta_MC = torch.ones((shape_d,1)).view(-1).to(y_i.device)
+        df_list.append(delta_MC)
+    delta_MC = torch.cat(df_list)
+    return delta_MC
