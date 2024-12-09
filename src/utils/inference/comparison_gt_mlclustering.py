@@ -4,12 +4,10 @@ import numpy as np
 import matplotlib
 
 def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
-
-
     perfect_pid=False
     mass_zero=False
     ML_pid=True
-    matched_all = {"ML": sd_hgb, "ML_GTC": sd_hgb_gt}
+    matched_all = {"ML": sd_hgb, "ML GTC": sd_hgb_gt}
     matched_pandora = sd_pandora
     event_res_dic = {} 
     for key in matched_all:
@@ -18,7 +16,7 @@ def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
                     matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
                 )
     old_font_size = matplotlib.rcParams['font.size']
-    matplotlib.rcParams.update({'font.size': 22})
+    matplotlib.rcParams.update({'font.size': 11})
     fig, ax = plt.subplots(1, 2,figsize=(16, 8))
     # set fontsize to 20
     ax[0].set_xlabel(r"$m_{pred}/m_{true}$")
@@ -35,12 +33,12 @@ def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
         density=True,
     )
     ax[0].hist(
-        event_res_dic["ML_GTC"]["mass_over_true_model"],
+        event_res_dic["ML GTC"]["mass_over_true_model"],
         bins=bins,
         histtype="step",
         label="ML GTC $\mu$={}".format(
-            round((event_res_dic["ML_GTC"]["mean_mass_model"]), 4)
-        )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic["ML_GTC"]["var_mass_model"]), 4),
+            round((event_res_dic["ML GTC"]["mean_mass_model"]), 4)
+        )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic["ML GTC"]["var_mass_model"]), 4),
         ),
         color="green",
         density=True,
@@ -53,7 +51,7 @@ def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
         histtype="step",
         label="Pandora $\mu$={}".format(
             round((event_res_dic["ML"]["mean_mass_pandora"]), 4)
-        )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic["ML_GTC"]["var_mass_pandora"]), 4),
+        )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic["ML GTC"]["var_mass_pandora"]), 4),
         ),
         color="blue",
         density=True,
@@ -65,8 +63,8 @@ def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
         event_res_dic["ML"]["var_energy_over_true_pandora"], 4)
     mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 4), round(
         event_res_dic["ML"]["var_energy_over_true"], 4)
-    mean_e_over_true_gtc, sigma_e_over_true_gtc = round(event_res_dic["ML_GTC"]["mean_energy_over_true"], 4), round(
-        event_res_dic["ML_GTC"]["var_energy_over_true"], 4)
+    mean_e_over_true_gtc, sigma_e_over_true_gtc = round(event_res_dic["ML GTC"]["mean_energy_over_true"], 4), round(
+        event_res_dic["ML GTC"]["var_energy_over_true"], 4)
     ax[1].hist(event_res_dic["ML"]["energy_over_true"], bins=bins, histtype="step",
                 # label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true),
                 color="red",
@@ -75,7 +73,7 @@ def plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store):
                 )+"\n"+"$\sigma/\mu$={}".format(sigma_e_over_true
                 ),
                 density=True)
-    ax[1].hist(event_res_dic["ML_GTC"]["energy_over_true"], bins=bins, histtype="step",
+    ax[1].hist(event_res_dic["ML GTC"]["energy_over_true"], bins=bins, histtype="step",
                 # label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true),
                 color="green",
                 label="ML GTC $\mu$={}".format(

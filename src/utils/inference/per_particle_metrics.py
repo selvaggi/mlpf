@@ -1855,6 +1855,7 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
 
 
 def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
+    matplotlib.rcParams["font.size"] = 11
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
@@ -2095,39 +2096,38 @@ def create_fakes_dic(photons_dic, matched_, id, var_i):
     return photons_dic
 
 def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
-    colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
-    markers = ["^", "*", "x", "d", ".", "s"]
+    colors_list = ["red", "green", "blue"]
     savefig = ax is None
     if ax is None:
         fig, ax = plt.subplots()
     j = 0
     ax.set_xlabel("Energy [GeV]")
     ax.set_ylabel("Efficiency")
-    # ax[row_i, j].set_xscale("log")
     ax.set_title(label1)
     ax.grid()
     for i in range(0, len(labels)):
         ax.plot(photons_dic["energy_eff_" + str(i)],
-            photons_dic["eff_" + str(i)], "--", color=colors_list[0])
+            photons_dic["eff_" + str(i)], "--", color=colors_list[i])
         ax.scatter(
             photons_dic["energy_eff_" + str(i)],
             photons_dic["eff_" + str(i)],
             label=labels[i], # temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
-            marker=markers[i],
-            color=colors_list[0],
+            color=colors_list[i],
             s=50,
+            marker="x"
         )
     ax.plot(photons_dic["energy_eff_p"],
         photons_dic["eff_p"], "--", color=colors_list[2])
     ax.scatter(
         photons_dic["energy_eff_p"],
         photons_dic["eff_p"],
-        facecolors=colors_list[2],
-        edgecolors=colors_list[2],
+        #facecolors=colors_list[2],
+        #edgecolors=colors_list[2],
+        color=colors_list[2],
         label="Pandora",
-        marker="x",
         # Add -- line
         s=50,
+        marker="x"
     )
     ax.legend(loc="lower right")
     ax.set_xscale("log")
@@ -2141,7 +2141,6 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
 
 def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
     colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
-    markers = ["^", "*", "x", "d", ".", "s"]
     fig, ax = plt.subplots()
     j = 0
     ax.set_xlabel("Energy [GeV]")
@@ -2151,13 +2150,12 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
     ax.grid(1)
     for i in range(0, len(labels)):
         ax.plot(photons_dic["energy_eff_" + str(i)],
-            photons_dic["eff_" + str(i)], "--", color=colors_list[0])
+            photons_dic["eff_" + str(i)], "--", color=colors_list[i])
         ax.scatter(
             photons_dic["energy_eff_" + str(i)],
             photons_dic["eff_" + str(i)],
             label="ML " + label1, # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
-            marker=markers[i],
-            color=colors_list[0],
+            color=colors[labels[i]],
             s=50,
         )
     ax.plot(photons_dic["energy_eff_p"],
@@ -2168,7 +2166,6 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
         facecolors=colors_list[2],
         edgecolors=colors_list[2],
         label="Pandora " + label1,
-        marker="x",
         s=50,
     )
     ax.legend(loc="upper right")
@@ -2190,7 +2187,6 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
             photons_dic["energy_fakes_" + str(i)],
             photons_dic["fakes_" + str(i)],
             label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
-            marker=markers[i],
             color=colors_list[0],
             s=50,
         )
@@ -2204,7 +2200,6 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
         facecolors=colors_list[2],
         edgecolors=colors_list[2],
         label="Pandora",
-        marker="x",
         # add -- line
         s=50,
     )
@@ -2215,8 +2210,7 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
 
 
 def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco=""): # Set reco to 'reco_'
-    colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
-    markers = ["x", "*", "x", "d", ".", "s"]
+    colors_list = ["red",  "green", "blue"]
     savefig = ax is None
     if ax is None:
         fig, ax = plt.subplots()
@@ -2231,14 +2225,14 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco="
     ax.grid()
     for i in range(0, len(labels)):
         ax.plot(photons_dic["energy_fakes_" + str(i)],
-            photons_dic["fake_percent_energy_" + reco + str(i)], "--", color=colors_list[0])
+            photons_dic["fake_percent_energy_" + reco + str(i)], "--", color=colors_list[i])
         ax.scatter(
             photons_dic["energy_fakes_" + str(i)],
             photons_dic["fake_percent_energy_" + reco + str(i)],
             label=labels[i], # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
-            marker=markers[i],
-            color=colors_list[0],
+            color=colors_list[i],
             s=50,
+            marker="x"
         )
     ax.plot(photons_dic["energy_fakes_p"],
         photons_dic["fake_percent_energy_" + reco + "p"], "--", color=colors_list[2])
@@ -2248,9 +2242,8 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco="
         facecolors=colors_list[2],
         edgecolors=colors_list[2],
         label="Pandora",
-        marker="x",
-        # add -- line
         s=50,
+        marker="x"
     )
     ax.legend(loc="upper right")
     #if title == "Electromagnetic":
@@ -2267,8 +2260,7 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco="
     #    plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None)
 
 def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
-    colors_list = ["#FF0000",  "#00FF00", "#0000FF"]
-    markers = ["^", "*", "x", "d", ".", "s"]
+    colors_list = ["red",  "green", "blue"]
     savefig = ax is None
     if ax is None:
         fig, ax = plt.subplots()
@@ -2279,14 +2271,14 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
     ax.grid()
     for i in range(0, len(labels)):
         ax.plot(photons_dic["energy_fakes_" + str(i)],
-            photons_dic["fakes_" + str(i)], "--", color=colors_list[0])
+            photons_dic["fakes_" + str(i)], "--", color=colors_list[i])
         ax.scatter(
             photons_dic["energy_fakes_" + str(i)],
             photons_dic["fakes_" + str(i)],
-            label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
-            marker=markers[i],
-            color=colors_list[0],
+            label=labels[i], # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            color=colors_list[i],
             s=50,
+            marker="x"
         )
     ax.plot(photons_dic["energy_fakes_p"],
         photons_dic["fakes_p"], "--", color=colors_list[2])
@@ -2299,6 +2291,7 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
         marker="x",
         # add -- line
         s=50,
+
     )
     ax.legend()
     #if title == "Electromagnetic":

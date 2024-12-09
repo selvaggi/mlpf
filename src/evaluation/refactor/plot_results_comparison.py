@@ -88,8 +88,6 @@ sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
 sd_hgb_gt, sd_pandora = preprocess_dataframe(sd_hgb_gt, sd_pandora, args.preprocess.split(","))
 
-
-
 current_dir = PATH_store_individual_plots
 current_dir_detailed = PATH_store_summary_plots
 if not os.path.exists(current_dir):
@@ -97,6 +95,11 @@ if not os.path.exists(current_dir):
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
 
+fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
+
+plot_efficiency_all(sd_pandora, [sd_hgb , sd_hgb_gt], PATH_store_individual_plots, ["ML", "ML GTC"], ax=ax_eff)
+fig_eff.tight_layout()
+fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
 
 plot_per_energy_resolution2_multiple(
     sd_pandora,
@@ -120,5 +123,4 @@ if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
 plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store)
 print("Done plotting")
-
 
