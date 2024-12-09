@@ -1,7 +1,7 @@
 
 import matplotlib
 import sys
-sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
+#sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
 from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist, \
     plot_mass_contribution_per_category, plot_mass_contribution_per_PID
 import matplotlib.pyplot as plt
@@ -15,6 +15,13 @@ from src.utils.inference.comparison_gt_mlclustering import plot_mass
 import matplotlib.pyplot as plt
 import torch
 import pickle
+from src.utils.inference.per_particle_metrics import (
+    plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes,
+    plot_cm_per_energy, plot_fake_and_missed_energy_regions, quick_plot_mass,
+    plot_cm_per_energy_on_overview
+)
+
 from src.evaluation.refactor.preprocess import preprocess_dataframe
 fs = 10
 font = {'size': fs}
@@ -62,6 +69,7 @@ if not os.path.exists(PATH_store_individual_plots):
 PATH_store_summary_plots = os.path.join(PATH_store, "summary_plots")
 if not os.path.exists(PATH_store_summary_plots):
     os.makedirs(PATH_store_summary_plots)
+
 path_ML_gt = "showers_df_evaluation/0_0_None_hdbscan.pt"
 path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
 
@@ -81,6 +89,25 @@ sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.sp
 sd_hgb_gt, sd_pandora = preprocess_dataframe(sd_hgb_gt, sd_pandora, args.preprocess.split(","))
 
 
+
+current_dir = PATH_store_individual_plots
+current_dir_detailed = PATH_store_summary_plots
+if not os.path.exists(current_dir):
+    os.makedirs(current_dir)
+if not os.path.exists(current_dir_detailed):
+    os.makedirs(current_dir_detailed)
+
+
+plot_per_energy_resolution2_multiple(
+    sd_pandora,
+    {"ML": sd_hgb, "ML GTC": sd_hgb_gt},
+    current_dir,
+    tracks=True,
+    perfect_pid=False,
+    mass_zero=False,
+    ML_pid=True,
+    PATH_store_detailed_plots=current_dir_detailed
+)
 
 
 e_ranges = [[0, 5], [5, 15], [15, 50]]

@@ -37,8 +37,9 @@ parser.add_argument("--preprocess", type=str, help="Comma-separated list of scri
 parser.add_argument("--output_dir", type=str, default="",
                     help="Output directory (just the name of the folder, nested under the input path")
 parser.add_argument("--mass-only", action="store_true", help="Only quickly plot mass in the energy resolution plots")
-args = parser.parse_args()
+# parser.add_argument("--exclude-gt-clusters") # TODO: implement
 
+args = parser.parse_args()
 print("Preprocess:", args.preprocess)
 PATH_store = os.path.join(args.path, args.output_dir)
 if not os.path.exists(PATH_store):
@@ -72,9 +73,11 @@ path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
 dir_top = args.path
 print(PATH_store)
 path_hgcal = os.path.join(dir_top, path_ML)
+#path_hgcal_GTC = os.path.join(dir_top, path_GT_clusters)
 sd_hgb, _ = open_mlpf_dataframe(path_hgcal, False)
 sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
+#sd_hgb_gt = open_mlpf_dataframe(path_hgcal_GTC, False)
 '''
 ch = sd_hgb[sd_hgb.pred_pid_matched == 1]
 ch_le = ch[ch.calibrated_E < 5.0]
@@ -142,7 +145,6 @@ fig.show()
 
 '''
 
-
 plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_summary_plots)
 
 if args.mass_only:
@@ -154,10 +156,7 @@ plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots
 plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[1, 10])
 plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[10, 100])
 plot_mass_contribution_per_PID(sd_hgb, sd_pandora, PATH_store_summary_plots)
-
 plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_summary_plots)
-
-
 pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
 
 # Filter the df based on where decay type is 0
@@ -188,7 +187,6 @@ x = sd_hgb.pred_ref_pt_matched[sd_hgb.is_track_in_cluster==1].values
 x = np.stack(x)
 x = np.linalg.norm(x, axis=1)
 
-
 e_ranges = [[0, 5], [5, 15], [15, 50]]
 
 current_dir = PATH_store_individual_plots
@@ -197,7 +195,6 @@ if not os.path.exists(current_dir):
     os.makedirs(current_dir)
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
-
 
 plot_per_energy_resolution2_multiple(
     sd_pandora,
@@ -209,6 +206,7 @@ plot_per_energy_resolution2_multiple(
     ML_pid=True,
     PATH_store_detailed_plots=current_dir_detailed
 )
+
 print("Done plotting")
 
 def save_dict(di_, filename_):

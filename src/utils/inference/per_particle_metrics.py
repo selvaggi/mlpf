@@ -541,7 +541,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("ML PID with GT clusters " + suffix)
+    ax.set_title("ML " + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -1018,6 +1018,7 @@ def plot_per_energy_resolution2_multiple(
     # colors = {"DNN": "green", "GNN+DNN": "purple", "DNN w/o FT": "blue"}
     colors = {
         "ML": "red",
+        "ML GTC": "green"
     }
     plot_pandora, plot_baseline = True, True
     figs_mass_hist, axs_mass_hist = plt.subplots(6, 3, figsize=(8, 15)) # also plot fraction of the whole event energy
@@ -1081,8 +1082,10 @@ def plot_per_energy_resolution2_multiple(
     )
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(7, 7))
     PIDs = [22, 11, 130, 211, 2112, 2212]
-    fig_distr, ax_distr = plt.subplots(len(PIDs), 3, figsize=(len(PIDs) * 2.5, 9))
+    fig_distr, ax_distr = plt.subplots(len(PIDs), 3, figsize=(len(PIDs) * 5, 18))
+    matplotlib.rcParams["font.size"] = 11
     fig_distr_reco, ax_distr_reco = plt.subplots(len(PIDs), 3, figsize=(len(PIDs) * 2.5, 9))
+    photons_dic_all, electrons_dic_all, hadrons_dic_all, hadrons_dic2_all, neutrons_all, protons_all = {}, {}, {}, {}, {}, {}
     for key in matched_all:
         matched_ = matched_all[key]
         #mask = matched_["calibration_factor"] > 0
@@ -1129,9 +1132,14 @@ def plot_per_energy_resolution2_multiple(
             )
             np.save(PATH_store+"2212.npy", protons)
             print(PATH_store+"/2212.npy")
-            plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, neutrons, protons,
-                                    os.path.join(PATH_store_detailed_plots, "E_resolution_per_PID_full_comparison.pdf")
-                                 )
+            hadrons_dic_all[key] = hadrons_dic
+            hadrons_dic2_all[key] = hadrons_dic2
+            photons_dic_all[key] = photons_dic
+            electrons_dic_all[key] = electrons_dic
+            neutrons_all[key] = neutrons
+            protons_all[key] = protons
+
+
             # For neutrons
             if True:
                 if len(neutrons["distributions_pandora"]) :
@@ -1143,8 +1151,8 @@ def plot_per_energy_resolution2_multiple(
                 mean_e_over_true, sigma_e_over_true = round(event_res_dic["ML"]["mean_energy_over_true"], 2), round(event_res_dic["ML"]["var_energy_over_true"], 2)
                 ax_event_res.hist(event_res_dic["ML"]["energy_over_true_pandora"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
                                   label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora, sigma_e_over_true_pandora), color="blue", density=True)
-                ax_event_res.hist(event_res_dic["ML"]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
-                                  label=r"ML $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color="red", density=True)
+                ax_event_res.hist(event_res_dic[key]["energy_over_true"], bins=np.linspace(0.5, 1.5, 100), histtype="step",
+                                  label=str(key) + r" $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color=colors[key], density=True)
                 ax_event_res.grid(1)
                 ax_event_res.set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
                 ax_event_res.legend()
@@ -1237,7 +1245,7 @@ def plot_per_energy_resolution2_multiple(
                 prefix=key + " ",
                 color=colors[key],
             )'''
-            plot_mass_resolution(event_res_dic[key], PATH_store_detailed_plots)
+
             neutral_masses = [0.0, 497.611/1000, 0.939565]
             charged_masses = [0.139570, 0.511/1000]
             neutral_masses = [x**2 for x in neutral_masses]
@@ -1277,6 +1285,7 @@ def plot_per_energy_resolution2_multiple(
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
                 fig_phi, ax_phi = plt.subplots(len(PIDs), 3, figsize=(len(PIDs)*2.5, 10))
                 fig_theta, ax_theta = plt.subplots(len(PIDs), 3, figsize=(len(PIDs)*2.5, 10))
+                matplotlib.rcParams["font.size"] = 10
                 fig_all_angles, ax_all_angles = plt.subplots(5, 2, figsize=(8, 14))  # For the total energy resolution
                 for j, angle in enumerate(["theta", "phi"]):
                     if len(photons_dic["distr_phi"]) > 0:
@@ -1313,8 +1322,8 @@ def plot_per_energy_resolution2_multiple(
                 fig_phi.tight_layout()
                 fig_theta.savefig(os.path.join(PATH_store_detailed_plots, "theta.pdf"), bbox_inches="tight")
                 fig_phi.savefig(os.path.join(PATH_store_detailed_plots, "phi.pdf"), bbox_inches="tight")
-                fig_all_angles.tight_layout()
-                fig_all_angles.savefig(os.path.join(PATH_store_detailed_plots, "Angular_Resolution_per_PID.pdf"), bbox_inches="tight")
+                #fig_all_angles.tight_layout()
+                #fig_all_angles.savefig(os.path.join(PATH_store_detailed_plots, "Angular_Resolution_per_PID.pdf"), bbox_inches="tight")
                 if len(photons_dic["energy_resolutions"]) > 1:
                     plot_one_label(
                         "Electromagnetic Resolution",
@@ -1528,6 +1537,9 @@ def plot_per_energy_resolution2_multiple(
                     )
                 plot_pandora = False
                 plot_baseline = False
+    plot_mass_resolution(event_res_dic, PATH_store_detailed_plots)
+    plot_full_comparison(photons_dic_all, electrons_dic_all, hadrons_dic_all, hadrons_dic2_all, neutrons_all,
+                         protons_all, os.path.join(PATH_store_detailed_plots, "E_resolution_per_PID_full_comparison.pdf"))
     for key in figs:
         for a in axs[key]:
             a.grid(1)
@@ -2100,7 +2112,7 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
         ax.scatter(
             photons_dic["energy_eff_" + str(i)],
             photons_dic["eff_" + str(i)],
-            label="ML", # temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            label=labels[i], # temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
             marker=markers[i],
             color=colors_list[0],
             s=50,
@@ -2223,7 +2235,7 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco="
         ax.scatter(
             photons_dic["energy_fakes_" + str(i)],
             photons_dic["fake_percent_energy_" + reco + str(i)],
-            label="ML", # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
+            label=labels[i], # Temporarily, for the ML-Pandora comparison plots, change if plotting more labels!
             marker=markers[i],
             color=colors_list[0],
             s=50,
@@ -2910,18 +2922,19 @@ def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title="", ax=None)
     new_plot = ax is None
     if new_plot:
         fig, ax = plt.subplots(1, 1, figsize=(14, 10))
-    E = np.array(dic["energy_resolutions"])
-    if angle == 'theta':
-        sigma = np.array(dic["sigma_theta"])
-        sigma_pandora = np.array(dic["sigma_theta_pandora"])
-        #if len(sigma_pandora) < len(sigma):
-        #    sigma_pandora = np.pad(sigma_pandora, (0, len(sigma) - len(sigma_pandora)))
-        #elif len(sigma_pandora) > len(sigma):
-        #    sigma = np.pad(sigma, (0, len(sigma_pandora) - len(sigma)))
-    else:
-        sigma = np.array(dic["sigma_phi"])
-        sigma_pandora = np.array(dic["sigma_phi_pandora"])
-    ax.plot(E, sigma, "--", marker=".", label="ML", color="red")
+    for key in dic:
+        E = np.array(dic[key]["energy_resolutions"])
+        if angle == 'theta':
+            sigma = np.array(dic[key]["sigma_theta"])
+            sigma_pandora = np.array(dic[key]["sigma_theta_pandora"])
+            #if len(sigma_pandora) < len(sigma):
+            #    sigma_pandora = np.pad(sigma_pandora, (0, len(sigma) - len(sigma_pandora)))
+            #elif len(sigma_pandora) > len(sigma):
+            #    sigma = np.pad(sigma, (0, len(sigma_pandora) - len(sigma)))
+        else:
+            sigma = np.array(dic[key]["sigma_phi"])
+            sigma_pandora = np.array(dic[key]["sigma_phi_pandora"])
+        ax.plot(E, sigma, "--", marker=".", label=key, color=colors[key])
     try:
         ax.plot(E, sigma_pandora, "--", marker=".", label="Pandora", color="blue")
     except:
@@ -3303,23 +3316,26 @@ def plot_histograms(
     ax_distr.set_yscale("log")
     fig_distr.tight_layout()
 
-
+colors = {"ML": "red", "ML GTC": "green"}
 def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, neutrons, protons, path):
     dics = [electrons_dic, hadrons_dic, neutrons, photons_dic, protons, hadrons_dic2]
     pids = ["11", "130", "2112", "22", "2212", "211"]
     pid_names = {"11": "$e^\pm$", "130": "$K_L$", "2112": "Neutrons", "22": "$\gamma$", "211": "$\pi^\pm$", "2212": "Protons"}
     fig_distr, ax_distr = plt.subplots(6, 4, figsize=(15*4/6, 15))
+    default_key= "ML"
     for i, dic in enumerate(dics):
-        ax_distr[i, 0].plot(dic["energy_resolutions_p"], dic["variance_om_p_reco"] / dic["energy_resolutions_p"], ".--", c="blue", label="Pandora")
-        ax_distr[i, 0].plot(dic["energy_resolutions"], dic["variance_om_reco"] / dic["energy_resolutions"], ".--", c="red", label="ML")
+        ax_distr[i, 0].plot(dic[default_key]["energy_resolutions_p"], dic[default_key]["variance_om_p_reco"] / dic[default_key]["energy_resolutions_p"], ".--", c="blue", label="Pandora")
+        for key in dic:
+            ax_distr[i, 0].plot(dic[key]["energy_resolutions"], dic[key]["variance_om_reco"] / dic[key]["energy_resolutions"], ".--", c=colors[key], label=key)
         # ax_distr[i, 0].plot(dic["energy_resolutions"], dic["variance_om_baseline"] / dic["energy_resolutions"], ".--", c="k", label="Baseline")
         ax_distr[i, 0].set_xlabel("Energy [GeV]", fontsize=12)
         ax_distr[i, 0].grid()
         ax_distr[i, 0].legend()
         ax_distr[i, 0].set_title(pid_names[pids[i]])
-        ax_distr[i, 1].plot(dic["energy_resolutions_p"], dic["variance_om_p"] / dic["energy_resolutions_p"], ".--", c="blue", label="Pandora")
-        ax_distr[i, 1].plot(dic["energy_resolutions"], dic["variance_om"] / dic["energy_resolutions"], ".--", c="red", label="ML")
-        ax_distr[i, 1].plot(dic["energy_resolutions"], dic["variance_om_baseline"] / dic["energy_resolutions"], ".--", c="k", label="Baseline")
+        ax_distr[i, 1].plot(dic[default_key]["energy_resolutions_p"], dic[default_key]["variance_om_p"] / dic[default_key]["energy_resolutions_p"], ".--", c="blue", label="Pandora")
+        ax_distr[i, 1].plot(dic[default_key]["energy_resolutions"], dic[default_key]["variance_om_baseline"] / dic[default_key]["energy_resolutions"], ".--", c="k", label="Baseline")
+        for key in dic:
+            ax_distr[i, 1].plot(dic[key]["energy_resolutions"], dic[key]["variance_om"] / dic[key]["energy_resolutions"], ".--", c=colors[key], label=key)
         ax_distr[i, 1].set_xlabel("Energy [GeV]", fontsize=12)
         ax_distr[i, 1].set_title(pid_names[pids[i]])
         ax_distr[i, 1].set_ylabel("$\sigma_E / E$")
@@ -3327,30 +3343,29 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
         ax_distr[i, 1].grid()
         ax_distr[i, 1].legend()
     for j, angle in enumerate(["theta", "phi"]):
-        if len(photons_dic["distr_phi"]) > 0:
+        if len(photons_dic[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("22"), j+2]
             plot_sigma_angle_vs_energy(photons_dic, path, "photons", angle, "Photons", ax=ax_angle)
             ax_angle.grid(1)
-        if len(neutrons["distr_phi"]) > 0:
+        if len(neutrons[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("2112"), j+2]
             plot_sigma_angle_vs_energy(neutrons, path, "neutrons", angle, "Neutrons", ax=ax_angle)
             ax_angle.grid(1)
-        if len(hadrons_dic["distr_phi"]) > 0:
+        if len(hadrons_dic[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("130"), j+2]
             plot_sigma_angle_vs_energy(hadrons_dic, path, "KL", angle, "$K_L$", ax=ax_angle)
             ax_angle.grid(1)
-        if len(hadrons_dic2["distr_phi"]) > 0:
+        if len(hadrons_dic2[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("211"), j+2]
             plot_sigma_angle_vs_energy(hadrons_dic2, path, "Pions", angle, "$\pi^\pm$", ax=ax_angle)
             ax_angle.grid(1)
-        if len(electrons_dic["distr_phi"]) > 0:
+        if len(electrons_dic[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("11"), j+2]
             plot_sigma_angle_vs_energy(electrons_dic, path, "electrons", angle, "$e^\pm$", ax=ax_angle)
             ax_angle.grid(1)
-        if len(protons["distr_phi"]) > 0:
+        if len(protons[default_key]["distr_phi"]) > 0:
             ax_angle = ax_distr[pids.index("2212"), j+2]
             plot_sigma_angle_vs_energy(protons, path, "protons", angle, "Protons", ax=ax_angle)
             ax_angle.grid(1)
     fig_distr.tight_layout()
     fig_distr.savefig(path, bbox_inches="tight")
-
