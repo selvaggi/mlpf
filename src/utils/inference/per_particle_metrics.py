@@ -879,11 +879,11 @@ def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store,
         #plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[1, i], ax1=ax[3, i], ax2=ax[5, i], suffix=suffix)
         #plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=True, ax=ax[6, i], suffix=suffix)
         #plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=True, ax=ax[7, i], suffix=suffix)
-        plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=False, ax=ax[0, i], ax1=None, ax2=None, suffix=suffix)
+        plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=False, ax=ax[1, i], ax1=None, ax2=None, suffix=suffix)
         if n_plots == 3:
             cond_gt = ((sd_hgb_gt.true_showers_E > energies[i]) & (sd_hgb_gt.true_showers_E < energies[i + 1])) | (np.isnan(sd_hgb_gt.pid) & ((sd_hgb_gt.pred_showers_E > energies[i]) & (sd_hgb_gt.pred_showers_E < energies[i + 1])))
             plot_confusion_matrix(sd_hgb_gt[cond_gt], path_store, add_pie_charts=False, ax=ax[2, i], ax1=None, ax2=None, suffix=suffix, prefix="ML GTC")
-        plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[1, i], ax1=None, ax2=None, suffix=suffix)
+        plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[0, i], ax1=None, ax2=None, suffix=suffix)
     fig.tight_layout()
     fig.savefig(os.path.join(path_store_summary_plots, "confusion_matrix_per_energy.pdf"))
 
