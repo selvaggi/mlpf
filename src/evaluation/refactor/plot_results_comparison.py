@@ -100,7 +100,7 @@ fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
 plot_efficiency_all(sd_pandora, [sd_hgb , sd_hgb_gt], PATH_store_individual_plots, ["ML", "ML GTC"], ax=ax_eff)
 fig_eff.tight_layout()
 fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
-
+plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots, sd_hgb_gt=sd_hgb_gt)
 plot_per_energy_resolution2_multiple(
     sd_pandora,
     {"ML": sd_hgb, "ML GTC": sd_hgb_gt},

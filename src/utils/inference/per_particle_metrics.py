@@ -460,7 +460,7 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         #    if bar * 0.95 < mean_mass:
         #        axs[i].axvline(bar, color="black", linestyle="--")
 
-def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None, suffix=""):
+def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None, suffix="", prefix="ML"):
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
     #sd_hgb1.loc[sd_hgb1["pred_pid_matched"] == -1, "pred_pid_matched"] = np.nan
@@ -471,7 +471,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     n_classes = max(n_classes, n_classes_pred)
     class_nan = n_classes # For 'fake' and 'missed'
     is_muons = n_classes == 5
-    print("Unique classes", set(list(class_true)), set(list(class_pred)))
+    print("Unique classes", set(list(class_true[~np.isnan(class_true)])), set(list(class_pred[~np.isnan(class_pred)])))
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0
     pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
@@ -541,7 +541,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     # axes
     ax.set_xlabel("Predicted")
     ax.set_ylabel("True")
-    ax.set_title("ML " + suffix)
+    ax.set_title(prefix + " " + suffix)
     suffix = ""
     if add_pie_charts:
         suffix = "_pie_charts"
@@ -862,9 +862,12 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     fig.savefig(os.path.join(PATH_store, "fakes_analysis.pdf"))'''
 
 
-def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store):
+def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store, sd_hgb_gt=None):
     # Plot confusion matrix for each energy bin
-    fig, ax = plt.subplots(2, 3, figsize=(12, 12*2/3))
+    n_plots = 3
+    if sd_hgb_gt is None:
+        n_plots = 2
+    fig, ax = plt.subplots(n_plots, 3, figsize=(12, 12 * n_plots / 3))
     energies = [0, 1, 10, 100]
     for i in range(len(energies) - 1):
         cond = ((sd_hgb.true_showers_E > energies[i]) & (sd_hgb.true_showers_E < energies[i + 1])) | (np.isnan(sd_hgb.pid) & ((sd_hgb.pred_showers_E > energies[i]) & (sd_hgb.pred_showers_E < energies[i + 1])))
@@ -877,6 +880,9 @@ def plot_cm_per_energy(sd_hgb, sd_pandora, path_store_summary_plots, path_store)
         #plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=True, ax=ax[6, i], suffix=suffix)
         #plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=True, ax=ax[7, i], suffix=suffix)
         plot_confusion_matrix(sd_hgb_i, path_store, add_pie_charts=False, ax=ax[0, i], ax1=None, ax2=None, suffix=suffix)
+        if n_plots == 3:
+            cond_gt = ((sd_hgb_gt.true_showers_E > energies[i]) & (sd_hgb_gt.true_showers_E < energies[i + 1])) | (np.isnan(sd_hgb_gt.pid) & ((sd_hgb_gt.pred_showers_E > energies[i]) & (sd_hgb_gt.pred_showers_E < energies[i + 1])))
+            plot_confusion_matrix(sd_hgb_gt[cond_gt], path_store, add_pie_charts=False, ax=ax[2, i], ax1=None, ax2=None, suffix=suffix, prefix="ML GTC")
         plot_confusion_matrix_pandora(sd_pandora_i, path_store, add_pie_charts=False, ax=ax[1, i], ax1=None, ax2=None, suffix=suffix)
     fig.tight_layout()
     fig.savefig(os.path.join(path_store_summary_plots, "confusion_matrix_per_energy.pdf"))
@@ -900,6 +906,7 @@ def quick_plot_mass(matched_, matched_pandora, path_store):
     )
     plot_mass_resolution(evt, path_store)
     print("Saved mass resolution")
+
 
 def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
     old_fontsize = matplotlib.rcParams["font.size"]
