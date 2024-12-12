@@ -1342,13 +1342,18 @@ class EnergyCorrection():
             ) = result
         if self.args.regress_pos:
             if len(self.pids_charged):
-                charged_PID_pred = e_cor["charged_PID_pred"]
                 charged_idx = e_cor["charged_idx"]
             if len(self.pids_neutral):
                 neutral_idx = e_cor["neutrals_idx"]
             pred_pid = e_cor["pred_PID"]
-            e_cor, pred_pos, pred_ref_pt, extra_features, fakes_labels = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
-                "pred_ref_pt"], e_cor["extra_features"], e_cor["fakes_labels"]
+            e_cor, pred_pos, pred_ref_pt, extra_features, fakes_labels, charged_PID_pred, neutral_PID_pred = e_cor["pred_energy_corr"], e_cor["pred_pos"], e_cor[
+                "pred_ref_pt"], e_cor["extra_features"], e_cor["fakes_labels"], e_cor["charged_PID_pred"], e_cor["neutral_PID_pred"]
+            max_len = max(len(self.pids_charged), len(self.pids_neutral))
+            PID_logits = torch.zeros(len(e_cor), max_len).float()
+            PID_logits[charged_idx.cpu()] = charged_PID_pred.detach().cpu()
+            PID_logits[neutral_idx.cpu()] = neutral_PID_pred.detach().cpu()
+            extra_features = extra_features.detach().cpu()
+            extra_features = torch.cat((extra_features, PID_logits), dim=1).numpy()
         else:
             pred_pos = None
             pred_ref_pt = None

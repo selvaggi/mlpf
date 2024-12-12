@@ -85,15 +85,20 @@ path_ml_gt = os.path.join(dir_top, path_ML_gt)
 sd_hgb, _ = open_mlpf_dataframe(path_ml, False)
 sd_hgb_gt, _ = open_mlpf_dataframe(path_ml_gt, False)
 sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
+sd_hgb_betas_corr, _ =  preprocess_dataframe(sd_hgb, sd_pandora, "beta_correction")
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
 sd_hgb_gt, sd_pandora = preprocess_dataframe(sd_hgb_gt, sd_pandora, args.preprocess.split(","))
-
 current_dir = PATH_store_individual_plots
 current_dir_detailed = PATH_store_summary_plots
 if not os.path.exists(current_dir):
     os.makedirs(current_dir)
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
+plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store)
+analyze_fakes(sd_pandora, sd_hgb, PATH_store_individual_plots)
+plot_mass(sd_hgb, sd_hgb_betas_corr, sd_pandora, PATH_store_individual_plots, label_ML_GTC=r"ML no low $\beta$",
+          filename="mass_comparison_betas.pdf", color_ML_GTC="#249413")
+
 
 fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
 
@@ -121,6 +126,5 @@ if not os.path.exists(current_dir):
     os.makedirs(current_dir)
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
-plot_mass(sd_hgb, sd_hgb_gt, sd_pandora, PATH_store)
 print("Done plotting")
 

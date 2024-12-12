@@ -501,12 +501,14 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["var_energy_over_true"] = var_energy_over_true
     dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
     return dic
+
 colors = {"ML": "red", "ML GTC": "green"}
+
 def plot_mass_resolution(event_res_dic, PATH_store):
     old_font_size = matplotlib.rcParams['font.size']
-    matplotlib.rcParams.update({'font.size': 11})
+    matplotlib.rcParams.update({'font.size': 22})
     pandora_dic = event_res_dic["ML"]
-    fig, ax = plt.subplots(1, 2,figsize=(16, 8))
+    fig, ax = plt.subplots(1, 2, figsize=(16, 8))
     # set fontsize to 20
     ax[0].set_xlabel(r"$m_{pred}/m_{true}$")
     bins = np.linspace(0, 2, 200)

@@ -803,13 +803,16 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     ax.set_title("Reco energy distribution for fakes")
     fig.show()
 
-    fig, ax = plt.subplots(figsize=(4,4))
+    fig, ax = plt.subplots(figsize=(8,8))
     bins = np.linspace(0, 1, 200)
     ax.hist(fakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML fakes", color="red")
     ax.hist(nonfakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML matched", color="blue")
     ax.legend()
-    ax.set_title("highest beta")
-    fig.show()
+    ax.set_yscale("log")
+    ax.set_xlabel(r"Highest $\beta$")
+    ax.set_ylabel("Count")
+    fig.tight_layout()
+    fig.savefig(os.path.join(PATH_store, "fakes_highest_beta_value.pdf"))
 
     # for each bin, plot a pie chart with the PIDs and their percentages.
     fig, ax = plt.subplots(2, 4, figsize=(10, 5))
@@ -3322,7 +3325,7 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
     pids = ["11", "130", "2112", "22", "2212", "211"]
     pid_names = {"11": "$e^\pm$", "130": "$K_L$", "2112": "Neutrons", "22": "$\gamma$", "211": "$\pi^\pm$", "2212": "Protons"}
     fig_distr, ax_distr = plt.subplots(6, 4, figsize=(15*4/6, 15))
-    default_key= "ML"
+    default_key = "ML"
     for i, dic in enumerate(dics):
         ax_distr[i, 0].plot(dic[default_key]["energy_resolutions_p"], dic[default_key]["variance_om_p_reco"] / dic[default_key]["energy_resolutions_p"], ".--", c="blue", label="Pandora")
         for key in dic:
