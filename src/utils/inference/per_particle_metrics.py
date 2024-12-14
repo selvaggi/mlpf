@@ -764,6 +764,36 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
         fig.savefig(os.path.join(save_dir, "Pandora_confusion_matrix_PID_NO_track_in_cluster.pdf"), bbox_inches="tight")
         plt.clf()
 
+def compute_score_certainty(scores):
+    # scores: (n_samples, n_classes)
+    # certainty is defined as the difference between the largest in each sample and the second-largest
+    # scores: (n_samples, n_classes)
+    # certainty is defined as the difference between the largest in each sample and the second largest
+    top2_scores, _ = torch.topk(scores, 2, dim=1)
+    certainty = top2_scores[:, 0] - top2_scores[:, 1]
+    return certainty
+
+def analyze_fakes_PID(matched_pandora, matched_all, PATH_store):
+    fakes_pandora = matched_pandora[pd.isna(matched_pandora.true_showers_E)]
+    nonfakes_pandora = matched_pandora[~pd.isna(matched_pandora.true_showers_E)]
+    fakes_model = matched_all[pd.isna(matched_all.true_showers_E)]
+    nonfakes_model = matched_all[~pd.isna(matched_all.true_showers_E)]
+    fakes_model_extra_f = np.stack(fakes_model.matched_extra_features.values)
+    pid_logits_fakes = torch.tensor(fakes_model_extra_f[:, 2:])
+    nonfakes_model_extra_f = np.stack(nonfakes_model.matched_extra_features.values)
+    energies = [0, 5, 15, 35, 50]
+    pid_logits_nonfakes = torch.tensor(nonfakes_model_extra_f[:, 2:])
+    pid_logits_fakes = torch.softmax(pid_logits_fakes, dim=1)
+    pid_logits_nonfakes = torch.softmax(pid_logits_nonfakes, dim=1)
+    certainty_fakes = compute_score_certainty(pid_logits_fakes)
+    certainty_nonfakes = compute_score_certainty(pid_logits_nonfakes)
+    fig, ax = plt.subplots()
+    ax.hist(certainty_fakes, histtype='step', bins=np.linspace(0, 1, 100), label="fakes", color="red", density=1)
+    ax.hist(certainty_nonfakes, histtype='step', bins=np.linspace(0, 1, 100), label="nonfakes", color="blue", density=1)
+    ax.legend()
+    ax.set_yscale("log")
+    fig.savefig(os.path.join(PATH_store, "fakes_certainty.pdf"))
+
 def analyze_fakes(matched_pandora, matched_all, PATH_store):
     fakes_pandora = matched_pandora[pd.isna(matched_pandora.true_showers_E)]
     nonfakes_pandora = matched_pandora[~pd.isna(matched_pandora.true_showers_E)]
@@ -907,7 +937,7 @@ def quick_plot_mass(matched_, matched_pandora, path_store):
     evt = get_response_for_event_energy(
         matched_pandora, matched_, perfect_pid=0, mass_zero=0, ML_pid=1
     )
-    plot_mass_resolution(evt, path_store)
+    plot_mass_resolution({"ML": evt}, path_store)
     print("Saved mass resolution")
 
 

@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from src.utils.pid_conversion import pid_conversion_dict
+from src.utils.inference.per_particle_metrics import compute_score_certainty
+import torch
 
 def renumber_batch_idx(df):
     # batch_idx has missing numbers
@@ -30,7 +32,7 @@ def apply_class_correction(sd_hgb):
 
 def apply_beta_correction(sd_hgb):
     highest_beta = np.stack(sd_hgb.matched_extra_features.values)[:, 1]
-    filter = (np.isnan(highest_beta)) | (highest_beta >= 0.05) | (highest_beta <= 0.03)
+    filter = (np.isnan(highest_beta)) | (highest_beta >= 0.3) | (highest_beta <= 0.03)
     cali_E = sd_hgb[~filter].calibrated_E
     fakes = pd.isna(sd_hgb[~filter].pid)
     print("E stored in cut off fakes:", cali_E[fakes].sum())
@@ -77,8 +79,8 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
     # names: list of scripts to do on data
     # sd_hgb: pandas dataframe with the HGB data
     # sd_pandora: pandas dataframe with the Pandora data
-    sd_hgb = sd_hgb[sd_hgb.reco_showers_E != 0.0]
-    sd_pandora = sd_pandora[sd_pandora.reco_showers_E != 0.0]
+    #sd_hgb = sd_hgb[sd_hgb.reco_showers_E != 0.0]
+    #sd_pandora = sd_pandora[sd_pandora.reco_showers_E != 0.0]
     if "class_correction" in names:
         sd_hgb = apply_class_correction(sd_hgb)
     if "no_correct_reco_photons" in names:
@@ -175,4 +177,12 @@ def preprocess_dataframe(sd_hgb, sd_pandora, names=""):
         # remove ch_le_filter
         #sd_hgb[ch_le_filter].calibrated_E = sd_hgb[ch_le_filter].pred_showers_E
         sd_hgb.loc[ch_le_filter, "calibrated_E"] = sd_hgb.loc[ch_le_filter, "pred_showers_E"]
+    if "remove_uncertain_particles" in names:
+        logits = torch.tensor(np.stack(sd_hgb.matched_extra_features.values))[:, 2:]
+        logits = torch.softmax(logits, dim=1)
+        score = compute_score_certainty(logits)
+        mask = (pd.isna(score)) | (score > 0.85) # makes it even slightly worse
+        mask = pd.Series(mask)
+        sd_hgb = sd_hgb[mask]
+        #sd_hgb = sd_hgb.iloc[torch.where(~mask)[0]]
     return renumber_batch_idx(sd_hgb), renumber_batch_idx(sd_pandora)

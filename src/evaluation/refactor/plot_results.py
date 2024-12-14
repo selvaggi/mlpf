@@ -12,7 +12,7 @@ import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
-    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes,
+    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, analyze_fakes_PID,
     plot_cm_per_energy, plot_fake_and_missed_energy_regions, quick_plot_mass,
     plot_cm_per_energy_on_overview
 )
@@ -77,6 +77,7 @@ path_hgcal = os.path.join(dir_top, path_ML)
 sd_hgb, _ = open_mlpf_dataframe(path_hgcal, False)
 sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
+
 #sd_hgb_gt = open_mlpf_dataframe(path_hgcal_GTC, False)
 '''
 ch = sd_hgb[sd_hgb.pred_pid_matched == 1]
@@ -144,7 +145,8 @@ ax.set_yscale("log")
 fig.show()
 
 '''
-
+#analyze_fakes(sd_pandora, sd_hgb, PATH_store_individual_plots)
+analyze_fakes_PID(sd_pandora, sd_hgb, PATH_store_individual_plots)
 plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_summary_plots)
 
 if args.mass_only:
