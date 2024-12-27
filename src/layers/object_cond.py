@@ -280,13 +280,29 @@ def calc_LV_Lbeta(
         # hit_type[tracks] = 250
         # total_sum_hits_types = scatter_add(hit_type.view(-1), object_index)
 
-        weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
-        total_sum_weights = scatter_add(weights.view(-1), object_index)
+        # weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
+        # total_sum_weights = scatter_add(weights.view(-1), object_index)
+        # V_attractive = (weights*q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+
+
+        
+        
+        weights = calculate_weights_for_class_hit_type_batch(g, torch.zeros_like(batch), is_sig)
+        total_sum_weights = torch.sum(weights)
         V_attractive = (weights*q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
-        assert V_attractive.size() == (n_hits_sig, n_objects)
-        V_attractive = V_attractive.sum(dim=0)  # K objects
+
+        V_attractive_per_object = V_attractive.sum(dim=0) #k objects 
+        V_attractive_per_event = scatter_add(V_attractive_per_object, batch_object)
+        weight_per_object = scatter_add(weights, object_index)# weight per object 
+        weight_per_event = scatter_add(weight_per_object, batch_object)
+        V_attractive = torch.mean(V_attractive_per_event/weight_per_event) #this is the attractive loss per event 
+        L_V_attractive = V_attractive
+
+        # V_attractive = (q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+        # assert V_attractive.size() == (n_hits_sig, n_objects)
+        # V_attractive = V_attractive.sum(dim=0)  # K objects
         # V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
-        V_attractive = V_attractive.view(-1) / (total_sum_weights.view(-1) + 1e-3)
+        # V_attractive = V_attractive.view(-1) / (total_sum_weights.view(-1) + 1e-3)
 
         #the other weight to give to the shower should be how close it is to another MC particle
 
@@ -298,12 +314,12 @@ def calc_LV_Lbeta(
         # L_V_attractive = torch.sum(V_attractive*weight_att)
         # L_V_attractive = L_V_attractive / torch.sum(weight_att)
         
-        L_V_attractive = torch.mean(V_attractive)
+        # L_V_attractive = torch.mean(V_attractive)
         L_V_attractive_2 = torch.sum(V_attractive)
     elif loss_type == "vrepweighted":
         
         # # weight per hit per shower to compensate for ecal hcal unbalance in hadronic showers
-        weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
+        # weights = calculate_weights_for_class_hit_type(g, object_index, is_sig)
 
         # # weight with an energy log of the hits
         # e_hits = g.ndata["e_hits"][is_sig].view(-1)
@@ -398,10 +414,13 @@ def calc_LV_Lbeta(
 
         V_repulsive2 = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep2
         L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
-        delta_MC = calculate_delta_MC(y, g)
-        weight_track = 1/(delta_MC+0.001).to(L_V_repulsive2.device)
-        L_V_repulsive2 = torch.sum(L_V_repulsive2 * weight_track.view(-1))/torch.sum(weight_track)
-
+        L_V_respulsive2_per_event = scatter_add(L_V_repulsive2, batch_object)
+        L_V_repulsive2 = torch.mean(L_V_respulsive2_per_event)
+        # delta_MC = calculate_delta_MC(y, g)
+        # weight_track = 1/(delta_MC+0.001).to(L_V_repulsive2.device)
+        # L_V_repulsive2 = torch.sum(L_V_repulsive2 * weight_track.view(-1))/torch.sum(weight_track)
+        #L_V_repulsive2 = torch.mean(L_V_repulsive2) #27.12
+        
 
 
         L_V_repulsive2 = L_V_repulsive2.view(-1)
@@ -435,9 +454,9 @@ def calc_LV_Lbeta(
         ).sum()
 
     L_V = (
-        attr_weight * L_V_attractive
+        attr_weight * L_V_attractive #attractive loss is now for 10 events 
         # + repul_weight * L_V_repulsive
-        + L_V_repulsive2 / 300
+        + L_V_repulsive2 / 300  #repulsive loss is for all hits per objects 
         # + L_V_attractive_2 / 600
     )
     
@@ -457,11 +476,15 @@ def calc_LV_Lbeta(
     if loss_type == "hgcalimplementation":
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
+        # hit_type_mask = (g.ndata["hit_type"]==1)*(g.ndata["particle_number"]>0)
+        # beta_alpha_track = beta[is_sig*hit_type_mask]
         L_beta_sig = torch.mean(
             1 - beta_alpha + 1 - torch.clip(beta_per_object_c, 0, 1)
         )
 
         L_beta_noise = L_beta_noise / 4
+
+        # L_beta_track = torch.mean(1-beta_alpha_track)
         # ? note: the training that worked quite well was dividing this by the batch size (1/4)
 
     elif loss_type == "vrepweighted":
@@ -530,7 +553,7 @@ def calc_LV_Lbeta(
             f'beta_term_option "{beta_term_option}" is not valid, choose from {valid_options}'
         )
 
-    L_beta = L_beta_noise + L_beta_sig
+    L_beta = L_beta_noise + L_beta_sig 
 
     L_alpha_coordinates = torch.mean(torch.norm(x_alpha_original - x_alpha, p=2, dim=1))
 
@@ -549,7 +572,7 @@ def calc_LV_Lbeta(
             L_beta,
             L_beta_sig,
             L_beta_noise,  # loss_x
-            None,  # loss_particle_ids0,  # 4
+            0,  # loss_particle_ids0,  # 4
             0,  # loss_momentum
             0,  # loss mass
             None,  # pid_true,
@@ -835,7 +858,7 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.1, td=1.0):
     # Only assign previously unassigned points (no overwriting)
     # Points unassigned at the end are bkg (-1)
     unassigned = torch.arange(n_points)
-    clustering = -1 * torch.ones(n_points, dtype=torch.long)
+    clustering = -1 * torch.ones(n_points, dtype=torch.long).to(betas.device)
     for index_condpoint in indices_condpoints:
         d = torch.norm(X[unassigned] - X[index_condpoint][0], dim=-1)
         assigned_to_this_condpoint = unassigned[d < td]
@@ -1248,6 +1271,49 @@ def calculate_weights_for_class_hit_type(g, object_index, is_sig):
 
     return weights
 
+
+def calculate_weights_for_class_hit_type_batch(g, object_index, is_sig):
+    ecal_hits = torch.sum(
+    1 * (g.ndata["hit_type"] == 2)[is_sig]
+    )
+    hcal_hits = torch.sum(
+        1 * (g.ndata["hit_type"] == 3)[is_sig]
+    ) + torch.sum(
+        1 * (g.ndata["hit_type"] == 4)[is_sig]
+    )
+    
+    track_hits = torch.sum(
+        1 * (g.ndata["hit_type"] == 1)[is_sig]
+    )*5
+    # muon_hits = torch.sum(
+    #     1 * (g.ndata["hit_type"] == 4)[is_sig]
+    # )
+    number_classes = 1*(ecal_hits>0)+1*(hcal_hits>0)+1*(track_hits>0)
+    weights = 1.0 * torch.ones_like(g.ndata["hit_type"][is_sig])
+    weight_ecal_per_object = 1.0 * torch.ones_like(ecal_hits)
+    weight_hcal_per_object = 1.0 *  torch.ones_like(ecal_hits)
+    weight_track_per_object = 1.0 * torch.ones_like(ecal_hits)
+    weight_muon_per_object = 1.0 *  torch.ones_like(ecal_hits)
+    weight_ecal_per_object = (ecal_hits + hcal_hits+track_hits) / (
+        number_classes * ecal_hits
+    )
+    weight_hcal_per_object = (ecal_hits + hcal_hits+track_hits) / (
+        number_classes* hcal_hits
+    )
+    weight_track_per_object = (ecal_hits + hcal_hits+track_hits) / (
+        number_classes* track_hits
+    )
+    # weight_muon_per_object = (ecal_hits + hcal_hits+track_hits) / (
+    #     number_classes* muon_hits
+    # )
+    weights[g.ndata["hit_type"][is_sig] == 2] = weight_ecal_per_object.view(-1)
+    weights[g.ndata["hit_type"][is_sig] == 3] = weight_hcal_per_object.view(-1)
+    weights[g.ndata["hit_type"][is_sig] == 1] = weight_track_per_object.view(-1)
+
+    weights[g.ndata["hit_type"][is_sig] == 4] = weight_hcal_per_object.view(-1)
+    weights = weights
+
+    return weights
 
 
 
