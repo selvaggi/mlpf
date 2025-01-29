@@ -141,7 +141,7 @@ def main():
         os.path.join(dir_top, path_pandora), neutrals_only
     )
 
-    #plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
+    plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_detailed_plots)
     analyze_fakes(sd_pandora, df_list[0], PATH_store_detailed_plots)
     sd_hgb = apply_beta_correction(sd_hgb)
     print("!!! Filtering !!!")
@@ -158,7 +158,7 @@ def main():
     # filter the df based on where decay type is 0
     ranges = [[0, 5000]]   # Ranges of the displacement to make the plots from, in cm
     fig, ax = plt.subplots(4, 5, figsize=(22, 22*4/5)) # The overview figure of efficiencies
-    plot_cm_per_energy(df_list[0], sd_pandora, PATH_store_detailed_plots, PATH_store_individual_plots)
+    # plot_cm_per_energy(df_list[0], sd_pandora, PATH_store_detailed_plots, PATH_store_individual_plots)
     plot_efficiency_all(sd_pandora, df_list, PATH_store_individual_plots, labels, ax=ax)
     reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
     plot_confusion_matrix(df_list[0], PATH_store_individual_plots, ax=ax[0, 3], ax1=ax[1, 3], ax2=ax[2, 3])

@@ -34,6 +34,7 @@ double get_mass_G4(int pid) {
     myMap[2212] = "proton";
     myMap[-2212] = "proton";
     myMap[2112] = "neutron";
+    myMap[-2112] = "neutron";
     myMap[111] = "pi0";
     myMap[130] = "kaon0L";
     myMap[-15]= "tau-";

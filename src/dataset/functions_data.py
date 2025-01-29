@@ -37,7 +37,7 @@ def find_mask_no_energy_close_particles(
         mask = hit_particle_link == p
         hit_types = np.unique(hit_type_a[mask])
         if (
-            delta_MC[index]<0.1
+            delta_MC[index]<0.19
         ):
             list_remove.append(p)
     if len(list_remove) > 0:

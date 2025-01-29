@@ -3,10 +3,10 @@ from lightning.pytorch.callbacks import BaseFinetuning
 import torch
 import torch.nn as nn
 import dgl
-from src.layers.object_cond import (
+from src.layers.inference_oc import (
     get_clustering,
 )
-from src.layers.inference_oc import hfdb_obtain_labels
+from src.layers.inference_oc import hfdb_obtain_labels, clustering_obtain_labels
 from src.layers.inference_oc import match_showers
 import torch_cmspepr
 
@@ -89,12 +89,13 @@ def obtain_clustering_for_matched_showers(
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
         if clustering_mode == "clustering_normal":
-            clustering = get_clustering(betas, X)
+            labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
         elif clustering_mode == "dbscan":
             if use_gt_clusters:
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
+                # labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
                 #if labels.min() == 0 and labels.sum() == 0:
                 #    labels += 1  # Quick hack
             particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
@@ -104,7 +105,6 @@ def obtain_clustering_for_matched_showers(
             )
             row_ind = torch.Tensor(row_ind).to(model_output.device).long()
             col_ind = torch.Tensor(col_ind).to(model_output.device).long()
-        
             if torch.sum(particle_ids == 0) > 0:
                 row_ind_ = row_ind - 1
             else:

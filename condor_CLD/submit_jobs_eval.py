@@ -31,7 +31,11 @@ def main():
         help="gun config file (has to be in gun/ directory) ",
         default="config.gun",
     )
-
+    parser.add_argument(
+        "--condordir",
+        help="output directory ",
+        default="/eos/experiment/fcc/ee/simulation/ClicDet/test/",
+    )
     parser.add_argument("--njobs", help="max number of jobs", default=2)
 
     parser.add_argument(
@@ -56,6 +60,7 @@ def main():
     args = parser.parse_args()
 
     outdir = os.path.abspath(args.outdir)
+    condor_dir = os.path.abspath(args.condordir)
     config = args.config
     njobs = int(args.njobs)
     nev = args.nev
@@ -99,7 +104,9 @@ log                   = std/condor.$(ClusterId).log
             print("{} : missing output file ".format(outputFile))
             jobCount += 1
 
-            argts = "{} {} {} {} {}".format(homedir, config, nev, seed, outdir)
+            argts = "{} {} {} {} {} {}".format(
+                homedir, config, nev, seed, outdir, condor_dir
+            )
 
             cmdfile += 'arguments="{}"\n'.format(argts)
             cmdfile += "queue\n"

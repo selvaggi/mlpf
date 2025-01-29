@@ -29,7 +29,7 @@ def create_inputs_from_table(
     Returns:
         _type_: all information to construct a graph
     """
-    remove_close_particles = True
+    remove_close_particles = False
     graph_empty = False
     number_hits = np.int32(np.sum(output["pf_mask"][0]))
     number_part = np.int32(np.sum(output["pf_mask"][1]))
@@ -359,22 +359,54 @@ def create_graph(
     # print("graph_empty",graph_empty)
     # t0 = time.time()
     g = store_track_at_vertex_at_track_at_calo(g)
-    # t1 = time.time()
-    # if noise_class:
-    g = make_bad_tracks_noise_tracks(g)
-    # if torch.sum(scatter_count(g.ndata["particle_number"])[1:]==0)>0:
-    #     print("here")
-    #     hit_particle_link = g.ndata["particle_number_nomap"]
-    #     cluster_id = g.ndata["particle_number"]
-    #     mask_loopers, mask_particles = create_noise_tracks(index_bad_tracks, hit_particle_link, y_data_graph, cluster_id)
-    #     hit_particle_link[mask_loopers] = -1
-    #     y_data_graph.mask(mask_particles)
-    #     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-    #     g.ndata["particle_number_nomap"] = hit_particle_link
-    #     g.ndata["particle_number"] = cluster_id
-    # t2 = time.time()
-    # wandb.log({"time_store_track_at_vertex_at_track_at_calo": t1-t0, "time_make_bad_tracks_noise_tracks": t2-t1})
+
+    g = make_bad_tracks_noise_tracks(g, y_data_graph)
+    
+    # g = make_graph_with_edges(g)
     return [g, y_data_graph], graph_empty
+
+
+def connect_mask():
+    def func(edges):
+        hit_type_src = edges.src["hit_type"]
+        hit_type_dst = edges.dst["hit_type"]
+        pos_src = edges.src["pos_hits_xyz"]
+        pos_dst = edges.dst["pos_hits_xyz"]
+        ecal_src = hit_type_src == 2
+        ecal_dst = hit_type_dst == 2
+        track_src = hit_type_src == 1
+        track_dst = hit_type_dst == 1
+        hcal_src = hit_type_src == 3
+        hcal_dst = hit_type_dst == 3
+        muon_src = hit_type_src == 4
+        muon_dst = hit_type_dst == 4
+        distance = torch.norm(pos_src-pos_dst, dim=-1)
+        angle = torch.sum(pos_src*pos_dst, dim=-1)
+        angle = angle/(torch.norm(pos_src, dim=-1)*torch.norm(pos_dst, dim=-1))
+
+        ecal_mask = ecal_src*ecal_dst*(angle>0.999)*(distance<50)
+        hcal_mask = hcal_src*hcal_dst*(angle>0.999)*(distance<150)
+        ecal_hcal_mask = ecal_src*hcal_dst*(angle>0.999)*(distance<250)
+        hcal_muon_mask = hcal_src*muon_dst*(angle>0.999)*(distance<1200)
+        muon_muon = muon_src*muon_dst*(angle>0.999)*(distance<300)
+        track_ecal = track_src*ecal_dst*(angle>0.999)*(distance<15)
+        mask_total = ecal_mask+hcal_mask+ecal_hcal_mask+hcal_muon_mask+muon_muon+track_ecal
+        connect_mask = 1*(mask_total>0)
+        return {"connect": connect_mask }
+
+    return func
+
+def make_graph_with_edges(g):
+    number_p = g.number_of_nodes()-1
+    i, j = torch.tril_indices(number_p, number_p)  # , offset=-1)
+    g.add_edges(i, j) # create fully connected graph
+    g = dgl.to_simple(g)  # remove repated edges
+    g = dgl.to_bidirected(g, copy_ndata=True)
+    g = dgl.remove_self_loop(g)
+    g.apply_edges(connect_mask())
+    g.remove_edges(torch.where(g.edata["connect"]==0)[0].long())
+    return g 
+
 
 
 def graph_batch_func(list_graphs):
@@ -395,7 +427,7 @@ def graph_batch_func(list_graphs):
     # reindex particle number
     return bg, ys
 
-def make_bad_tracks_noise_tracks(g):
+def make_bad_tracks_noise_tracks(g, y ):
     # is_chardged =scatter_add((g.ndata["hit_type"]==1).view(-1), g.ndata["particle_number"].long())[1:]
     mask_hit_type_t1 = g.ndata["hit_type"]==2
     mask_hit_type_t2 = g.ndata["hit_type"]==1
@@ -439,7 +471,11 @@ def make_bad_tracks_noise_tracks(g):
         # if mean_pos_cluster.shape[0]> torch.max(particle_track):
         #     distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
         distance_track_cluster = torch.norm(mean_pos_cluster_all-pos_track,dim=1)/1000
-        bad_tracks = (distance_track_cluster>0.21)+(angles<0.9998)
+        pid = y.pid[particle_track.long()-1]
+        pid[particle_track.long()==0]=0
+        pid = torch.abs(pid)
+        bad_tracks = ((distance_track_cluster>0.24)+(angles<0.9998))*(pid.view(-1)!=13)
+        bad_tracks = bad_tracks+((distance_track_cluster>0.5)+(angles<0.99))*(pid.view(-1)==13)
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         
         g.ndata["particle_number"][index_bad_tracks]= 0 

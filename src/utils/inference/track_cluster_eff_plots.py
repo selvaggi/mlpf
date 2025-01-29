@@ -22,7 +22,7 @@ def track_cluser_eff_(sd_hgb):
         mask_below = sd_hgb["true_showers_E"] > bin_i
         mask_check = ~pd.isna(sd_hgb["pred_showers_E"])
         mask = mask_below * mask_above * mask_check
-        correct_track_found = sd_hgb["is_track_correct"][mask].values/sd_hgb["is_track_in_MC"][mask].values
+        correct_track_found = sd_hgb["is_track_correct"][mask*(sd_hgb.distance_to_cluster_MC<0.21)].values/sd_hgb["is_track_in_MC"][mask*(sd_hgb.distance_to_cluster_MC<0.21)].values
         correct_track_found = correct_track_found[~np.isnan(correct_track_found)]>0
         correct_track_found_percent = np.mean(correct_track_found)
         track_cluser_eff.append(correct_track_found_percent)

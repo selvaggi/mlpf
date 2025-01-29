@@ -751,7 +751,7 @@ def store_tracks(
         genlink = -1
         if ngen > 0:
             genlink = link_vector[0]
-
+       
         if len(gen_indices) > 0:
             dic["hit_genlink0"].push_back(gen_indices[0])
 
@@ -1026,6 +1026,8 @@ def store_calo_hits(
             genlink = -1
             if ngen > 0:
                 genlink = link_vector[0]
+            if gen_indices[0] ==4: 
+                print(gen_indices[0],gen_indices[1], calohit_col_index + 1)
             if store_pandora_hits == "True":
                 # print("looking for calo hit")
                 (

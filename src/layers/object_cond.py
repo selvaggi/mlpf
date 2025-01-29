@@ -415,6 +415,7 @@ def calc_LV_Lbeta(
         V_repulsive2 = q.unsqueeze(1) * q_alpha.unsqueeze(0) * norms_rep2
         L_V_repulsive2 = V_repulsive2.sum(dim=0)  # size number of objects
         L_V_respulsive2_per_event = scatter_add(L_V_repulsive2, batch_object)
+        L_V_respulsive2_per_event = L_V_respulsive2_per_event/ n_clusters_per_event 
         L_V_repulsive2 = torch.mean(L_V_respulsive2_per_event)
         # delta_MC = calculate_delta_MC(y, g)
         # weight_track = 1/(delta_MC+0.001).to(L_V_repulsive2.device)

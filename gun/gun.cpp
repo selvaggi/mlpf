@@ -34,6 +34,7 @@ double get_mass_G4(int pid) {
     myMap[2212] = "proton";
     myMap[-2212] = "proton";
     myMap[2112] = "neutron";
+    myMap[-2112] = "neutron";
     myMap[111] = "pi0";
     myMap[130] = "kaon0L";
     myMap[-15]= "tau-";
@@ -46,6 +47,13 @@ double get_mass_G4(int pid) {
     myMap[213]= "rho+";
     myMap[-213]= "rho-";
     myMap[310]= "kaon0S";
+    myMap[321]= "kaon+";
+    myMap[-321]= "kaon-";
+    myMap[3112]= "sigma+";
+    myMap[-3112]= "sigma-";
+    myMap[3122]= "lambda";
+    myMap[3312]= "xi-";
+
     std::string  particle_name = myMap[pid];
     // Initialize a builtin physics list, any would work in this case
     G4VModularPhysicsList* physicsList = new QBBC; // from QBBC.hh
@@ -100,7 +108,6 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
         // Generate random PID
         std::uniform_int_distribution<> pid_dist(0, pid_list.size() - 1);
         int pid = pid_list[pid_dist(gen)];
-
         // Generate random direction within drmax
         float etap, phip;
         do {
