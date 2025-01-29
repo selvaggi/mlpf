@@ -1,7 +1,7 @@
 
 import matplotlib
 import sys
-#sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
+sys.path.append("/afs/cern.ch/work/m/mgarciam/private/mlpf/")
 from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist, \
     plot_mass_contribution_per_category, plot_mass_contribution_per_PID
 import matplotlib.pyplot as plt
@@ -88,6 +88,9 @@ sd_pandora, _ = open_mlpf_dataframe(os.path.join(dir_top, path_pandora), False)
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
 sd_hgb_gt, sd_pandora = preprocess_dataframe(sd_hgb_gt, sd_pandora, args.preprocess.split(","))
 
+# id_group = [211, -211, -13, 13, 2212, -2212, 321, -321, 3222, 3112, 3224, -3112, -3224]
+# mask = (sd_hgb.true_showers_E >5)*(sd_hgb.pid.isin(id_group))*np.isnan(sd_hgb.pred_showers_E)
+# sd_hgb = sd_hgb[~mask]
 current_dir = PATH_store_individual_plots
 current_dir_detailed = PATH_store_summary_plots
 if not os.path.exists(current_dir):
@@ -95,12 +98,22 @@ if not os.path.exists(current_dir):
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
 
+SMALL_SIZE = 15
+MEDIUM_SIZE = 15
+BIGGER_SIZE = 22
+plt.rc('font', size=SMALL_SIZE)
+plt.rc('axes', titlesize=SMALL_SIZE)
+plt.rc('axes', labelsize=MEDIUM_SIZE)
+plt.rc('xtick', labelsize=SMALL_SIZE)
+plt.rc('ytick', labelsize=SMALL_SIZE)
+plt.rc('legend', fontsize=SMALL_SIZE)
+plt.rc('figure', titlesize=BIGGER_SIZE)
 fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
 
-plot_efficiency_all(sd_pandora, [sd_hgb , sd_hgb_gt], PATH_store_individual_plots, ["ML", "ML GTC"], ax=ax_eff)
-fig_eff.tight_layout()
-fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
-plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots, sd_hgb_gt=sd_hgb_gt)
+# plot_efficiency_all(sd_pandora, [sd_hgb , sd_hgb_gt], PATH_store_individual_plots, ["ML", "ML GTC"], ax=ax_eff)
+# fig_eff.tight_layout()
+# fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
+# plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots, sd_hgb_gt=sd_hgb_gt)
 plot_per_energy_resolution2_multiple(
     sd_pandora,
     {"ML": sd_hgb, "ML GTC": sd_hgb_gt},

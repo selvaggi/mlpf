@@ -79,12 +79,18 @@ def create_and_store_graph_output(
         #    dic["ec_x"] = ec_x  ## ? No mask ?!?
         if predict:
             labels_clustering = clustering_obtain_labels(
-                X, dic["graph"].ndata["beta"].view(-1), model_output.device
+                X, dic["graph"].ndata["beta"].view(-1), model_output.device, tbeta=0.7, td=0.3
             )
         if use_gt_clusters:
             labels_hdb = dic["graph"].ndata["particle_number"].type(torch.int64)
         else:
             labels_hdb = hfdb_obtain_labels(X, model_output.device)
+            # betas = torch.sigmoid(dic["graph"].ndata["beta"])
+            # labels_clustering = clustering_obtain_labels(
+            #     X, betas.view(-1), model_output.device,  tbeta=0.7, td=0.3
+            # )
+            # labels_hdb = labels_clustering
+
             num_clusters = len(labels_hdb.unique())
             #if labels_hdb.min() == 0 and labels_hdb.sum() == 0:
             #    labels_hdb += 1  # Quick hack
@@ -160,7 +166,7 @@ def create_and_store_graph_output(
         # torch.save(
         #     dic,
         #     path_save
-        #     + "/graphs/"
+        #     + "/graphs_option7/"
         #     + str(local_rank)
         #     + "_"
         #     + str(step)
@@ -302,7 +308,7 @@ def store_at_batch_end(
         + str(step)
         + "_"
         + str(epoch)
-        + "_hdbscan.pt"
+        + "_hdbscan_option9_v1.pt"
     )
     if store and predict:
         df_batch1.to_pickle(path_save_)
@@ -315,7 +321,7 @@ def store_at_batch_end(
             + str(step)
             + "_"
             + str(epoch)
-            + "_pandora.pt"
+            + "_pandora_option9_v1.pt"
         )
         if store and predict:
             df_batch_pandora.to_pickle(path_save_pandora)
@@ -480,6 +486,7 @@ def generate_showers_data_frame(
 
     row_ind = torch.Tensor(row_ind).to(e_pred_showers.device).long()
     col_ind = torch.Tensor(col_ind).to(e_pred_showers.device).long()
+
     if torch.sum(particle_ids == 0) > 0:
         # particle id can be 0 because there is noise
         # then row ind 0 in any case corresponds to particle 1.
@@ -898,7 +905,7 @@ def obtain_union_matrix(shower_p_unique, particle_ids, labels, dic):
     return union_matrix
 
 
-def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.7, td=0.03):
+def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.7, td=0.2):
     """
     Returns a clustering of hits -> cluster_index, based on the GravNet model
     output (predicted betas and cluster space coordinates) and the clustering
@@ -918,10 +925,12 @@ def get_clustering(betas: torch.Tensor, X: torch.Tensor, tbeta=0.7, td=0.03):
     clustering = -1 * torch.ones(n_points, dtype=torch.long).to(betas.device)
     while len(indices_condpoints) > 0 and len(unassigned) > 0:
         index_condpoint = indices_condpoints[0]
-        d = torch.norm(X[unassigned] - X[index_condpoint][0], dim=-1)
-        assigned_to_this_condpoint = unassigned[d < td]
+        d = torch.norm(X[unassigned] - X[index_condpoint][0], dim=-1).to(betas.device)
+        indices = d < td
+        indices = indices.cpu()
+        assigned_to_this_condpoint = unassigned[indices]
         clustering[assigned_to_this_condpoint] = index_condpoint[0]
-        unassigned = unassigned[~(d < td)]
+        unassigned = unassigned[~(indices)]
         # calculate indices_codpoints again
         indices_condpoints = find_condpoints(betas, unassigned, tbeta)
     return clustering
@@ -1036,8 +1045,8 @@ def match_showers(
     return shower_p_unique, row_ind, col_ind, i_m_w, iou_matrix
 
 
-def clustering_obtain_labels(X, betas, device):
-    clustering = get_clustering(betas, X)
+def clustering_obtain_labels(X, betas, device,  tbeta=0.7, td=0.2):
+    clustering = get_clustering(betas, X,  tbeta=tbeta, td=td)
     map_from = list(np.unique(clustering.detach().cpu()))
     cluster_id = map(lambda x: map_from.index(x), clustering.detach().cpu())
     clustering_ordered = torch.Tensor(list(cluster_id)).long()

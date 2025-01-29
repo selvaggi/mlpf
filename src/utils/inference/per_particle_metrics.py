@@ -1292,7 +1292,7 @@ def plot_per_energy_resolution2_multiple(
                 #plot_pxyz_resolution(event_res_dic[key]["energy_resolutions"], protons["mean_pxyz_pandora"], protons["mean_pxyz"], axs_response_pxyz[2212], key)
                 fig_phi, ax_phi = plt.subplots(len(PIDs), 3, figsize=(len(PIDs)*2.5, 10))
                 fig_theta, ax_theta = plt.subplots(len(PIDs), 3, figsize=(len(PIDs)*2.5, 10))
-                matplotlib.rcParams["font.size"] = 10
+                # matplotlib.rcParams["font.size"] = 10
                 fig_all_angles, ax_all_angles = plt.subplots(5, 2, figsize=(8, 14))  # For the total energy resolution
                 for j, angle in enumerate(["theta", "phi"]):
                     if len(photons_dic["distr_phi"]) > 0:
@@ -1862,7 +1862,7 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
 
 
 def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
-    matplotlib.rcParams["font.size"] = 11
+    matplotlib.rcParams["font.size"] = 22
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
@@ -3318,17 +3318,28 @@ def plot_histograms(
 
 colors = {"ML": "red", "ML GTC": "green"}
 def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, neutrons, protons, path):
+    matplotlib.rcParams.update({'font.size': 22})
+    SMALL_SIZE = 15
+    MEDIUM_SIZE = 15
+    BIGGER_SIZE = 22
+    plt.rc('font', size=SMALL_SIZE)
+    plt.rc('axes', titlesize=SMALL_SIZE)
+    plt.rc('axes', labelsize=MEDIUM_SIZE)
+    plt.rc('xtick', labelsize=SMALL_SIZE)
+    plt.rc('ytick', labelsize=SMALL_SIZE)
+    plt.rc('legend', fontsize=SMALL_SIZE)
+    plt.rc('figure', titlesize=BIGGER_SIZE)
     dics = [electrons_dic, hadrons_dic, neutrons, photons_dic, protons, hadrons_dic2]
     pids = ["11", "130", "2112", "22", "2212", "211"]
     pid_names = {"11": "$e^\pm$", "130": "$K_L$", "2112": "Neutrons", "22": "$\gamma$", "211": "$\pi^\pm$", "2212": "Protons"}
-    fig_distr, ax_distr = plt.subplots(6, 4, figsize=(15*4/6, 15))
+    fig_distr, ax_distr = plt.subplots(6, 4, figsize=(14, 14/4*6))
     default_key= "ML"
     for i, dic in enumerate(dics):
         ax_distr[i, 0].plot(dic[default_key]["energy_resolutions_p"], dic[default_key]["variance_om_p_reco"] / dic[default_key]["energy_resolutions_p"], ".--", c="blue", label="Pandora")
         for key in dic:
             ax_distr[i, 0].plot(dic[key]["energy_resolutions"], dic[key]["variance_om_reco"] / dic[key]["energy_resolutions"], ".--", c=colors[key], label=key)
         # ax_distr[i, 0].plot(dic["energy_resolutions"], dic["variance_om_baseline"] / dic["energy_resolutions"], ".--", c="k", label="Baseline")
-        ax_distr[i, 0].set_xlabel("Energy [GeV]", fontsize=12)
+        ax_distr[i, 0].set_xlabel("Energy [GeV]", fontsize=SMALL_SIZE)
         ax_distr[i, 0].grid()
         ax_distr[i, 0].legend()
         ax_distr[i, 0].set_title(pid_names[pids[i]])
@@ -3336,7 +3347,7 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
         ax_distr[i, 1].plot(dic[default_key]["energy_resolutions"], dic[default_key]["variance_om_baseline"] / dic[default_key]["energy_resolutions"], ".--", c="k", label="Baseline")
         for key in dic:
             ax_distr[i, 1].plot(dic[key]["energy_resolutions"], dic[key]["variance_om"] / dic[key]["energy_resolutions"], ".--", c=colors[key], label=key)
-        ax_distr[i, 1].set_xlabel("Energy [GeV]", fontsize=12)
+        ax_distr[i, 1].set_xlabel("Energy [GeV]", fontsize=SMALL_SIZE)
         ax_distr[i, 1].set_title(pid_names[pids[i]])
         ax_distr[i, 1].set_ylabel("$\sigma_E / E$")
         ax_distr[i, 0].set_ylabel("$\sigma_{E_{reco}} / E_{reco}$")
@@ -3367,5 +3378,17 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
             ax_angle = ax_distr[pids.index("2212"), j+2]
             plot_sigma_angle_vs_energy(protons, path, "protons", angle, "Protons", ax=ax_angle)
             ax_angle.grid(1)
+    
+    SMALL_SIZE = 22
+    MEDIUM_SIZE = 22
+    BIGGER_SIZE = 22
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)
     fig_distr.tight_layout()
     fig_distr.savefig(path, bbox_inches="tight")

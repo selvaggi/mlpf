@@ -504,54 +504,66 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
 colors = {"ML": "red", "ML GTC": "green"}
 def plot_mass_resolution(event_res_dic, PATH_store):
     old_font_size = matplotlib.rcParams['font.size']
-    matplotlib.rcParams.update({'font.size': 11})
+    matplotlib.rcParams.update({'font.size': 22})
     pandora_dic = event_res_dic["ML"]
     fig, ax = plt.subplots(1, 2,figsize=(16, 8))
     # set fontsize to 20
-    ax[0].set_xlabel(r"$m_{pred}/m_{true}$")
-    bins = np.linspace(0, 2, 200)
+    ax[0].set_xlabel(r"$M_{pred}/M_{true}$")
+    bins = np.linspace(0, 2, 100)
     ax[0].hist(
         pandora_dic["mass_over_true_pandora"],
         bins=bins,
         histtype="step",
-        label="Pandora $\mu$={} $\sigma/\mu$={}".format(
-            round((pandora_dic["mean_mass_pandora"]), 4),
-            round((pandora_dic["var_mass_pandora"]), 4),
+        label="Pandora $\mu$={}".format(
+            round((pandora_dic["mean_mass_pandora"]), 4)
+        )+"\n"+"$\sigma/\mu$={}".format(round((pandora_dic["var_mass_pandora"]), 4),
         ),
         color="blue",
         density=True,
+        linewidth=1.5
     )
     mean_e_over_true_pandora, sigma_e_over_true_pandora = round(pandora_dic["mean_energy_over_true_pandora"], 4), round(
         pandora_dic["var_energy_over_true_pandora"], 4)
     ax[1].hist(pandora_dic["energy_over_true_pandora"], bins=bins, histtype="step",
-               label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
-                                                                  sigma_e_over_true_pandora), color="blue",
-               density=True)
+                # label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
+                #                                                   sigma_e_over_true_pandora),
+                label="Pandora  $\mu$={}".format(
+                            mean_e_over_true_pandora
+                        )+"\n"+"$\sigma/\mu$={}".format(sigma_e_over_true_pandora
+                        ),
+                color="blue",
+                density=True)
     for key in event_res_dic:
         ax[0].hist(
                 event_res_dic[key]["mass_over_true_model"],
                 bins=bins,
                 histtype="step",
-                label= str(key)+ " $\mu$={} $\sigma/\mu$={}".format(
-                    round((event_res_dic[key]["mean_mass_model"]), 4),
-                    round((event_res_dic[key]["var_mass_model"]), 4),
+                label="ML $\mu$={}".format(
+                    round((event_res_dic[key]["mean_mass_model"]), 4)
+                )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic[key]["var_mass_model"]), 4),
                 ),
                 color=colors[key],
                 density=True,
+                linewidth=1.5
         )
         #ax.set_xlim([0, 10])
         mean_e_over_true, sigma_e_over_true = round(event_res_dic[key]["mean_energy_over_true"], 4), round(
             event_res_dic[key]["var_energy_over_true"], 4)
-        ax[1].hist(event_res_dic[key]["energy_over_true"], bins=bins, histtype="step",
-                   label=str(key) + r" $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true), color=colors[key],
-                   density=True)
+        ax[1].hist(event_res_dic[key]["energy_over_true"], bins=bins, 
+                histtype="step",
+                label=str(key) +" $\mu$={}".format(
+                    mean_e_over_true
+                )+"\n"+"$\sigma/\mu$={}".format(sigma_e_over_true
+                ),
+                #    label=str(key) + r" $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true),
+                color=colors[key],
+                density=True)
 
     ax[0].grid(1)
-    ax[0].legend()
+    ax[0].legend(loc='upper left')
     ax[1].grid(1)
     ax[1].set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
-    ax[1].legend()
-
+    ax[1].legend(loc='upper left')
     fig.tight_layout()
     print("Saving mass resolution")
     import os
