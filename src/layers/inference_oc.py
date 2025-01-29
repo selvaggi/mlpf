@@ -539,9 +539,9 @@ def generate_showers_data_frame(
     matched_HCAL[row_ind_] = 1.0*e_pred_showers_hcal[index_matches]
 
 
-    n_extra_features = 2# n nodes, 1 highest betas
+    n_extra_features = 7 # n nodes, 1 highest betas
     matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
-    matched_extra_features = matched_extra_features.to(e_pred_showers.device)
+    #matched_extra_features = matched_extra_features.to(e_pred_showers.device)
     if pandora:
         matched_es_cali = matched_es.clone()
         matched_es_cali[row_ind_] = e_pred_showers_cali[index_matches]
@@ -578,7 +578,7 @@ def generate_showers_data_frame(
                 matched_ref_pt[row_ind_] = pred_ref_pt[number_of_showers_total : number_of_showers_total + number_of_showers]
                 matched_pid[row_ind_] = pred_pid[number_of_showers_total : number_of_showers_total + number_of_showers]
                 if not pandora:
-                    matched_extra_features[row_ind_] = extra_features[number_of_showers_total : number_of_showers_total + number_of_showers]
+                    matched_extra_features[row_ind_] = torch.tensor(extra_features[number_of_showers_total : number_of_showers_total + number_of_showers])
             if shap:
                 matched_shap_vals[row_ind_.cpu()] = shap_vals[index_matches.cpu()]
                 matched_ec_x[row_ind_.cpu()] = ec_x[index_matches.cpu()]
@@ -712,7 +712,7 @@ def generate_showers_data_frame(
             e_pred_pos = torch.cat((matched_positions, fakes_positions), dim=0)
             e_pred_pid = torch.cat((matched_pid, fakes_pid_pred), dim=0)
             e_pred_ref_pt = torch.cat((matched_ref_pt, fakes_positions), dim=0)
-            extra_features_all = torch.cat((matched_extra_features, fakes_extra_features), dim=0)
+            extra_features_all = torch.cat((matched_extra_features, torch.tensor(fakes_extra_features)), dim=0)
         if pandora:
             e_pred_cali_pfo = torch.cat(
                 (matched_es_cali_pfo, fake_showers_e_cali), dim=0
@@ -820,11 +820,13 @@ def generate_showers_data_frame(
             d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
-        event_list = [40]   # Fill with the list of selected events that we want to investigate
+        #event_list = [40]   # Fill with the list of selected events that we want to investigate
         if save_plots_to_folder:
             event_numbers = np.unique(df.number_batch)
             for evt in event_numbers:
-                if evt in event_list and len(df[df.number_batch == evt]):
+                #if evt contains muons
+                if 13 in dic["part_true"].pid.flatten().abs():
+                    print("Event contains muons, plotting!")
                     # Random string
                     if not pandora:
                         plot_event(
@@ -834,17 +836,18 @@ def generate_showers_data_frame(
                             graph=dic["graph"].to("cpu"),
                             y=dic["part_true"],
                             labels=dic["graph"].ndata["particle_number"].long(),
-                            is_track_in_cluster=df.is_track_in_cluster
+                            is_track_in_cluster=df.is_track_in_cluster,
+                            pid_filter=[13, -13]
                         )
-                    plot_event(
-                        df[df.number_batch == evt],
-                        pandora,
-                        save_plots_to_folder + "clustering_" + str(evt),
-                        graph=dic["graph"].to("cpu"),
-                        y=dic["part_true"],
-                        labels=labels.detach().cpu(),
-                        is_track_in_cluster=df.is_track_in_cluster
-                    )
+                    #plot_event(
+                    #    df[df.number_batch == evt],
+                    #    pandora,
+                    #   save_plots_to_folder + "clustering_" + str(evt),
+                    #    graph=dic["graph"].to("cpu"),
+                    #    y=dic["part_true"],
+                    #    labels=labels.detach().cpu(),
+                    #    is_track_in_cluster=df.is_track_in_cluster
+                    #)
 
         if number_of_showers_total is None:
             return df
