@@ -174,13 +174,12 @@ def find_cluster_id(hit_particle_link):
 def get_hit_features(
     output, number_hits, prediction, number_part, hit_chis, pos_pxpy, is_Ks=False
 ):
-    
+    # obtain link to MC for Ground Truth
     hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
-    if prediction:
-        indx_daugthers = 3
-    else:
-        indx_daugthers = 1
+    indx_daugthers = 3
     daughters = torch.tensor(output["pf_vectoronly"][indx_daugthers, 0:number_hits])
+
+    # obtain link to Pandora for comparison
     if prediction:
         pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
         pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
@@ -194,8 +193,6 @@ def get_hit_features(
             if output["pf_points_pfo"].shape[0] > 6:
                 pandora_pid = torch.tensor(output["pf_points_pfo"][6, 0:number_hits])
             else:
-                # zeros
-                # print("Zeros for pandora pid!")
                 pandora_pid=torch.zeros(number_hits)
             
         else:
@@ -230,12 +227,13 @@ def get_hit_features(
         pandora_mom = None
         pandora_ref_point = None
         pandora_pid = None
-    # hit type
-    # t0 = time.time()
+    
+    # obtain hit type
     hit_type_feature = torch.permute(
         torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
     )[:, 0].to(torch.int64)
-    # t1 = time.time()
+
+    # modify the index link for gamma and e (brems should point back to the photon)
     (
         hit_particle_link,
         hit_link_modified,
@@ -243,17 +241,17 @@ def get_hit_features(
     ) = modify_index_link_for_gamma_e(
         hit_type_feature, hit_particle_link, daughters, output, number_part, is_Ks
     )
-    # t2 = time.time()
+    
+    # obtain a 1,...,N id for the hits (the hit particle link might not be continuous)
     cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-    # t3 = time.time()
-    # wandb.log({"time_hit_type_feature": t1-t0, "time_modify_index_link_for_gamma_e": t2-t1, "time_find_cluster_id": t3-t2})
-    # position, e, p
+    
+    # obtain the position of the hits and the energies and p
     pos_xyz_hits = torch.permute(
         torch.tensor(output["pf_points"][0:3, 0:number_hits]), (1, 0)
     )
     pf_features_hits = torch.permute(
         torch.tensor(output["pf_features"][0:2, 0:number_hits]), (1, 0)
-    )  # removed theta, phi
+    )  
     p_hits = pf_features_hits[:, 0].unsqueeze(1)
     p_hits[p_hits == -1] = 0  # correct p of Hcal hits to be 0
     e_hits = pf_features_hits[:, 1].unsqueeze(1)
@@ -264,7 +262,6 @@ def get_hit_features(
         )
     else:
         pos_pxpypz = pos_xyz_hits
-    # pos_pxpypz = pos_theta_phi
 
     return (
         pos_xyz_hits,
@@ -315,6 +312,17 @@ def calculate_distance_to_boundary(g):
 
 
 def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
+    """
+    Creates a mask to identify noise hits in the event, these hits are assigned an index 0 so we don't attempt to reconstruct the particles they belong to.
+    Args:
+        hit_energies (torch.Tensor): Tensor containing the energies of the hits.
+        hit_particle_link (torch.Tensor): Tensor containing the particle link for each hit.
+        y (torch.Tensor): Tensor containing the particle information.
+        cluster_id (torch.Tensor): Tensor containing the cluster IDs.
+    Returns:
+        tuple: A tuple containing two boolean masks. The first mask identifies the noise hits, and the second mask identifies the noise particles.
+    """
+
     unique_p_numbers = torch.unique(cluster_id)
     number_of_hits = get_number_hits(hit_energies, cluster_id)
     e_reco = get_e_reco(hit_energies, cluster_id)
