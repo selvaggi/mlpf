@@ -96,27 +96,27 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
+        if job>3200:
+            seed = str(job + 1)
+            basename = "pf_tree_" + seed + ".root"
+            outputFile = outdir + "/" + basename
 
-        seed = str(job + 1)
-        basename = "pf_tree_" + seed + ".root"
-        outputFile = outdir + "/" + basename
+            # print outdir, basename, outputFile
+            if not outputFile in list_of_outfiles:
+                print("{} : missing output file ".format(outputFile))
+                jobCount += 1
 
-        # print outdir, basename, outputFile
-        if not outputFile in list_of_outfiles:
-            print("{} : missing output file ".format(outputFile))
-            jobCount += 1
+                argts = "{} {} {} {} {} {}".format(
+                    homedir, config, nev, seed, outdir, condor_dir
+                )
 
-            argts = "{} {} {} {} {} {}".format(
-                homedir, config, nev, seed, outdir, condor_dir
-            )
+                cmdfile += 'arguments="{}"\n'.format(argts)
+                cmdfile += "queue\n"
 
-            cmdfile += 'arguments="{}"\n'.format(argts)
-            cmdfile += "queue\n"
-
-            cmd = "rm -rf job*; ./{} {}".format(script, argts)
-            if jobCount == 1:
-                print("")
-                print(cmd)
+                cmd = "rm -rf job*; ./{} {}".format(script, argts)
+                if jobCount == 1:
+                    print("")
+                    print(cmd)
 
     with open("condor_gun.sub", "w") as f:
         f.write(cmdfile)

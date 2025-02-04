@@ -1,113 +1,63 @@
 #!/bin/bash
+/**
+ * The main difference with the train script is that the eval one saves the pandora outputs.
+ */
+ 
+HOMEDIR=${1} # path to where it's ran from (usally mlpf dir)
+GUNCARD=${2} # name of gun card to use
+NEV=${3} # number of events, if running with gun this is fixed in the gun card
+SEED=${4} # seed for the random number generator
+OUTPUTDIR=${5} # output directory
+DIR=${6} # directory where the job is ran and intermidiate files are created
 
-HOMEDIR=${1}
-GUNCARD=${2}
-NEV=${3}
-SEED=${4}
-OUTPUTDIR=${5}
-
-DIR="/eos/user/m/mgarciam/datasets_mlpf/CLD/condor/eval/10_15_05_50_dr01/"
 mkdir ${DIR}
-mkdir ${DIR}${SEED}
-cd ${DIR}${SEED}
+mkdir ${DIR}/${SEED}
+cd ${DIR}/${SEED}
+SAMPLE="gun" 
+
+# Path to the CLD configuration files (needed for the reconstruction and ddsim) this needs to be changed after git clone CLD config
+PATH_CLDCONFIG=/afs/cern.ch/work/m/mgarciam/private/CLD_Config_versions/CLDConfig_030225/CLDConfig/ 
 
 
-# cp -r ${HOMEDIR}/gun/gun_random_angle.cpp .
-# cp -r ${HOMEDIR}/gun/compile_gun_RA.x .
-cp -r ${HOMEDIR}/gun/gun.cpp .
-cp -r ${HOMEDIR}/gun/compile_gun.x .
-cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/cld_steer.py .
-cp -r /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/CLDReconstruction.py .
-mkdir ${DIR}${SEED}/PandoraSettingsCLD
-cp /afs/cern.ch/work/m/mgarciam/private/CLDConfig/CLDConfig/PandoraSettingsCLD/* ./PandoraSettingsCLD/
-cp -r ${HOMEDIR}/condor/make_pftree_clic_bindings.py .
-cp -r ${HOMEDIR}/condor/tree_tools.py .
-
-cp -r ${HOMEDIR}/gun/${GUNCARD} .
-echo ${HOMEDIR}/gun/${GUNCARD}
-echo ${INPUTFILE}
-
-#first recompile gun locally 
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "compiling gun"
-echo "  "
-echo " ===============================================================================  "
-echo "  "
-# source compile_gun_RA.x
-source compile_gun.x
-
-#produce hepmc event file 
-echo 'nevents '${NEV} >> ${GUNCARD}
-
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "running gun"
-echo "  "
-echo " ===============================================================================  "
-echo "  "
-
-./gun ${GUNCARD}
-
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "gun complete ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
+wrapperfunction() {
+    source /cvmfs/sw.hsf.org/key4hep/setup.sh -r 2025-01-28
+}
+wrapperfunction
 
 
-# #When you want to revert the changes:
 
-source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
+# Build gun  or Zcard
+if [[ "${SAMPLE}" == "gun" ]] 
+then 
+    cp -r ${HOMEDIR}/guns/gun/gun.cpp .
+    cp -r ${HOMEDIR}/guns/gun/CMakeLists.txt . 
+    PATH_GUN_CONFIG=${HOMEDIR}/guns/gun/config_files/${GUNCARD} 
+    mkdir build install
+    cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=../install
+    make install -j 8
+    cd ..
+    ./build/gun ${PATH_GUN_CONFIG} 
+fi
 
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "run simulation ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
-ddsim --compactFile $K4GEO/FCCee/CLD/compact/CLD_o2_v05/CLD_o2_v05.xml --outputFile out_sim_edm4hep.root --steeringFile cld_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
+if [[ "${SAMPLE}" == "Zcard" ]]
+then
+    cp ${HOMEDIR}/Pythia_generation/${SAMPLE}.cmd card.cmd
+    echo "Random:seed=${SEED}" >> card.cmd
+    cat card.cmd
+    k4run pythia.py -n $NEV --Dumper.Filename out.hepmc --Pythia8.PythiaInterface.pythiacard card.cmd
+    cp out.hepmc events.hepmc
+fi
 
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "run reconstruction ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
 
+ddsim --compactFile $K4GEO/FCCee/CLD/compact/CLD_o2_v06/CLD_o2_v06.xml --outputFile out_sim_edm4hep.root --steeringFile ${PATH_CLDCONFIG}/cld_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
+
+cp -r ${PATH_CLDCONFIG}/* .
 k4run CLDReconstruction.py -n ${NEV}  --inputFiles out_sim_edm4hep.root --outputBasename out_reco_edm4hep
 
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "produce pf tree ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
-
-python make_pftree_clic_bindings.py out_reco_edm4hep_edm4hep.root tree.root True False
-
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "copying output file  ..."
-echo "  "
-echo " ================================================================================ "
-echo "  "
+#! This is the main difference with the eval script as it will save the pandora outpues
+python make_pftree_clic_bindings.py out_reco_edm4hep_REC.edm4hep.root tree5.root True False
 
 mkdir -p ${OUTPUTDIR}
-python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
 
-echo "  "
-echo " ================================================================================ "
-echo "  "
-echo "file copied ... "
-echo "  "
-echo " ================================================================================ "
-echo "  "
