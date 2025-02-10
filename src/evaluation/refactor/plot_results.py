@@ -68,8 +68,8 @@ if not os.path.exists(PATH_store_individual_plots):
     os.makedirs(PATH_store_individual_plots)
 if not os.path.exists(PATH_store_summary_plots):
     os.makedirs(PATH_store_summary_plots)
-path_ML = "showers_df_evaluation/0_0_None_hdbscan.pt"
-path_pandora = "showers_df_evaluation/0_0_None_pandora.pt"
+path_ML = "showers_df_evaluation/0_0_None_hdbscan_option9_v1.pt"
+path_pandora = "showers_df_evaluation/0_0_None_pandora_option9_v1.pt"
 dir_top = args.path
 print(PATH_store)
 path_hgcal = os.path.join(dir_top, path_ML)
