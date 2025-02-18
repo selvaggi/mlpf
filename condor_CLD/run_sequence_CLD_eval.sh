@@ -17,7 +17,8 @@ SAMPLE="gun"
 
 # Path to the CLD configuration files (needed for the reconstruction and ddsim) this needs to be changed after git clone CLD config
 PATH_CLDCONFIG=/afs/cern.ch/work/m/mgarciam/private/CLD_Config_versions/CLDConfig_030225/CLDConfig/ 
-
+cp $HOMEDIR/condor/make_pftree_clic_bindings.py ./
+cp $HOMEDIR/condor/tree_tools.py ./
 
 wrapperfunction() {
     source /cvmfs/sw.hsf.org/key4hep/setup.sh -r 2025-01-28
@@ -56,8 +57,8 @@ cp -r ${PATH_CLDCONFIG}/* .
 k4run CLDReconstruction.py -n ${NEV}  --inputFiles out_sim_edm4hep.root --outputBasename out_reco_edm4hep
 
 #! This is the main difference with the eval script as it will save the pandora outpues
-python make_pftree_clic_bindings.py out_reco_edm4hep_REC.edm4hep.root tree5.root True False
+python make_pftree_clic_bindings.py out_reco_edm4hep_REC.edm4hep.root tree1.root True False
 
 mkdir -p ${OUTPUTDIR}
-python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree1.root ${OUTPUTDIR}/pf_tree_${SEED}.root
 
