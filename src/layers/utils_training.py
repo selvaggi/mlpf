@@ -89,7 +89,7 @@ def obtain_clustering_for_matched_showers(
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
         if clustering_mode == "clustering_normal":
-            labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
+            labels = clustering_obtain_labels( X,torch.sigmoid(betas.view(-1)), betas.device,  tbeta=0.3, td=0.4)
         elif clustering_mode == "dbscan":
             if use_gt_clusters:
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
@@ -98,124 +98,124 @@ def obtain_clustering_for_matched_showers(
                 # labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
                 #if labels.min() == 0 and labels.sum() == 0:
                 #    labels += 1  # Quick hack
-            particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-            shower_p_unique = torch.unique(labels)
-            shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
-                labels, dic, particle_ids, model_output, local_rank, i, None
-            )
-            row_ind = torch.Tensor(row_ind).to(model_output.device).long()
-            col_ind = torch.Tensor(col_ind).to(model_output.device).long()
-            if torch.sum(particle_ids == 0) > 0:
-                row_ind_ = row_ind - 1
-            else:
-                # if there is no zero then index 0 corresponds to particle 1.
-                row_ind_ = row_ind
-            index_matches = col_ind + 1
-            index_matches = index_matches.to(model_output.device).long()
-            """
-                        ### Plot shapes of some showers, to debug what's wrong with the energies
-                        debug_showers = False
-                        if debug_showers:
-                            energy_true_part = dic["part_true"][:, 3].detach().cpu()
-                            from torch_scatter import scatter_sum
-                            energy_sum_hits = scatter_sum(dic["graph"].ndata["e_hits"], dic["graph"].ndata["particle_number"].type(torch.int64), dim=0).flatten().detach().cpu()
-                            energy_noise = str(round(energy_sum_hits[0].item(), 2))
-                            n_hits_noise = torch.sum(dic["graph"].ndata["particle_number"] == 0).detach().cpu().item()
-                            #frac_energy_sum = energy_sum_hits / energy_true_part[1:]
-                            import matplotlib.pyplot as plt
-                            n_particles = len(particle_ids)
-                            fig = plt.figure(figsize=(18, 4 * n_particles))
-                            for j in range(n_particles):
-                                mask = labels == j
-                                # make ax projection 3D
-                                #ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
-                                ax = fig.add_subplot(n_particles, 1, j+1, projection='3d')
-                                ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), X[mask, 2].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
-                                pnum = (particle_ids[j]-1).type(torch.int64).detach().cpu()
-                                part_xyz = dic["part_true"][pnum, [0,1,2]].detach().cpu()
-                                ax.scatter(part_xyz[0], part_xyz[1], part_xyz[2], c='r', s=100)
-                                ax.set_title(f"gr. {i}, E c.f. = {str(round(energy_true_part[pnum].item() / energy_sum_hits[1:][pnum].item() - 1, 2))}, Etrue = {round(energy_true_part[pnum].item(), 2)}, Esum_hits = {round(energy_sum_hits[1:][pnum].item(), 2)}, Nnoisehits = {n_hits_noise}, Enoise = {energy_noise}, eta={part_eta},phi={part_phi}")
-                            # log to wandb
-                            wandb.log({"showers": [wandb.Image(fig, caption="showers")]})
-            """
-            for j, unique_showers_label in enumerate(index_matches):
-                if torch.sum(unique_showers_label == index_matches) == 1:
-                    index_in_matched = torch.argmax(
-                        (unique_showers_label == index_matches) * 1
-                    )
-                    mask = labels == unique_showers_label
-                    # non_graph = torch.sum(mask)
-                    sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
-                    k = 7
-                    edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
-                    g = dgl.graph(
-                        (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
-                    )
-                    g = dgl.remove_self_loop(g)
-                    # g = dgl.DGLGraph().to(graphs[i].device)
-                    # g.add_nodes(non_graph.detach().cpu())
-                    g.ndata["h"] = torch.cat(
-                        (
-                            graphs[i].ndata["h"][mask],
-                            graphs[i].ndata["beta"][mask].view(-1, 1),
-                        ),
-                        dim=1,
-                    )
-                    if "pos_pxpypz" in graphs[i].ndata:
-                        g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
-                    if "pos_pxpypz_at_vertex" in graphs[i].ndata:
-                        g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
-                            "pos_pxpypz_at_vertex"
-                        ][mask]
-                    g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
-                    energy_t = dic["part_true"].E.to(model_output.device)
-                    energy_t_corr_daughters = dic["part_true"].E_corrected.to(
-                        model_output.device
-                    )
-                    true_energy_shower = energy_t[row_ind_[j]]
-                    y_pids_matched.append(y.pid[row_ind_[j]].item())
-                    y_coords_matched.append(y.coord[row_ind_[j]].detach().cpu().numpy())
-                    energy_true_daughters.append(energy_t_corr_daughters[row_ind_[j]])
-                    reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
-                    graphs_showers_matched.append(g)
-                    true_energy_showers.append(true_energy_shower.view(-1))
-                    reco_energy_showers.append(reco_energy_shower.view(-1))
-            pred_showers = shower_p_unique
-            pred_showers[index_matches] = -1
-            pred_showers[
-                0
-            ] = (
-                -1
-            )
-            mask_fakes = pred_showers != -1
-            fakes_idx = torch.where(mask_fakes)[0]
-            if add_fakes:
-                for j in fakes_idx:
-                    mask = labels == j
-                    sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
-                    k = 7
-                    edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
-                    g = dgl.graph(
-                        (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
-                    )
-                    g = dgl.remove_self_loop(g)
-                    g.ndata["h"] = torch.cat(
-                        (
-                            graphs[i].ndata["h"][mask],
-                            graphs[i].ndata["beta"][mask].view(-1, 1),
-                        ),
-                        dim=1,
-                    )
-                    if "pos_pxpypz" in graphs[i].ndata:
-                        g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
-                    if "pos_pxpypz_at_vertex" in graphs[i].ndata:
-                        g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
-                            "pos_pxpypz_at_vertex"
-                        ][mask]
-                    g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
-                    graphs_showers_fakes.append(g)
-                    reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
-                    reco_energy_showers_fakes.append(reco_energy_shower.view(-1))
+        particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
+        shower_p_unique = torch.unique(labels)
+        shower_p_unique, row_ind, col_ind, i_m_w, _ = match_showers(
+            labels, dic, particle_ids, model_output, local_rank, i, None
+        )
+        row_ind = torch.Tensor(row_ind).to(model_output.device).long()
+        col_ind = torch.Tensor(col_ind).to(model_output.device).long()
+        if torch.sum(particle_ids == 0) > 0:
+            row_ind_ = row_ind - 1
+        else:
+            # if there is no zero then index 0 corresponds to particle 1.
+            row_ind_ = row_ind
+        index_matches = col_ind + 1
+        index_matches = index_matches.to(model_output.device).long()
+        """
+                    ### Plot shapes of some showers, to debug what's wrong with the energies
+                    debug_showers = False
+                    if debug_showers:
+                        energy_true_part = dic["part_true"][:, 3].detach().cpu()
+                        from torch_scatter import scatter_sum
+                        energy_sum_hits = scatter_sum(dic["graph"].ndata["e_hits"], dic["graph"].ndata["particle_number"].type(torch.int64), dim=0).flatten().detach().cpu()
+                        energy_noise = str(round(energy_sum_hits[0].item(), 2))
+                        n_hits_noise = torch.sum(dic["graph"].ndata["particle_number"] == 0).detach().cpu().item()
+                        #frac_energy_sum = energy_sum_hits / energy_true_part[1:]
+                        import matplotlib.pyplot as plt
+                        n_particles = len(particle_ids)
+                        fig = plt.figure(figsize=(18, 4 * n_particles))
+                        for j in range(n_particles):
+                            mask = labels == j
+                            # make ax projection 3D
+                            #ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
+                            ax = fig.add_subplot(n_particles, 1, j+1, projection='3d')
+                            ax.scatter(X[mask, 0].detach().cpu(), X[mask, 1].detach().cpu(), X[mask, 2].detach().cpu(), c=dic["graph"].ndata["hit_type"][mask].detach().cpu())
+                            pnum = (particle_ids[j]-1).type(torch.int64).detach().cpu()
+                            part_xyz = dic["part_true"][pnum, [0,1,2]].detach().cpu()
+                            ax.scatter(part_xyz[0], part_xyz[1], part_xyz[2], c='r', s=100)
+                            ax.set_title(f"gr. {i}, E c.f. = {str(round(energy_true_part[pnum].item() / energy_sum_hits[1:][pnum].item() - 1, 2))}, Etrue = {round(energy_true_part[pnum].item(), 2)}, Esum_hits = {round(energy_sum_hits[1:][pnum].item(), 2)}, Nnoisehits = {n_hits_noise}, Enoise = {energy_noise}, eta={part_eta},phi={part_phi}")
+                        # log to wandb
+                        wandb.log({"showers": [wandb.Image(fig, caption="showers")]})
+        """
+        for j, unique_showers_label in enumerate(index_matches):
+            if torch.sum(unique_showers_label == index_matches) == 1:
+                index_in_matched = torch.argmax(
+                    (unique_showers_label == index_matches) * 1
+                )
+                mask = labels == unique_showers_label
+                # non_graph = torch.sum(mask)
+                sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
+                k = 7
+                edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+                g = dgl.graph(
+                    (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+                )
+                g = dgl.remove_self_loop(g)
+                # g = dgl.DGLGraph().to(graphs[i].device)
+                # g.add_nodes(non_graph.detach().cpu())
+                g.ndata["h"] = torch.cat(
+                    (
+                        graphs[i].ndata["h"][mask],
+                        graphs[i].ndata["beta"][mask].view(-1, 1),
+                    ),
+                    dim=1,
+                )
+                if "pos_pxpypz" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
+                if "pos_pxpypz_at_vertex" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
+                        "pos_pxpypz_at_vertex"
+                    ][mask]
+                g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
+                energy_t = dic["part_true"].E.to(model_output.device)
+                energy_t_corr_daughters = dic["part_true"].E_corrected.to(
+                    model_output.device
+                )
+                true_energy_shower = energy_t[row_ind_[j]]
+                y_pids_matched.append(y.pid[row_ind_[j]].item())
+                y_coords_matched.append(y.coord[row_ind_[j]].detach().cpu().numpy())
+                energy_true_daughters.append(energy_t_corr_daughters[row_ind_[j]])
+                reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
+                graphs_showers_matched.append(g)
+                true_energy_showers.append(true_energy_shower.view(-1))
+                reco_energy_showers.append(reco_energy_shower.view(-1))
+        pred_showers = shower_p_unique
+        pred_showers[index_matches] = -1
+        pred_showers[
+            0
+        ] = (
+            -1
+        )
+        mask_fakes = pred_showers != -1
+        fakes_idx = torch.where(mask_fakes)[0]
+        if add_fakes:
+            for j in fakes_idx:
+                mask = labels == j
+                sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
+                k = 7
+                edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
+                g = dgl.graph(
+                    (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
+                )
+                g = dgl.remove_self_loop(g)
+                g.ndata["h"] = torch.cat(
+                    (
+                        graphs[i].ndata["h"][mask],
+                        graphs[i].ndata["beta"][mask].view(-1, 1),
+                    ),
+                    dim=1,
+                )
+                if "pos_pxpypz" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
+                if "pos_pxpypz_at_vertex" in graphs[i].ndata:
+                    g.ndata["pos_pxpypz_at_vertex"] = graphs[i].ndata[
+                        "pos_pxpypz_at_vertex"
+                    ][mask]
+                g.ndata["chi_squared_tracks"] = graphs[i].ndata["chi_squared_tracks"][mask]
+                graphs_showers_fakes.append(g)
+                reco_energy_shower = torch.sum(graphs[i].ndata["e_hits"][mask])
+                reco_energy_showers_fakes.append(reco_energy_shower.view(-1))
     graphs_showers_matched = dgl.batch(graphs_showers_matched + graphs_showers_fakes)
     true_energy_showers = torch.cat(true_energy_showers, dim=0)
     reco_energy_showers = torch.cat(reco_energy_showers + reco_energy_showers_fakes, dim=0)

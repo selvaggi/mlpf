@@ -14,8 +14,8 @@ SAMPLE="gun"
 
 # Path to the CLD configuration files (needed for the reconstruction and ddsim) this needs to be changed after git clone CLD config
 PATH_CLDCONFIG=/afs/cern.ch/work/m/mgarciam/private/CLD_Config_versions/CLDConfig_030225/CLDConfig/ 
-
-
+cp $HOMEDIR/condor/make_pftree_clic_bindings.py ./
+cp $HOMEDIR/condor/tree_tools.py ./
 wrapperfunction() {
     source /cvmfs/sw.hsf.org/key4hep/setup.sh -r 2025-01-28
 }
@@ -26,9 +26,9 @@ wrapperfunction
 # Build gun  or Zcard
 if [[ "${SAMPLE}" == "gun" ]] 
 then 
-    cp -r ${HOMEDIR}/guns/gun/gun.cpp .
-    cp -r ${HOMEDIR}/guns/gun/CMakeLists.txt . 
-    PATH_GUN_CONFIG=${HOMEDIR}/guns/gun/config_files/${GUNCARD} 
+    cp -r ${HOMEDIR}/guns/gun_log_dr/gun.cpp .
+    cp -r ${HOMEDIR}/guns/gun_log_dr/CMakeLists.txt . 
+    PATH_GUN_CONFIG=${HOMEDIR}/guns/gun_log_dr/config_files/${GUNCARD} 
     mkdir build install
     cd build
     cmake .. -DCMAKE_INSTALL_PREFIX=../install
@@ -42,7 +42,7 @@ then
     cp ${HOMEDIR}/Pythia_generation/${SAMPLE}.cmd card.cmd
     echo "Random:seed=${SEED}" >> card.cmd
     cat card.cmd
-    k4run pythia.py -n $NEV --Dumper.Filename out.hepmc --Pythia8.PythiaInterface.pythiacard card.cmd
+    k4run ${HOMEDIR}/Pythia_generation/pythia.py -n $NEV --Dumper.Filename out.hepmc --Pythia8.PythiaInterface.pythiacard card.cmd
     cp out.hepmc events.hepmc
 fi
 
