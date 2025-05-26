@@ -1,5 +1,12 @@
 # MLPF FCC
-particle-flow with ml 
+This is our machine learning based pipeline for particle flow. 
+
+Latest documentation/ presentations can be found here:
+https://repository.cern/records/n9wc2-09n03
+https://indico.cern.ch/event/1408515/contributions/6521312/
+
+Additional information and setup instructions can be found in the wiki!
+
 
 ## ML pipeline:
 - The dataloaders, train scripts and tools are currently based on [Weaver](https://github.com/hqucms/weaver-core/tree/main), the reason for this is that we are importing a root file that contains the dataset and these files can be large. Weaver has all the tools to read and load from the rootfile and also develops and iterable dataloader that prefetches some data. Currently this dataset includes events. One event is formed by hits (which can be tracks or calo hits). An input is an event in the form of a graph, and the output is a single particle (in coming versions of the dataset there will be more). 
