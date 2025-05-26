@@ -1,9 +1,9 @@
 # MLPF FCC
-This is our machine learning based pipeline for particle flow. 
+Machine learning based pipeline for particle flow at FCC. 
 
 Latest documentation/ presentations can be found here:
-https://repository.cern/records/n9wc2-09n03
-https://indico.cern.ch/event/1408515/contributions/6521312/
+- https://repository.cern/records/n9wc2-09n03
+- https://indico.cern.ch/event/1408515/contributions/6521312/
 
 Additional information and setup instructions can be found in the wiki!
 
@@ -18,9 +18,9 @@ Additional information and setup instructions can be found in the wiki!
 Runs for this project can be found in the following work space: https://wandb.ai/imdea_dolo/mlpf?workspace=user-imdea_dolo
 
 ## Environment 
-You can use the docker container ```docker://dologarcia/gatr:v0``` and use singularity to run the container as:
+You can use the docker container ```docker://dologarcia/gatr:v9``` and use singularity to run the container as:
  ```export APPTAINER_CACHEDIR=/home/ADDUSER/cache/```
- ```singularity  shell   -B /eos -B /afs  --nv docker://dologarcia/gatr:v0```
+ ```singularity  shell   -B /eos -B /afs  --nv docker://dologarcia/gatr:v9```
 
 You might need to set up a conda env to run notebooks. To set up the env create a conda env following the instructions from [Weaver](https://github.com/hqucms/weaver-core/tree/main) and also install the packages in the requirements.sh script above 
 Alternatively, you can try to use a pre-built environment from [this link](https://cernbox.cern.ch/s/Rwz2S35BUePbwG4) - the .tar.gz file was built using conda-pack on fcc-gpu-04v2.cern.ch.
