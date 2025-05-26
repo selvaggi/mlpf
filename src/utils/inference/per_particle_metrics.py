@@ -485,6 +485,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     cm = confusion_matrix(class_true, class_pred)#, labels=list(range(n_classes + 1)))
     if cm.shape[0] < n_classes + 1:
         cm = np.pad(cm, ((0, n_classes + 1 - cm.shape[0]), (0, n_classes + 1 - cm.shape[1]))) # for the GT clustering
+    effi_diag = np.trace(cm) / np.sum(cm)
     #assert cm.shape[0] == cm.shape[1]
     #assert cm.shape[0] == n_classes + 1
     savefigs = ax is None
@@ -552,6 +553,7 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     f1 = no_nan_filter & (is_trk == 0)
     cm = confusion_matrix(class_true[f], class_pred[f])
     cm1 = confusion_matrix(class_true[f1], class_pred[f1])
+    ax.set_title(f"{prefix} {suffix}, $\\epsilon_{{\\mathrm{{diag}}}}$={effi_diag:.2f}")
     # plot cm
     savefigs = ax1 is None
     if ax1 is None:
@@ -634,6 +636,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     if savefigs:
         fig, ax = plt.subplots(figsize=(6, 6))
     cm = confusion_matrix(class_true[no_nan_filter], class_pred[no_nan_filter])
+    effi_diag = np.trace(cm) / np.sum(cm)
     if add_pie_charts:
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
@@ -710,6 +713,7 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
     f1 = no_nan_filter & (is_trk == 0)
     cm = confusion_matrix(class_true[f], class_pred[f])
     cm1 = confusion_matrix(class_true[f1], class_pred[f1])
+    ax.set_title(f"Pandora {suffix}, $\\epsilon_{{\\mathrm{{diag}}}}$={effi_diag:.2f}")
     # plot cm
     savefigs = ax1 is None
     if ax1 is None:
@@ -2979,6 +2983,9 @@ def plot_sigma_angle_vs_energy(dic, PATH_store, label, angle, title="", ax=None)
         ax.set_ylabel(r"$\phi$ resolution")
     ax.set_title(title)
     ax.legend()
+    ax.set_xticks([2.5, 10.0, 33.0])
+    ax.set_xticklabels(["[0,5]","[5,15]","[15,50]"], fontsize=10)  # Set the corresponding bin range labels
+    ax.tick_params(axis='x', which='both', direction='inout')
     if new_plot:
         fig.savefig(
             os.path.join(PATH_store, "angles_" + title + label + "-" + angle + ".pdf"),
@@ -3368,10 +3375,15 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
     fig_distr, ax_distr = plt.subplots(6, 4, figsize=(14, 14/4*6))
     default_key= "ML"
     for i, dic in enumerate(dics):
+        bins = [0, 5, 15, 50]
+        bin_labels = [f"[{bins[i]},{bins[i + 1]}]" for i in range(len(bins) - 1)]
         ax_distr[i, 0].plot(dic[default_key]["energy_resolutions_p"], dic[default_key]["variance_om_p_reco"] / dic[default_key]["energy_resolutions_p"], ".--", c="blue", label="Pandora")
         for key in dic:
             ax_distr[i, 0].plot(dic[key]["energy_resolutions"], dic[key]["variance_om_reco"] / dic[key]["energy_resolutions"], ".--", c=colors[key], label=key)
         # ax_distr[i, 0].plot(dic["energy_resolutions"], dic["variance_om_baseline"] / dic["energy_resolutions"], ".--", c="k", label="Baseline")
+        ax_distr[i, 0].set_xticks([2.5, 10.0, 33.0])
+        ax_distr[i, 0].set_xticklabels(bin_labels, fontsize=10)  # Set the corresponding bin range labels
+        ax_distr[i, 0].tick_params(axis='x', which='both', direction='inout')
         ax_distr[i, 0].set_xlabel("Energy [GeV]", fontsize=SMALL_SIZE)
         ax_distr[i, 0].grid()
         ax_distr[i, 0].legend()
@@ -3383,6 +3395,9 @@ def plot_full_comparison(photons_dic, electrons_dic, hadrons_dic, hadrons_dic2, 
         ax_distr[i, 1].set_xlabel("Energy [GeV]", fontsize=SMALL_SIZE)
         ax_distr[i, 1].set_title(pid_names[pids[i]])
         ax_distr[i, 1].set_ylabel("$\sigma_E / E$")
+        ax_distr[i, 1].set_xticks([2.5, 10.0, 33.0])
+        ax_distr[i, 1].set_xticklabels(bin_labels, fontsize=10)  # Set the corresponding bin range labels
+        ax_distr[i, 1].tick_params(axis='x', which='both', direction='inout')
         ax_distr[i, 0].set_ylabel("$\sigma_{E_{reco}} / E_{reco}$")
         ax_distr[i, 1].grid()
         ax_distr[i, 1].legend()

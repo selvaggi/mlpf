@@ -157,7 +157,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
     if perfect_pid or mass_zero or ML_pid:
         if len(pred_vect) > 0:
             pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
-            pred_vect[np.isnan(pred_vect)] = 0
+            pred_vect[torch.isnan(pred_vect)] = 0
         if ML_pid:
             if pandora:
                 print("Using Pandora provided PID for Pandora")

@@ -1,6 +1,8 @@
 
 import matplotlib
 import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
 from src.utils.inference.per_particle_metrics import plot_per_energy_resolution, reco_hist, \
     plot_mass_contribution_per_category, plot_mass_contribution_per_PID
 import matplotlib.pyplot as plt
@@ -8,7 +10,6 @@ from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 import mplhep as hep
-import os
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
