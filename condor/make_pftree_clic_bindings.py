@@ -17,22 +17,23 @@ from tree_tools import (
 
 # TODO
 # is last track state position at calo?
-# Bz should be stored in the in the tree
-# should allow for multiple gen links to hit (probablyhas to be done in the previous edm4hep formation stage)
+# Bz should be stored in the tree
+# should allow for multiple gen links to hit (probably has to be done in the previous edm4hep formation stage)
 
 debug = False
 """
 source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
 
-python scripts/make_pftree_clic.py /afs/cern.ch/work/s/selvaggi/private/particleflow/fcc/out_reco_edm4hep.root tree.root 
+python make_pftree_clic_bindings.py /afs/cern.ch/work/s/selvaggi/private/particleflow/fcc/out_reco_edm4hep.root tree.root 
 
 """
 
 ## global params
-CALO_RADIUS_IN_MM = 1500
+CALO_RADIUS_IN_MM = 1500   # unused?
 
+# parse command line
 if len(sys.argv) < 2:
-    print(" Usage: make_pftree.py input_file output_file")
+    print(" Usage: make_pftree_clic_bindings.py input_file output_file")
     sys.exit(1)
 
 input_file = sys.argv[1]
@@ -42,10 +43,14 @@ print("will store calo hits", store_pandora_hits)
 CLIC = sys.argv[4]
 print("is it CLIC", CLIC)
 
+# create podio reader for input file
 reader = root_io.Reader(input_file)
 
+# initialize output file
 out_root = TFile(output_file, "RECREATE")
 t = TTree("events", "pf tree lar")
+
+# initialize output tree using method in tree_tools
 event_number, n_hit, n_part, dic, t = initialize(t)
 
 event_number[0] = 0

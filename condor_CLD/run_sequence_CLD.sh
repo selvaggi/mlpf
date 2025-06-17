@@ -6,8 +6,8 @@ NEV=${3}
 SEED=${4}
 OUTPUTDIR=${5}
 
-mkdir /eos/user/m/mgarciam/datasets_mlpf/condor_dataset_CLD/
-mkdir /eos/user/m/mgarciam/datasets_mlpf/condor_dataset_CLD/${SEED}
+mkdir -p /eos/user/m/mgarciam/datasets_mlpf/condor_dataset_CLD/
+mkdir -p /eos/user/m/mgarciam/datasets_mlpf/condor_dataset_CLD/${SEED}
 cd /eos/user/m/mgarciam/datasets_mlpf/condor_dataset_CLD/${SEED}
 
 

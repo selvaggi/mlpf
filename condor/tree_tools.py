@@ -7,12 +7,13 @@ import numpy as np
 from podio import root_io
 import edm4hep
 
-c_light = 2.99792458e8
-Bz_clic = 4.0
-Bz_cld = 2.0
-mchp = 0.139570
+# constants
+c_light = 2.99792458e8      # speed of light
+Bz_clic = 4.0               # B field, CLIC
+Bz_cld = 2.0                # B field, CLD
+mchp = 0.139570             # muon mass
 
-
+# convert track curvature to pT
 def omega_to_pt(omega, isclic):
     if isclic:
         Bz = Bz_clic
@@ -21,7 +22,7 @@ def omega_to_pt(omega, isclic):
     a = c_light * 1e3 * 1e-15
     return a * Bz / abs(omega)
 
-
+# get track momentum from track state
 def track_momentum(trackstate, isclic=True):
     pt = omega_to_pt(trackstate.omega, isclic)
     phi = trackstate.phi
@@ -34,7 +35,7 @@ def track_momentum(trackstate, isclic=True):
     # print(p, theta, phi, energy)
     return p, theta, phi, energy, px, py, pz
 
-
+# get indices of daughters of genparticle with position i in collection mcparts
 def get_genparticle_daughters(i, mcparts):
 
     p = mcparts[i]
@@ -240,14 +241,16 @@ def find_gen_link(
     gen_positions = []
     gen_weights = []
     for i, l in enumerate(SiTracksMCTruthLink):
-        rec_ = l.getRec()
+        # rec_ = l.getRec()
+        rec_ = l.getFrom()
         object_id = rec_.getObjectID()
         index = object_id.index
         collectionID = object_id.collectionID
         # print(index, j, collectionID, id)
         if index == j and collectionID == id:
             # print(j, "found match")
-            gen_positions.append(l.getSim().getObjectID().index)
+            # gen_positions.append(l.getSim().getObjectID().index)
+            gen_positions.append(l.getTo().getObjectID().index)
             weight = l.getWeight()
             gen_weights.append(weight)
 
@@ -587,6 +590,8 @@ def store_gen_particles(
         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
         theta = math.acos(momentum.z / p)
         phi = math.atan2(momentum.y, momentum.x)
+        m = part.getMass()
+        e = math.sqrt(m**2 + p**2)
         dic["part_p"].push_back(p)
         dic["part_px"].push_back(momentum.x)
         dic["part_py"].push_back(momentum.y)
@@ -596,7 +601,8 @@ def store_gen_particles(
         dic["part_vertex_z"].push_back(part.getVertex().z)
         dic["part_theta"].push_back(theta)
         dic["part_phi"].push_back(phi)
-        dic["part_m"].push_back(part.getMass())
+        dic["part_m"].push_back(m)
+        dic["part_e"].push_back(e)
         dic["part_pid"].push_back(part.getPDG())
         dic["part_ks_dataset"].push_back(0)
         dic["part_isDecayedInCalorimeter"].push_back(
@@ -952,7 +958,7 @@ def store_calo_hits(
             ecal_endcap[0],
             hcal_endcap[0],
             hcal_other[0],
-            "MUON" #add muon coleections
+            "MUON" #add muon collections
         ]
 
     total_calohit_ = np.zeros(11)
