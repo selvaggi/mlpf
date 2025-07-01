@@ -1,5 +1,6 @@
 #!/bin/bash
-# source run_sequence_ALLEGRO_train.sh /home/gmarchio/work/fcc/allegro/mlpf/mlpf/ config_spread_031224_fair.gun 10 42 /home/gmarchio/work/fcc/allegro/mlpf/mlpf/output /home/gmarchio/work/fcc/allegro/mlpf/mlpf/tmp/
+# apcatlas01: source run_sequence_ALLEGRO_train.sh /home/gmarchio/work/fcc/allegro/mlpf/mlpf/ config_spread_031224_fair.gun 10 42 /home/gmarchio/work/fcc/allegro/mlpf/mlpf/output /home/gmarchio/work/fcc/allegro/mlpf/mlpf/tmp/
+# lxplus: source run_sequence_ALLEGRO_train.sh /afs/cern.ch/user/g/gmarchio/work/fcc/allegro/mlpf/mlpf/ config_spread_031224_fair.gun 10 42 /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/output/ /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/tmp/
 
 HOMEDIR=${1} # path to where it's ran from (usally mlpf dir)
 GUNCARD=${2} # name of gun card to use
@@ -8,19 +9,26 @@ SEED=${4} # seed for the random number generator
 OUTPUTDIR=${5} # output directory
 DIR=${6} # directory where the job is ran and intermediate files are created
 
-gen=0
-sim=0
-rec=0
+gen=1
+sim=1
+rec=1
 flatten=1
 
 mkdir -p ${DIR}
 mkdir -p ${DIR}/${SEED}
 cd ${DIR}/${SEED}
+pwd
 SAMPLE="gun" 
 
 # Path to the ALLEGRO configuration files (needed for the reconstruction and ddsim)
-PATH_FCCCONFIG=$HOMEDIR/FCC-config/
-PATH_ALLEGRO=/home/gmarchio/work/fcc/allegro/pandora/  # the files could also be downloaded from the web..
+# PATH_FCCCONFIG=$HOMEDIR/FCC-config/
+PATH_ALLEGRO_DATA=$HOMEDIR/condor_ALLEGRO/data/
+if [ ! -d "$PATH_ALLEGRO_DATA" ]; then
+    cd $HOMEDIR/condor_ALLEGRO
+    python downloadFilesForReco.py
+    cd ${DIR}/${SEED}
+fi
+
 cp $HOMEDIR/condor/make_pftree_clic_bindings.py ./
 cp $HOMEDIR/condor_ALLEGRO/tree_tools.py ./
 wrapperfunction() {
@@ -65,9 +73,7 @@ fi
 
 if [[ "${rec}" -ne 0 ]]
 then
-    # download files needed for ALLEGRO reconstruction
-    ln -f -s $PATH_ALLEGRO/run/data .
-    # cp $PATH_ALLEGRO/run/run_ALLEGRO_reco.py .
+    ln -f -s $PATH_ALLEGRO_DATA .
     cp ${HOMEDIR}/condor_ALLEGRO/run_ALLEGRO_reco.py .
     k4run run_ALLEGRO_reco.py -n ${NEV} --IOSvc.Input out_sim_edm4hep.root --IOSvc.Output out_reco_edm4hep.root --includeHCal --includeMuon --saveCells --addTracks
 fi
