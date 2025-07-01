@@ -4,8 +4,6 @@ import glob
 import argparse
 import time
 
-# TODO: add flag for train vs eval
-
 # ____________________________________________________________________________________________________________
 
 
@@ -61,6 +59,12 @@ def main():
         default="workday",
     )
 
+    parser.add_argument(
+        '--mode', 
+        choices=['train', 'eval'],
+        help='Mode of operation: train or eval'
+    )
+
     args = parser.parse_args()
 
     outdir = os.path.abspath(args.outdir)
@@ -70,6 +74,7 @@ def main():
     nev = args.nev
     queue = args.queue
     homedir = os.path.abspath(os.getcwd()) + "/../"
+    mode = args.mode
 
     os.system("mkdir -p {}".format(outdir))
 
@@ -78,10 +83,10 @@ def main():
     for name in glob.glob("{}/*.root".format(outdir)):
         list_of_outfiles.append(name)
 
-    # training
-    script = "run_sequence_ALLEGRO_train_dr_gun.sh"
-    # eval
-    # script = "run_sequence_CLD_eval.sh"
+    if mode == "train":
+        script = "run_sequence_ALLEGRO_train.sh"
+    else:
+        script = "run_sequence_ALLEGRO_eval.sh"
 
     jobCount = 0
 
@@ -93,7 +98,7 @@ output                = std/condor.$(ClusterId).$(ProcId).out
 error                 = std/condor.$(ClusterId).$(ProcId).err
 log                   = std/condor.$(ClusterId).log
 
-+AccountingGroup = "group_u_CMST3.all"
+# +AccountingGroup = ""
 +JobFlavour    = "{}"
 """.format(
         script, queue
