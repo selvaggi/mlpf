@@ -245,14 +245,10 @@ def create_graph(
     hits_only = config.graph_config.get(
         "only_hits", False
     )  
-    extended_coords = config.graph_config.get("extended_coords", False)
     prediction = config.graph_config.get("prediction", False)
     hit_chis = config.graph_config.get("hit_chis_track", False)
     pos_pxpy = config.graph_config.get("pos_pxpy", False)
     is_Ks = config.graph_config.get("ks", False)
-    is_muons = config.graph_config.get("muons", False)
-    noise_class = config.graph_config.get("noise", False)
-    # t0 = time.time()
     result = create_inputs_from_table(
         output,
         hits_only=hits_only,
@@ -261,9 +257,6 @@ def create_graph(
         pos_pxpy=pos_pxpy,
         is_Ks=is_Ks,
     )
-    # t1 = time.time()
-    # wandb.log({"time_create_inputs_from_table": t1-t0})
-   
     if len(result) == 1:
         graph_empty = True
         g = 0
@@ -351,17 +344,13 @@ def create_graph(
         # if is_Ks == False:
         #     if len(y_data_graph) < 4:
         #         graph_empty = True
-
+        if torch.unique(hit_particle_link).shape[0]==1 and torch.unique(hit_particle_link)[0]==-1:
+            graph_empty = True 
         if pos_xyz_hits.shape[0] < 10:
             graph_empty = True
-    if graph_empty:
         return [g, y_data_graph], graph_empty
-    # print("graph_empty",graph_empty)
-    # t0 = time.time()
     g = store_track_at_vertex_at_track_at_calo(g)
-
     g = make_bad_tracks_noise_tracks(g, y_data_graph)
-    
     # g = make_graph_with_edges(g)
     return [g, y_data_graph], graph_empty
 
