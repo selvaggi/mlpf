@@ -148,7 +148,7 @@ class ExampleWrapper(L.LightningModule):
         )  # (batch_size*num_points, 1, 16)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = g.ndata["h"][:, -2:]  # this corresponds to e,p
+        scalars = torch.cat((g.ndata["e_hits"], g.ndata["p_hits"]), dim=1)  
         # Pass data through GATr
         forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(

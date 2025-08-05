@@ -3,10 +3,7 @@
 graph_config:
    only_hits: false
    k: 40
-   prediction: true
-   hit_chis_track: true
-   pos_pxpy: true
-   ks: true
+   prediction: false
    noise: true
 custom_model_kwargs:
    # add custom model kwargs here

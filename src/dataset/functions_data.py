@@ -4,7 +4,6 @@ import dgl
 from torch_scatter import scatter_add
 from src.dataset.utils_hits import CachedIndexList, get_number_of_daughters, get_ratios, get_number_hits, modify_index_link_for_gamma_e, get_e_reco
 
-
 def calculate_delta_MC(y):
     y1 = y
     y_i = y1
@@ -21,33 +20,30 @@ def calculate_delta_MC(y):
     return delta_MC
 
 def find_mask_no_energy_close_particles(
-    hit_particle_link,
-    hit_type_a,
-    hit_energies,
+    hits,
     y,
-    daughters,
     predict=False,
     is_Ks=False,
 ):
     
-    list_p = np.unique(hit_particle_link)
+    list_p = np.unique(hits.hit_particle_link)
     list_remove = []
     delta_MC = calculate_delta_MC(y)
     for index, p in enumerate(list_p):
-        mask = hit_particle_link == p
-        hit_types = np.unique(hit_type_a[mask])
+        mask = hits.hit_particle_link == p
+        hit_types = np.unique(hits.hit_type_feature[mask])
         if (
             delta_MC[index]<0.19
         ):
             list_remove.append(p)
     if len(list_remove) > 0:
-        mask = torch.tensor(np.full((len(hit_particle_link)), False, dtype=bool))
+        mask = torch.tensor(np.full((len(hits.hit_particle_link)), False, dtype=bool))
         for p in list_remove:
-            mask1 = hit_particle_link == p
+            mask1 = hits.hit_particle_link == p
             mask = mask1 + mask
 
     else:
-        mask = np.full((len(hit_particle_link)), False, dtype=bool)
+        mask = np.full((len(hits.hit_particle_link)), False, dtype=bool)
 
     if len(list_remove) > 0:
         mask_particles = np.full((len(list_p)), False, dtype=bool)
@@ -85,6 +81,23 @@ def find_mask_no_energy(
 
     Returns:
         _type_: _description_
+
+
+    To use this function add the following code to create inputs from table:
+                mask_hits, mask_particles = find_mask_no_energy(
+                hits.hit_particle_link,
+                hits.hit_type_feature,
+                hits.e_hits,
+                y_data_graph,
+                hits.daughters,
+                prediction,
+                is_Ks=is_Ks,
+            )
+            # create mapping from links to number of particles in the event
+            hits.hit_particle_link = hits.hit_particle_link[~mask_hits]
+            hits.find_cluster_id()
+            y_data_graph.mask(~mask_particles)
+        
     """
 
     number_of_daughters = get_number_of_daughters(
@@ -146,144 +159,7 @@ def find_mask_no_energy(
 
 
 
-def find_cluster_id(hit_particle_link):
-    unique_list_particles = list(np.unique(hit_particle_link))
 
-    if np.sum(np.array(unique_list_particles) == -1) > 0:
-        non_noise_idx = torch.where(hit_particle_link != -1)[0]  #
-        noise_idx = torch.where(hit_particle_link == -1)[0]  #
-        unique_list_particles1 = torch.unique(hit_particle_link)[1:]
-        cluster_id_ = torch.searchsorted(
-            unique_list_particles1, hit_particle_link[non_noise_idx], right=False
-        )
-        cluster_id_small = 1.0 * cluster_id_ + 1
-        cluster_id = hit_particle_link.clone()
-        cluster_id[non_noise_idx] = cluster_id_small
-        cluster_id[noise_idx] = 0
-    else:
-        c_unique_list_particles = CachedIndexList(unique_list_particles)
-        cluster_id = map(
-            lambda x: c_unique_list_particles.index(x), hit_particle_link.tolist()
-        )
-        cluster_id = torch.Tensor(list(cluster_id)) + 1
-    return cluster_id, unique_list_particles
-
-
-
-
-def get_hit_features(
-    output, number_hits, prediction, number_part, hit_chis, pos_pxpy, is_Ks=False
-):
-    # obtain link to MC for Ground Truth
-    hit_particle_link = torch.tensor(output["pf_vectoronly"][0, 0:number_hits])
-    indx_daugthers = 3
-    daughters = torch.tensor(output["pf_vectoronly"][indx_daugthers, 0:number_hits])
-
-    # obtain link to Pandora for comparison
-    if prediction:
-        pandora_cluster = torch.tensor(output["pf_vectoronly"][1, 0:number_hits])
-        pandora_pfo_link = torch.tensor(output["pf_vectoronly"][2, 0:number_hits])
-        if is_Ks:
-            pandora_mom = torch.permute(
-                torch.tensor(output["pf_points_pfo"][0:3, 0:number_hits]), (1, 0)
-            )
-            pandora_ref_point = torch.permute(
-                torch.tensor(output["pf_points_pfo"][3:6, 0:number_hits]), (1, 0)
-            )
-            if output["pf_points_pfo"].shape[0] > 6:
-                pandora_pid = torch.tensor(output["pf_points_pfo"][6, 0:number_hits])
-            else:
-                pandora_pid=torch.zeros(number_hits)
-            
-        else:
-            pandora_mom = None
-            pandora_ref_point = None
-            pandora_pid = None
-        if is_Ks:
-            pandora_cluster_energy = torch.tensor(
-                output["pf_features"][9, 0:number_hits]
-            )
-            pfo_energy = torch.tensor(output["pf_features"][10, 0:number_hits])
-            chi_squared_tracks = torch.tensor(output["pf_features"][11, 0:number_hits])
-        elif hit_chis:
-            pandora_cluster_energy = torch.tensor(
-                output["pf_features"][-3, 0:number_hits]
-            )
-            pfo_energy = torch.tensor(output["pf_features"][-2, 0:number_hits])
-            chi_squared_tracks = torch.tensor(output["pf_features"][-1, 0:number_hits])
-        else:
-            pandora_cluster_energy = torch.tensor(
-                output["pf_features"][-2, 0:number_hits]
-            )
-            pfo_energy = torch.tensor(output["pf_features"][-1, 0:number_hits])
-            chi_squared_tracks = None
-
-    else:
-        pandora_cluster = None
-        pandora_pfo_link = None
-        pandora_cluster_energy = None
-        pfo_energy = None
-        chi_squared_tracks = None
-        pandora_mom = None
-        pandora_ref_point = None
-        pandora_pid = None
-    
-    # obtain hit type
-    hit_type_feature = torch.permute(
-        torch.tensor(output["pf_vectors"][:, 0:number_hits]), (1, 0)
-    )[:, 0].to(torch.int64)
-
-    # modify the index link for gamma and e (brems should point back to the photon)
-    (
-        hit_particle_link,
-        hit_link_modified,
-        connection_list,
-    ) = modify_index_link_for_gamma_e(
-        hit_type_feature, hit_particle_link, daughters, output, number_part, is_Ks
-    )
-    
-    # obtain a 1,...,N id for the hits (the hit particle link might not be continuous)
-    cluster_id, unique_list_particles = find_cluster_id(hit_particle_link)
-    
-    # obtain the position of the hits and the energies and p
-    pos_xyz_hits = torch.permute(
-        torch.tensor(output["pf_points"][0:3, 0:number_hits]), (1, 0)
-    )
-    pf_features_hits = torch.permute(
-        torch.tensor(output["pf_features"][0:2, 0:number_hits]), (1, 0)
-    )  
-    p_hits = pf_features_hits[:, 0].unsqueeze(1)
-    p_hits[p_hits == -1] = 0  # correct p of Hcal hits to be 0
-    e_hits = pf_features_hits[:, 1].unsqueeze(1)
-    e_hits[e_hits == -1] = 0  # correct the energy of the tracks to be 0
-    if pos_pxpy:
-        pos_pxpypz = torch.permute(
-            torch.tensor(output["pf_points"][3:, 0:number_hits]), (1, 0)
-        )
-    else:
-        pos_pxpypz = pos_xyz_hits
-
-    return (
-        pos_xyz_hits,
-        pos_pxpypz,
-        p_hits,
-        e_hits,
-        hit_particle_link,
-        pandora_cluster,
-        pandora_cluster_energy,
-        pfo_energy,
-        pandora_mom,
-        pandora_ref_point,
-        pandora_pid, 
-        unique_list_particles,
-        cluster_id,
-        hit_type_feature,
-        pandora_pfo_link,
-        daughters,
-        hit_link_modified,
-        connection_list,
-        chi_squared_tracks,
-    )
 
 
 def calculate_distance_to_boundary(g):

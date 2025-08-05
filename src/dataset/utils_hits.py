@@ -27,12 +27,14 @@ def create_noise_tracks(index_bad_tracks, hit_particle_link, y, cluster_id):
         mask_particles = torch.tensor(np.full((len(list_p)), False, dtype=bool))
     return mask.to(bool), ~mask_particles.to(bool)
 
-def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
+def create_noise_label(hits, y):
+    cluster_id = hits.cluster_id
+    hit_energies = hits.e_hits
     unique_p_numbers = torch.unique(cluster_id)
     number_of_hits = get_number_hits(hit_energies, cluster_id)
     e_reco = get_e_reco(hit_energies, cluster_id)
-    mask_hits = torch.Tensor(number_of_hits) < 6
-    mask_p = e_reco<0.10
+    mask_hits = torch.Tensor(number_of_hits) < 5
+    mask_p = e_reco<0.1
     mask_all = mask_hits.view(-1) + mask_p.view(-1)
     list_remove = unique_p_numbers[mask_all.view(-1)]
 
@@ -51,7 +53,11 @@ def create_noise_label(hit_energies, hit_particle_link, y, cluster_id):
             mask_particles = mask_particles1 + mask_particles
     else:
         mask_particles = torch.tensor(np.full((len(list_p)), False, dtype=bool))
-    return mask.to(bool), ~mask_particles.to(bool)
+    mask_loopers = mask.to(bool)
+    mask_particles = ~mask_particles.to(bool)
+    hits.hit_particle_link[mask_loopers] = -1
+    y.mask(mask_particles)
+    hits.find_cluster_id()
 
 
 def get_ratios(e_hits, part_idx, y):
@@ -140,10 +146,10 @@ def modify_index_link_for_gamma_e(
     electron_photon_mask = (
         electron_photon_mask * number_of_p > 1
     )  # electron_photon_mask *
-    if is_Ks:
-        index_change = a_u  # [electron_photon_mask]
-    else:
-        index_change = a_u[electron_photon_mask]
+  
+    index_change = a_u  # [electron_photon_mask]
+    # else:
+    #     index_change = a_u[electron_photon_mask]
     for i in index_change:
         mask_n = mask * (hit_particle_link == i)
         hit_particle_link[mask_n] = daughters[mask_n]

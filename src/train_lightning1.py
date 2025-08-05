@@ -18,10 +18,7 @@ import wandb
 from src.utils.train_utils import get_samples_steps_per_epoch, model_setup, set_gpus
 from src.utils.load_pretrained_models import load_train_model, load_test_model
 from src.utils.callbacks import get_callbacks, get_callbacks_eval
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-# os.environ["TORCH_USE_CUDA_DSA"] = "1"
 from lightning.pytorch.profilers import AdvancedProfiler
-
 
 
 def main():
@@ -64,7 +61,7 @@ def main():
             logger=wandb_logger,
             max_epochs=args.num_epochs,
             strategy="ddp",
-            limit_train_batches=2150,
+            limit_train_batches=12300, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
             limit_val_batches=50,
         )
         args.local_rank = trainer.global_rank
@@ -84,7 +81,7 @@ def main():
         trainer = L.Trainer(
             callbacks=get_callbacks_eval(args),
             accelerator="gpu",
-            devices=gpus,
+            devices=[3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )
