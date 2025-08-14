@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-import mplhep as hep
+# import mplhep as hep
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
@@ -26,7 +26,7 @@ from src.evaluation.refactor.preprocess import preprocess_dataframe, renumber_ba
 fs = 10
 font = {'size': fs}
 matplotlib.rc('font', **font)
-hep.style.use("CMS")
+# hep.style.use("CMS")
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -69,8 +69,8 @@ if not os.path.exists(PATH_store_individual_plots):
     os.makedirs(PATH_store_individual_plots)
 if not os.path.exists(PATH_store_summary_plots):
     os.makedirs(PATH_store_summary_plots)
-path_ML = "showers_df_evaluation/0_0_None_hdbscan_option9_v1.pt"
-path_pandora = "showers_df_evaluation/0_0_None_pandora_option9_v1.pt"
+path_ML = "showers_df_evaluation/0_0_None_hdbscan_gun_drlog_v9_dr01_4_57500_hdbscan_Hss_400_8_8_01.pt"
+path_pandora = "showers_df_evaluation/0_0_None_pandora_gun_drlog_v9_dr01_4_57500_hdbscan_Hss_400_8_8_01.pt"
 dir_top = args.path
 print(PATH_store)
 path_hgcal = os.path.join(dir_top, path_ML)
@@ -87,7 +87,7 @@ cluster_E = ch_le.pred_showers_E
 track_E = ch_le.calibrated_E
 fakes_mask = pd.isna(ch_le.pid)
 dist_trk = np.linalg.norm(np.stack(ch_le.pred_ref_pt_matched.values), axis=1)
-ch_le_filter = ch_le[dist_trk<0.21]
+ch_le_filter = ch_le[dist_trk<0.21
 
 fig, ax = plt.subplots()
 diff_E_truth = ch_le.true_showers_E - track_E
