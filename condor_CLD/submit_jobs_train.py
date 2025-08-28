@@ -76,7 +76,8 @@ def main():
     for name in glob.glob("{}/*.root".format(outdir)):
         list_of_outfiles.append(name)
 
-    script = "run_sequence_CLD_train_dr_gun.sh"
+    # script = "run_sequence_CLD_train_dr_gun.sh"
+    script = "run_sequence_CLD_train.sh"
 
     jobCount = 0
 
@@ -88,7 +89,7 @@ output                = std/condor.$(ClusterId).$(ProcId).out
 error                 = std/condor.$(ClusterId).$(ProcId).err
 log                   = std/condor.$(ClusterId).log
 
-+AccountingGroup = "group_u_CMST3.all"
+# +AccountingGroup = "group_u_CMST3.all"
 +JobFlavour    = "{}"
 """.format(
         script, queue
@@ -96,7 +97,8 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
-        if job>3200:
+        #if job>3200:
+        if job>-1:
             seed = str(job + 1)
             basename = "pf_tree_" + seed + ".root"
             outputFile = outdir + "/" + basename

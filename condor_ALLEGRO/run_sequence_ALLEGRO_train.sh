@@ -83,8 +83,12 @@ then
     python make_pftree_clic_bindings.py out_reco_edm4hep.root tree5.root False False
     mkdir -p ${OUTPUTDIR}
     if [[ "$OUTPUTDIR" == /eos/* ]]; then
-	python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+        python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
     else
-	cp tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+        cp tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
     fi
 fi
+
+# remove intermediate temporary directory
+#cd ..
+#rm -rf ${SEED}

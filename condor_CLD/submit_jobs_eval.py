@@ -86,7 +86,7 @@ output                = std/condor.$(ClusterId).$(ProcId).out
 error                 = std/condor.$(ClusterId).$(ProcId).err
 log                   = std/condor.$(ClusterId).log
 
-+AccountingGroup = "group_u_CMST3.all"
+# +AccountingGroup = "group_u_CMST3.all"
 +JobFlavour    = "{}"
 """.format(
         script, queue
