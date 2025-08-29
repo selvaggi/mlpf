@@ -1,5 +1,5 @@
 import torch
-from torch_scatter import scatter_sum, scatter_std
+from torch_scatter import scatter_sum, scatter_std, scatter_mean
 
 def calculate_phi(x, y, z=None):
     return torch.arctan2(y, x)
@@ -7,6 +7,32 @@ def calculate_phi(x, y, z=None):
 def calculate_eta(x, y, z):
     theta = torch.arctan2(torch.sqrt(x ** 2 + y ** 2), z)
     return -torch.log(torch.tan(theta / 2))
+
+def custom_scatter_var(values, batch_indices, dim_size=None, eps=1e-6):
+    """
+    Manually compute the standard deviation per group defined by batch_indices.
+
+    Args:
+        values (Tensor): Input values to reduce (e.g., e_hits[filter_hcal]), shape (N,)
+        batch_indices (Tensor): Group assignment for each value, shape (N,)
+        dim_size (int): Total number of groups (e.g., batch_idx.max() + 1). If None, inferred from batch_indices.
+        eps (float): Small value to ensure numerical stability.
+    
+    Returns:
+        Tensor of shape (dim_size,) with the std per group.
+    """
+    if dim_size is None:
+        dim_size = int(batch_indices.max().item()) + 1
+
+    # Sum and count per group
+    mean = scatter_mean(values, batch_indices, dim=0, dim_size=dim_size)
+
+    # Compute squared difference
+    mean_expanded = mean[batch_indices]
+    sq_diff = (values - mean_expanded) ** 2
+    var = scatter_mean(sq_diff, batch_indices, dim=0, dim_size=dim_size)
+ 
+    return var
 
 def get_post_clustering_features(graphs_new, sum_e, is_muons=False, add_hit_chis=False):
     '''
@@ -35,15 +61,23 @@ def get_post_clustering_features(graphs_new, sum_e, is_muons=False, add_hit_chis
     per_graph_e_hits_ecal_dispersion = torch.zeros_like(per_graph_e_hits_ecal)
     per_graph_e_hits_ecal_dispersion = per_graph_e_hits_ecal_dispersion / batch_num_nodes
     # similar as above but with scatter_std
-    per_graph_e_hits_ecal_dispersion = scatter_std(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1) ** 2
+    #per_graph_e_hits_ecal_dispersion = scatter_std(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1) ** 2
+    per_graph_e_hits_ecal_dispersion = custom_scatter_var(e_hits[filter_ecal], batch_idx[filter_ecal], dim_size=batch_idx.max() + 1) 
     per_graph_e_hits_hcal = scatter_sum(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1)
     # similar as above but with scatter_std -- !!!!! TODO: Retrain the base EC models using this definition !!!!!
-    per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
+   
+    #per_graph_e_hits_hcal_dispersion = scatter_std(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) ** 2
+    #print("checkstd")
+    #print(per_graph_e_hits_hcal_dispersion)
+
+    per_graph_e_hits_hcal_dispersion = custom_scatter_var(e_hits[filter_hcal], batch_idx[filter_hcal], dim_size=batch_idx.max() + 1) 
+
+
     # track_nodes =
     track_p = scatter_sum(graphs_new.ndata["h"][:, 9], batch_idx)
     chis_tracks = scatter_sum(graphs_new.ndata["chi_squared_tracks"], batch_idx)
     num_tracks = scatter_sum((graphs_new.ndata["h"][:, 9] > 0).type(torch.int), batch_idx)
-    track_p = track_p / num_tracks
+    track_p = track_p / (num_tracks + 1e-8)
     track_p[num_tracks == 0] = 0.
     chis_tracks = chis_tracks / num_tracks
     num_hits = graphs_new.batch_num_nodes()

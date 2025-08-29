@@ -539,7 +539,7 @@ def generate_showers_data_frame(
     matched_HCAL[row_ind_] = 1.0*e_pred_showers_hcal[index_matches]
 
 
-    n_extra_features = 7 # n nodes, 1 highest betas
+    n_extra_features = 6 # n nodes, 1 highest betas
     matched_extra_features = torch.zeros((energy_t.shape[0], n_extra_features)) * (torch.nan)
     #matched_extra_features = matched_extra_features.to(e_pred_showers.device)
     if pandora:

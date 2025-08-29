@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
-import mplhep as hep
+# for CMS style
+# import mplhep as hep
 from src.utils.inference.pandas_helpers import open_hgcal, open_mlpf_dataframe
 from src.utils.inference.per_particle_metrics import (
     plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
@@ -26,7 +27,7 @@ from src.evaluation.refactor.preprocess import preprocess_dataframe, renumber_ba
 fs = 10
 font = {'size': fs}
 matplotlib.rc('font', **font)
-hep.style.use("CMS")
+# hep.style.use("CMS")
 
 import argparse
 parser = argparse.ArgumentParser()

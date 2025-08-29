@@ -257,9 +257,8 @@ def plot_X(
         #    plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1)
         #if plot_label2:
         #    plot_fit(fits_l2, line_type_fits_l2, color_list_fits_l2)
-        if reco == "_reco":
-            plt.yscale("log")
-        else:
+        if reco != "_reco":
+            #plt.yscale("log")
             if title == "Electromagnetic Resolution":
                 ymax = 0.3
             else:
@@ -453,7 +452,7 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         axs[i].set_title(f"[{energy_ranges[i][0]}, {energy_ranges[i][1]}] GeV")
         axs[i].legend()
         axs[i].grid(1)
-        axs[i].set_yscale("log")
+        #axs[i].set_yscale("log")
         mean_mass = masses[i][torch.isnan(masses[i])].mean()
         mean_mass_pandora = masses_pandora[i][torch.isnan(masses_pandora[i])].mean()
         #for bar in bars:
@@ -795,7 +794,7 @@ def analyze_fakes_PID(matched_pandora, matched_all, PATH_store):
     ax.hist(certainty_fakes, histtype='step', bins=np.linspace(0, 1, 100), label="fakes", color="red", density=1)
     ax.hist(certainty_nonfakes, histtype='step', bins=np.linspace(0, 1, 100), label="nonfakes", color="blue", density=1)
     ax.legend()
-    ax.set_yscale("log")
+    #ax.set_yscale("log")
     fig.savefig(os.path.join(PATH_store, "fakes_certainty.pdf"))
 
 def analyze_fakes(matched_pandora, matched_all, PATH_store):
@@ -826,8 +825,8 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     ax[1].hist(frac_nonfakes[frac_nonfakes!=0] ,histtype='step', bins=bins, label="nonfakes", color="blue")
     ax[1].legend()
     ax[1].set_title("(reco E - cali E) / reco E")
-    ax[0].set_yscale('log')
-    ax[1].set_yscale('log')
+    #ax[0].set_yscale('log')
+    #ax[1].set_yscale('log')
     fig.show()
     fig, ax = plt.subplots()
     bins = np.arange(0, 100, 1)
@@ -842,7 +841,7 @@ def analyze_fakes(matched_pandora, matched_all, PATH_store):
     ax.hist(fakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML fakes", color="red")
     ax.hist(nonfakes_model_extra_f[:, 1], histtype='step', bins=bins, label="ML matched", color="blue")
     ax.legend()
-    ax.set_yscale("log")
+    #ax.set_yscale("log")
     ax.set_xlabel(r"Highest $\beta$")
     ax.set_ylabel("Count")
     fig.tight_layout()
@@ -985,9 +984,9 @@ def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
             axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
             axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
             axs_mass_hist[i, 2].legend()
-            axs_mass_hist[i, 0].set_yscale("log")
-            axs_mass_hist[i, 1].set_yscale("log")
-            axs_mass_hist[i, 2].set_yscale("log")
+            #axs_mass_hist[i, 0].set_yscale("log")
+            #axs_mass_hist[i, 1].set_yscale("log")
+            #axs_mass_hist[i, 2].set_yscale("log")
         figs_mass_hist.tight_layout()
         figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
         #matplotlib.rcParams["font.size"] = old_fontsize
@@ -1036,9 +1035,9 @@ def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, e
         axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth",
                                  color="green", density=True)
         axs_mass_hist[i, 2].legend()
-        axs_mass_hist[i, 0].set_yscale("log")
-        axs_mass_hist[i, 1].set_yscale("log")
-        axs_mass_hist[i, 2].set_yscale("log")
+        #axs_mass_hist[i, 0].set_yscale("log")
+        #axs_mass_hist[i, 1].set_yscale("log")
+        #axs_mass_hist[i, 2].set_yscale("log")
     figs_mass_hist.tight_layout()
     if energy_bins is not None:
         figs_mass_hist.savefig(os.path.join(path_store, "E_breakdown_by_PID_category_{}_{}_GeV.pdf".format(energy_bins[0], energy_bins[1])))
@@ -1115,9 +1114,9 @@ def plot_per_energy_resolution2_multiple(
         axs_mass_hist[i, 2].hist(frac_E_pandora[pid], bins=binsE, histtype="step", label="Pandora", color="blue", density=True)
         axs_mass_hist[i, 2].hist(pid_true_over_true[pid], bins=binsE, histtype="step", label="Truth", color="green", density=True)
         axs_mass_hist[i, 2].legend()
-        axs_mass_hist[i, 0].set_yscale("log")
-        axs_mass_hist[i, 1].set_yscale("log")
-        axs_mass_hist[i, 2].set_yscale("log")
+        #axs_mass_hist[i, 0].set_yscale("log")
+        #axs_mass_hist[i, 1].set_yscale("log")
+        #axs_mass_hist[i, 2].set_yscale("log")
     event_res_dic = {} # Event energy resolution
     figs_mass_hist.tight_layout()
     figs_mass_hist.savefig(
@@ -1224,7 +1223,7 @@ def plot_per_energy_resolution2_multiple(
                     ax.hist(distances, bins=bins, histtype="step", label="ML", color="red", density=True)
                     ax.legend()
                     ax.grid(1)
-                    ax.set_yscale("log")
+                    #ax.set_yscale("log")
                     ax.set_title("Photons p distance from truth [0,5] GeV")
                     fig.tight_layout()
                     fig.savefig(PATH_store + "/Photons_p_distance.pdf", bbox_inches="tight")
@@ -1253,13 +1252,13 @@ def plot_per_energy_resolution2_multiple(
                 axs_distr[211].set_title("Pions [0, 5] GeV")
                 axs_distr[211].set_xlabel("$E_{pred.} / E_{true}$")
                 axs_distr[211].legend()
-                axs_distr[211].set_yscale("log")
+                #axs_distr[211].set_yscale("log")
                 plot_hist_distr(hadrons_dic2["distributions_model"][0], key, axs_distr[11], colors[key])
             axs_distr[11].set_ylabel("Density")
             axs_distr[11].set_title("Electrons [0, 5] GeV")
             axs_distr[11].set_xlabel("$E_{pred.} / E_{true}$")
             axs_distr[11].legend()
-            axs_distr[11].set_yscale("log")
+            #axs_distr[11].set_yscale("log")
             if len(photons_dic["distributions_model"]) > 0:
                 plot_hist_distr(photons_dic["distributions_model"][0], key, axs_distr[22], colors[key])
             axs_distr[22].set_title("Photons [0, 5] GeV")
@@ -1680,13 +1679,13 @@ def plot_per_energy_resolution2_multiple(
                 round(var_phi_model, 4)),
                 color="red",
             )
-            ax.set_xlabel("log norm $n-n_{pred}$")
-            ax.set_yscale("log")
+            #ax.set_xlabel("log norm $n-n_{pred}$")
+            #ax.set_yscale("log")
             ax.legend()
             ax.grid(True)
             fig.savefig(os.path.join(PATH_store, f"unit_circle_dist_{pid}.pdf"))
             axphi.set_xlabel(r"$\Delta \Phi$")
-            axphi.set_yscale("log")
+            #axphi.set_yscale("log")
             axphi.legend()
             axphi.grid(True)
             figphi.savefig(os.path.join(PATH_store, f"phi_dist_{pid}.pdf"))
@@ -1713,7 +1712,7 @@ def plot_per_energy_resolution2_multiple(
                 color="red",
             )
             axeta.set_xlabel(r"$\Delta \theta$")
-            axeta.set_yscale("log")
+            #axeta.set_yscale("log")
             axeta.legend()
             axeta.grid(True)
             figeta.savefig(os.path.join(PATH_store, f"eta_dist_{pid}.pdf"))
@@ -1743,7 +1742,7 @@ def reco_hist(ml, pandora, PATH_store, pids=[22, 130, 2112, 211, 2212, 310]):
                 ax1.set_xlabel(r"$E_{reco, pred.}/E_{reco, true}$")
                 ax1.set_ylabel("Density")
                 ax1.set_title("Photons [0, 5] GeV")
-                ax1.set_yscale("log")
+                #ax1.set_yscale("log")
                 ax1.legend()
                 fig1.savefig(os.path.join(PATH_store, "reco_hist_photons_5GeV.pdf"))
             #filt_ml = (ml.pid == 130) & (ml.true_showers_E < 5)
@@ -1757,7 +1756,7 @@ def reco_hist(ml, pandora, PATH_store, pids=[22, 130, 2112, 211, 2212, 310]):
             ax[i].set_xlabel(r"$E_{reco, pred.}/E_{reco, true}$")
             ax[i].set_ylabel("Density")
             ax[i].set_title("PID: {}, E range: {} GeV".format(pid, bin))
-            ax[i].set_yscale("log")
+            #ax[i].set_yscale("log")
             ax[i].legend()
         fig.tight_layout()
         fig.savefig(os.path.join(path_reco, "reco_hist_{}.pdf".format(pid)))
@@ -1772,7 +1771,7 @@ def plot_per_energy_resolution(
         for el in list_plots:
             colors_list = ["#fde0dd", "#c994c7", "#dd1c77"]  # Color list poster Neurips
             marker_size = 15
-            log_scale = True
+            log_scale = False
             photons_dic = get_response_for_id_i([22], matched_pandora, matched_)
             electrons_dic = get_response_for_id_i([11], matched_pandora, matched_)
             plot_X(
@@ -1882,13 +1881,13 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
         ax[i, 0].hist(fake_energy_frac_distr, bins=np.linspace(0, 1, 100), histtype="step", label="ML", color="red")
         ax[i, 0].hist(fake_energy_frac_distr_pandora, bins=np.linspace(0, 1, 100), histtype="step", label="Pandora",
                       color="blue")
-        ax[i, 0].set_yscale("log")
+        #ax[i, 0].set_yscale("log")
         ax[i, 0].legend()
         ax[i, 0].grid()
         ax[i, 1].hist(missed_energy_frac_distr, bins=np.linspace(0, 1, 100), histtype="step", label="ML", color="red")
         ax[i, 1].hist(missed_energy_frac_distr_pandora, bins=np.linspace(0, 1, 100), histtype="step", label="Pandora",
                       color="blue")
-        ax[i, 1].set_yscale("log")
+        #ax[i, 1].set_yscale("log")
         ax[i, 1].legend()
         ax[i, 1].grid()
         ax[i, 0].set_title(f"Model in [{item[0]:.2f},{item[1]:.2f}] - fake energy frac.")
@@ -2174,7 +2173,7 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
         marker="x"
     )
     ax.legend(loc="lower right")
-    ax.set_xscale("log")
+    #ax.set_xscale("log")
     if savefig:
         fig.savefig(
             os.path.join(PATH_store, "Efficiency_" + label1 + ".pdf"),
@@ -2217,7 +2216,7 @@ def plot_eff_and_fakes(title, photons_dic, label1, PATH_store, labels):
         ax.set_ylim([0.5, 1.1])
     else:
         ax.set_ylim([0.5, 1.1])
-    ax.set_xscale("log")
+    #ax.set_xscale("log")
     ax.set_xlabel("Efficiency")
     ax_fakes = inset_axes(ax,
                             width="50%",  # width = 30% of parent_bbox
@@ -2294,7 +2293,7 @@ def plot_fakes_E(title, photons_dic, label1, PATH_store, labels, ax=None, reco="
     #    plt.ylim([0.0, 0.5])
     #else:
     #    plt.ylim([0.0, 0.5])
-    ax.set_xscale("log")
+    #ax.set_xscale("log")
     if savefig:
         fig.savefig(
             os.path.join(PATH_store, "Fake_Energy_Rate_"  + reco + label1 + ".pdf"),
@@ -2342,7 +2341,7 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
     #    plt.ylim([0.0, 0.07])
     #else:
     #    plt.ylim([0.0, 0.07])
-    ax.set_xscale("log")
+    #ax.set_xscale("log")
     if savefig:
         fig.savefig(
             os.path.join(PATH_store, "Fake_Rate_" + label1 + ".pdf"),
@@ -2796,7 +2795,7 @@ def calculate_response(matched, pandora, log_scale=False, tracks=False, perfect_
             elif ML_pid:
                 if pandora:
                     print("Using Pandora PID")
-                    m = np.array([particle_masses[abs(int(i))] for i in matched.pandora_pid[mask]])
+                    m = np.array([particle_masses.get(abs(int(i)), 0.0) for i in matched.pandora_pid[mask]])
                 else:
                     m = np.array([particle_masses_4_class.get(safeint(i), 0.0) for i in matched.pred_pid_matched[mask]])
             if mass_zero:
@@ -3085,7 +3084,7 @@ def plot_histograms_E(distr_model, distr_pandora, photons_dic, ax_distr, i, titl
     )
     ax_distr[i].legend()
     ax_distr[i].grid()
-    ax_distr[i].set_yscale("log")
+    #ax_distr[i].set_yscale("log")
 
 def plot_one_label(
     title,
@@ -3153,7 +3152,7 @@ def plot_one_label(
     ax[0].set_title(title, fontsize=30)
     ax[0].grid()
     ax[1].grid()
-    ax[1].set_yscale("log")
+    #ax[1].set_yscale("log")
     """f y_axis == "mean":
         # error is the mean error
         errors = photons_dic["mean_errors"]
@@ -3237,9 +3236,8 @@ def plot_one_label(
                 line_type_fits_l1.append("-.")
             for a in ax:
                 plot_fit(fits_l1, line_type_fits_l1, color_list_fits_l1, ax=a)
-        if reco == "_reco":
-            plt.yscale("log")
-        else:
+        if reco != "_reco":
+            #plt.yscale("log")
             if title == "Electromagnetic Resolution":
                 ymax = 0.3
             else:
@@ -3353,7 +3351,7 @@ def plot_histograms(
     ax_distr.set_xlim([0, 2])
     ax_distr.set_title(f"{title}")
     ax_distr.legend()
-    ax_distr.set_yscale("log")
+    #ax_distr.set_yscale("log")
     fig_distr.tight_layout()
 
 colors = {"ML": "red", "ML GTC": "green"}

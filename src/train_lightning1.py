@@ -39,7 +39,7 @@ def main():
         train_loader, val_loader, data_config, train_input_names = train_load(args)
     else:
         test_loaders, data_config = test_load(args)
-    args.is_muons = data_config.graph_config.get("muons", False)  # secpnd argument is default
+    args.is_muons = data_config.graph_config.get("muons", False)  # second argument is default
     # Set up model
     # loads model using the get_model() method of the python module passed via args.network_config
     model = model_setup(args, data_config)

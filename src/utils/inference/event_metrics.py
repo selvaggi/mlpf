@@ -135,10 +135,10 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         pred_E[nan_mask] = 0
         pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
         pred_vect = torch.tensor(np.array(df.pandora_calibrated_pos.values.tolist()))
-        nan_mask_p = torch.isnan(pred_vect).any(dim=1)
+        nan_mask_p = torch.isnan(pred_vect)
         pred_vect[nan_mask_p] = 0
         true_vect = torch.tensor(np.array(df.true_pos.values.tolist()))
-        mask_nan_p = torch.isnan(true_vect).any(dim=1)
+        mask_nan_p = torch.isnan(true_vect)
         true_vect[mask_nan_true] = 0
     else:
         pred_E = df.calibrated_E.values
@@ -177,7 +177,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
     pred_jet_vect = scatter_sum(torch.tensor(pred_vect), batch_idx, dim=0)
     true_E_jet = scatter_sum(torch.tensor(true_e), batch_idx)
     pred_E_jet = scatter_sum(torch.tensor(pred_E), batch_idx)
-    true_jet_p = torch.norm(true_jet_vect, dim=1)  # This is actually momentum resolution
+    true_jet_p = torch.norm(true_jet_vect)  # This is actually momentum resolution
     pred_jet_p = torch.norm(pred_jet_vect, dim=1)
     mass_true = torch.sqrt((true_E_jet ** 2).abs() - true_jet_p ** 2)
     mass_pred_p = torch.sqrt(torch.abs(pred_E_jet ** 2) - pred_jet_p ** 2)

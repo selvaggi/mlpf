@@ -41,6 +41,8 @@ from gatr import GATr
 import dgl
 
 
+
+
 class Net(nn.Module):
     def __init__(self, in_features=13, out_features=1, return_raw=True):
         super(Net, self).__init__()
@@ -267,6 +269,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         if graphs_new is not None and self.gnn is not None:
             batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
             batch_idx = []
@@ -397,6 +400,7 @@ class ECNetWrapperAvg(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         _, p_pred, _ = self.AvgHits.predict(x_global_features, graphs_new)
         p_pred = (p_pred / torch.norm(p_pred, dim=1).unsqueeze(1)).clone()
         return None, p_pred, None, None
@@ -431,6 +435,7 @@ class PickPAtDCA(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         assert graphs_new is not None
         batch_num_nodes = graphs_new.batch_num_nodes()  # Num. hits in each graph
         batch_idx = []
@@ -479,6 +484,7 @@ class AverageHitsP(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         assert graphs_new is not None
         batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
         batch_idx = []
@@ -506,6 +512,8 @@ class AverageHitsP(torch.nn.Module):
         if self.ecal_only:
             hcal_hits = graphs_new.ndata["h"][:, 6] > 0
             E_hits[mask_ecal_only & (hcal_hits)] = 0
+        xyz_hits = xyz_hits.clone()
+        E_hits = E_hits.clone()
         weighted_avg_hits = scatter_sum(xyz_hits * E_hits.unsqueeze(1), batch_idx, dim=0)
         E_total = scatter_sum(E_hits, batch_idx, dim=0)
         p_direction = weighted_avg_hits / E_total.unsqueeze(1)
@@ -531,6 +539,7 @@ class NeutralPCA(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         assert graphs_new is not None
         batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
         batch_idx = []
@@ -601,6 +610,7 @@ class ThrustAxis(torch.nn.Module):
         :param graphs_new:
         :return:
         """
+        torch.autograd.set_detect_anomaly(True)
         assert graphs_new is not None
         batch_num_nodes = graphs_new.batch_num_nodes()  # Num. of hits in each graph
         batch_idx = []
@@ -690,6 +700,7 @@ class EnergyCorrection():
         ckpt_charged = main_model.args.ckpt_charged
         dev = main_model.dev
         num_global_features = 14
+        torch.autograd.set_detect_anomaly(True)
         if main_model.args.is_muons:
             num_global_features += 2 # for the muon calorimeter hits and the number of muon hits
         self.model_charged = EnergyCorrectionWrapper(
@@ -754,7 +765,10 @@ class EnergyCorrection():
         for i, n in enumerate(batch_num_nodes):
             batch_idx.extend([i] * n)
         batch_idx = torch.tensor(batch_idx).to(self.main_model.device)
-        graphs_new.ndata["h"][:, 0:3] = graphs_new.ndata["h"][:, 0:3] / 3300
+        h = graphs_new.ndata["h"].clone()
+        h_scaled = torch.cat([h[:, 0:3] / 3300,h[:, 3:]], dim=1)
+        graphs_new.ndata["h"] = h_scaled
+
         # TODO: add global features to each node here
         graphs_sum_features = scatter_add(graphs_new.ndata["h"], batch_idx, dim=0)
         # now multiply graphs_sum_features so the shapes match
@@ -762,9 +776,7 @@ class EnergyCorrection():
         # append the new features to "h" (graphs_sum_features)
         shape0 = graphs_new.ndata["h"].shape
         betas = torch.sigmoid(graphs_new.ndata["h"][:, -1])
-        graphs_new.ndata["h"] = torch.cat(
-            (graphs_new.ndata["h"], graphs_sum_features), dim=1
-        )
+        graphs_new.ndata["h"] = torch.cat((graphs_new.ndata["h"], graphs_sum_features.clone()), dim=1)
         assert shape0[1] * 2 == graphs_new.ndata["h"].shape[1]
         # print("Also computing graph-level features")
         graphs_high_level_features = get_post_clustering_features(
@@ -831,9 +843,9 @@ class EnergyCorrection():
             graphs_high_level_features.shape[0] == graphs_new.batch_num_nodes().shape[0]
         )
         features_neutral_no_nan = graphs_high_level_features[neutral_idx]
-        features_neutral_no_nan[features_neutral_no_nan != features_neutral_no_nan] = 0
+        features_neutral_no_nan = torch.nan_to_num(features_neutral_no_nan, nan=0.0)
         features_charged_no_nan = graphs_high_level_features[charged_idx]
-        features_charged_no_nan[features_charged_no_nan != features_charged_no_nan] = 0
+        features_charged_no_nan = torch.nan_to_num(features_charged_no_nan, nan=0.0)
         # if self.args.ec_model == "gat" or self.args.ec_model == "gat-concat":
         return (
             graphs_new,
@@ -856,8 +868,10 @@ class EnergyCorrection():
             fakes_idx
         )
 
+
     def forward_correction(self, g, x, y, return_train):
         time_matching_start = time()
+        torch.autograd.set_detect_anomaly(True)
         (
             graphs_new,
             graphs_high_level_features,
@@ -928,12 +942,9 @@ class EnergyCorrection():
             ec_x[charged_idx.detach().cpu().numpy()] = charged_energies_ec_x[0]
             ec_x[neutral_idx.detach().cpu().numpy()] = neutral_energies_ec_x[0]
         # dummy loss to make it work without complaining about not using params in loss
-        pred_energy_corr[charged_idx.flatten()] = (
-            charged_energies #/ sum_e.flatten()[charged_idx.flatten()]
-        )
-        pred_energy_corr[neutral_idx.flatten()] = (
-            neutral_energies #/ sum_e.flatten()[neutral_idx.flatten()]
-        )
+        pred_energy_corr = pred_energy_corr.scatter(0, charged_idx.flatten(), charged_energies)
+        pred_energy_corr = pred_energy_corr.scatter(0, neutral_idx.flatten(), neutral_energies)
+
         if len(self.pids_charged):
             if len(charged_idx):
                 charged_PID_pred1 = np.array(self.pids_charged)[np.argmax(charged_PID_pred.cpu().detach(), axis=1)]
