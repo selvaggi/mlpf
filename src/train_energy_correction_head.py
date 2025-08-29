@@ -1,7 +1,7 @@
 # Compact training script to train a simple NN
-import mplhep as hep
+#import mplhep as hep
 import wandb
-hep.style.use("CMS")
+#hep.style.use("CMS")
 import matplotlib
 matplotlib.rc('font', size=13)
 import os
@@ -24,7 +24,9 @@ from scipy import asarray as ar, exp
 # args: prefix, wandb name, PIDs to train on, loss to use
 parser = argparse.ArgumentParser()
 parser.add_argument("--prefix", type=str, required=True)
-parser.add_argument("--wandb_name", type=str, required=True)
+parser.add_argument("--wandb-displayname",type=str,help="give display name to wandb run, if not entered a random one is generated",)
+parser.add_argument("--wandb-projectname", type=str, help="project where the run is stored inside wandb")
+parser.add_argument( "--wandb-entity", type=str, help="username or team name where you are sending runs")
 parser.add_argument("--PIDs", type=str, required=True) # comma-separated list of PIDs to train and evaluate on
 parser.add_argument("--loss", type=str, default="default") # loss to use
 parser.add_argument("--patience", type=int, default=50000) # patience for early stopping
@@ -41,7 +43,6 @@ parser.add_argument("--load-model-weights", type=str, default=None)
 
 args = parser.parse_args()
 prefix = args.prefix
-wandb_name = args.wandb_name
 all_pids = args.PIDs.split(",")
 assert len(all_pids) > 0
 all_pids = [int(pid) for pid in all_pids]
@@ -51,9 +52,11 @@ print("CUDA available:", torch.cuda.is_available())  # in case needed
 DEVICE = torch.device("cuda:0")
 #prefix = "/eos/user/g/gkrzmanc/2024/1_4_/BS64_train_neutral_l1_loss_only/"
 
-wandb.init(project="mlpf_debug_energy_corr", entity="fcc_ml", name=wandb_name)
-# wandb log code
-#wandb.run.log_code(".")
+wandb.init(
+    project=args.wandb_projectname,
+    entity=args.wandb_entity,
+    name=args.wandb_displayname,
+    )
 
 # make dir
 os.makedirs(prefix, exist_ok=True)
@@ -388,9 +391,11 @@ def get_nn(patience, save_to_folder=None, wandb_log_name=None, pid_predict_chann
             ])'''
 
         def forward(self, x):
+            # print("shape of x is", x.shape)
             # pad x with self.n_gnn_feat randomly distributed features
             if self.n_gnn_feat > 0:
                 x = torch.cat([x, torch.randn(x.size(0), self.n_gnn_feat).to(DEVICE)], dim=1)
+                print("shape of x is", np.shape(x))
             for layer in self.model:
                 x = layer(x)
             #if self.out_features > 1:
@@ -582,8 +587,8 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
     if args.regress_pos:
         pid_channels = 3
     muons = 2*int(split[0].shape[1] == 16)
+    print("number of muons is:", muons)
     model = get_nn(patience=patience, save_to_folder=save_to_folder, wandb_log_name=wandb_log_name, pid_predict_channels=pid_channels, muons=muons)
-    print("train only on PIDs:", train_only_on_PIDs)
     # elif use_model == "gradboost1":
     #    # gradboost with more depth, longer training
     #    from sklearn.ensemble import GradientBoostingRegressor
@@ -617,6 +622,7 @@ def main(ds, train_only_on_tracks=False, train_only_on_neutral=False, train_ener
         split[9] = split[9][masktest]
     if remove_sum_e:
         split[0][:, 6] = 0.0  # Remove the sum of the hits
+    print("shape split is", np.shape(split[0]))
     if not train_energy_regression:
         print("Fitting")
         if pid_channels > 0:

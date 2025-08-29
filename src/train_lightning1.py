@@ -4,6 +4,7 @@ import os
 import ast  # abstract syntax trees - maybe unused
 import sys
 import torch  # pytorch
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))  # GM: added by Rami - needed?
 from torch.utils.data import DataLoader
 import lightning as L  # lightning: high-level framework that abstracts and simplifies much of the boilerplate code needed in PyTorch
 from src.utils.parser_args import parser
@@ -98,6 +99,9 @@ def main():
     if args.data_test:
         # initialize model with pre-trained weights
         model = load_test_model(args, dev)
+
+        print("\n====== Model structure ======")
+        print(model)
 
         # setup the trainer
         trainer = L.Trainer(

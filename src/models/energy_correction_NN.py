@@ -95,6 +95,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self,
         device,
         in_features_global=13,
+        #in_features_global=15,
         in_features_gnn=13,
         out_features_gnn=16,
         ckpt_file=None,
@@ -128,7 +129,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self.use_gatr = gatr
         self.separate_pid_gatr = args.separate_PID_GATr
         self.n_layers_pid_head = args.n_layers_PID_head
-        print("pos_regression", self.pos_regression)
+
         # if pos_regression:
         #     out_f += 3
         self.ignore_global_features_for_p = ignore_global_features_for_p
@@ -140,6 +141,10 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 return_raw=True
             )
             self.model.explainer_mode = False
+        print("pos_regression", self.pos_regression)
+        print("→ out_features_gnn:", out_features_gnn)
+        print("→ in_features_global:", in_features_global)
+        print("→ total in_features to Net:", out_features_gnn + in_features_global)
         # use a GAT
         if gnn:
             if self.use_gatr:
@@ -187,6 +192,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             n_layers = self.n_layers_pid_head
             if n_layers == 1:
                 self.PID_head = nn.Linear(out_features_gnn + in_features_global, pid_channels)   # Additional head for PID classification
+                print("PID out_features:", out_features_gnn, in_features_global, pid_channels)
             else:
                 self.PID_head = nn.ModuleList()
                 self.PID_head.append(nn.Linear(out_features_gnn + in_features_global, 64))
@@ -198,8 +204,11 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             self.PID_head.to(device)
         if ckpt_file is not None and ckpt_file != "" and not self.charged:
             # self.model.model = pickle.load(open(ckpt_file, 'rb'))
+
+            ## Rami: following code does not work, but does not seem to be used - comment if needed
             with open(ckpt_file.strip(), "rb") as f:
                 self.model.model = CPU_Unpickler(f).load()
+
                 # if self.use_gatr:
                 #     self.gatr = CPU_Unpickler(f).load()
             print("Loaded energy correction model weights from ECNetWrapperGNNGlobalFeaturesSeparate", ckpt_file)
@@ -706,6 +715,7 @@ class EnergyCorrection():
         self.model_charged = EnergyCorrectionWrapper(
             device=dev,
             in_features_global=num_global_features,
+            #in_features_global=14,
             in_features_gnn=20,
             ckpt_file=ckpt_charged,
             gnn=True,
