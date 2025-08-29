@@ -76,6 +76,7 @@ then
     ln -f -s $PATH_ALLEGRO_DATA .
     cp ${HOMEDIR}/condor_ALLEGRO/run_ALLEGRO_reco.py .
     k4run run_ALLEGRO_reco.py -n ${NEV} --IOSvc.Input out_sim_edm4hep.root --IOSvc.Output out_reco_edm4hep.root --includeHCal --includeMuon --saveCells --addTracks
+    # rm -f out_sim_edm4hep.root
 fi
 
 if [[ "${flatten}" -ne 0 ]]
@@ -90,5 +91,5 @@ then
 fi
 
 # remove intermediate temporary directory
-#cd ..
-#rm -rf ${SEED}
+cd ..
+rm -rf ${SEED}
