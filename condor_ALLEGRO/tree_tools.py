@@ -10,7 +10,7 @@ import edm4hep
 # constants
 c_light = 2.99792458e8      # speed of light
 Bz_clic = 4.0               # B field, CLIC
-Bz_cld = 2.0                # B field, CLD
+Bz_cld = 2.0                # B field, CLD and ALLEGRO
 mchp = 0.139570             # muon mass
 
 # convert track curvature to pT
@@ -50,12 +50,18 @@ def get_genparticle_daughters(i, mcparts):
 
     return daughter_positions
 
-
+# given a hit with index hit_index in collection hit_collection, find
+# index and energy of cluster in cluster_collection to which the hit belongs
 def find_pandora_cluster_of_hit(hit_index, hit_collection, cluster_collection):
     cluster_energy_found = 0
+    # loop over clusters in cluster_collection
     for index_c, cluster in enumerate(cluster_collection):
+        # retrieve energy and hits of clusters
         cluster_hits = cluster.getHits()
         cluster_energy = cluster.getEnergy()
+        # loop over cluster hits, and find hit which has same index and collectionID
+        # as input hit. if found, set pandora_cluster_index and cluster_energy_found
+        # to cluster index and energy
         for index_h, hit in enumerate(cluster_hits):
             object_id_hit = hit.getObjectID()
             if (
@@ -90,6 +96,11 @@ def find_pandora_cluster_of_hit(hit_index, hit_collection, cluster_collection):
 #         break
 
 
+# given a hit with index hit_index in collection hit_collection, find
+# pandora PFO object in pfo_collection whose cluster(s) contain that hit
+# return index and energy of PFO in pfo_collection, index and energy of cluster 
+# in list of clusters associated fo PFO object
+# cluster_collection is ignored
 def find_pandora_pfo_and_cluster_of_hit(
     hit_index, hit_collection, cluster_collection, pfo_collection
 ):
@@ -100,18 +111,26 @@ def find_pandora_pfo_and_cluster_of_hit(
     reference_point_found = None
     momentum_found = None
     pid_reconstructed_pfo = -1
+    # loop over PFOs
     for index_pfo, pfo in enumerate(pfo_collection):
         # print("index pfo ", index_pfo)
+        # retrieve PFO properties
         clusters_pfo = pfo.getClusters()
         pfo_energy = pfo.getEnergy()
         reference_point = pfo.getReferencePoint()
         momentum = pfo.getMomentum()
         pid_reconstructed_pfo = pfo.getPDG()
+        # loop over clusters associated to PFO
         for index_c, cluster in enumerate(clusters_pfo):
             # print("index cluster ", index_c)
             cluster_hits = cluster.getHits()
             cluster_energy = cluster.getEnergy()
             cluster_id = cluster.getObjectID().index
+            # loop over cluster hits, and find hit which has same index and collectionID
+            # as input hit. if found, set pandora_cluster_index and cluster_energy_found
+            # to cluster index and energy, and pfo_index and pfo_energy_found to PFO
+            # index and energy. Also set reference_point_found and momentum_found to
+            # PFO reference point and PFO reconstructed PDG
             for index_h, hit in enumerate(cluster_hits):
                 object_id_hit = hit.getObjectID()
                 if (
@@ -145,7 +164,12 @@ def find_pandora_pfo_and_cluster_of_hit(
         pid_reconstructed_pfo
     )
 
-
+# given a hit with index hit_index in collection hit_collection, find
+# pandora PFO object in pfo_collection whose track matches that hit
+# (reminder: tracks are saved as single "hits")
+# return index and energy of PFO in pfo_collection, PFO momentum and
+# reference point and reconstructed PDG
+# the returned cluster_index is -1
 def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
     pandora_cluster_index = -1
     pandora_pfo_index = -1
@@ -153,17 +177,21 @@ def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
     pfo_momentum_found = None
     pfo_reference_point_found = None
     pandora_pid = None
+    # loop over PFOs
     for index_pfo, pfo in enumerate(pfo_collection):
+        # retrieve PFO properties
         tracks_pfo = pfo.getTracks()
         pfo_energy = pfo.getEnergy()
         pfo_momentum = pfo.getMomentum()
         pfo_reference_point = pfo.getReferencePoint()
         pandora_pid = pfo.getPDG()
+        # loop over tracks associated to PFO
+        # find track with index and collectionID equal to hit_index and hit_collection
+        # if found, set pandora_pfo_index and pfo_XXX_found
         for index_t, track in enumerate(tracks_pfo):
             # print("index cluster ", index_c)
             track_index = track.getObjectID().index
             track_collection_id = track.getObjectID().collectionID
-
             if hit_index == track_index and track_collection_id == hit_collection:
                 pandora_pfo_index = index_pfo
                 pfo_energy_found = pfo_energy
@@ -187,7 +215,7 @@ def find_pandora_pfo_track(hit_index, hit_collection, pfo_collection):
         pandora_pid
     )
 
-
+# get indices of parents of genparticle with position i in collection mcparts
 def get_genparticle_parents(i, mcparts):
 
     p = mcparts[i]
@@ -203,16 +231,22 @@ def get_genparticle_parents(i, mcparts):
 
     return parent_positions
 
-
+# recursively loop through MCParticles collection to find initial mother of particle with index j
+# particle that does not have further parents, or has multiple ones)
 def find_mother_particle(j, gen_part_coll):
     parent_p = j
     counter = 0
+    # keep looping as long as flattened array of parent_p
+    # is empty or has length 1
     while len(np.reshape(np.array(parent_p), -1)) < 1.5:
+        # if parent_p is a list: empty => break; not empty => take first element
         if type(parent_p) == list:
             if len(parent_p) > 0:
                 parent_p = parent_p[0]
             else:
                 break
+        # retrieve list of indices of parents of parent_p and assign it to parent_p
+        # before next iteration
         parent_p_r = get_genparticle_parents(
             parent_p,
             gen_part_coll,
@@ -458,28 +492,32 @@ def gen_particles_find(event, debug):
     genparts_daughters = "_MCParticles_daughters"
     # gen_parent_link_indexmc = event.get(genparts_parents)
     # gen_daughter_link_indexmc = event.get(genparts_daughters)
-    gen_part_coll = event.get(genparts)
     genpart_indexes_pre = (
         dict()
     )  ## key: index in gen particle collection, value: position in stored gen particle array
     indexes_genpart_pre = (
         dict()
     )  ## key: position in stored gen particle array, value: index in gen particle collection
-    total_e = 0
+    # number of particles
     n_part_pre = 0
+    # for debug: total energy, and vector of momenta of each particle (skipping the initial state e+e-)
+    total_e = 0
     e_pp = np.zeros(11)
+
+    # retrieve mc particles collection and loop over them
+    gen_part_coll = event.get(genparts)
     for j, part in enumerate(gen_part_coll):
+        # retrieve 3-momentum, compute momentum magnitude and direction, and update total_e and e_pp for debug
         momentum = part.getMomentum()
         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
+        theta = math.acos(momentum.z / p)
+        phi = math.atan2(momentum.y, momentum.x)
         if debug:
             if j < 11 and j > 1:
                 e_pp[j] = p
                 total_e = total_e + p
-        theta = math.acos(momentum.z / p)
-        phi = math.atan2(momentum.y, momentum.x)
-        if debug:
             print(
-                "all genparts: N: {}, PID: {}, Q: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, status: {}, parents: {}, daughters: {}, decayed_traacker: {}".format(
+                "all genparts: N: {}, PID: {}, Q: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, status: {}, parents: {}, daughters: {}, decayed_tracker: {}".format(
                     j,
                     part.getPDG(),
                     part.getCharge(),
@@ -489,8 +527,7 @@ def gen_particles_find(event, debug):
                     part.getMass(),
                     part.getVertex().x * 1e-03,
                     part.getVertex().y * 1e-03,
-                    math.sqrt(part.getVertex().x ** 2 + part.getVertex().y ** 2)
-                    * 1e-03,
+                    math.sqrt(part.getVertex().x ** 2 + part.getVertex().y ** 2) * 1e-03,
                     part.getVertex().z * 1e-03,
                     part.getGeneratorStatus(),
                     get_genparticle_parents(
@@ -647,7 +684,7 @@ def store_tracks(
         isclic = False
     ## track stuff
     tracks = ("TracksFromGenParticles", 45)
-    # trackstates = "SiTracks_1"
+    # trackstates = "SiTracks_1"  # not used
     SiTracksMCTruthLink = "TracksFromGenParticlesAssociation"
     # gen_track_links1 = "SiTracksMCTruthLink#1"
     # gen_track_weights = "SiTracksMCTruthLink"
