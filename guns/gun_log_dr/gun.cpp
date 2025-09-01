@@ -95,7 +95,7 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
     // Create a vertex at the origin
     GenVertexPtr v = std::make_shared<GenVertex>();
 
-    GenParticlePtr p1 = make_shared<GenParticle>(FourVector (0.0,    0.0,   125.0,  125.0  ),11,  3);
+    GenParticlePtr p1 = make_shared<GenParticle>(FourVector (0.0,    0.0,    125.0,  125.0  ),11,  3);
     GenParticlePtr p2 = make_shared<GenParticle>(FourVector (0.0,    0.0,   -125.0,  125.0  ),11,  3);
 
     v->add_particle_in(p1);
