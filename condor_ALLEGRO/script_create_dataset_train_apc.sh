@@ -1,8 +1,9 @@
 #!/bin/bash
 
-production=220625
+# start jobs with >0 to avoid problem with seed=0
+production=290825
 nevents=10
-startjob=101
+startjob=1
 njobs=1
 
 stopjob=$((startjob + njobs -1))
