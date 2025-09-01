@@ -75,7 +75,9 @@ if [[ "${rec}" -ne 0 ]]
 then
     ln -f -s $PATH_ALLEGRO_DATA .
     cp ${HOMEDIR}/condor_ALLEGRO/run_ALLEGRO_reco.py .
+    # added saveHits for debug
     k4run run_ALLEGRO_reco.py -n ${NEV} --IOSvc.Input out_sim_edm4hep.root --IOSvc.Output out_reco_edm4hep.root --includeHCal --includeMuon --saveCells --addTracks
+    # --saveHits
     # rm -f out_sim_edm4hep.root
 fi
 
