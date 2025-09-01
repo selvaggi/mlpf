@@ -6,4 +6,4 @@ rm condor_ALLEGRO/events.hepmc
 rm condor_ALLEGRO/gun.cpp
 rm -rf condor_ALLEGRO/install/
 rm condor_ALLEGRO/make_pftree_clic_bindings.py
-
+rm *.html
