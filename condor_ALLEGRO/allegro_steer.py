@@ -27,7 +27,8 @@ SIM.compactFile = os.environ["K4GEO"]+"/FCCee/ALLEGRO/compact/ALLEGRO_o1_v03/ALL
 
 ## Lorentz boost for the crossing angle, in radian!
 ## NOTE: CLD has 0.015
-SIM.crossingAngleBoost = 0.0
+## SIM.crossingAngleBoost = 0.0
+SIM.crossingAngleBoost = 0.015
 ## not in CLD nor IDEA steering scripts
 SIM.disableSignalHandler = False
 SIM.enableDetailedShowerMode = True
@@ -488,6 +489,7 @@ SIM.part.enableDetailedHitsAndParticleInfo = False
 
 ## Keep all created particles 
 SIM.part.keepAllParticles = False
+# SIM.part.keepAllParticles = True
 
 ## Minimal distance between particle vertex and endpoint of parent after
 ## which the vertexIsNotEndpointOfParent flag is set
@@ -507,6 +509,8 @@ SIM.part.saveProcesses = ['Decay']
 
 ## Optionally enable an extended Particle Handler
 SIM.part.userParticleHandler = "Geant4TCUserParticleHandler"
+# This requires defining a tracking volume in the XML
+# SIM.part.userParticleHandler = "Geant4TVUserParticleHandler"
 
 
 ################################################################################
