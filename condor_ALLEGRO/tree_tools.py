@@ -260,13 +260,12 @@ def find_mother_particle(j, gen_part_coll):
     #     print("old parent and new parent", j, pp_old)
     return pp_old
 
-
+# loop over RecoMCTruthLink collection, find reco object with index j and collectionID id,
+# then find corresponding true object(s), and return positions and weights of those objects
 def find_gen_link(
     j,
     id,
-    SiTracksMCTruthLink,
-    # gen_link_indexmc,
-    # gen_link_weight,
+    RecoMCTruthLink,
     genpart_indexes,
     calo=False,
     gen_part_coll=None,
@@ -274,7 +273,10 @@ def find_gen_link(
     # print(id)
     gen_positions = []
     gen_weights = []
-    for i, l in enumerate(SiTracksMCTruthLink):
+    # loop over RecoMCTruthLink collection, find reco object with index j and collectionID id,
+    # then find corresponding true object and append its index and weight to the gen_positions and
+    # gen_weights lists
+    for i, l in enumerate(RecoMCTruthLink):
         # rec_ = l.getRec()
         rec_ = l.getFrom()
         object_id = rec_.getObjectID()
@@ -288,6 +290,14 @@ def find_gen_link(
             weight = l.getWeight()
             gen_weights.append(weight)
 
+    # loop over the gen_positions list and check element against genpart_indexes
+    # if particle is in stored list of particles, and calo is true, then
+    # append to indices both the initial mother and this particle; if calo is false,
+    # just append this particle.
+    # GM: note that this can introduce a mismatch in position between indices and
+    # gen_weights in 2 cases, (1) when pos is not in genpart_indexes (why not
+    # appending -1 in that case as index?) and when calo is true (2 indices added for
+    # just one weight - is it correct to append both?)
     indices = []
     for i, pos in enumerate(gen_positions):
         if pos in genpart_indexes:
@@ -298,12 +308,13 @@ def find_gen_link(
             else:
                 indices.append(genpart_indexes[pos])
 
+    # pad indices and gen_weights with -1's so that they are of size=5
     indices += [-1] * (5 - len(indices))
     gen_weights += [-1] * (5 - len(gen_weights))
 
     return indices, gen_weights
 
-
+# initialize branches of output tree
 def initialize(t):
     event_number = array("i", [0])
     n_hit = array("i", [0])
@@ -479,17 +490,21 @@ def initialize(t):
     }
     return (event_number, n_hit, n_part, dic, t)
 
-
+# utility function to clear a dictionary
 def clear_dic(dic):
     for key in dic:
         dic[key].clear()
     return dic
 
-
+# retrieve MC particle collection, and fill dictionaries of index in MC particle collection
+# vs index of particles in stored gen particle array
+# return dictionaries and stored gen particle array
+# GM: currently does not filter away anything, keeps initial collection
 def gen_particles_find(event, debug):
     genparts = "MCParticles"
-    genparts_parents = "_MCParticles_parents"
-    genparts_daughters = "_MCParticles_daughters"
+    # not used
+    # genparts_parents = "_MCParticles_parents"
+    # genparts_daughters = "_MCParticles_daughters"
     # gen_parent_link_indexmc = event.get(genparts_parents)
     # gen_daughter_link_indexmc = event.get(genparts_daughters)
     genpart_indexes_pre = (
@@ -573,6 +588,12 @@ def gen_particles_find(event, debug):
                 indexes_genpart_pre[n_part_pre] = d
                 n_part_pre += 1
         """
+    if debug:
+        print("all gen parts: total e= " , total_e)
+
+    if debug:
+        print("genpart_indexes_pre: ", genpart_indexes_pre)
+        print("indexes_genpart_pre: ", indexes_genpart_pre)
     return (
         genpart_indexes_pre,
         indexes_genpart_pre,
@@ -582,7 +603,8 @@ def gen_particles_find(event, debug):
         gen_part_coll,
     )
 
-
+# loop over pre-filtered MC particles and get final array of saved gen particles,
+# saved in dic[part_XXX]
 def store_gen_particles(
     n_part_pre,
     gen_part_coll,
@@ -615,20 +637,23 @@ def store_gen_particles(
         dict()
     )  ## key: position in stored gen particle array, value: index in gen particle collection
 
+    # loop over pre-filtered list of MC Particles (currently all particles..)
     for j in range(n_part_pre):
-
+        # retrieve MCParticle in original collection
         part = gen_part_coll[indexes_genpart_pre[j]]
+        # find particle daughters
         daughters = get_genparticle_daughters(indexes_genpart_pre[j], gen_part_coll)
-
         # check if particles has interacted, if it did remove it from the list of gen particles
         # if len(daughters) > 0:
         #    continue
+        # get particle kinematics
         momentum = part.getMomentum()
         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
         theta = math.acos(momentum.z / p)
         phi = math.atan2(momentum.y, momentum.x)
         m = part.getMass()
         e = math.sqrt(m**2 + p**2)
+        # fill dictionary with particle properties
         dic["part_p"].push_back(p)
         dic["part_px"].push_back(momentum.x)
         dic["part_py"].push_back(momentum.y)
@@ -647,34 +672,37 @@ def store_gen_particles(
         )
         dic["part_isDecayedInTracker"].push_back(part.isDecayedInTracker() * 1)
 
+        # fill dictionaries of indices for stored gen particle array <-> mcparticles
         genpart_indexes[indexes_genpart_pre[j]] = n_part[0]
         indexes_genpart[n_part[0]] = indexes_genpart_pre[j]
         n_part[0] += 1
 
-    # if debug:
-    #     print("")
-    #     # print(genpart_indexes)
-    #     for j in range(n_part[0]):
-    #         part = gen_part_coll[indexes_genpart[j]]
-    #         momentum = part.getMomentum()
-    #         p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
-    #         theta = math.acos(momentum.z / p)
-    #         phi = math.atan2(momentum.y, momentum.x)
-    #         print(
-    #             "stored genparts: N: {}, PID: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}".format(
-    #                 j, part.getPDG(), p, theta, phi, part.getMass()
-    #             )
-    #         )
+    if debug:
+        print("")
+        print("genpart_indexes: ", genpart_indexes)
+        for j in range(n_part[0]):
+            part = gen_part_coll[indexes_genpart[j]]
+            momentum = part.getMomentum()
+            p = math.sqrt(momentum.x**2 + momentum.y**2 + momentum.z**2)
+            theta = math.acos(momentum.z / p)
+            phi = math.atan2(momentum.y, momentum.x)
+            print(
+                "stored genparts: N: {}, PID: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, M: {:.2e}".format(
+                    j, part.getPDG(), p, theta, phi, part.getMass()
+                )
+            )
+
     return dic, genpart_indexes
 
-
+# retrieve track collection from event, loop over tracks, retrieve track states at vertex and at calo
+# and save in dic[hit_XXX]
 def store_tracks(
     event,
     debug,
     dic,
     genpart_indexes,
     n_hit,
-    number_of_hist_with_no_genlinks,
+    number_of_hits_with_no_genlinks,
     store_pandora_hits=False,
     CLIC="True",
 ):
@@ -682,48 +710,54 @@ def store_tracks(
         isclic = True
     else:
         isclic = False
-    ## track stuff
-    tracks = ("TracksFromGenParticles", 45)
-    # trackstates = "SiTracks_1"  # not used
-    SiTracksMCTruthLink = "TracksFromGenParticlesAssociation"
+    ## reco tracks, tracs<->MC links and Pandora PFOs collection
+    tracks = ("TracksFromGenParticles", 45)  # 2nd parameter is collection ID (not used)
+    TracksMCTruthLink = "TracksFromGenParticlesAssociation"
+    pandora_pfo = "PandoraPFOs"
+    if store_pandora_hits == "True":
+        pandora_pfos_event = event.get(pandora_pfo)
+    else:
+        pandora_pfos_event = None
+    gen_track_link_indextr = event.get(TracksMCTruthLink)
+
+    # The following things are not used
+    # trackstates = "SiTracks_1"
     # gen_track_links1 = "SiTracksMCTruthLink#1"
     # gen_track_weights = "SiTracksMCTruthLink"
-    pandora_pfo = "PandoraPFOs"
     # gen_calo_links1 = "CalohitMCTruthLink#1"
     # gen_calo_weights = "CalohitMCTruthLink"
-    # pandora_pfos_event = event.get(pandora_pfo)
-    gen_track_link_indextr = event.get(SiTracksMCTruthLink)
     # gen_track_link_indexmc = event.get(gen_track_links1)
     # gen_track_link_weight = event.get(gen_track_weights)
 
     track_coll = tracks[0]
     track_collid = tracks[1]
-
     if debug:
         print("")
+    # loop over track collections
     for j, track in enumerate(event.get(track_coll)):
         # there are 4 track states , accessible via 4*j, 4*j+1, 4*j+2, 4*j+3
         # TODO check that this is the last track state, presumably, the one that gives coordinates at calo
-        # first store track state at vertex
 
+        # first store track state at vertex
         trackstate = track.getTrackStates()[0]
+
+        # - reference position (vertex/poca) and chi2 of fit
         referencePoint = trackstate.referencePoint
         x = referencePoint.x
         y = referencePoint.y
         z = referencePoint.z
         R = math.sqrt(x**2 + y**2)
         r = math.sqrt(x**2 + y**2 + z**2)
-
         chi_s = track.getChi2()
-
         dic["hit_chis"].push_back(chi_s)
         dic["hit_x"].push_back(x)
         dic["hit_y"].push_back(y)
         dic["hit_z"].push_back(z)
         dic["hit_t"].push_back(trackstate.time)
 
+        # - momentum (cylindric and cartesian coordinates)
+        # energy is set to -1 to distinguish from calo hits
         track_mom = track_momentum(trackstate, isclic=isclic)
-
         dic["hit_p"].push_back(track_mom[0])
         dic["hit_theta"].push_back(track_mom[1])
         dic["hit_phi"].push_back(track_mom[2])
@@ -734,13 +768,12 @@ def store_tracks(
 
         dic["hit_type"].push_back(0)  # 0 for tracks at vertex
         dic["calohit_col"].push_back(0)
+
         # print(gen_track_link_indextr[0].MCRecoTrackParticleAssociation())
         gen_indices, gen_weights = find_gen_link(
             j,
             track.getObjectID().collectionID,
             gen_track_link_indextr,
-            # gen_track_link_indexmc,
-            # gen_track_link_weight,
             genpart_indexes,
         )
         # print("store_pandora_hits", store_pandora_hits)
@@ -783,7 +816,7 @@ def store_tracks(
         ngen = len(link_vector)
 
         if ngen == 0:
-            number_of_hist_with_no_genlinks += 1
+            number_of_hits_with_no_genlinks += 1
             if debug:
                 print("  -> WARNING: this track with no gen-link")
 
@@ -806,7 +839,6 @@ def store_tracks(
         if store_pandora_hits == "True":
             # print("storing calo hit")
             dic["hit_genlink2"].push_back(pandora_index_pfo)
-
         else:
             if len(gen_indices) > 2:
                 dic["hit_genlink2"].push_back(gen_indices[2])
@@ -826,6 +858,22 @@ def store_tracks(
         if len(gen_indices) > 4:
             dic["hit_genweight4"].push_back(gen_weights[4])
 
+        if debug:
+            print(
+                "track at vertex: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+                    n_hit[0],
+                    track_mom[0],
+                    track_mom[1],
+                    track_mom[2],
+                    x * 1e-03,
+                    y * 1e-03,
+                    R * 1e-03,
+                    z * 1e-03,
+                    r * 1e-03,
+                    list(link_vector),
+                )
+            )
+
         n_hit[0] += 1
 
         ## now access trackstate at calo
@@ -836,7 +884,6 @@ def store_tracks(
         z = trackstate.referencePoint.z
         R = math.sqrt(x**2 + y**2)
         r = math.sqrt(x**2 + y**2 + z**2)
-
         dic["hit_chis"].push_back(chi_s)
         dic["hit_x"].push_back(x)
         dic["hit_y"].push_back(y)
@@ -844,7 +891,6 @@ def store_tracks(
         dic["hit_t"].push_back(trackstate.time)
 
         track_mom = track_momentum(trackstate, isclic=isclic)
-
         dic["hit_p"].push_back(track_mom[0])
         dic["hit_theta"].push_back(track_mom[1])
         dic["hit_phi"].push_back(track_mom[2])
@@ -855,6 +901,7 @@ def store_tracks(
 
         dic["hit_type"].push_back(1)  # 0 for tracks at calo
         dic["calohit_col"].push_back(0)
+
         gen_indices, gen_weights = find_gen_link(
             j,
             track.getObjectID().collectionID,
@@ -869,7 +916,7 @@ def store_tracks(
         ngen = len(link_vector)
 
         if ngen == 0:
-            number_of_hist_with_no_genlinks += 1
+            number_of_hits_with_no_genlinks += 1
             if debug:
                 print("  -> WARNING: this track with no gen-link")
 
@@ -929,27 +976,28 @@ def store_tracks(
         if len(gen_indices) > 4:
             dic["hit_genweight4"].push_back(gen_weights[4])
 
-        # if debug:
-        #     print(
-        #         "track at calo: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-        #             n_hit[0],
-        #             track_mom[0],
-        #             track_mom[1],
-        #             track_mom[2],
-        #             x * 1e-03,
-        #             y * 1e-03,
-        #             R * 1e-03,
-        #             z * 1e-03,
-        #             r * 1e-03,
-        #             list(link_vector),
-        #         )
-        #     )
+        if debug:
+            print(
+                "track at calo: N: {}, P: {:.2e}, Theta: {:.2e}, Phi: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+                    n_hit[0],
+                    track_mom[0],
+                    track_mom[1],
+                    track_mom[2],
+                    x * 1e-03,
+                    y * 1e-03,
+                    R * 1e-03,
+                    z * 1e-03,
+                    r * 1e-03,
+                    list(link_vector),
+                )
+            )
 
         n_hit[0] += 1
 
-    return n_hit, dic, number_of_hist_with_no_genlinks
+    return n_hit, dic, number_of_hits_with_no_genlinks
 
-
+# retrieve calo hit collections from event, retrieve hit info
+# and save in dic[hit_XXX]
 def store_calo_hits(
     event,
     debug,
@@ -957,7 +1005,7 @@ def store_calo_hits(
     n_hit,
     genpart_indexes,
     gen_part_coll,
-    number_of_hist_with_no_genlinks,
+    number_of_hits_with_no_genlinks,
     store_pandora_hits,
     CLIC,
 ):
@@ -972,14 +1020,17 @@ def store_calo_hits(
     # only for CLD
     # hcal_other = ("HCALOther", 51)
     gen_calo_links0 = "CaloHitMCParticleLinks"
-    # pandora_clusters = "PandoraClusters"
-    # pandora_pfo = "PandoraPFOs"
+    pandora_clusters = "PandoraClusters"
+    pandora_pfo = "PandoraPFOs"
     gen_calohit_link_indexhit = event.get(gen_calo_links0)
-    # pandora_clusters_event = event.get(pandora_clusters)
-    # pandora_pfos_event = event.get(pandora_pfo)
+    if store_pandora_hits == "True":
+        pandora_clusters_event = event.get(pandora_clusters)
+        pandora_pfos_event = event.get(pandora_pfo)
+    else:
+        pandora_clusters_event = None
+        pandora_pfo_event = None
     print("checking clic again", CLIC)
     if CLIC == "True":
-        print("here")
         calohit_collections = [
             ecal_barrel[0],
             hcal_barrel[0],
@@ -989,7 +1040,6 @@ def store_calo_hits(
             hcal_other[0],
         ]
     else:
-        print("here2")
         calohit_collections = [
             ecal_barrel[0],
             hcal_barrel[0],
@@ -998,15 +1048,16 @@ def store_calo_hits(
             # hcal_other[0],
             "MuonTaggerBarrelPhiThetaPositioned",
             "MuonTaggerEndcapPhiThetaPositioned",
-            # "MUON" #add muon collections => thisi for CLD
+            # "MUON" #add muon collections => this is for CLD
         ]
 
     total_calohit_ = np.zeros(11)
+    total_calohit_e = 0
     total_calohit_pandora = np.zeros(15)
     for calohit_col_index, calohit_coll in enumerate(calohit_collections):
         if debug:
             print("")
-        # print(calohit_coll, len(event.get(calohit_coll)))
+            print(calohit_coll, len(event.get(calohit_coll)))
         for j, calohit in enumerate(event.get(calohit_coll)):
             # print(j, calohit.getObjectID().index)
             # print(dir(calohit))
@@ -1036,9 +1087,9 @@ def store_calo_hits(
             dic["hit_phi"].push_back(phi)
 
             htype = 2  # 2 if ECAL, 3 if HCAL
-            if "HCAL" in calohit_coll:
+            if "HCAL" in calohit_coll.upper():
                 htype = 3
-            elif  "MUON" in calohit_coll:
+            elif  "MUON" in calohit_coll.upper():
                 htype = 4
 
             dic["hit_type"].push_back(htype)  # 0 for calo hits
@@ -1061,9 +1112,9 @@ def store_calo_hits(
             ngen = len(link_vector)
 
             if ngen == 0:
-                number_of_hist_with_no_genlinks += 1
-                # if debug:
-                #    print("  -> WARNING: this calo hit has no gen-link")
+                number_of_hits_with_no_genlinks += 1
+                if debug:
+                    print("  -> WARNING: this calo hit has no gen-link")
 
             dic["hit_genlink"].push_back(
                 link_vector
@@ -1138,29 +1189,30 @@ def store_calo_hits(
 
             # find_pandora_cluster_of_hit(j, hit_collection, pandora_clusters_event)
 
-            # if debug:
-            #     total_calohit_e = total_calohit_e + calohit.getEnergy()
-            #     if list(link_vector)[0] < 11 and list(link_vector)[0] > 1:
-            #         total_calohit_[list(link_vector)[0]] = (
-            #             total_calohit_[list(link_vector)[0]] + calohit.getEnergy()
-            #         )
-            #     total_calohit_pandora[pandora_cluster] = (
-            #         total_calohit_pandora[pandora_cluster] + calohit.getEnergy()
-            #     )
+            if debug:
+                total_calohit_e = total_calohit_e + calohit.getEnergy()
+                if list(link_vector)[0] < 11 and list(link_vector)[0] > 1:
+                    total_calohit_[list(link_vector)[0]] = (
+                        total_calohit_[list(link_vector)[0]] + calohit.getEnergy()
+                    )
+                if store_pandora_hits == "True":
+                    total_calohit_pandora[pandora_cluster] = (
+                        total_calohit_pandora[pandora_cluster] + calohit.getEnergy()
+                    )
 
-            # print(
-            #     "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
-            #         htype,
-            #         n_hit[0],
-            #         calohit.energy,
-            #         x * 1e-03,
-            #         y * 1e-03,
-            #         R * 1e-03,
-            #         z * 1e-03,
-            #         r * 1e-03,
-            #         list(link_vector),
-            #     )
-            # )
+                print(
+                    "calo hit type: {}, N: {}, E: {:.2e}, X(m): {:.3f}, Y(m): {:.3f}, R(m): {:.3f}, Z(m): {:.3f}, r(m): {:.3f}, gen links: {}".format(
+                        htype,
+                        n_hit[0],
+                        calohit.getEnergy(),
+                        x * 1e-03,
+                        y * 1e-03,
+                        R * 1e-03,
+                        z * 1e-03,
+                        r * 1e-03,
+                        list(link_vector),
+                    )
+                )
 
             n_hit[0] += 1
 
@@ -1168,6 +1220,6 @@ def store_calo_hits(
         n_hit,
         dic,
         total_calohit_,
-        number_of_hist_with_no_genlinks,
+        number_of_hits_with_no_genlinks,
         total_calohit_pandora,
     )
