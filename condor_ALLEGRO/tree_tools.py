@@ -1167,7 +1167,6 @@ def store_calo_hits(
                 if len(gen_indices) > 1:
                     dic["hit_genlink1"].push_back(0)
             if store_pandora_hits == "True":
-                # print("storing calo hit")
                 dic["hit_genlink2"].push_back(pandora_pfo_index)
             else:
                 if len(gen_indices) > 2:
