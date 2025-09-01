@@ -81,6 +81,7 @@ fi
 
 if [[ "${flatten}" -ne 0 ]]
 then
+    # arguments are: input_file output_file store_pandora_hits isCLIC
     python make_pftree_clic_bindings.py out_reco_edm4hep.root tree5.root False False
     mkdir -p ${OUTPUTDIR}
     if [[ "$OUTPUTDIR" == /eos/* ]]; then
@@ -92,4 +93,4 @@ fi
 
 # remove intermediate temporary directory
 cd ..
-rm -rf ${SEED}
+# rm -rf ${SEED}
