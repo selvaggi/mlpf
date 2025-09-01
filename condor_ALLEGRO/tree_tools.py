@@ -1123,8 +1123,9 @@ def store_calo_hits(
             genlink = -1
             if ngen > 0:
                 genlink = link_vector[0]
-            if gen_indices[0] ==4: 
-                print(gen_indices[0],gen_indices[1], calohit_col_index + 1)
+            # GM: why this special handling of hits where 1st link points to 3rd particle in output (0, 1 are initial e+e-..)
+            # if gen_indices[0] == 4:
+            #     print(gen_indices[0], gen_indices[1], calohit_col_index + 1)
             if store_pandora_hits == "True":
                 # print("looking for calo hit")
                 (
