@@ -78,7 +78,8 @@ then
     # added saveHits for debug
     k4run run_ALLEGRO_reco.py -n ${NEV} --IOSvc.Input out_sim_edm4hep.root --IOSvc.Output out_reco_edm4hep.root --includeHCal --includeMuon --saveCells --addTracks
     # --saveHits
-    # rm -f out_sim_edm4hep.root
+    # save a lot of space by getting rid of sim file
+    rm -f out_sim_edm4hep.root
 fi
 
 if [[ "${flatten}" -ne 0 ]]
@@ -86,11 +87,13 @@ then
     # arguments are: input_file output_file store_pandora_hits isCLIC
     python make_pftree_clic_bindings.py out_reco_edm4hep.root tree5.root False False
     mkdir -p ${OUTPUTDIR}
-    if [[ "$OUTPUTDIR" == /eos/* ]]; then
-        python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
-    else
-        cp tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
-    fi
+    # sometimes condor gets stuck on this... just use cp instead
+#    if [[ "$OUTPUTDIR" == /eos/* ]]; then
+#        python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+#    else
+#        cp tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
+#    fi
+    cp tree5.root ${OUTPUTDIR}/pf_tree_${SEED}.root
 fi
 
 # remove intermediate temporary directory
