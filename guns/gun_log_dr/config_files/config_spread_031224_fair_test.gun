@@ -1,0 +1,10 @@
+# npart_range 10,15
+# for debug, only 5 primaries
+npart_range 5,5
+eta_range -0.5,0.5 
+mom_range 0.5,50
+dr_range 0.1,0.2
+pid_list 211,-211,130,130,2112,2112,-2112,-2112,22,22,22,22,22,22,11,-11,11,-11,11,-11,13,-13,13,-13,13,-13,-321,321,2212,-2212
+# nevents 1000
+# for debug, only 10 events
+nevents 10
