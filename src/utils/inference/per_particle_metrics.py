@@ -460,6 +460,31 @@ def plot_mass_hist(masses_lst, masses_pandora_lst, axs, bars=[], energy_ranges=[
         #    if bar * 0.95 < mean_mass:
         #        axs[i].axvline(bar, color="black", linestyle="--")
 
+def mixed_percentages(cm, fake_row, fake_norm="column"):
+    """
+    Return a percentage matrix where all rows are row-normalized,
+    except you can set the fake_row to use 'row' or 'column' normalization.
+    Default is 'column' for the fake row.
+    """
+    cm = cm.astype(float)
+
+    # Row-normalization for everything
+    row_sums = cm.sum(axis=1, keepdims=True)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        cm_row = np.divide(cm, row_sums, out=np.zeros_like(cm, dtype=float), where=row_sums != 0) * 100.0
+
+    if fake_norm == "row":
+        return cm_row
+
+    # Column-normalization (we'll only use it to replace the fake_row)
+    col_sums = cm.sum(axis=0, keepdims=True)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        cm_col = np.divide(cm, col_sums, out=np.zeros_like(cm, dtype=float), where=col_sums != 0) * 100.0
+
+    disp = cm_row.copy()
+    disp[fake_row, :] = cm_col[fake_row, :]   
+    return disp
+
 def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=None, ax2=None, suffix="", prefix="ML"):
     #sd_hgb1["pid_4_class_true"] = sd_hgb1["pid"].map(pid_conversion_dict)
     # sd_hgb1["pred_pid_matched"][sd_hgb1["pred_pid_matched"] < -1] = np.nan
@@ -516,11 +541,12 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
         class_names_true = ["e", "CH", "NH", "gamma", "mu", "fake"]
         class_names_pred = ["e", "CH", "NH", "gamma", "mu", "missed"]
     if not add_pie_charts:
-        row_sums = cm.sum(axis=1, keepdims=True)
-        cm_percent = cm / row_sums * 100  # Get percentages per row
+        fake_row = len(class_names_pred) - 1  # last row
+        cm_percent = mixed_percentages(cm, fake_row, fake_norm="column") 
         palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
         sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names_pred, yticklabels=class_names_true, ax=ax, cmap=palette)
         # Loop over each cell to add custom annotations
+        ax.hlines(fake_row, xmin=0, xmax=cm.shape[0], linewidth=3, color="black") #bold line to seperate fakes
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
                 # Raw count
@@ -673,11 +699,12 @@ def plot_confusion_matrix_pandora(sd_pandora, save_dir, add_pie_charts=False, ax
 
     if not add_pie_charts:
         # Calculate percentages
-        row_sums = cm.sum(axis=1, keepdims=True)
-        cm_percent = cm / row_sums * 100  # Get percentages per row
+        fake_row = len(class_names_pred) - 1  # last row
+        cm_percent = mixed_percentages(cm, fake_row, fake_norm="column") 
         palette = sns.dark_palette("#69d", reverse=True, as_cmap=True)
         sns.heatmap(cm_percent, annot=cm, fmt="d", xticklabels=class_names_pred, yticklabels=class_names_true, ax=ax,
                     cmap=palette)
+        ax.hlines(fake_row, xmin=0, xmax=cm.shape[0], linewidth=3, color="black") #bold line to seperate fakes
         # Loop over each cell to add custom annotations
         for i in range(cm.shape[0]):
             for j in range(cm.shape[1]):
