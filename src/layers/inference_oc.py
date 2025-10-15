@@ -16,6 +16,27 @@ import wandb
 from src.utils.inference.per_particle_metrics import plot_event
 import random
 import string
+import hdbscan
+def remove_bad_tracks_from_cluster(g, labels_hdb):
+    mask_hit_type_t1 = g.ndata["hit_type"]==2
+    mask_hit_type_t2 = g.ndata["hit_type"]==1
+    labels_hdb_corrected_tracks = labels_hdb.clone()
+    # check each cluster
+    for i in range(0, torch.max(labels_hdb)+1):
+        mask_labels_i = labels_hdb == i
+        if torch.sum(mask_hit_type_t2[mask_labels_i])>0 and i>0:
+            pos_track = g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2]
+            mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
+            angles = torch.sum(mean_pos_cluster*g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
+            norms = torch.norm(mean_pos_cluster)*torch.norm(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
+            angles_tracks = angles/norms
+            distance_track_cluster = torch.norm(mean_pos_cluster-pos_track,dim=1)/1000
+            bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999))
+            bad_tracks_ = torch.nonzero(bad_tracks).view(-1)
+            cluster_t2_nodes = torch.nonzero(mask_labels_i & mask_hit_type_t2).view(-1)
+            bad_tracks_nodes = cluster_t2_nodes[bad_tracks]
+            labels_hdb_corrected_tracks[bad_tracks_nodes] = 0
+    return labels_hdb_corrected_tracks
 
 
 def generate_random_string(length):
@@ -77,14 +98,15 @@ def create_and_store_graph_output(
         #    dic["shap_values"] = shap_vals
         # if ec_x is not None:
         #    dic["ec_x"] = ec_x  ## ? No mask ?!?
-        if predict:
-            labels_clustering = clustering_obtain_labels(
-                X, dic["graph"].ndata["beta"].view(-1), model_output.device, tbeta=0.7, td=0.3
-            )
+        # if predict:
+            # labels_clustering = clustering_obtain_labels(
+            #     X, dic["graph"].ndata["beta"].view(-1), model_output.device, tbeta=0.2, td=0.05
+            # )
         if use_gt_clusters:
             labels_hdb = dic["graph"].ndata["particle_number"].type(torch.int64)
         else:
             labels_hdb = hfdb_obtain_labels(X, model_output.device)
+            #labels_hdb = labels_clustering 
             # betas = torch.sigmoid(dic["graph"].ndata["beta"])
             # labels_clustering = clustering_obtain_labels(
             #     X, betas.view(-1), model_output.device,  tbeta=0.7, td=0.3
@@ -95,27 +117,13 @@ def create_and_store_graph_output(
             #if labels_hdb.min() == 0 and labels_hdb.sum() == 0:
             #    labels_hdb += 1  # Quick hack
             #    raise Exception("!!!! Labels==0 !!!!")
+            labels_hdb = remove_bad_tracks_from_cluster(dic["graph"], labels_hdb)
         if predict:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
             num_clusters_pandora = len(labels_pandora.unique())
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
-        #current_number_candidates = num_clusters
-        #pred_pos_batch = pred_pos[total_number_candidates:total_number_candidates+current_number_candidates]
-        #pred_ref_pt_batch = pred_ref_pt[total_number_candidates:total_number_candidates+current_number_candidates]
-        #pred_pid_batch = pred_pid[total_number_candidates:total_number_candidates+current_number_candidates]
-        #e_corr_batch = e_corr[total_number_candidates:total_number_candidates+current_number_candidates]
-        """if predict:
-            shower_p_unique = torch.unique(labels_clustering)
-            shower_p_unique, row_ind, col_ind, i_m_w, iou_m_c = match_showers(
-                labels_clustering,
-                dic,
-                particle_ids,
-                model_output,
-                local_rank,
-                i,
-                path_save,
-                tracks=tracks,
-            )"""
+        
+        ## add function to remove tracks if they are bad
         shower_p_unique_hdb, row_ind_hdb, col_ind_hdb, i_m_w_hdb, iou_m = match_showers(
             labels_hdb,
             dic,
@@ -162,18 +170,18 @@ def create_and_store_graph_output(
             + "_"
             + str(i)
             + ".pt",
-         )'''
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs_option7/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        #  )
+        #  )'''
+        torch.save(
+            dic,
+            path_save
+            + "/graphs_3M/"
+            + str(local_rank)
+            + "_"
+            + str(step)
+            + "_"
+            + str(i)
+            + ".pt",
+         )
         
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
@@ -308,7 +316,7 @@ def store_at_batch_end(
         + str(step)
         + "_"
         + str(epoch)
-        + "_hdbscan_option9_v1.pt"
+        + "test_200_300_gt.pt"
     )
     if store and predict:
         df_batch1.to_pickle(path_save_)
@@ -321,7 +329,7 @@ def store_at_batch_end(
             + str(step)
             + "_"
             + str(epoch)
-            + "_pandora_option9_v1.pt"
+            + "_pandora_200_300_gt.pt"
         )
         if store and predict:
             df_batch_pandora.to_pickle(path_save_pandora)
@@ -421,7 +429,7 @@ def generate_showers_data_frame(
     e_pred_showers_hcal = scatter_add(1*(dic["graph"].ndata["hit_type"].view(-1)==3), labels)
     if pandora:
         e_pred_showers_cali = scatter_mean(
-            dic["graph"].ndata["pandora_cluster_energy"].view(-1), labels
+            dic["graph"].ndata["pandora_pfo_energy"].view(-1), labels
         )
         e_pred_showers_pfo = scatter_mean(
             dic["graph"].ndata["pandora_pfo_energy"].view(-1), labels
@@ -499,7 +507,7 @@ def generate_showers_data_frame(
     pred_showers = shower_p_unique
     energy_t = (
         dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
-    )  # dic["part_true"][:, 3].to(e_pred_showers.device)
+    ).float()  # dic["part_true"][:, 3].to(e_pred_showers.device)
     vertex = dic["part_true"].vertex.to(e_pred_showers.device)
     pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
@@ -821,24 +829,24 @@ def generate_showers_data_frame(
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
         #event_list = [40]   # Fill with the list of selected events that we want to investigate
-        if save_plots_to_folder:
-            event_numbers = np.unique(df.number_batch)
-            for evt in event_numbers:
-                #if evt contains muons
-                if 13 in dic["part_true"].pid.flatten().abs():
-                    print("Event contains muons, plotting!")
-                    # Random string
-                    if not pandora:
-                        plot_event(
-                            df[df.number_batch == evt],
-                            pandora,
-                            save_plots_to_folder + "GT_" + str(evt),
-                            graph=dic["graph"].to("cpu"),
-                            y=dic["part_true"],
-                            labels=dic["graph"].ndata["particle_number"].long(),
-                            is_track_in_cluster=df.is_track_in_cluster,
-                            pid_filter=[13, -13]
-                        )
+        # if save_plots_to_folder:
+        #     event_numbers = np.unique(df.number_batch)
+        #     for evt in event_numbers:
+        #         #if evt contains muons
+        #         if 13 in dic["part_true"].pid.flatten().abs():
+        #             print("Event contains muons, plotting!")
+        #             # Random string
+        #             if not pandora:
+        #                 plot_event(
+        #                     df[df.number_batch == evt],
+        #                     pandora,
+        #                     save_plots_to_folder + "GT_" + str(evt),
+        #                     graph=dic["graph"].to("cpu"),
+        #                     y=dic["part_true"],
+        #                     labels=dic["graph"].ndata["particle_number"].long(),
+        #                     is_track_in_cluster=df.is_track_in_cluster,
+        #                     pid_filter=[13, -13]
+        #                 )
                     #plot_event(
                     #    df[df.number_batch == evt],
                     #    pandora,
@@ -1061,8 +1069,8 @@ def clustering_obtain_labels(X, betas, device,  tbeta=0.7, td=0.2):
     return clustering
 
 
-def hfdb_obtain_labels(X, device, eps=0.1):
-    hdb = HDBSCAN(min_cluster_size=8, min_samples=8, cluster_selection_epsilon=eps).fit(
+def hfdb_obtain_labels(X, device, eps=0.05):
+    hdb = hdbscan.HDBSCAN(min_cluster_size=8, min_samples=8, cluster_selection_epsilon=eps).fit(
         X.detach().cpu()
     )
     labels_hdb = hdb.labels_ + 1

@@ -21,7 +21,7 @@ from src.utils.inference.event_metrics import (
     get_mass_contribution_per_category
 )
 from matplotlib.colors import LogNorm
-
+from matplotlib.ticker import FormatStrFormatter
 
 def get_mask_id(id, pids_pandora):
     mask_id = np.full((len(pids_pandora)), False, dtype=bool)
@@ -1019,24 +1019,30 @@ def plot_mass_contribution_per_PID(matched_, matched_pandora, path_store):
         figs_mass_hist.savefig(os.path.join(path_store, f"E_breakdown_by_PID_{bin[0]}_{bin[1]}_GeV.pdf"))
         #matplotlib.rcParams["font.size"] = old_fontsize
 
-def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, energy_bins=None):
+def plot_mass_contribution_per_category(matched_, matched_pandora, matched_gt, path_store, energy_bins=None, perfect_pid=False):
     old_fontsize = matplotlib.rcParams["font.size"]
     matplotlib.rcParams["font.size"] = 10
-    bins_mass = np.linspace(0, 2, 200)
-    massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model, frac_E_pandora, pid_true_over_true = get_mass_contribution_per_category(matched_pandora,
+    bins_mass = np.linspace(0, 2, 50)
+    massPID, massPIDpandora, EPID, EPIDpandora, frac_E_model, frac_E_pandora, pid_true_over_true, mass_over_true_gt = get_mass_contribution_per_category(matched_pandora,
                                                              matched_,
+                                                             matched_gt,
                                                              ML_pid=1,
-                                                             perfect_pid=0,
+                                                             perfect_pid=perfect_pid,
                                                              mass_zero=0, energy_bins=energy_bins)
-    figs_mass_hist, axs_mass_hist = plt.subplots(4, 3, figsize=(8, 10))  # e, CH, NH, gamma
-    for i, pid in enumerate([0, 1, 2, 3]):
+   
+    figs_mass_hist, axs_mass_hist = plt.subplots(3, 3, figsize=(8*3, 8*3))  # e, CH, NH, gamma
+    for i, pid in enumerate([0, 1, 2]):
+   
+        axs_mass_hist[i, 0].hist(mass_over_true_gt[pid], bins=bins_mass, histtype="step", label="ML_GT", color="black",
+                                density=True)
+        
         axs_mass_hist[i, 0].hist(massPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
                                  density=True)
         axs_mass_hist[i, 0].hist(massPIDpandora[pid], bins=bins_mass, histtype="step", label="Pandora",
                                  color="blue",
                                  density=True)
         axs_mass_hist[i, 1].grid(1)
-        pid_text = {0: "e", 1: "CH", 2: "NH", 3: "gamma", 4: "mu"}.get(pid)
+        pid_text = {0: "e+CH", 1: "NH+gamma", 2: "e+CH no track", 3: "gamma", 4: "mu"}.get(pid)
         axs_mass_hist[i, 1].set_xlabel(f"E pred., {pid_text} / E true, {pid_text}")
         axs_mass_hist[i, 1].hist(EPID[pid], bins=bins_mass, histtype="step", label="ML", color="red",
                                  density=True)
@@ -1045,12 +1051,12 @@ def plot_mass_contribution_per_category(matched_, matched_pandora, path_store, e
                                  density=True)
         axs_mass_hist[i, 0].set_title(pid_text)
         axs_mass_hist[i, 1].set_title(pid_text)
-        binsE = np.linspace(0, 1.0, 100)
+        binsE = np.linspace(0, 1.0, 50)
         if energy_bins is not None and (energy_bins[0] == 0.0 and energy_bins[1] == 1.0):
             # [0, 1] GeV
-            binsE=np.linspace(0, 0.15, 100)
+            binsE=np.linspace(0, 0.15, 50)
         elif energy_bins is not None and (energy_bins[0] == 1.0 and energy_bins[1] == 10.0):
-            binsE=np.linspace(0, 0.8, 100)
+            binsE=np.linspace(0, 0.8, 50)
         axs_mass_hist[i, 0].legend()
         axs_mass_hist[i, 1].legend()
         axs_mass_hist[i, 2].grid(1)
@@ -1100,6 +1106,7 @@ def plot_per_energy_resolution2_multiple(
                                                          ML_pid=1,
                                                          perfect_pid=0,
                                                          mass_zero=0)
+    
     bins_mass = np.linspace(0, 2, 200)
     for i, pid in enumerate([22, 11, 130, 211, 2112, 2212]):
         figs_theta_res[pid], axs_theta_res[pid] = plt.subplots(1, 1, figsize=(7, 7))
@@ -1151,12 +1158,14 @@ def plot_per_energy_resolution2_multiple(
         os.path.join(PATH_store_detailed_plots, f"mass_breakdown_by_PID.pdf"),
         bbox_inches="tight",
     )
+    #############################################################################
     fig_event_res, ax_event_res = plt.subplots(1, 1, figsize=(7, 7))
     PIDs = [22, 11, 130, 211, 2112, 2212]
     fig_distr, ax_distr = plt.subplots(len(PIDs), 3, figsize=(len(PIDs) * 5, 18))
     matplotlib.rcParams["font.size"] = 11
-    fig_distr_reco, ax_distr_reco = plt.subplots(len(PIDs), 3, figsize=(len(PIDs) * 2.5, 9))
+    fig_distr_reco, ax_distr_reco = plt.subplots(len(PIDs), 3, figsize=(len(PIDs)*3, 9*3))
     photons_dic_all, electrons_dic_all, hadrons_dic_all, hadrons_dic2_all, neutrons_all, protons_all = {}, {}, {}, {}, {}, {}
+   
     for key in matched_all:
         matched_ = matched_all[key]
         #mask = matched_["calibration_factor"] > 0
@@ -1168,6 +1177,7 @@ def plot_per_energy_resolution2_multiple(
         plot_response = True
         if plot_response:
             list_plots = [""]  # "","_reco"
+            
             event_res_dic[key] = get_response_for_event_energy(
                 matched_pandora, matched_, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid
             )
@@ -1927,6 +1937,7 @@ def plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, path_store):
 
 def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
     matplotlib.rcParams["font.size"] = 22
+    print("photons pandora")
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
@@ -1947,6 +1958,7 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
     #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],"fake_percent_energy_p": fakes_dic_p[2]}
     #kaons_dic.update(fakes_dic_p)
     for var_i, sd_hgb in enumerate(df_list):
+        print("photons")
         photons_dic = create_eff_dic(photons_dic, sd_hgb, 22, var_i=var_i)
         #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=22)
         #photons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
@@ -2126,12 +2138,14 @@ def create_eff_dic_pandora(matched_pandora, id):
     id_group = our_to_pandora_mapping[our_id]
     mask_id_true = matched_pandora.pid.isin(id_group)
     #df_id_pandora = matched_pandora[mask_id]
-    eff_p, energy_eff_p = calculate_eff(matched_pandora[mask_id_true], False, pandora=True)
-    fakes_p, energy_fakes_p, fake_percent_energy, fake_percent_reco = calculate_fakes(matched_pandora, None, False, pandora=True, id=id)
+    eff_p, energy_eff_p, errors_p = calculate_eff(matched_pandora[mask_id_true], False, pandora=True)
+    fakes_p, energy_fakes_p, fake_percent_energy, fake_percent_reco, fake_errors = calculate_fakes(matched_pandora, None, False, pandora=True, id=id)
     photons_dic = {}
     photons_dic["eff_p"] = eff_p
+    photons_dic["errors_p"]= errors_p
     photons_dic["energy_eff_p"] = energy_eff_p
     photons_dic["fakes_p"] = fakes_p
+    photons_dic["fakes_errors_p"]  = fake_errors
     photons_dic["energy_fakes_p"] = energy_fakes_p
     photons_dic["fake_percent_energy_p"] = fake_percent_energy
     photons_dic["fake_percent_energy_reco_p"] = fake_percent_reco
@@ -2143,11 +2157,13 @@ def create_eff_dic(photons_dic, matched_, id, var_i):
     id_group = our_to_pandora_mapping[our_id]
     mask_id = matched_.pred_pid_matched.isin(id_group)
     mask_id_gt = matched_.pid.isin(id_group)
-    eff, energy_eff = calculate_eff(matched_[mask_id_gt], False)
-    fakes, energy_fakes, fake_percent_energy, fake_percent_reco = calculate_fakes(matched_, None, False, pandora=False, id=id)
+    eff, energy_eff, errors = calculate_eff(matched_[mask_id_gt], False)
+    fakes, energy_fakes, fake_percent_energy, fake_percent_reco, fake_errors = calculate_fakes(matched_, None, False, pandora=False, id=id)
     photons_dic["eff_" + str(var_i)] = eff
+    photons_dic["errors_" + str(var_i)] = errors
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
+    photons_dic["fakes_errors" + str(var_i)] = fake_errors
     photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
     photons_dic["fake_percent_energy_" + str(var_i)] = fake_percent_energy
     photons_dic["fake_percent_energy_reco_" + str(var_i)] = fake_percent_reco
@@ -2158,13 +2174,19 @@ def create_fakes_dic(photons_dic, matched_, id, var_i):
     mask_id = pids == id
     our_to_pandora_mapping
     df_id = matched_[mask_id]
-    eff, energy_eff = calculate_eff(df_id, False)
+    eff, energy_eff, errors = calculate_eff(df_id, False)
     fakes, energy_fakes, fake_percent_energy, fake_percent_reco = calculate_fakes(df_id, None, False, pandora=False, id=id)
     photons_dic["eff_" + str(var_i)] = eff
+    photons_dic["errors_fakes_" + str(var_i)] = errors
     photons_dic["energy_eff_" + str(var_i)] = energy_eff
     photons_dic["fakes_" + str(var_i)] = fakes
     photons_dic["energy_fakes_" + str(var_i)] = energy_fakes
     return photons_dic
+
+def limit_error_bars(y, yerr, upper_limit=1):
+    yerr_upper = np.minimum(y + yerr, upper_limit) - y
+    yerr_lower = yerr  # Lower error bars remain unchanged
+    return yerr_lower, yerr_upper
 
 def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
     colors_list = ["red", "green", "blue"]
@@ -2187,6 +2209,12 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
             s=50,
             marker="x"
         )
+    energy = photons_dic["energy_eff_" + str(i)]
+    eff = photons_dic["eff_" + str(i)]
+    error_y = photons_dic["errors_"+ str(i)]
+    yerr_lower, yerr_upper = limit_error_bars(eff, np.array(error_y)/2, upper_limit=1)
+    ax.errorbar(energy, eff ,yerr= [yerr_lower, yerr_upper], ecolor=colors_list[i], linestyle='none', capsize=4)
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     ax.plot(photons_dic["energy_eff_p"],
         photons_dic["eff_p"], "--", color=colors_list[2])
     ax.scatter(
@@ -2200,8 +2228,14 @@ def plot_eff(title, photons_dic, label1, PATH_store, labels, ax=None):
         s=50,
         marker="x"
     )
+    energy = photons_dic["energy_eff_p"]
+    eff = photons_dic["eff_p"]
+    error_y = photons_dic["errors_p"]
+    yerr_lower, yerr_upper = limit_error_bars(eff, np.array(error_y)/2, upper_limit=1)
+    ax.errorbar(energy, eff ,yerr= [yerr_lower, yerr_upper], ecolor=colors_list[2], linestyle='none', capsize=4)
+
     ax.legend(loc="lower right")
-    ax.set_xscale("log")
+    # ax.set_xscale("log")
     if savefig:
         fig.savefig(
             os.path.join(PATH_store, "Efficiency_" + label1 + ".pdf"),
@@ -2364,12 +2398,28 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
         s=50,
 
     )
+    energy = photons_dic["energy_fakes_" + str(i)]
+    eff = photons_dic["fakes_" + str(i)]
+    error_y = photons_dic["fakes_errors"+ str(i)]
+    # yerr_lower, yerr_upper = limit_error_bars(eff, np.array(error_y)/2, upper_limit=1)
+    print("NOT pandora", error_y, energy, eff)
+    error_y = np.array(error_y)/2
+    ax.errorbar(energy, eff ,yerr= [error_y, error_y], ecolor=colors_list[i], linestyle='none', capsize=4)
+
+    energy = photons_dic["energy_fakes_p"]
+    eff = photons_dic["fakes_p"]
+    error_y = photons_dic["fakes_errors_p"]
+    # yerr_lower, yerr_upper = limit_error_bars(eff, np.array(error_y)/2, upper_limit=1)
+    print("pandora", error_y, energy, eff)
+    error_y = np.array(error_y)/2
+    ax.errorbar(energy, eff ,yerr= [error_y, error_y], ecolor=colors_list[2], linestyle='none', capsize=4)
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     ax.legend()
     #if title == "Electromagnetic":
     #    plt.ylim([0.0, 0.07])
     #else:
     #    plt.ylim([0.0, 0.07])
-    ax.set_xscale("log")
+    # ax.set_xscale("log")
     if savefig:
         fig.savefig(
             os.path.join(PATH_store, "Fake_Rate_" + label1 + ".pdf"),

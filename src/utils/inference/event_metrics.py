@@ -121,46 +121,51 @@ def safeint(x, default_val=0):
         return default_val
     return int(x)
 
-def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False):
+
+
+def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=False, ML_pid=False, fake=False):
     # reco showers> 0 does not consider showers that are in the event but do not contribute energy to the total in the event
     #df = df[((df.reco_showers_E>0) | (pd.isna(df.pid)))]
     df = df[df.reco_showers_E != 0.0]
     true_e = torch.Tensor(df.true_showers_E.values)
+    reco_true_e = torch.Tensor(df.reco_showers_E.values)
     mask_nan_true = np.isnan(df.true_showers_E.values)
     true_e[mask_nan_true] = 0
+    reco_true_e[mask_nan_true] = 0
     batch_idx = df.number_batch
     if pandora:
         pred_E = df.pandora_calibrated_pfo.values
+        pred_E_reco = df.pred_showers_E.values
         nan_mask = np.isnan(df.pandora_calibrated_pfo.values)
+        pred_E_reco[nan_mask] = 0
         pred_E[nan_mask] = 0
-        pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
+
         pred_vect = torch.tensor(np.array(df.pandora_calibrated_pos.values.tolist()))
         nan_mask_p = torch.isnan(pred_vect).any(dim=1)
         pred_vect[nan_mask_p] = 0
-        true_vect = torch.tensor(np.array(df.true_pos.values.tolist()))
-        mask_nan_p = torch.isnan(true_vect).any(dim=1)
-        true_vect[mask_nan_true] = 0
     else:
         pred_E = df.calibrated_E.values
+        pred_E_reco = df.pred_showers_E.values
         nan_mask = np.isnan(df.calibrated_E.values)
-        print(np.sum(nan_mask))
         pred_E[nan_mask] = 0
-        pred_e1 = torch.tensor(pred_E).unsqueeze(1).repeat(1, 3)
+        pred_E_reco[nan_mask] = 0
         pred_vect = torch.tensor(
             np.array(df.pred_pos_matched.values.tolist())
         )
         pred_vect[nan_mask] = 0
-        true_vect = torch.tensor(
-            np.array(df.true_pos.values.tolist())
-        )
-        true_vect[mask_nan_true] = 0
+    true_vect = torch.tensor(np.array(df.true_pos.values.tolist()))
+    true_vect[mask_nan_true] = 0
+    if fake:
+        p_true_norm = true_vect/ np.linalg.norm(true_vect, axis=1).reshape(-1, 1)
+        m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pid])
+        p_squared_true = (true_e ** 2 - m ** 2)
+        true_vect = np.sqrt(p_squared_true).reshape(-1, 1) * np.array(p_true_norm)
     if perfect_pid or mass_zero or ML_pid:
         if len(pred_vect) > 0:
             pred_vect /= np.linalg.norm(pred_vect, axis=1).reshape(-1, 1)
             pred_vect[torch.isnan(pred_vect)] = 0
         if ML_pid:
             if pandora:
-                print("Using Pandora provided PID for Pandora")
                 m = np.array([particle_masses.get(abs(safeint(i)), 0) for i in df.pandora_pid.values])
             else:
                 m = np.array([particle_masses_4_class.get(safeint(i), 0) for i in df.pred_pid_matched.values])
@@ -173,10 +178,13 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         pred_vect = np.sqrt(p_squared).reshape(-1, 1) * np.array(pred_vect)
     batch_idx = torch.tensor(batch_idx.values).long()
     pred_E = torch.tensor(pred_E)
+    pred_E_reco = torch.tensor(pred_E_reco)
     true_jet_vect = scatter_sum(true_vect, batch_idx, dim=0)
     pred_jet_vect = scatter_sum(torch.tensor(pred_vect), batch_idx, dim=0)
     true_E_jet = scatter_sum(torch.tensor(true_e), batch_idx)
+    true_E_jet_reco = scatter_sum(torch.tensor(reco_true_e), batch_idx)
     pred_E_jet = scatter_sum(torch.tensor(pred_E), batch_idx)
+    pred_E_jet_reco = scatter_sum(torch.tensor(pred_E_reco), batch_idx)
     true_jet_p = torch.norm(true_jet_vect, dim=1)  # This is actually momentum resolution
     pred_jet_p = torch.norm(pred_jet_vect, dim=1)
     mass_true = torch.sqrt((true_E_jet ** 2).abs() - true_jet_p ** 2)
@@ -184,6 +192,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
     # replace nans in these with 0
     mass_over_true_p = mass_pred_p / mass_true
     E_over_true = pred_E_jet / true_E_jet
+    E_over_true_reco = pred_E_jet/true_E_jet_reco
     p_over_true = pred_jet_p / true_jet_p
     p_jet_pandora = pred_jet_p
     (
@@ -192,7 +201,7 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         _,
         _,
     ) = get_sigma_gaussian(mass_over_true_p, np.linspace(0, 2, 400), epsilon=0.005)
-    return mean_mass, var_mass, mass_over_true_p, mass_true, p_over_true, true_jet_p, E_over_true
+    return mean_mass, var_mass, mass_over_true_p, mass_true, p_over_true, true_jet_p, E_over_true, E_over_true_reco
 
 
 def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
@@ -319,9 +328,10 @@ def calculate_event_energy_resolution(df, pandora=False, full_vector=False):
         ret += [None]
     return ret
 
-def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True, energy_bins=None):
+def get_mass_contribution_per_category(matched_pandora, matched_, matched_gt, perfect_pid=False, mass_zero=False, ML_pid=True, energy_bins=None):
     # PID_categories: Report in terms of categories e, CH, NH, gamma
     mass_over_true = {}
+    mass_over_true_gt = {}
     mass_over_true_pandora = {}
     pid_model_over_pred = {}
     pid_pandora_over_pred = {}
@@ -330,30 +340,62 @@ def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=Fa
     pid_true_over_true = {}
     E_over_true = {}
     E_over_true_pandora = {}
+    pid_groups = [[0,1],[2,3], [0,1]]
+    for pid_indx, pid_group in enumerate(pid_groups):
+        filt_pandora_pred = (matched_pandora.pid_4_class_true == pid_group[0])+(matched_pandora.pid_4_class_true == pid_group[1]) #matched_pandora.pid.isin(our_to_pandora_mapping[pid_group[0]])+ matched_pandora.pid.isin(our_to_pandora_mapping[pid_group[1]])
+        filt_model_pred = (matched_.pid_4_class_true == pid_group[0])+(matched_.pid_4_class_true == pid_group[1])
+        filt_model_pred_GT = (matched_gt.pid_4_class_true == pid_group[0])+(matched_gt.pid_4_class_true == pid_group[1])
+        filt_model_true = ((matched_.pid_4_class_true == pid_group[0]))+(matched_.pid_4_class_true == pid_group[1])
 
-    for pid in [0, 1, 2, 3]:
-        filt_pandora_pred = matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid])
-        filt_model_pred = matched_.pred_pid_matched == pid
-        filt_model_true = matched_.pid_4_class_true == pid
-        filt_pandora_true = matched_pandora.pid_4_class_true == pid
-        if energy_bins is not None:
-            filt_pandora_pred = filt_pandora_pred & (matched_pandora.pandora_calibrated_pfo > energy_bins[0]) & (matched_pandora.pandora_calibrated_pfo < energy_bins[1])
-            filt_model_pred = filt_model_pred & (matched_.calibrated_E > energy_bins[0]) & (matched_.calibrated_E < energy_bins[1])
-            filt_model_true = filt_model_true & (matched_.true_showers_E > energy_bins[0]) & (matched_.true_showers_E < energy_bins[1])
-            filt_pandora_true = filt_pandora_true & (matched_pandora.true_showers_E > energy_bins[0]) & (matched_pandora.true_showers_E < energy_bins[1])
-        _, _, distr_mass_p, _, _, _, _ = calculate_event_mass_resolution(matched_pandora[filt_pandora_pred],
+        if pid_indx==0:
+            filt_model_pred = filt_model_pred*(~np.isnan(matched_.pred_showers_E))*((matched_.pred_pid_matched == pid_group[0])+(matched_.pred_pid_matched == pid_group[1]))
+            filt_pandora_pred = filt_pandora_pred*(~np.isnan(matched_pandora.pred_showers_E))*(matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid_group[0]])+ matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid_group[1]]))
+            filt_model_true = filt_model_true*(matched_.is_track_in_MC ==1)
+            filt_model_pred_GT =filt_model_pred_GT*(matched_gt.is_track_in_MC ==1)
+            filt_model_pred = filt_model_pred*(matched_.is_track_in_MC ==1)
+            filt_pandora_pred = filt_pandora_pred*(matched_pandora.is_track_in_MC ==1)
+        if pid_indx==2:
+            filt_model_pred = filt_model_pred*(~np.isnan(matched_.pred_showers_E))*((matched_.pred_pid_matched == pid_groups[1][0])+(matched_.pred_pid_matched == pid_groups[1][1]))
+            filt_pandora_pred = filt_pandora_pred*(~np.isnan(matched_pandora.pred_showers_E))*(matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid_groups[1][0]])+ matched_pandora.pandora_pid.isin(our_to_pandora_mapping[pid_groups[1][1]]))
+            filt_model_true = filt_model_true*(matched_.is_track_in_MC ==0)
+            filt_model_pred_GT =filt_model_pred_GT*(matched_gt.is_track_in_MC ==0)
+            filt_model_pred = filt_model_pred*(matched_.is_track_in_MC ==0)
+            filt_pandora_pred = filt_pandora_pred*(matched_pandora.is_track_in_MC ==0)
+ 
+
+        
+
+        # filt_pandora_true = matched_pandora.pid_4_class_true == pid
+        # if energy_bins is not None:
+        #     filt_pandora_pred = filt_pandora_pred & (matched_pandora.pandora_calibrated_pfo > energy_bins[0]) & (matched_pandora.pandora_calibrated_pfo < energy_bins[1])
+        #     filt_model_pred = filt_model_pred & (matched_.calibrated_E > energy_bins[0]) & (matched_.calibrated_E < energy_bins[1])
+        #     filt_model_true = filt_model_true & (matched_.true_showers_E > energy_bins[0]) & (matched_.true_showers_E < energy_bins[1])
+        #     filt_pandora_true = filt_pandora_true & (matched_pandora.true_showers_E > energy_bins[0]) & (matched_pandora.true_showers_E < energy_bins[1])
+            
+        _, _, distr_mass_p, _, _, _, _, _= calculate_event_mass_resolution(matched_pandora[filt_pandora_pred],
                                                                         True,
                                                                         perfect_pid=perfect_pid,
                                                                         mass_zero=mass_zero,
                                                                         ML_pid=ML_pid)
+        
         if filt_model_pred.sum() > 0:
-            _, _, distr_mass, _, _, _, _ = calculate_event_mass_resolution(matched_[filt_model_pred],
+            _, _, distr_mass, _, _, _, _, _ = calculate_event_mass_resolution(matched_[filt_model_pred],
                                                                            False,
                                                                             perfect_pid=perfect_pid,
                                                                             mass_zero=mass_zero,
                                                                             ML_pid=ML_pid)
         else:
             distr_mass = torch.tensor([])
+        
+        # the best that we can compare to for charged is perfect clustering (perfect track to cluster link) and perfect PID
+        _, _, distr_mass_GT, _, _, _, _, _ = calculate_event_mass_resolution(matched_gt[filt_model_pred_GT],
+                                                                                False,
+                                                                                    perfect_pid=True,
+                                                                                    mass_zero=False,
+                                                                                ML_pid=False)
+
+
+        
         dimsize = int(matched_.number_batch.max() + 1)
         assert dimsize == matched_pandora.number_batch.max() + 1
         E_model = torch.nan_to_num(torch.tensor(matched_.calibrated_E.values))
@@ -373,7 +415,9 @@ def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=Fa
         pid_pandora_over_pred_result = event_energy_pred_pandora_PID / event_energy_pred_pandora
         pid_model_over_true_result = event_energy_pred_PID / event_energy_true
         pid_pandora_over_true_result = event_energy_pred_pandora_PID / event_energy_true
+        pid = pid_indx
         mass_over_true[pid] = distr_mass
+        mass_over_true_gt[pid] = distr_mass_GT
         mass_over_true_pandora[pid] = distr_mass_p
         pid_model_over_pred[pid] = pid_model_over_pred_result
         pid_pandora_over_pred[pid] = pid_pandora_over_pred_result
@@ -382,7 +426,7 @@ def get_mass_contribution_per_category(matched_pandora, matched_, perfect_pid=Fa
         pid_true_over_true[pid] = event_energy_PID_true / event_energy_true
         E_over_true_pandora[pid] = event_energy_pred_pandora_PID / event_energy_PID_true
         E_over_true[pid] = event_energy_pred_PID / event_energy_PID_true
-    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_true, pid_pandora_over_true, pid_true_over_true
+    return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_true, pid_pandora_over_true, pid_true_over_true, mass_over_true_gt
 
 def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=True):
     # PID_categories: whether to report in terms of categories e, CH, NH, gamma
@@ -401,12 +445,12 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
         filt_model = matched_.pid==pid
         if filt_pandora.sum() == 0:
             continue
-        mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result = calculate_event_mass_resolution(matched_pandora[filt_pandora],
+        mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora_result,_ = calculate_event_mass_resolution(matched_pandora[filt_pandora],
                                                                                                                         True,
                                                                                                                         perfect_pid=perfect_pid,
                                                                                                                         mass_zero=mass_zero,
                                                                                                                         ML_pid=ML_pid)
-        mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true_result = calculate_event_mass_resolution(matched_[filt_model], False,
+        mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true_result, _ = calculate_event_mass_resolution(matched_[filt_model], False,
                                                                                                         perfect_pid=perfect_pid,
                                                                                                         mass_zero=mass_zero,
                                                                                                         ML_pid=ML_pid)
@@ -461,8 +505,18 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
         _,
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
-    mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
-    mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid)
+    
+    mean_mass_p, var_mass_p, distr_mass_p, mass_true_p, _, _, E_over_true_pandora, E_over_true_reco_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid, fake=True)
+    
+    mean_mass, var_mass, distr_mass, mass_true, _, _, E_over_true, E_over_true_reco = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid, fake=True)
+    mean_mass_perfect_PID, var_mass_perfect_PID, distr_mass_perfect_PID, mass_true_perfect_PID, _, _, E_over_true_perfect_PID, E_over_true_reco_perfect_PID = calculate_event_mass_resolution(matched_, False, perfect_pid=True, mass_zero=False, ML_pid=False,  fake=True)
+    # matched_.calibrated_E = matched_.pred_showers_E
+    df_copy = matched_.copy(deep=True)
+    df_copy.true_showers_E = matched_.reco_showers_E
+    # matched_pandora.pandora_calibrated_pfo = matched_pandora.pred_showers_E
+    # matched_.pred_pos_matched = matched_.true_pos
+    _, _, distr_mass_perfect_E, mass_true_perfect_PID, _, _, E_over_true_perfect_PID, E_over_true_reco_perfect_PID = calculate_event_mass_resolution(df_copy, False, perfect_pid=False, mass_zero=False, ML_pid=True, fake=True)
+    _, _, distr_mass_perfect_E_pandora, mass_true_perfect_PID, _, _, E_over_true_perfect_PID, E_over_true_reco_perfect_PID = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=False, mass_zero=False, ML_pid=True, fake=True)
     (
         mean_energy_over_true,
         var_energy_over_true,
@@ -487,6 +541,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["distributions_pandora"] = distr_p
     dic["distributions_model"] = distr
     dic["mass_over_true_model"] = distr_mass
+    dic["mass_over_true_model_perfect_E_pandora"] = distr_mass_perfect_E_pandora
+    dic["mass_over_true_model_perfect_E"] = distr_mass_perfect_E
     dic["mass_over_true_pandora"] = distr_mass_p
     dic["mass_model"] = distr_mass * mass_true
     dic["mass_pandora"] = distr_mass_p * mass_true_p
@@ -500,6 +556,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     dic["mean_energy_over_true_pandora"] = mean_energy_over_true_pandora
     dic["var_energy_over_true"] = var_energy_over_true
     dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
+    dic["energy_over_true_reco"] = E_over_true_reco
+    dic["energy_over_true_reco_pandora"] = E_over_true_reco_pandora
     return dic
 
 colors = {"ML": "red", "ML GTC": "green"}
@@ -508,7 +566,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     old_font_size = matplotlib.rcParams['font.size']
     matplotlib.rcParams.update({'font.size': 22})
     pandora_dic = event_res_dic["ML"]
-    fig, ax = plt.subplots(1, 2, figsize=(16, 8))
+    fig, ax = plt.subplots(1, 3, figsize=(24*2, 8))
     # set fontsize to 20
     ax[0].set_xlabel(r"$M_{pred}/M_{true}$")
     bins = np.linspace(0, 2, 100)
@@ -548,6 +606,24 @@ def plot_mass_resolution(event_res_dic, PATH_store):
                 density=True,
                 linewidth=1.5
         )
+        # ax[0].hist(
+        #         event_res_dic[key]["mass_over_true_model_perfect_E"],
+        #         bins=bins,
+        #         histtype="step",
+        #         label="ML perfect E",
+        #         color="green",
+        #         density=True,
+        #         linewidth=1.5
+        # )
+        # ax[0].hist(
+        #         event_res_dic[key]["mass_over_true_model_perfect_E_pandora"],
+        #         bins=bins,
+        #         histtype="step",
+        #         label="pandora perfect E",
+        #         color="black",
+        #         density=True,
+        #         linewidth=1.5
+        # )
         #ax.set_xlim([0, 10])
         mean_e_over_true, sigma_e_over_true = round(event_res_dic[key]["mean_energy_over_true"], 4), round(
             event_res_dic[key]["var_energy_over_true"], 4)
@@ -560,12 +636,24 @@ def plot_mass_resolution(event_res_dic, PATH_store):
                 #    label=str(key) + r" $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true, sigma_e_over_true),
                 color=colors[key],
                 density=True)
-
+        ax[2].hist(event_res_dic[key]["energy_over_true_reco"], bins=bins, histtype="step",
+            label="ML",
+            color=colors[key],
+            density=True)
+    ax[2].hist(pandora_dic["energy_over_true_reco_pandora"], bins=bins, histtype="step",
+                label="Pandora",
+                color="blue",
+                density=True)
+    
+    print("energy_over_true_reco_pandora", pandora_dic["energy_over_true_reco_pandora"])
     ax[0].grid(1)
     ax[0].legend(loc='upper left')
     ax[1].grid(1)
     ax[1].set_xlabel(r"$E_{vis,pred} / E_{vis,true}$")
+    ax[2].grid(1)
+    ax[2].set_xlabel(r"$E_{vis,pred} / E_{vis,reco}$")
     ax[1].legend(loc='upper left')
+    ax[2].legend(loc='upper left')
     fig.tight_layout()
     print("Saving mass resolution")
     import os
