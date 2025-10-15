@@ -15,6 +15,7 @@ def calculate_eff(sd, log_scale=False, pandora=False):
         bins = [0, 5, 10, 35, 50]
     eff = []
     energy_eff = []
+    errors = []
     for i in range(len(bins) - 1):
         bin_i = bins[i]
         bin_i1 = bins[i + 1]
@@ -35,7 +36,12 @@ def calculate_eff(sd, log_scale=False, pandora=False):
                 (total_showers - number_of_non_reconstructed_showers) / total_showers
             )
             energy_eff.append((bin_i1 + bin_i) / 2)
-    return eff, energy_eff
+            n_total = total_showers
+            n_r = total_showers-number_of_non_reconstructed_showers
+            error = (n_r/(n_total**2)*np.sqrt(n_total))**2+(1/n_total*np.sqrt(n_r))**2
+            error = np.sqrt(error)
+            errors.append(error)
+    return eff, energy_eff, errors
 
 
 def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
@@ -48,6 +54,7 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
     fake_percent_energy = []
     fake_percent_reco_energy = []
     id_our = pandora_to_our_mapping[id]
+    fake_errors = []
     for i in range(len(bins_fakes) - 1):
         bin_i = bins_fakes[i]
         bin_i1 = bins_fakes[i + 1]
@@ -84,10 +91,16 @@ def calculate_fakes(sd, matched, log_scale=False, pandora=False, id=None):
         if total_showers > 0:
             # print(fakes, np.mean(sd.pred_energy_hits_raw[mask]))
             fake_rate.append(fakes / total_showers)
+            n_r = fakes
+            n_total = total_showers
+            error = (n_r/(n_total**2)*np.sqrt(n_total))**2+(1/n_total*np.sqrt(n_r))**2
+            error = np.sqrt(error)
+            print(fakes, n_total, pandora, error)
+            fake_errors.append(error)
             energy_fakes.append((bin_i1 + bin_i) / 2)
             fake_percent_energy.append(energy_in_fakes / total_E_meas)
             fake_percent_reco_energy.append(reco_in_fakes / total_E_reco)
-    return fake_rate, energy_fakes, fake_percent_energy, fake_percent_reco_energy
+    return fake_rate, energy_fakes, fake_percent_energy, fake_percent_reco_energy, fake_errors 
 
 
 def calculate_response(matched, pandora, log_scale=False):
