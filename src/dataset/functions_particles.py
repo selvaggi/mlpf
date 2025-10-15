@@ -16,42 +16,34 @@ class Particles_GT:
     mass: Optional[Any] = None
     pid: Optional[Any] = None
     vertex: Optional[Any] = None
-    unique_list_particles: Optional[Any] = None
-    decayed_in_calo: Optional[Any] = None
-    decayed_in_tracker: Optional[Any] = None
+    gen_status: Optional[Any] = None
+    # unique_list_particles: Optional[Any] = None
+    # decayed_in_calo: Optional[Any] = None
+    # decayed_in_tracker: Optional[Any] = None
     batch_number: Optional[Any] = None
 
-    def fill(self,unique_list_particles, output, prediction):
-        unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
+    def fill(self, output, prediction):
         
-        number_particle_features = 18
-        features_particles = torch.permute(
-            torch.tensor(
-                output["pf_features"][
-                    2:number_particle_features, list(unique_list_particles)
-                ]
-            ),
-            (1, 0),
-        )  #
-        particle_coord_angle = features_particles[:,0:2]
-        particle_coord = features_particles[:, 10:13]
-        vertex_coord = features_particles[:, 13:16]
+        features_particles = torch.tensor(output["X_gen"])
+        particle_coord_angle = features_particles[:,4:6]
+        particle_coord = features_particles[:, 12:15]
+        vertex_coord = features_particles[:, 15:18]
 
-        y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
-        y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
-        y_energy = torch.sqrt(y_mass**2 + y_mom**2)
-        y_pid = features_particles[:, 4].view(-1).unsqueeze(1)
+        y_mass = features_particles[:, 10].view(-1).unsqueeze(1)
+        y_mom = features_particles[:, 11].view(-1).unsqueeze(1)
+        y_energy = features_particles[:, 8].view(-1).unsqueeze(1)
+        y_pid = features_particles[:,0]
+        gen_status = features_particles[:,1]
   
         self.angle= particle_coord_angle
         self.coord = particle_coord
+        self.E_corrected = y_energy
         self.E = y_energy
         self.m = y_mom
         self.mass = y_mass
         self.pid = y_pid
-        self.decayed_in_calo = features_particles[:, 5].view(-1).unsqueeze(1)
-        self.decayed_in_tracker = features_particles[:, 6].view(-1).unsqueeze(1)
-        self.unique_list_particles=unique_list_particles
         self.vertex=vertex_coord
+        self.gen_status = gen_status
         
 
     def __len__(self):
@@ -72,6 +64,7 @@ class Particles_GT:
         return obj
 
     def calculate_corrected_E(self, g, connections_list):
+        self.E_corrected = self.E.clone()
         for element in connections_list:
             # checked there is track
             parent_particle = element[0]
@@ -116,6 +109,8 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_mass = torch.cat(list_mass, dim=0)
     list_pid = [p[1].pid for p in list_of_Particles_GT]
     list_pid = torch.cat(list_pid, dim=0)
+    list_genstatus = [p[1].gen_status for p in list_of_Particles_GT]
+    list_genstatus = torch.cat(list_genstatus, dim=0)
     if list_vertex[0] is not None:
         list_vertex = torch.cat(list_vertex, dim=0)
     if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
@@ -138,6 +133,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     particle_batch.decayed_in_calo = list_dec_calo
     particle_batch.decayed_in_tracker = list_dec_track
     particle_batch.batch_number = batch_number
+    particle_batch.gen_status = list_genstatus
     return particle_batch
 
 def add_batch_number(list_graphs):

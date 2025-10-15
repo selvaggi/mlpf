@@ -12,8 +12,8 @@ from src.dataset.dataclasses import Hits
 def create_inputs_from_table(
     output, prediction=False
 ):
-    number_hits = np.int32(np.sum(output["pf_mask"][0]))
-    number_part = np.int32(np.sum(output["pf_mask"][1]))
+    number_hits = np.int32(len(output["X_track"])+len(output["X_hit"]))
+    number_part = np.int32(len(output["X_gen"]))
 
     hits = Hits.from_data(
     output,
@@ -21,40 +21,26 @@ def create_inputs_from_table(
     prediction,
     number_part
     )
-    if torch.sum(torch.Tensor(hits.unique_list_particles)>20000)>0:
-        return [None]
-    else:
-        y_data_graph = Particles_GT()
-        y_data_graph.fill(hits.unique_list_particles, output, prediction)
 
-        result = [
-            y_data_graph,  
-            hits
-        ]
-        return result
+    y_data_graph = Particles_GT()
+    y_data_graph.fill( output, prediction)
+
+    result = [
+        y_data_graph,  
+        hits
+    ]
+    return result
  
-def remove_hittype0(graph):
-    filt = graph.ndata["hit_type"] == 0
-    return dgl.remove_nodes(graph, torch.where(filt)[0])
 
-def store_track_at_vertex_at_track_at_calo(graph):
-    # To make it compatible with clustering, remove the 0 hit type nodes and store them as pos_pxpypz_at_vertex
-    tracks_at_calo = graph.ndata["hit_type"] == 1
-    tracks_at_vertex = graph.ndata["hit_type"] == 0
-    # assert (part[tracks_at_calo] == part[tracks_at_vertex]).all()
-    graph.ndata["pos_pxpypz_at_vertex"] = torch.zeros_like(graph.ndata["pos_pxpypz"])
-    graph.ndata["pos_pxpypz_at_vertex"][tracks_at_calo] = graph.ndata["pos_pxpypz"][tracks_at_vertex]
-    return remove_hittype0(graph)
+
 
 def create_graph(
     output,
-    config=None,
-    n_noise=0,
+    for_training =True 
 ):
+    prediction = not for_training
     graph_empty = False
-    prediction = config.graph_config.get("prediction", False)
-    
-    
+   
     result = create_inputs_from_table(
         output,
         prediction=prediction
@@ -66,42 +52,40 @@ def create_graph(
         return [0, 0], graph_empty
     else:
         (y_data_graph,hits) = result
-        create_noise_label(hits, y_data_graph)
+
         g = dgl.graph(([], []))
         g.add_nodes(hits.pos_xyz_hits.shape[0])
         g.ndata["h"] = torch.cat(
                 (hits.pos_xyz_hits, hits.hit_type_one_hot, hits.e_hits, hits.p_hits), dim=1
-            )  
-        g.ndata["p_hits"] = hits.p_hits 
-        g.ndata["pos_hits_xyz"] = hits.pos_xyz_hits
-        g.ndata["pos_pxpypz"] = hits.pos_pxpypz
+            ).float()  
+        g.ndata["p_hits"] = hits.p_hits.float() 
+        g.ndata["pos_hits_xyz"] = hits.pos_xyz_hits.float()
+        g.ndata["pos_pxpypz_at_vertex"] = hits.pos_pxpypz.float()
+        g.ndata["pos_pxpypz"] = hits.pos_pxpypz  #TrackState::AtIP
         g = calculate_distance_to_boundary(g)
-        g.ndata["hit_type"] = hits.hit_type_feature
-        g.ndata["e_hits"] = hits.e_hits  
+        g.ndata["hit_type"] = hits.hit_type_feature.float()
+        g.ndata["e_hits"] = hits.e_hits.float()  
 
-        g.ndata["chi_squared_tracks"] = hits.chi_squared_tracks
-        g.ndata["particle_number"] = hits.cluster_id
-        g.ndata["hit_link_modified"] = hits.hit_link_modified
-        g.ndata["particle_number_nomap"] = hits.hit_particle_link
+        g.ndata["chi_squared_tracks"] = hits.chi_squared_tracks.float()
+        g.ndata["particle_number"] = hits.hit_particle_link.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
+        # g.ndata["particle_number_calomother"] = hits.hit_particle_link_calomother.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
         if prediction:
-            g.ndata["pandora_cluster"] = hits.pandora_features.pandora_cluster
-            g.ndata["pandora_pfo"] = hits.pandora_features.pandora_pfo_link
-            g.ndata["pandora_cluster_energy"] = hits.pandora_features.pandora_cluster_energy
-            g.ndata["pandora_pfo_energy"] = hits.pandora_features.pfo_energy
+            # g.ndata["pandora_cluster"] = hits.pandora_features.pandora_cluster
+            g.ndata["pandora_pfo"] = hits.pandora_features.pandora_pfo_link.float()
+            # g.ndata["pandora_cluster_energy"] = hits.pandora_features.pandora_cluster_energy
+            g.ndata["pandora_pfo_energy"] = hits.pandora_features.pfo_energy.float()
       
-            g.ndata["pandora_momentum"] = hits.pandora_features.pandora_mom
-            g.ndata["pandora_reference_point"] = hits.pandora_features.pandora_ref_point
-            g.ndata["daughters"] = hits.daughters
-            g.ndata["pandora_pid"] = hits.pandora_features.pandora_pid
-        y_data_graph.calculate_corrected_E(g, hits.connection_list)
+            g.ndata["pandora_momentum"] = hits.pandora_features.pandora_mom_components.float()
+            g.ndata["pandora_reference_point"] = hits.pandora_features.pandora_ref_point.float()
+            # g.ndata["daughters"] = hits.daughters
+            g.ndata["pandora_pid"] = hits.pandora_features.pandora_pid.float()
+        # y_data_graph.calculate_corrected_E(g, hits.connection_list)
         graph_empty = False
         if torch.unique(hits.hit_particle_link).shape[0]==1 and torch.unique(hits.hit_particle_link)[0]==-1:
             graph_empty = True 
         if hits.pos_xyz_hits.shape[0] < 10:
             graph_empty = True
-        
-
-    g = store_track_at_vertex_at_track_at_calo(g)
+    
 
     g = make_bad_tracks_noise_tracks(g, y_data_graph)
 

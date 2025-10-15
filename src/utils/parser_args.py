@@ -182,6 +182,12 @@ parser.add_argument(
     default=None,
     help="initialize model with pre-trained weights",
 )
+parser.add_argument(
+    "--load-model-weights-clustering",
+    type=str,
+    default=None,
+    help="initialize model with pre-trained weights for clustering part of the model",
+)
 parser.add_argument("--num-epochs", type=int, default=20, help="number of epochs")
 parser.add_argument(
     "--steps-per-epoch",

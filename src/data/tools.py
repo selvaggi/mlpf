@@ -3,6 +3,21 @@ import math
 
 import awkward as ak
 
+def build_dummy_array(num, dtype=np.int64):
+    return ak.Array(
+        ak.contents.ListOffsetArray(
+            ak.index.Index64(np.zeros(num + 1, dtype=np.int64)),
+            ak.from_numpy(np.array([], dtype=dtype), highlevel=False),
+        )
+    )
+
+def _concat_records(table):
+    table1 =  {k : ak.from_iter([record[k][event] for record in table for event in range(len(record[k])) ]) for k in table[0].fields}
+    for k in table1.keys():
+            if len(ak.flatten(table1[k])) == 0:
+                table1[k] = build_dummy_array(len(table1[k]), np.float32)
+    table1 = ak.Record(table1)
+    return table1
 
 def _concat(arrays, axis=0):
     if len(arrays) == 0:

@@ -8,95 +8,28 @@ import time
 
 from functools import partial
 from concurrent.futures.thread import ThreadPoolExecutor
-from src.logger.logger import _logger, warn_once
-from src.data.tools import _pad, _repeat_pad, _clip, _pad_vector
+from src.data.tools import _pad
 from src.data.fileio import _read_files
-from src.data.config import DataConfig, _md5
 from src.data.preprocess import (
-    _apply_selection,
-    _build_new_variables,
-    _build_weights,
     AutoStandardizer,
     WeightMaker,
 )
 from src.dataset.functions_graph import create_graph
 
-def _finalize_inputs(table, data_config):
-    # transformation
-    output = {}
-    # transformation
-    for k, params in data_config.preprocess_params.items():
-        if data_config._auto_standardization and params["center"] == "auto":
-            raise ValueError("No valid standardization params for %s" % k)
-        # if params["center"] is not None:
-        #     table[k] = (table[k] - params["center"]) * params["scale"]
-        if params["length"] is not None:
-            # if k == "hit_genlink":
-            #    pad_fn = partial(_pad_vector, value=-1)
-            #    table[k] = pad_fn(table[k])
-            # else:
-            pad_fn = partial(_pad, value=0)
-            table[k] = pad_fn(table[k], params["length"])
-
-    # stack variables for each input group
-    for k, names in data_config.input_dicts.items():
-        if (
-            len(names) == 1
-            and data_config.preprocess_params[names[0]]["length"] is None
-        ):
-            output["_" + k] = ak.to_numpy(ak.values_astype(table[names[0]], "float32"))
-        else:
-            output["_" + k] = ak.to_numpy(
-                np.stack(
-                    [ak.to_numpy(table[n]).astype("float32") for n in names], axis=1
-                )
-            )
-    # copy monitor variables
-    for k in data_config.z_variables:
-        if k not in output:
-            output[k] = ak.to_numpy(table[k])
-    return output
-
-
-def _padlabel(table, _data_config):
-    for k in _data_config.label_value:
-        pad_fn = partial(_pad, value=0)
-        table[k] = pad_fn(table[k], 400)
-
-    return table
-
-
-def _preprocess(table, data_config, options):
-    # apply selection
-    table = _apply_selection(
-        table,
-        data_config.selection
-        if options["training"]
-        else data_config.test_time_selection,
-    )
-    if len(table) == 0:
-        return []
-    # table = _padlabel(table,data_config)
-    # define new variables
-    table = _build_new_variables(table, data_config.var_funcs)
-
-    # else:
+def _preprocess(table, options):
     indices = np.arange(
-        len(table["hit_x"])
-    )  # np.arange(len(table[data_config.label_names[0]]))
-    # shuffle
+        len(table["X_track"])
+    )  
     if options["shuffle"]:
         np.random.shuffle(indices)
-    # perform input variable standardization, clipping, padding and stacking
-    table = _finalize_inputs(table, data_config)
     return table, indices
 
 
-def _load_next(data_config, filelist, load_range, options):
+def _load_next(filelist, load_range, options):
     table = _read_files(
-        filelist, data_config.load_branches, load_range, treename=data_config.treename
+        filelist, load_range,
     )
-    table, indices = _preprocess(table, data_config, options)
+    table, indices = _preprocess(table, options)
     return table, indices
 
 
@@ -143,7 +76,6 @@ class _SimpleIter(object):
         self.worker_file_dict = file_dict
         self.worker_filelist = sum(file_dict.values(), [])
         self.worker_info = worker_info
-
         self.restart()
 
     def restart(self):
@@ -168,33 +100,11 @@ class _SimpleIter(object):
             else:
                 self.load_range = (start_pos, start_pos + interval)
 
-        _logger.debug(
-            "Init iter [%d], will load %d (out of %d*%s=%d) files with load_range=%s:\n%s",
-            0 if self.worker_info is None else self.worker_info.id,
-            len(self.filelist),
-            len(sum(self._init_file_dict.values(), [])),
-            self._file_fraction,
-            int(len(sum(self._init_file_dict.values(), [])) * self._file_fraction),
-            str(self.load_range),
-        )
-        # '\n'.join(self.filelist[: 3]) + '\n ... ' + self.filelist[-1],)
-
-        _logger.info(
-            "Restarted DataIter %s, load_range=%s, file_list:\n%s"
-            % (
-                self._name,
-                str(self.load_range),
-                json.dumps(self.worker_file_dict, indent=2),
-            )
-        )
-
-        # reset file fetching cursor
         self.ipos = 0 if self._fetch_by_files else self.load_range[0]
         # prefetch the first entry asynchronously
         self._try_get_next(init=True)
 
     def __next__(self):
-        # print(self.ipos, self.cursor)
         graph_empty = True
         self.iter_count += 1
         if self.dataset_cap is not None and self.iter_count > self.dataset_cap:
@@ -233,10 +143,7 @@ class _SimpleIter(object):
                 self.cursor = 0
                 i = self.indices[self.cursor]
             self.cursor += 1
-            # t0 = time.time()
             data, graph_empty = self.get_data(i)
-            # t1 = time.time()
-            # wandb.log({"time_to_get_data": t1 - t0})
         return data
 
     def _try_get_next(self, init=False):
@@ -269,40 +176,31 @@ class _SimpleIter(object):
                 self.ipos,
                 min(self.ipos + self._fetch_step, self.load_range[1]),
             )
-        # _logger.info('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
+        print('Start fetching next batch, len(filelist)=%d, load_range=%s'%(len(filelist), load_range))
         if self._async_load:
             self.prefetch = self.executor.submit(
                 _load_next,
-                self._data_config,
                 filelist,
                 load_range,
                 self._sampler_options,
             )
         else:
             self.prefetch = _load_next(
-                self._data_config, filelist, load_range, self._sampler_options
+                filelist, load_range, self._sampler_options
             )
         self.ipos += self._fetch_step
 
     def get_data(self, i):
         # inputs
-        X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
-        if not self.synthetic:
-            # t0 = time.time()
-            [g, features_partnn], graph_empty = create_graph(
-                X, self._data_config, n_noise=self.n_noise
-            )
-            # t1 = time.time()
-            # wandb.log({"time_to_create_graph": t1 - t0})
-        else:
-            npart_min, npart_max = self.synthetic_npart_min, self.synthetic_npart_max
-            [g, features_partnn], graph_empty = create_graph_synthetic(
-                self._data_config,
-                n_noise=self.n_noise,
-                npart_min=npart_min,
-                npart_max=npart_max,
-            )
+        # X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
+        X = {k: self.table[k][i] for k in self.table.fields}
+
+        [g, features_partnn], graph_empty = create_graph(
+            X, self.for_training
+        )
+
         return [g, features_partnn], graph_empty
+        # return X, False
 
 
 class SimpleIterDataset(torch.utils.data.IterableDataset):
@@ -349,10 +247,6 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         edges=False,
         diffs=False,
         dataset_cap=None,
-        n_noise=0,
-        synthetic=False,
-        synthetic_npart_min=2,
-        synthetic_npart_max=5,
     ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
@@ -365,14 +259,8 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self._infinity_mode = infinity_mode
         self._in_memory = in_memory
         self._name = name
-        self.laplace = laplace
-        self.edges = edges
-        self.diffs = diffs
-        self.synthetic = synthetic
-        self.synthetic_npart_min = synthetic_npart_min
-        self.synthetic_npart_max = synthetic_npart_max
         self.dataset_cap = dataset_cap  # used to cap the dataset to some fixed number of events - used for debugging purposes
-        self.n_noise = n_noise
+        self.for_training = for_training
         # ==== sampling parameters ====
         self._sampler_options = {
             "up_sample": up_sample,
@@ -384,63 +272,8 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
             self._sampler_options.update(training=True, shuffle=True, reweight=True)
         else:
             self._sampler_options.update(training=False, shuffle=False, reweight=False)
-
-        # discover auto-generated reweight file
-        if ".auto.yaml" in data_config_file:
-            data_config_autogen_file = data_config_file
-        else:
-            data_config_md5 = _md5(data_config_file)
-            data_config_autogen_file = data_config_file.replace(
-                ".yaml", ".%s.auto.yaml" % data_config_md5
-            )
-            if os.path.exists(data_config_autogen_file):
-                data_config_file = data_config_autogen_file
-                _logger.info(
-                    "Found file %s w/ auto-generated preprocessing information, will use that instead!"
-                    % data_config_file
-                )
-
-        # load data config (w/ observers now -- so they will be included in the auto-generated yaml)
-        self._data_config = DataConfig.load(data_config_file)
-
-        if for_training:
-            # produce variable standardization info if needed
-            if self._data_config._missing_standardization_info:
-                s = AutoStandardizer(file_dict, self._data_config)
-                self._data_config = s.produce(data_config_autogen_file)
-
-            # produce reweight info if needed
-            # if self._sampler_options['reweight'] and self._data_config.weight_name and not self._data_config.use_precomputed_weights:
-            #    if remake_weights or self._data_config.reweight_hists is None:
-            #        w = WeightMaker(file_dict, self._data_config)
-            #        self._data_config = w.produce(data_config_autogen_file)
-
-            # reload data_config w/o observers for training
-            if (
-                os.path.exists(data_config_autogen_file)
-                and data_config_file != data_config_autogen_file
-            ):
-                data_config_file = data_config_autogen_file
-                _logger.info(
-                    "Found file %s w/ auto-generated preprocessing information, will use that instead!"
-                    % data_config_file
-                )
-            self._data_config = DataConfig.load(
-                data_config_file, load_observers=False, extra_selection=extra_selection
-            )
-        else:
-            self._data_config = DataConfig.load(
-                data_config_file,
-                load_reweight_info=False,
-                extra_test_selection=extra_selection,
-            )
-
-        # derive all variables added to self.__dict__
         self._init_args = set(self.__dict__.keys()) - _init_args
 
-    @property
-    def config(self):
-        return self._data_config
 
     def __iter__(self):
         if self._iters is None:
