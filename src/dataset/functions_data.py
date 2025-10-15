@@ -3,6 +3,36 @@ import torch
 import dgl
 from torch_scatter import scatter_add
 from src.dataset.utils_hits import CachedIndexList, get_number_of_daughters, get_ratios, get_number_hits, modify_index_link_for_gamma_e, get_e_reco
+import math 
+
+def cdist_wrap_angles(x1, x2=None, p=2, angle_indices=[0,1]):
+    """
+    Compute pairwise distances with wrap-around for multiple angular coordinates.
+    
+    Parameters
+    ----------
+    x1 : torch.Tensor, shape (N, D)
+    x2 : torch.Tensor, shape (M, D) or None (defaults to x1)
+    p  : float, norm degree (default 2)
+    angle_indices : list or tuple of int
+        Indices of dimensions that are angles to be wrapped in [-pi, pi].
+        If None, no wrapping is done.
+    """
+    if x2 is None:
+        x2 = x1
+
+    diff = x1[:, None, :] - x2[None, :, :]
+
+    if angle_indices is not None:
+        for idx in angle_indices:
+            diff[..., idx] = (diff[..., idx] + math.pi) % (2 * math.pi) - math.pi
+
+    if p == 2:
+        dist = torch.sqrt((diff ** 2).sum(dim=-1))
+    else:
+        dist = (diff.abs() ** p).sum(dim=-1) ** (1 / p)
+
+    return dist
 
 def calculate_delta_MC(y):
     y1 = y
@@ -10,7 +40,7 @@ def calculate_delta_MC(y):
     pseudorapidity = -torch.log(torch.tan(y_i.angle[:,0] / 2))
     phi = y_i.angle[:,1]
     x1 = torch.cat((pseudorapidity.view(-1, 1), phi.view(-1, 1)), dim=1)
-    distance_matrix = torch.cdist(x1, x1, p=2)
+    distance_matrix = cdist_wrap_angles(x1, x1, p=2)
     shape_d = distance_matrix.shape[0]
     values, _ = torch.sort(distance_matrix, dim=1)
     if shape_d>1:
@@ -169,7 +199,7 @@ def calculate_distance_to_boundary(g):
     mask_barrer = ~mask_endcap
     weight = torch.ones_like(g.ndata["pos_hits_xyz"][:, 0])
     C = g.ndata["pos_hits_xyz"]
-    A = torch.Tensor([0, 0, 1]).to(C.device)
+    A = torch.tensor([0, 0, 1], dtype=C.dtype, device=C.device)
     P = (
         r
         * 1

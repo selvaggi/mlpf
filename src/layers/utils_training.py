@@ -9,7 +9,7 @@ from src.layers.inference_oc import (
 from src.layers.inference_oc import hfdb_obtain_labels, clustering_obtain_labels
 from src.layers.inference_oc import match_showers
 import torch_cmspepr
-
+from src.layers.inference_oc import remove_bad_tracks_from_cluster
 class FreezeClustering(BaseFinetuning):
     def __init__(
         self,
@@ -89,12 +89,13 @@ def obtain_clustering_for_matched_showers(
         X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
         if clustering_mode == "clustering_normal":
-            labels = clustering_obtain_labels( X,torch.sigmoid(betas.view(-1)), betas.device,  tbeta=0.3, td=0.4)
+            labels = clustering_obtain_labels( X,torch.sigmoid(betas.view(-1)), betas.device,  tbeta=0.2, td=0.05)
         elif clustering_mode == "dbscan":
             if use_gt_clusters:
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
                 labels = hfdb_obtain_labels(X, model_output.device)
+                labels = remove_bad_tracks_from_cluster(dic["graph"], labels)
                 # labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
                 #if labels.min() == 0 and labels.sum() == 0:
                 #    labels += 1  # Quick hack

@@ -1,13 +1,11 @@
 from os import path
 import sys
 
-# sys.path.append(
-#     path.abspath("/afs/cern.ch/work/m/mgarciam/private/geometric-algebra-transformer/")
-# )
 # sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 from time import time
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
+
 from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
@@ -127,7 +125,7 @@ class ExampleWrapper(L.LightningModule):
         #    param.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
-        inputs = g.ndata["pos_hits_xyz"]
+        inputs = g.ndata["pos_hits_xyz"].float()
         if self.trainer.is_global_zero and step_count % 500 == 0:
             g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
             PlotCoordinates(
@@ -139,7 +137,7 @@ class ExampleWrapper(L.LightningModule):
                 epoch=str(self.current_epoch) + eval,
                 step_count=step_count,
             )
-        inputs_scalar = g.ndata["hit_type"].view(-1, 1)
+        inputs_scalar = g.ndata["hit_type"].float().view(-1, 1)
         inputs = self.ScaledGooeyBatchNorm2_1(inputs)
         # inputs = inputs.unsqueeze(0)
         embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
@@ -148,7 +146,7 @@ class ExampleWrapper(L.LightningModule):
         )  # (batch_size*num_points, 1, 16)
         mask = self.build_attention_mask(g)
         scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = torch.cat((g.ndata["e_hits"], g.ndata["p_hits"]), dim=1)  
+        scalars = torch.cat((g.ndata["e_hits"].float(), g.ndata["p_hits"].float()), dim=1)  
         # Pass data through GATr
         forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(
@@ -181,6 +179,7 @@ class ExampleWrapper(L.LightningModule):
                 step_count=step_count,
             )
         x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
+        
         pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
         if self.args.correction:
             result = self.energy_correction.forward_correction(g, x, y, return_train)
@@ -274,6 +273,8 @@ class ExampleWrapper(L.LightningModule):
         if self.args.correction:
             result = self(batch_g, y, 1)
             model_output = result[0]
+            # filename = f"/afs/cern.ch/work/m/mgarciam/private/mlpf/notebooks/onnx_debug/output_onnx_gatr_{batch_idx}.npy"
+            # np.save(filename, model_output.cpu().numpy())
             outputs = self.energy_correction.get_validation_step_outputs(batch_g, y, result)
             loss_ll = 0
             e_cor1, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features, fakes_labels = outputs
@@ -460,7 +461,7 @@ class ExampleWrapper(L.LightningModule):
         #     T_max=int(7900*3), # for now for testing
         #     eta_min=1e-6,
         # )
-        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(20000), fixed_lr=1e-5 ) #10000
+        scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(36400*2), fixed_lr=1e-5 ) #10000
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

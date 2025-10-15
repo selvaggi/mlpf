@@ -4,8 +4,9 @@
     At first the model is fixed and the weights are loaded from earlier training
 """
 import wandb
+
 from xformers.ops.fmha import BlockDiagonalMask
-from gatr.interface import (
+from gatr.interface  import (
     embed_point,
     extract_point,
     extract_translation,
@@ -28,14 +29,13 @@ import numpy as np
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 import pickle
 from copy import deepcopy
-import shap
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from src.models.thrust_axis import Thrust, hits_xyz_to_momenta, LR, weighted_least_squares_line
 from src.utils.pid_conversion import pid_conversion_dict
-from torch_geometric.nn.models import GAT, GraphSAGE
+# from torch_geometric.nn.models import GAT, GraphSAGE
 from torch_scatter import scatter_mean, scatter_sum
 from gatr import GATr
 import dgl
@@ -126,7 +126,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self.use_gatr = gatr
         self.separate_pid_gatr = args.separate_PID_GATr
         self.n_layers_pid_head = args.n_layers_PID_head
-        print("pos_regression", self.pos_regression)
+    
         # if pos_regression:
         #     out_f += 3
         self.ignore_global_features_for_p = ignore_global_features_for_p
@@ -336,6 +336,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         if self.pos_regression:
             if self.charged:
                 p_tracks, pos, ref_pt_pred = self.PickPAtDCA.predict(x_global_features, graphs_new)
+                
                 E = torch.norm(pos, dim=1)
                 if self.unit_p:
                     pos = (pos / torch.norm(pos, dim=1).unsqueeze(1)).clone()
@@ -671,8 +672,8 @@ class EnergyCorrection():
             print("Also running classification for charged particles", self.pids_charged)
         if len(pids_neutral):
             print("Also running classification for neutral particles", self.pids_neutral)
-        pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon
-        pids_neutral = [0, 1, 2, 3]  # electron, CH, NH, gamma, muon (not implemented yet)
+        pids_charged = [0, 1, 2, 3]  # electron, CH, NH, gamma
+        pids_neutral = [0, 1, 2, 3]  # electron, CH, NH, gamma
         if self.args.restrict_PID_charge:
             print("Restricting PID classification to match charge")
             pids_charged = [0, 1]

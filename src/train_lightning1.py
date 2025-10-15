@@ -14,7 +14,7 @@ from src.utils.train_utils import (
     test_load,
 )
 import wandb
-
+import glob 
 from src.utils.train_utils import get_samples_steps_per_epoch, model_setup, set_gpus
 from src.utils.load_pretrained_models import load_train_model, load_test_model
 from src.utils.callbacks import get_callbacks, get_callbacks_eval
@@ -24,16 +24,19 @@ from lightning.pytorch.profilers import AdvancedProfiler
 def main():
     # parse arguments 
     args = parser.parse_args()
-    args = get_samples_steps_per_epoch(args)
-    args.local_rank = 0
+   
+   
     training_mode = not args.predict
-
+    args.local_rank = 0
     # get dataloader 
     if training_mode:
+        args.data_train = glob.glob(args.data_train[0]+ "*.parquet")
+        args = get_samples_steps_per_epoch(args)
         train_loader, val_loader, data_config, train_input_names = train_load(args)
     else:
+        args = get_samples_steps_per_epoch(args)
         test_loaders, data_config = test_load(args)
-    args.is_muons = data_config.graph_config.get("muons", False)
+    args.is_muons = True
     # Set up model
     model = model_setup(args, data_config)
     gpus, dev = set_gpus(args)
@@ -61,8 +64,8 @@ def main():
             logger=wandb_logger,
             max_epochs=args.num_epochs,
             strategy="ddp",
-            limit_train_batches=12300, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
-            limit_val_batches=50,
+            limit_train_batches=36400, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
+            limit_val_batches=5,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
@@ -81,7 +84,7 @@ def main():
         trainer = L.Trainer(
             callbacks=get_callbacks_eval(args),
             accelerator="gpu",
-            devices=[3],
+            devices=[0],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )

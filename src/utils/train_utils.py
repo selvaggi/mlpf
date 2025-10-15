@@ -218,10 +218,6 @@ def train_load(args):
         edges=args.class_edges,
         name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.train_cap,
-        n_noise=args.n_noise,
-        synthetic=synthetic,
-        synthetic_npart_min=minp,
-        synthetic_npart_max=maxp,
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -239,10 +235,6 @@ def train_load(args):
         edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.val_cap,
-        n_noise=args.n_noise,
-        synthetic=synthetic,
-        synthetic_npart_min=minp,
-        synthetic_npart_max=maxp,
     )
 
     collator_func = graph_batch_func
@@ -277,8 +269,8 @@ def train_load(args):
         prefetch_factor=prefetch_factor
     )
 
-    data_config = train_data.config
-    train_input_names = train_data.config.input_names
+    data_config = 0 #train_data.config
+    train_input_names = 0 #train_data.config.input_names
     train_label_names = 0  # train_data.config.label_names
 
     return train_loader, val_loader, data_config, train_input_names
@@ -350,7 +342,8 @@ def test_load(args):
     test_loaders = {
         name: functools.partial(get_test_loader, name) for name in file_dict
     }
-    data_config = SimpleIterDataset({}, args.data_config, for_training=False).config
+    #data_config = SimpleIterDataset({}, args.data_config, for_training=False).config
+    data_config = 0
     return test_loaders, data_config
 
 

@@ -3,7 +3,7 @@
 graph_config:
    only_hits: false
    k: 40
-   prediction: false
+   prediction: true
    noise: true
 custom_model_kwargs:
    # add custom model kwargs here
