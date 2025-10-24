@@ -287,32 +287,31 @@ def calc_LV_Lbeta(
 
         
         
-        weights = calculate_weights_for_class_hit_type_batch(g, torch.zeros_like(batch), is_sig)
-        total_sum_weights = torch.sum(weights)
-        V_attractive = (weights*q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+        # weights = calculate_weights_for_class_hit_type_batch(g, torch.zeros_like(batch), is_sig)
+        # total_sum_weights = torch.sum(weights)
+        # V_attractive = (weights*q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
 
-        V_attractive_per_object = V_attractive.sum(dim=0) #k objects 
-        V_attractive_per_event = scatter_add(V_attractive_per_object, batch_object)
-        weight_per_object = scatter_add(weights, object_index)# weight per object 
-        weight_per_event = scatter_add(weight_per_object, batch_object)
-        V_attractive = torch.mean(V_attractive_per_event/weight_per_event) #this is the attractive loss per event 
-        L_V_attractive = V_attractive
+        # V_attractive_per_object = V_attractive.sum(dim=0) #k objects 
+        # V_attractive_per_event = scatter_add(V_attractive_per_object, batch_object)
+        # weight_per_object = scatter_add(weights, object_index)# weight per object 
+        # weight_per_event = scatter_add(weight_per_object, batch_object)
+        # V_attractive = torch.mean(V_attractive_per_event/weight_per_event) #this is the attractive loss per event 
+        # L_V_attractive = V_attractive
 
-        # V_attractive = (q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
-        # assert V_attractive.size() == (n_hits_sig, n_objects)
-        # V_attractive = V_attractive.sum(dim=0)  # K objects
-        # V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
-        # V_attractive = V_attractive.view(-1) / (total_sum_weights.view(-1) + 1e-3)
+        V_attractive = (q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+        assert V_attractive.size() == (n_hits_sig, n_objects)
+        V_attractive = V_attractive.sum(dim=0)  # K objects
+        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
 
         #the other weight to give to the shower should be how close it is to another MC particle
 
         # V_attractive = V_attractive.view(-1) / (total_sum_hits_types.view(-1) + 1e-3)
         # L_V_attractive = torch.mean(V_attractive)
         ## multiply by a weight that depends on the energy of the shower:
-        # e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
-        # weight_att = torch.exp(e_hits/6)   # form the calculations of the energy distribution 
-        # L_V_attractive = torch.sum(V_attractive*weight_att)
-        # L_V_attractive = L_V_attractive / torch.sum(weight_att)
+        e_hits = scatter_add(g.ndata["e_hits"][is_sig].view(-1), object_index)
+        weight_att = torch.exp(e_hits/15)   # form the calculations of the energy distribution 
+        L_V_attractive = torch.sum(V_attractive*weight_att)
+        L_V_attractive = L_V_attractive / torch.sum(weight_att)
         
         # L_V_attractive = torch.mean(V_attractive)
         L_V_attractive_2 = torch.sum(V_attractive)
