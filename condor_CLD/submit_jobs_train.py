@@ -96,7 +96,7 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
-        if (job>  50000):
+        if (job>  0):
             seed = str(job + 1)
             basename = "pf_tree_" + seed + ".parquet"
             outputFile = outdir + "/" + basename
