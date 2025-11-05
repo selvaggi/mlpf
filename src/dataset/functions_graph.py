@@ -162,13 +162,17 @@ def make_bad_tracks_noise_tracks(g, y ):
     # mean_pos_cluster = scatter_mean(g.ndata["pos_hits_xyz"][mask_all], g.ndata["particle_number"][mask_all].long().view(-1), dim=0)
     mean_pos_cluster_all = []
     mean_pos_cluster_ecal = []
+    E_cluster = []
+    p_tracks = []
     pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
+    p_tracks = g.ndata["p_hits"][mask_hit_type_t2]
     particle_track = g.ndata["particle_number"][mask_hit_type_t2]
     if len(particle_track)>0:
         for index, i in enumerate(particle_track):
             if i ==0:
                 mean_pos_cluster_all.append(torch.zeros((1,3)).view(-1,3))
                 mean_pos_cluster_ecal.append(torch.zeros((1,3)).view(-1,3))
+                E_cluster.append(torch.zeros((1)).view(-1))
             else:
                 mask_labels_i = g.ndata["particle_number"] ==i
                 mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
@@ -185,8 +189,13 @@ def make_bad_tracks_noise_tracks(g, y ):
                 else:
                     mean_cl = torch.sum(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1][index_sort][distance_from_track]*g.ndata["e_hits"][mask_labels_i*mask_hit_type_t1][index_sort][distance_from_track], dim=0)/torch.sum(g.ndata["e_hits"][mask_labels_i*mask_hit_type_t1][index_sort][distance_from_track])
                     mean_pos_cluster_ecal.append(mean_cl.view(-1,3))
+                E_cluster.append(torch.sum(g.ndata["e_hits"][mask_labels_i]).view(-1))
+           
         mean_pos_cluster_all = torch.cat(mean_pos_cluster_all, dim=0)
         mean_pos_cluster_ecal = torch.cat(mean_pos_cluster_ecal, dim=0)
+        E_cluster =  torch.cat(E_cluster, dim=0)
+        diffs = torch.abs(E_cluster-p_tracks.view(-1))/p_tracks.view(-1)
+   
         angles = torch.sum(mean_pos_cluster_ecal*pos_track,dim=1)/(torch.norm(mean_pos_cluster_ecal, dim=1)*torch.norm(pos_track, dim=1))
         angles[torch.isnan(angles)]=0
         
@@ -196,12 +205,13 @@ def make_bad_tracks_noise_tracks(g, y ):
         #     particle_track = particle_track-1
         # if mean_pos_cluster.shape[0]> torch.max(particle_track):
         #     distance_track_cluster = torch.norm(mean_pos_cluster[particle_track.long()]-pos_track,dim=1)/1000
+
         distance_track_cluster = torch.norm(mean_pos_cluster_all-pos_track,dim=1)/1000
         pid = y.pid[particle_track.long()-1]
         pid[particle_track.long()==0]=0
         pid = torch.abs(pid)
         bad_tracks = ((distance_track_cluster>0.24)+(angles<0.9998))*(pid.view(-1)!=13)
-        bad_tracks = bad_tracks+((distance_track_cluster>0.5)+(angles<0.99))*(pid.view(-1)==13)
+        bad_tracks = bad_tracks+((distance_track_cluster>0.5)+(angles<0.99))*(pid.view(-1)==13)+(diffs>0.75)
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         
         g.ndata["particle_number"][index_bad_tracks]= 0 
