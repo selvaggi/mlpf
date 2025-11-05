@@ -36,7 +36,6 @@ class Hits:
     @classmethod
     def from_data(cls, output, number_hits, prediction, number_part):
         hit_particle_link_hits = torch.tensor(output["ygen_hit"])
-        hit_particle_link_hits_calomother = torch.tensor(output["ygen_hit_calomother"])
         hit_particle_link_tracks= torch.tensor(output["ygen_track"])
         hit_particle_link = torch.cat((hit_particle_link_hits, hit_particle_link_tracks), dim=0)
         # hit_particle_link_calomother = torch.cat((hit_particle_link_hits_calomother, hit_particle_link_tracks), dim=0)
