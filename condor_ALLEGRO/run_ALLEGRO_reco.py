@@ -850,7 +850,7 @@ def setupSWClusters(inputCells,
                                                  # do_photon_shapeVar=runPhotonIDTool,
                                                  do_photon_shapeVar=True,  # we want these variables to train the photon ID BDT
                                                  do_widthTheta_logE_weights=logEWeightInPhotonID,
-                                                 OutputLevel=DEBUG
+                                                 OutputLevel=INFO
                                                  )
         TopAlg += [augmentClusterAlg]
         # since the non-decorated version of the clusters will be dropped, we update the list of clusters for which we store the truth links
@@ -1224,7 +1224,7 @@ createTruthLinks = CreateTruthLinks("CreateTruthLinks",
                                     clusters=outputSaveClusters,
                                     cell_mcparticle_links="CaloHitMCParticleLinks",
                                     cluster_mcparticle_links="ClusterMCParticleLinks",
-                                    OutputLevel=DEBUG)
+                                    OutputLevel=INFO)
 TopAlg += [createTruthLinks]
 
 ################################################
