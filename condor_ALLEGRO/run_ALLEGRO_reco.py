@@ -6,7 +6,7 @@
 #
 
 # Logger
-from Gaudi.Configuration import INFO, DEBUG, VERBOSE
+from Gaudi.Configuration import INFO, DEBUG, VERBOSE, ERROR
 # units and physical constants
 from GaudiKernel.PhysicalConstants import pi
 
@@ -26,18 +26,41 @@ dataFolder = "data/"                       # directory containing the calibratio
 
 # - general settings set via CLI
 from k4FWCore.parseArgs import parser
-parser.add_argument("--pandora", action="store_true", help="Run pandora PFA", default=False)
-parser.add_argument("--includeHCal", action="store_true", help="Also digitise HCal hits and create ECAL+HCAL clusters", default=False)
-parser.add_argument("--includeMuon", action="store_true", help="Also digitise muon hits", default=False)
-parser.add_argument("--saveHits", action="store_true", help="Save G4 hits", default=False)
-parser.add_argument("--saveCells", action="store_true", help="Save cell collection", default=False)
-parser.add_argument("--addNoise", action="store_true", help="Add noise to cells (ECAL barrel only)", default=False)
-parser.add_argument("--addCrosstalk", action="store_true", help="Add cross-talk to cells (ECAL barrel only)", default=False)
-parser.add_argument("--addTracks", action="store_true", help="Add reco-level tracks (smeared truth tracks)", default=False)
-parser.add_argument("--calibrateClusters", action="store_true", help="Apply MVA calibration to clusters", default=False)
-parser.add_argument("--runPhotonID", action="store_true", help="Apply photon ID tool to clusters", default=False)
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+#parser.add_argument("--pandora", action="store_true", help="Run pandora PFA", default=False)
+#parser.add_argument("--includeHCal", action="store_true", help="Also digitise HCal hits and create ECAL+HCAL clusters", default=False)
+#parser.add_argument("--includeMuon", action="store_true", help="Also digitise muon hits", default=False)
+#parser.add_argument("--saveHits", action="store_true", help="Save G4 hits", default=False)
+#parser.add_argument("--saveCells", action="store_true", help="Save cell collection", default=False)
+#parser.add_argument("--addNoise", action="store_true", help="Add noise to cells (ECAL barrel only)", default=False)
+#parser.add_argument("--addCrosstalk", action="store_true", help="Add cross-talk to cells (ECAL barrel only)", default=False)
+#parser.add_argument("--addTracks", action="store_true", help="Add reco-level tracks (smeared truth tracks)", default=False)
+#parser.add_argument("--calibrateClusters", action="store_true", help="Apply MVA calibration to clusters", default=False)
+#parser.add_argument("--runPhotonID", action="store_true", help="Apply photon ID tool to clusters", default=False)
 parser.add_argument("--pfaOutputFile", help="Output file name", default="")
-parser.add_argument("--trkdigi", action="store_true", help="Digitise tracker hits", default=False)
+#parser.add_argument("--trkdigi", action="store_true", help="Digitise tracker hits", default=False)
+parser.add_argument("--pandora", type=str2bool, nargs="?", help="Run pandora PFA", const=True, default=False)
+parser.add_argument("--includeHCal", type=str2bool, nargs="?", help="Also digitise HCal hits and create ECAL+HCAL clusters", const=True, default=False)
+parser.add_argument("--includeMuon", type=str2bool, nargs="?", help="Also digitise muon hits", const=True, default=False)
+parser.add_argument("--saveHits", type=str2bool, nargs="?", help="Save G4 hits", const=True, default=False)
+parser.add_argument("--saveCells", type=str2bool, nargs="?", help="Save cell collection", const=True, default=False)
+parser.add_argument("--addNoise", type=str2bool, nargs="?", help="Add noise to cells (ECAL barrel only)", const=True, default=False)
+parser.add_argument("--addCrosstalk", type=str2bool, nargs="?", help="Add cross-talk to cells (ECAL barrel only)", const=True, default=False)
+parser.add_argument("--addTracks", type=str2bool, nargs="?", help="Add reco-level tracks (smeared truth tracks)", const=True, default=False)
+parser.add_argument("--doSWClustering", type=str2bool, nargs="?", help="Enable or disable sliding window clustering", const=True, default=True)
+parser.add_argument("--doTopoClustering", type=str2bool, nargs="?", help="Enable or disable topo clustering", const=True, default=True)
+parser.add_argument("--calibrateClusters", type=str2bool, nargs="?", help="Apply MVA calibration to clusters", const=True, default=False)
+parser.add_argument("--runPhotonID", type=str2bool, nargs="?", help="Apply photon ID tool to clusters", const=True, default=False)
+parser.add_argument("--trkdigi", type=str2bool, nargs="?", help="Digitise tracker hits", const=True, default=False)
 
 opts = parser.parse_known_args()[0]
 runPandora = opts.pandora                 # if true, add tracks, include HCal and Muon, and run pandora PFA instead of basic clustering algorithm
@@ -108,6 +131,7 @@ resegmentECalBarrel = False
 doSWClustering = False
 doTopoClustering = False
 doCreateClusterCellCollection = True  # create new collection with clustered cells or just link from cluster to original input cell collections (this applies to both SW and Topo cluster cell collections)
+outputSaveClusters = []  # list of clusters for which we want to create the truth links
 
 # cluster energy corrections
 # simple parametrisations of up/downstream losses for ECAL-only clusters
@@ -243,9 +267,21 @@ if addTracks:
                                                                 IDs["DCH"],
                                                                 IDs["SiWr_Barrel"],
                                                                 IDs["SiWr_Disks"]],
-                                                    OutputLevel=DEBUG)
+                                                    OutputLevel=ERROR)
     TopAlg += [tracksFromGenParticles]
 
+    # Calculate dNdx from tracks
+    from Configurables import TrackdNdxDelphesBased
+    dNdxFromTracks = TrackdNdxDelphesBased("dNdxFromTracks",
+                                           InputLinkCollection=tracksFromGenParticles.OutputMCRecoTrackParticleAssociation,
+                                           OutputCollection=["DCHdNdxCollection"],
+                                           ZmaxParameterName="DCH_gas_Lhalf",
+                                           ZminParameterName="DCH_gas_Lhalf",
+                                           RminParameterName="DCH_gas_inner_cyl_R",
+                                           RmaxParameterName="DCH_gas_outer_cyl_R",
+                                           FillFactor=1.0,
+                                           OutputLevel=INFO)
+    TopAlg += [dNdxFromTracks]
 
 # Tracker digitisation
 if digitiseTrackerHits:
@@ -688,21 +724,6 @@ else:
     muonEndcapLinks = ""
 
 
-# Create CaloHit<->MCParticle links (needed for training datasets for MLPF)
-from Configurables import CreateHitTruthLinks
-caloLinks = [ecalBarrelLinks, ecalEndcapLinks]
-if runHCal:
-    caloLinks += [hcalBarrelLinks, hcalEndcapLinks]
-if runMuon:
-    # FIXME: there are muon sim hits without corresponding calo hits... check why...
-    caloLinks += [muonBarrelLinks, muonEndcapLinks]
-createHitParticleLinks = CreateHitTruthLinks("CreateHitParticleLinks",
-                                             cell_hit_links=caloLinks,
-                                             mcparticles="MCParticles",
-                                             cell_mcparticle_links="CaloHitMCParticleLinks",
-                                             OutputLevel=INFO)
-TopAlg += [createHitParticleLinks]
-
 
 # Function that sets up the sequence for producing SW clusters given an input cell collection
 def setupSWClusters(inputCells,
@@ -791,6 +812,7 @@ def setupSWClusters(inputCells,
     clusterAlg.clusters.Path = outputClusters
     clusterAlg.clusterCells.Path = outputClusters.replace("Clusters", "Cluster") + "Cells"
     TopAlg += [clusterAlg]
+    outputSaveClusters.append(outputClusters)
 
     if applyUpDownstreamCorrections:
         # note that this only works for ecal barrel given various hardcoded quantities
@@ -831,6 +853,9 @@ def setupSWClusters(inputCells,
                                                  OutputLevel=DEBUG
                                                  )
         TopAlg += [augmentClusterAlg]
+        # since the non-decorated version of the clusters will be dropped, we update the list of clusters for which we store the truth links
+        outputSaveClusters.append("Augmented" + clusterAlg.clusters.Path)
+        outputSaveClusters.remove(clusterAlg.clusters.Path)
 
     if applyMVAClusterEnergyCalibration:
         # note that this only works for ecal barrel given various hardcoded quantities
@@ -932,6 +957,7 @@ def setupTopoClusters(inputCells,
                                       createClusterCellCollection=doCreateClusterCellCollection,
                                       OutputLevel=INFO)
     TopAlg += [clusterAlg]
+    outputSaveClusters.append(outputClusters)
 
     if applyUpDownstreamCorrections:
         # note that this only works for ecal barrel given various hardcoded quantities
@@ -970,6 +996,9 @@ def setupTopoClusters(inputCells,
                                                  do_widthTheta_logE_weights=logEWeightInPhotonID,
                                                  OutputLevel=INFO)
         TopAlg += [augmentClusterAlg]
+        # since the non-decorated version of the clusters will be dropped, we update the list of clusters for which we store the truth links
+        outputSaveClusters.append("Augmented" + clusterAlg.clusters.Path)
+        outputSaveClusters.remove(clusterAlg.clusters.Path)
 
         # tool to identify resolved pi0->two photon cluster candidates
         # see: https://indico.cern.ch/event/1483299/contributions/6488594/attachments/3056315/5403634/ALLEGRO_photon_pi0_20250424.pdf
@@ -1180,6 +1209,23 @@ if doTopoClustering:
                           False,
                           False)
 
+
+# Create CaloHit<->MCParticle links (needed for training datasets for MLPF)
+# Also store Cluster<->MCParticle links (for truth matching for efficiency and purity studies)
+from Configurables import CreateTruthLinks
+caloLinks = [ecalBarrelLinks, ecalEndcapLinks]
+if runHCal:
+    caloLinks += [hcalBarrelLinks, hcalEndcapLinks]
+if runMuon:
+    caloLinks += [muonBarrelLinks, muonEndcapLinks]
+createTruthLinks = CreateTruthLinks("CreateTruthLinks",
+                                    cell_hit_links=caloLinks,
+                                    mcparticles="MCParticles",
+                                    clusters=outputSaveClusters,
+                                    cell_mcparticle_links="CaloHitMCParticleLinks",
+                                    cluster_mcparticle_links="ClusterMCParticleLinks",
+                                    OutputLevel=DEBUG)
+TopAlg += [createTruthLinks]
 
 ################################################
 #  Pandora
