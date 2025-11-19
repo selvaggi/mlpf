@@ -2,11 +2,7 @@
 
 graph_config:
    only_hits: false
-   k: 40
    prediction: true
-   hit_chis_track: true
-   pos_pxpy: true
-   ks: true
    muons: true
 custom_model_kwargs:
    # add custom model kwargs here
@@ -82,8 +78,7 @@ inputs:
       ###              clip_min(optional, default=-5),
       ###              clip_max(optional, default=5),
       ###              pad_value(optional, default=0)]
-         # - [hit_theta, null]
-         # - [hit_phi, null]
+
          - [hit_p, null]
          - [hit_e, null]
          - [part_theta , null]
@@ -124,7 +119,6 @@ inputs:
       - [hit_genlink1, null] # pandora_cluster if val data otherwise 0
       - [hit_genlink2, null] # pandora_index_pfo if val data otherwise 0
       - [hit_genlink3, null] # hit link to daugther
-      - [hit_genlink4, null] #2
 
 
    pf_mask:
@@ -148,9 +142,5 @@ labels:
       # target_mass: np.where(fj_isQCD, fj_genjet_sdmass, fj_gen_mass)
 
 observers:
-   #- recojet_e
-   #- recojet_theta
-   #- recojet_phi
-   #- recojet_m
-   #- n_pfcand
+
 

@@ -1,120 +1,53 @@
 import numpy as np
 import torch
-import dgl
-from torch_scatter import scatter_add, scatter_sum
 from sklearn.preprocessing import StandardScaler
-from torch_scatter import scatter_sum
+from dataclasses import dataclass
+from typing import Any, List, Optional
 
 
+@dataclass
+class Particles_GT():
+    
+    angle: Optional[Any] = None
+    coord: Optional[Any] = None
+    E: Optional[Any] = None
+    E_corrected: Optional[Any] = None
+    m: Optional[Any] = None
+    mass: Optional[Any] = None
+    pid: Optional[Any] = None
+    vertex: Optional[Any] = None
+    gen_status: Optional[Any] = None
+    # unique_list_particles: Optional[Any] = None
+    # decayed_in_calo: Optional[Any] = None
+    # decayed_in_tracker: Optional[Any] = None
+    batch_number: Optional[Any] = None
+    endpoint: Optional[Any] = None
 
-def get_particle_features(unique_list_particles, output, prediction, connection_list):
-    unique_list_particles = torch.Tensor(unique_list_particles).to(torch.int64)
-    if prediction:
-        number_particle_features = 12 - 2
-    else:
-        number_particle_features = 9 - 2
-    if output["pf_features"].shape[0] == 18:
-        number_particle_features += 8  # add vertex information
-    features_particles = torch.permute(
-        torch.tensor(
-            output["pf_features"][
-                2:number_particle_features, list(unique_list_particles)
-            ]
-        ),
-        (1, 0),
-    )  #
-    # particle_coord are just features 10, 11, 12
-    if features_particles.shape[1] == 16: # Using config with part_pxyz and part_vertex_xyz
-        #print("Using config with part_pxyz and part_vertex_xyz")
-        particle_coord_angle = features_particles[:,0:2]
-        particle_coord = features_particles[:, 10:13]
-        vertex_coord = features_particles[:, 13:16]
-        # normalize particle coords
-        particle_coord = particle_coord# / np.linalg.norm(particle_coord, axis=1).reshape(-1, 1)  # DO NOT NORMALIZE
-        #particle_coord, spherical_to_cartesian(
-        #    features_particles[:, 1],
-        #    features_particles[:, 0],  # theta and phi are mixed!!!
-        #    features_particles[:, 2],
-        #    normalized=True,
-        #)
-    else:
-        particle_coord_angle  = features_particles[:,0:2]
-        particle_coord = spherical_to_cartesian(
-            features_particles[:, 1],
-            features_particles[:, 0],  # theta and phi are mixed!!!
-            features_particles[:, 2],
-            normalized=True,
-        )
-        vertex_coord = torch.zeros_like(particle_coord)
-    y_mass = features_particles[:, 3].view(-1).unsqueeze(1)
-    y_mom = features_particles[:, 2].view(-1).unsqueeze(1)
-    y_energy = torch.sqrt(y_mass**2 + y_mom**2)
-    y_pid = features_particles[:, 4].view(-1).unsqueeze(1)
-    if prediction:
-        y_data_graph = Particles_GT(
-            particle_coord_angle, 
-            particle_coord,
-            y_energy,
-            y_mom,
-            y_mass,
-            y_pid,
-            features_particles[:, 5].view(-1).unsqueeze(1),
-            features_particles[:, 6].view(-1).unsqueeze(1),
-            unique_list_particles=unique_list_particles,
-            vertex=vertex_coord,
-        )
-    else:
-        y_data_graph = Particles_GT(
-            particle_coord_angle,
-            particle_coord,
-            y_energy,
-            y_mom,
-            y_mass,
-            y_pid,
-            unique_list_particles=unique_list_particles,
-            vertex=vertex_coord,
-        )
-    return y_data_graph
+    def fill(self, output, prediction, args):
+        
+        features_particles = torch.tensor(output["X_gen"])
+        particle_coord_angle = features_particles[:,4:6]
+        particle_coord = features_particles[:, 12:15]
+        vertex_coord = features_particles[:, 15:18]
 
-
-
-class Particles_GT:
-    def __init__(
-        self,
-        particle_coord_angle, 
-        coordinates,
-        energy,
-        momentum,
-        mass,
-        pid,
-        decayed_in_calo=None,
-        decayed_in_tracker=None,
-        batch_number=None,
-        unique_list_particles=None,
-        energy_corrected=None,
-        vertex=None,
-    ):
-        self.angle = particle_coord_angle
-        self.coord = coordinates
-        self.E = energy
-        self.E_corrected = energy
-        if energy_corrected is not None:
-            self.E_corrected = energy_corrected
-        if len(coordinates) != len(energy):
-            print("!!!!!!!!!!!!!!!!!!!")
-            raise Exception
-        self.m = momentum
-        self.mass = mass
-        self.pid = pid
-        self.vertex = vertex
-        if unique_list_particles is not None:
-            self.unique_list_particles = unique_list_particles
-        if decayed_in_calo is not None:
-            self.decayed_in_calo = decayed_in_calo
-        if decayed_in_tracker is not None:
-            self.decayed_in_tracker = decayed_in_tracker
-        if batch_number is not None:
-            self.batch_number = batch_number
+        y_mass = features_particles[:, 10].view(-1).unsqueeze(1)
+        y_mom = features_particles[:, 11].view(-1).unsqueeze(1)
+        y_energy = features_particles[:, 8].view(-1).unsqueeze(1)
+        y_pid = features_particles[:,0]
+        gen_status = features_particles[:,1]
+  
+        self.angle= particle_coord_angle
+        self.coord = particle_coord
+        self.E_corrected = y_energy
+        self.E = y_energy
+        self.m = y_mom
+        self.mass = y_mass
+        self.pid = y_pid
+        self.vertex=vertex_coord
+        self.gen_status = gen_status
+        if args.allegro:
+            self.endpoint=features_particles[:, 18:]
+        
 
     def __len__(self):
         return len(self.E)
@@ -134,6 +67,7 @@ class Particles_GT:
         return obj
 
     def calculate_corrected_E(self, g, connections_list):
+        self.E_corrected = self.E.clone()
         for element in connections_list:
             # checked there is track
             parent_particle = element[0]
@@ -158,6 +92,8 @@ class Particles_GT:
                     self.E_corrected[index_parent] - energy_daugthers
                 )
                 self.coord[index_parent] *= (1 - energy_daugthers / torch.norm(self.coord[index_parent]))
+        if not connections_list:
+            self.E_corrected = self.E.clone()
 
 
 def concatenate_Particles_GT(list_of_Particles_GT):
@@ -176,6 +112,13 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_mass = torch.cat(list_mass, dim=0)
     list_pid = [p[1].pid for p in list_of_Particles_GT]
     list_pid = torch.cat(list_pid, dim=0)
+    list_genstatus = [p[1].gen_status for p in list_of_Particles_GT]
+    list_genstatus = torch.cat(list_genstatus, dim=0)
+    if hasattr(list_of_Particles_GT[0], "endpoint"):
+        list_endpoint = [p[1].endpoint for p in list_of_Particles_GT]
+        list_endpoint= torch.cat(list_endpoint, dim=0)
+    else:
+        list_endpoint = None
     if list_vertex[0] is not None:
         list_vertex = torch.cat(list_vertex, dim=0)
     if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
@@ -187,19 +130,20 @@ def concatenate_Particles_GT(list_of_Particles_GT):
         list_dec_calo = None
         list_dec_track = None
     batch_number = add_batch_number(list_of_Particles_GT)
-    return Particles_GT(
-        list_angle, 
-        list_coord,
-        list_E,
-        list_m,
-        list_mass,
-        list_pid,
-        list_dec_calo,
-        list_dec_track,
-        batch_number,
-        energy_corrected=list_E_corr,
-        vertex=list_vertex,
-    )
+    particle_batch = Particles_GT()
+    particle_batch.angle = list_angle
+    particle_batch.coord = list_coord
+    particle_batch.E = list_E
+    particle_batch.E_corrected = list_E_corr
+    particle_batch.m = list_m
+    particle_batch.pid = list_pid
+    particle_batch.vertex=  list_vertex
+    particle_batch.decayed_in_calo = list_dec_calo
+    particle_batch.decayed_in_tracker = list_dec_track
+    particle_batch.batch_number = batch_number
+    particle_batch.gen_status = list_genstatus
+    particle_batch.endpoint = list_endpoint
+    return particle_batch
 
 def add_batch_number(list_graphs):
     list_y = []

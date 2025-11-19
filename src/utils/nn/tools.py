@@ -96,10 +96,10 @@ def log_losses_wandb(
                 "loss" + val_ + " attractive": losses[12],
                 "loss" + val_ + " repulsive": losses[13],
                 "loss" + val_ + " repulsive 2": losses[18],
-                #"loss" + val_ + " alpha coord": losses[14],
+                "loss" + val_ + " track": losses[19],
                 #"loss" + val_ + " beta zeros": losses[15],
 
-                "loss regularization gravnet" + val_: loss_ll,
+                "loss  score" + val_: loss_ll,
                 "loss energy correction": loss_ec,
             }
         )

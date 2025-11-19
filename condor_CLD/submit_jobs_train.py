@@ -53,7 +53,7 @@ def main():
             "longlunch",
             "workday",
             "tomorrow",
-            "testmatch",
+            " ",
             "nextweek",
         ],
         default="longlunch",
@@ -73,10 +73,9 @@ def main():
 
     # find list of already produced files:
     list_of_outfiles = []
-    for name in glob.glob("{}/*.root".format(outdir)):
+    for name in glob.glob("{}/*_caloinfo.parquet".format(outdir)):
         list_of_outfiles.append(name)
 
-    # script = "run_sequence_CLD_train_dr_gun.sh"
     script = "run_sequence_CLD_train.sh"
 
     jobCount = 0
@@ -89,6 +88,7 @@ output                = std/condor.$(ClusterId).$(ProcId).out
 error                 = std/condor.$(ClusterId).$(ProcId).err
 log                   = std/condor.$(ClusterId).log
 
+# not all FCC collaborators can use a CMS condor accounting group..
 # +AccountingGroup = "group_u_CMST3.all"
 +JobFlavour    = "{}"
 """.format(
@@ -97,10 +97,9 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
-        #if job>3200:
-        if job>-1:
+        if (job>  0):
             seed = str(job + 1)
-            basename = "pf_tree_" + seed + ".root"
+            basename = "pf_tree_" + seed + ".parquet"
             outputFile = outdir + "/" + basename
 
             # print outdir, basename, outputFile

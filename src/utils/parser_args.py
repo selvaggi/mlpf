@@ -182,6 +182,12 @@ parser.add_argument(
     default=None,
     help="initialize model with pre-trained weights",
 )
+parser.add_argument(
+    "--load-model-weights-clustering",
+    type=str,
+    default=None,
+    help="initialize model with pre-trained weights for clustering part of the model",
+)
 parser.add_argument("--num-epochs", type=int, default=20, help="number of epochs")
 parser.add_argument(
     "--steps-per-epoch",
@@ -671,3 +677,26 @@ parser.add_argument(
 )
 
 # --classify-pid-neutral 2112,130,22  --classify-pid-charged 11,-11,211,-211
+parser.add_argument(
+    "--name-output",
+    type=str,
+    help="name of the dataframe stored during eval",
+)
+parser.add_argument(
+    "--allegro",
+    default=False,
+    action="store_true",
+    help="using allegro",
+)
+parser.add_argument(
+    "--train-batches",
+    default=100,
+    type=int,
+    help="number of train batches",
+)
+parser.add_argument(
+    "--truth-tracking",
+    default=False,
+    action="store_true",
+    help="using truth tracking from gen",
+)

@@ -2,7 +2,7 @@ import math
 import awkward as ak
 import tqdm
 import traceback
-from src.data.tools import _concat
+from src.data.tools import _concat, _concat_records
 from src.logger.logger import _logger
 
 
@@ -54,18 +54,25 @@ def _read_awkd(filepath, branches, load_range=None):
     return ak.Array(outputs)
 
 
-def _read_parquet(filepath, branches, load_range=None):
-    outputs = ak.from_parquet(filepath, columns=branches)
+def _slice_record(record, start, stop):
+    sliced_fields = {}
+    for field in record.fields:
+        sliced_fields[field] = record[field][start:stop]
+    return ak.Record(sliced_fields)
+
+def _read_parquet(filepath, load_range=None):
+    outputs = ak.from_parquet(filepath)
+    len_outputs = len(outputs["X_track"])
     if load_range is not None:
-        start = math.trunc(load_range[0] * len(outputs))
-        stop = max(start + 1, math.trunc(load_range[1] * len(outputs)))
-        outputs = outputs[start:stop]
+        start = math.trunc(load_range[0] * len_outputs)
+        stop = max(start + 1, math.trunc(load_range[1] * len_outputs))
+        outputs = _slice_record(outputs, start, stop)
+
     return outputs
 
 
-def _read_files(filelist, branches, load_range=None, show_progressbar=False, **kwargs):
+def _read_files(filelist, load_range=None, show_progressbar=False, **kwargs):
     import os
-    branches = list(branches)
     table = []
     if show_progressbar:
         filelist = tqdm.tqdm(filelist)
@@ -74,22 +81,15 @@ def _read_files(filelist, branches, load_range=None, show_progressbar=False, **k
         if ext not in ('.h5', '.root', '.awkd', '.parquet'):
             raise RuntimeError('File %s of type `%s` is not supported!' % (filepath, ext))
         try:
-            if ext == '.h5':
-                a = _read_hdf5(filepath, branches, load_range=load_range)
-            elif ext == '.root':
-                a = _read_root(filepath, branches, load_range=load_range, treename=kwargs.get('treename', None))
-            elif ext == '.awkd':
-                a = _read_awkd(filepath, branches, load_range=load_range)
-            elif ext == '.parquet':
-                a = _read_parquet(filepath, branches, load_range=load_range)
+                a = _read_parquet(filepath, load_range=load_range)
         except Exception as e:
             a = None
             _logger.error('When reading file %s:', filepath)
             _logger.error(traceback.format_exc())
         if a is not None:
             table.append(a)
-    table = _concat(table)  # ak.Array
-    if len(table) == 0:
+    table = _concat_records(table)  # ak.Array
+    if len(table["X_track"]) == 0:
         raise RuntimeError(f'Zero entries loaded when reading files {filelist} with `load_range`={load_range}.')
     return table
 

@@ -14,33 +14,33 @@ from src.utils.train_utils import (
     train_load,
     test_load,
 )
-import wandb  # to integrate W&B - not used and not needed (use WandbLogger instead)
 
+import wandb  # to integrate W&B - not used and not needed (use WandbLogger instead)
+import glob 
 from src.utils.train_utils import get_samples_steps_per_epoch, model_setup, set_gpus
 from src.utils.load_pretrained_models import load_train_model, load_test_model
 from src.utils.callbacks import get_callbacks, get_callbacks_eval
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-# os.environ["TORCH_USE_CUDA_DSA"] = "1"
 from lightning.pytorch.profilers import AdvancedProfiler  # profiler - record info about time spent in each function call during vicen action - not used here
-
 
 
 def main():
     # parse arguments
     args = parser.parse_args()
-    # determine args.steps_per_epoch and args.steps_per_epoch_val from parameters in command line
-    args = get_samples_steps_per_epoch(args)
-    args.local_rank = 0
+    torch.autograd.set_detect_anomaly(True)
+   
     # training or inference?
     training_mode = not args.predict
-
+    args.local_rank = 0
     # get dataloader (list of files to be used for training and validation; data config)
     # the data passed to the data loader is an iterable dataset of type SimpleIterDataset, derived from torch.utils.data.IterableDataset
     if training_mode:
+        args.data_train = glob.glob(args.data_train[0]+ "*.parquet")
+        args = get_samples_steps_per_epoch(args)
         train_loader, val_loader, data_config, train_input_names = train_load(args)
     else:
+        args = get_samples_steps_per_epoch(args)
         test_loaders, data_config = test_load(args)
-    args.is_muons = data_config.graph_config.get("muons", False)  # second argument is default
+    args.is_muons = True
     # Set up model
     # loads model using the get_model() method of the python module passed via args.network_config
     model = model_setup(args, data_config)
@@ -80,9 +80,9 @@ def main():
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             max_epochs=args.num_epochs,
-            strategy="ddp",
-            limit_train_batches=2150,
-            limit_val_batches=50,
+            # strategy="ddp",
+            limit_train_batches=args.train_batches, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
+            limit_val_batches=5,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
@@ -98,7 +98,8 @@ def main():
     # Evaluation (on test dataset)
     if args.data_test:
         # initialize model with pre-trained weights
-        model = load_test_model(args, dev)
+        if args.load_model_weights:
+            model = load_test_model(args, dev)
 
         print("\n====== Model structure ======")
         print(model)
@@ -107,7 +108,7 @@ def main():
         trainer = L.Trainer(
             callbacks=get_callbacks_eval(args),
             accelerator="gpu",
-            devices=gpus,
+            devices=[3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )
