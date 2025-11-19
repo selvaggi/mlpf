@@ -10,7 +10,7 @@ from src.dataset.utils_hits import create_noise_label
 from src.dataset.dataclasses import Hits
 
 def create_inputs_from_table(
-    output, prediction=False
+    output, prediction=False, args=None
 ):
     number_hits = np.int32(len(output["X_track"])+len(output["X_hit"]))
     number_part = np.int32(len(output["X_gen"]))
@@ -18,12 +18,12 @@ def create_inputs_from_table(
     hits = Hits.from_data(
     output,
     number_hits,
-    prediction,
+    args,
     number_part
     )
 
     y_data_graph = Particles_GT()
-    y_data_graph.fill( output, prediction)
+    y_data_graph.fill( output, prediction,args)
 
     result = [
         y_data_graph,  
@@ -36,14 +36,15 @@ def create_inputs_from_table(
 
 def create_graph(
     output,
-    for_training =True 
+    for_training =True, args=None
 ):
     prediction = not for_training
     graph_empty = False
    
     result = create_inputs_from_table(
         output,
-        prediction=prediction
+        prediction=prediction, 
+        args=args
     )
 
    
@@ -69,7 +70,7 @@ def create_graph(
         g.ndata["chi_squared_tracks"] = hits.chi_squared_tracks.float()
         g.ndata["particle_number"] = hits.hit_particle_link.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
         # g.ndata["particle_number_calomother"] = hits.hit_particle_link_calomother.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
-        if prediction:
+        if prediction and (not args.allegro):
             # g.ndata["pandora_cluster"] = hits.pandora_features.pandora_cluster
             g.ndata["pandora_pfo"] = hits.pandora_features.pandora_pfo_link.float()
             # g.ndata["pandora_cluster_energy"] = hits.pandora_features.pandora_cluster_energy
@@ -86,11 +87,46 @@ def create_graph(
         if hits.pos_xyz_hits.shape[0] < 10:
             graph_empty = True
     
-
-    g = make_bad_tracks_noise_tracks(g, y_data_graph)
+    if (not args.allegro) and (not args.truth_tracking):
+        g = make_bad_tracks_noise_tracks(g, y_data_graph)
+    if args.allegro or args.truth_tracking:
+        g = remove_hits_outside_cone(g,y_data_graph, args.allegro)
+        g = remove_tracks_in_noise_collection(g)
+        
 
     return [g, y_data_graph], graph_empty
 
+def remove_hits_outside_cone(g,y, allegro=False):
+    if allegro:
+        cut = 2000
+    else:
+        cut = 3700
+    for mask_particle in range(1,len(y)):
+        allHitX = g.ndata["pos_hits_xyz"][:,0][g.ndata["particle_number"]==mask_particle]
+        allHitY = g.ndata["pos_hits_xyz"][:,1][g.ndata["particle_number"]==mask_particle]
+        allHitZ = g.ndata["pos_hits_xyz"][:,2][g.ndata["particle_number"]==mask_particle]
+        allHitTX = y.endpoint[mask_particle-1,0]
+        allHitTY = y.endpoint[mask_particle-1,1]
+        allHitTZ = y.endpoint[mask_particle-1,2]
+        allHitE = y.E[mask_particle-1]
+        allHistDist = ((allHitX-allHitTX)**2 + (allHitY-allHitTY)**2 + (allHitZ-allHitTZ)**2 )**.5
+        if np.abs(y.pid[mask_particle-1])!=13:
+            mask_hits = allHistDist>cut
+            mask_p = g.ndata["particle_number"] == mask_particle        # full-size mask for the particle
+            full_mask_hits = torch.zeros_like(mask_p, dtype=torch.bool)
+            full_mask_hits[mask_p] = mask_hits
+            index_modify = np.where(full_mask_hits)[0]
+            number_of_hits_in_particle = g.ndata["particle_number"]==mask_particle
+            if len(index_modify)<torch.sum(number_of_hits_in_particle):
+                g.ndata['particle_number'][index_modify]=0
+        
+    return g 
+def remove_tracks_in_noise_collection(g):
+    mask = (g.ndata["hit_type"]==1)* (g.ndata["particle_number"]==0)
+    g = dgl.remove_nodes(
+        g, torch.where(mask)[0]
+    )
+    return g 
 
 def connect_mask():
     def func(edges):

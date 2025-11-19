@@ -24,7 +24,7 @@ from lightning.pytorch.profilers import AdvancedProfiler
 def main():
     # parse arguments 
     args = parser.parse_args()
-   
+    torch.autograd.set_detect_anomaly(True)
    
     training_mode = not args.predict
     args.local_rank = 0
@@ -54,7 +54,7 @@ def main():
     if training_mode:
         if args.load_model_weights is not None:
             model = load_train_model(args, dev)
-        
+
         callbacks = get_callbacks(args)
         trainer = L.Trainer(
             callbacks=callbacks,
@@ -63,13 +63,13 @@ def main():
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
             max_epochs=args.num_epochs,
-            strategy="ddp",
-            limit_train_batches=36400, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
+            # strategy="ddp",
+            limit_train_batches=args.train_batches, #! It is important that all gpus have the same number of batches, adjust this number acoordingly
             limit_val_batches=5,
         )
         args.local_rank = trainer.global_rank
         train_loader, val_loader, data_config, train_input_names = train_load(args)
-        
+
         trainer.fit(
             model=model,
             train_dataloaders=train_loader,
@@ -79,12 +79,13 @@ def main():
         
     # Evaluating
     if args.data_test:
-        model = load_test_model(args, dev)
+        if args.load_model_weights:
+            model = load_test_model(args, dev)
 
         trainer = L.Trainer(
             callbacks=get_callbacks_eval(args),
             accelerator="gpu",
-            devices=[0],
+            devices=[3],
             default_root_dir=args.model_prefix,
             logger=wandb_logger,
         )

@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 
 
 @dataclass
-class Particles_GT:
+class Particles_GT():
     
     angle: Optional[Any] = None
     coord: Optional[Any] = None
@@ -21,8 +21,9 @@ class Particles_GT:
     # decayed_in_calo: Optional[Any] = None
     # decayed_in_tracker: Optional[Any] = None
     batch_number: Optional[Any] = None
+    endpoint: Optional[Any] = None
 
-    def fill(self, output, prediction):
+    def fill(self, output, prediction, args):
         
         features_particles = torch.tensor(output["X_gen"])
         particle_coord_angle = features_particles[:,4:6]
@@ -44,6 +45,8 @@ class Particles_GT:
         self.pid = y_pid
         self.vertex=vertex_coord
         self.gen_status = gen_status
+        if args.allegro:
+            self.endpoint=features_particles[:, 18:]
         
 
     def __len__(self):
@@ -111,6 +114,11 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     list_pid = torch.cat(list_pid, dim=0)
     list_genstatus = [p[1].gen_status for p in list_of_Particles_GT]
     list_genstatus = torch.cat(list_genstatus, dim=0)
+    if hasattr(list_of_Particles_GT[0], "endpoint"):
+        list_endpoint = [p[1].endpoint for p in list_of_Particles_GT]
+        list_endpoint= torch.cat(list_endpoint, dim=0)
+    else:
+        list_endpoint = None
     if list_vertex[0] is not None:
         list_vertex = torch.cat(list_vertex, dim=0)
     if hasattr(list_of_Particles_GT[0], "decayed_in_calo"):
@@ -134,6 +142,7 @@ def concatenate_Particles_GT(list_of_Particles_GT):
     particle_batch.decayed_in_tracker = list_dec_track
     particle_batch.batch_number = batch_number
     particle_batch.gen_status = list_genstatus
+    particle_batch.endpoint = list_endpoint
     return particle_batch
 
 def add_batch_number(list_graphs):

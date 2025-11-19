@@ -25,13 +25,18 @@ def remove_bad_tracks_from_cluster(g, labels_hdb):
     for i in range(0, torch.max(labels_hdb)+1):
         mask_labels_i = labels_hdb == i
         if torch.sum(mask_hit_type_t2[mask_labels_i])>0 and i>0:
+            e_cluster = torch.sum(g.ndata["e_hits"][mask_labels_i])
+            p_track = g.ndata["p_hits"][mask_labels_i*mask_hit_type_t2]
+            diffs = torch.abs(e_cluster-p_track)/p_track
+            diffs = diffs.view(-1)
+            bad_diffs = diffs>0.7
             pos_track = g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2]
             mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
             angles = torch.sum(mean_pos_cluster*g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
             norms = torch.norm(mean_pos_cluster)*torch.norm(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
             angles_tracks = angles/norms
             distance_track_cluster = torch.norm(mean_pos_cluster-pos_track,dim=1)/1000
-            bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999))
+            bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999)+bad_diffs)
             bad_tracks_ = torch.nonzero(bad_tracks).view(-1)
             cluster_t2_nodes = torch.nonzero(mask_labels_i & mask_hit_type_t2).view(-1)
             bad_tracks_nodes = cluster_t2_nodes[bad_tracks]
@@ -171,17 +176,17 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
         #  )'''
-        torch.save(
-            dic,
-            path_save
-            + "/graphs_3M/"
-            + str(local_rank)
-            + "_"
-            + str(step)
-            + "_"
-            + str(i)
-            + ".pt",
-         )
+        # torch.save(
+        #     dic,
+        #     path_save
+        #     + "/graphs_3M_Hss/"
+        #     + str(local_rank)
+        #     + "_"
+        #     + str(step)
+        #     + "_"
+        #     + str(i)
+        #     + ".pt",
+        #  )
         
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
@@ -297,7 +302,6 @@ def store_at_batch_end(
     if predict:
         path_save_ = (
             path_save
-            + "/"
             + str(local_rank)
             + "_"
             + str(step)
@@ -310,26 +314,24 @@ def store_at_batch_end(
         # log_efficiency(df_batch, clustering=True)
     path_save_ = (
         path_save
-        + "/"
         + str(local_rank)
         + "_"
         + str(step)
         + "_"
         + str(epoch)
-        + "test_200_300_gt.pt"
+        + ".pt"
     )
     if store and predict:
         df_batch1.to_pickle(path_save_)
     if predict:
         path_save_pandora = (
             path_save
-            + "/"
             + str(local_rank)
             + "_"
             + str(step)
             + "_"
             + str(epoch)
-            + "_pandora_200_300_gt.pt"
+            + "_pandora.pt"
         )
         if store and predict:
             df_batch_pandora.to_pickle(path_save_pandora)

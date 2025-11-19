@@ -493,10 +493,11 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     class_pred = np.array(sd_hgb1["pred_pid_matched"].values)
     n_classes = class_true[~np.isnan(class_true)].max() + 1
     n_classes_pred = class_pred[~np.isnan(class_pred)].max() + 1
-    n_classes = max(n_classes, n_classes_pred)
+    n_classes = int(max(n_classes, n_classes_pred))
+
     class_nan = n_classes # For 'fake' and 'missed'
     is_muons = n_classes == 5
-    print("Unique classes", set(list(class_true[~np.isnan(class_true)])), set(list(class_pred[~np.isnan(class_pred)])))
+    # print("Unique classes", set(list(class_true[~np.isnan(class_true)])), set(list(class_pred[~np.isnan(class_pred)])))
     assert ((np.isnan(class_true)) * (np.isnan(class_pred))).sum() == 0
     pid_true = sd_hgb1["pid"].values
     is_trk = sd_hgb1.is_track_in_cluster.values
@@ -506,8 +507,8 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     class_true[np.isnan(class_true)] = class_nan
     class_pred[np.isnan(class_pred)] = class_nan
     from sklearn.metrics import confusion_matrix
-    #print("1", set(list(class_true)), set(list(class_pred)))
-    cm = confusion_matrix(class_true, class_pred)#, labels=list(range(n_classes + 1)))
+
+    cm = confusion_matrix(class_true, class_pred, labels=list(range(n_classes + 1)))
     if cm.shape[0] < n_classes + 1:
         cm = np.pad(cm, ((0, n_classes + 1 - cm.shape[0]), (0, n_classes + 1 - cm.shape[1]))) # for the GT clustering
     effi_diag = np.trace(cm) / np.sum(cm)
@@ -561,7 +562,6 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
         # Now plot just the ticks on the plot without the CM
         ax.set_xticks(np.arange(cm.shape[1]) + 0.5, minor=False)
         ax.set_yticks(np.arange(cm.shape[0]) + 0.5, minor=False)
-        print("Class names pred:", class_names_pred, "cm.shape", cm.shape)
         ax.set_xticklabels(class_names_pred, minor=False)
         ax.set_yticklabels(class_names_true, minor=False)
         ax.grid(False)
@@ -575,10 +575,11 @@ def plot_confusion_matrix(sd_hgb1, save_dir, add_pie_charts=False, ax=None, ax1=
     if savefigs:
         fig.savefig(os.path.join(save_dir, "confusion_matrix_PID" + suffix + ".pdf"), bbox_inches="tight")
         plt.clf()
-    f = no_nan_filter & (is_trk == 1)
-    f1 = no_nan_filter & (is_trk == 0)
-    cm = confusion_matrix(class_true[f], class_pred[f])
-    cm1 = confusion_matrix(class_true[f1], class_pred[f1])
+    f =  (is_trk == 1)
+    f1 = (is_trk == 0)
+
+    cm = confusion_matrix(class_true[f], class_pred[f] , labels=list(range(n_classes + 1)))
+    cm1 = confusion_matrix(class_true[f1], class_pred[f1], labels=list(range(n_classes + 1)))
     ax.set_title(f"{prefix} {suffix}, $\\epsilon_{{\\mathrm{{diag}}}}$={effi_diag:.2f}")
     # plot cm
     savefigs = ax1 is None
@@ -1941,6 +1942,7 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
     photons_dic = create_eff_dic_pandora(sd_pandora, 22)
     electrons_dic = create_eff_dic_pandora(sd_pandora, 11)
     pions_dic = create_eff_dic_pandora(sd_pandora, 211)
+    
     kaons_dic = create_eff_dic_pandora(sd_pandora, 130)
     #fakes_dic_p = calculate_fakes(sd_pandora, None, False, pandora=True, id=22)
     #fakes_dic_p = {"fakes_p": fakes_dic_p[0], "energy_fakes_p": fakes_dic_p[1],
@@ -1963,13 +1965,16 @@ def plot_efficiency_all(sd_pandora, df_list, PATH_store, labels, ax=None):
         #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=22)
         #photons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #photons_dic.update(create_fakes_dic(photons_dic, sd_hgb, 22, var_i))
+        print("___________________________electrons")
         electrons_dic = create_eff_dic(electrons_dic, sd_hgb, 11, var_i=var_i)
         #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=11)
         #electrons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
         #electrons_dic.update(create_fakes_dic(electrons_dic, sd_hgb, 11, var_i))
+        print("___________________________pions")
         pions_dic = create_eff_dic(pions_dic, sd_hgb, 211, var_i=var_i)
         #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=211)
         #pions_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
+        print("___________________________kaons")
         kaons_dic = create_eff_dic(kaons_dic, sd_hgb, 130, var_i=var_i) # NH
         #fakes_dic = calculate_fakes(sd_hgb, None, False, pandora=False, id=130)
         #kaons_dic.update({"fakes_" + str(var_i): fakes_dic[0], "energy_fakes_" + str(var_i): fakes_dic[1], "fake_percent_energy_" + str(var_i): fakes_dic[2]})
@@ -2375,6 +2380,7 @@ def plot_fakes(title, photons_dic, label1, PATH_store, labels, ax=None):
     ax.set_title(label1)
     ax.grid()
     for i in range(0, len(labels)):
+        print(label1,photons_dic["fakes_" + str(i)])
         ax.plot(photons_dic["energy_fakes_" + str(i)],
             photons_dic["fakes_" + str(i)], "--", color=colors_list[i])
         ax.scatter(

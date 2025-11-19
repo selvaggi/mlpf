@@ -1,47 +1,25 @@
 from os import path
 import sys
-
 # sys.path.append(path.abspath("/mnt/proj3/dd-23-91/cern/geometric-algebra-transformer/"))
 from time import time
 from gatr import GATr, SelfAttentionConfig, MLPConfig
 from gatr.interface import embed_point, extract_scalar, extract_point, embed_scalar
-
-from torch_scatter import scatter_add, scatter_mean
 import torch
 import torch.nn as nn
 from src.logger.plotting_tools import PlotCoordinates
 import numpy as np
-from typing import Tuple, Union, List
 import dgl
 from src.logger.plotting_tools import PlotCoordinates
-from src.layers.obj_cond_inf import calc_energy_loss
 from src.layers.object_cond import object_condensation_loss2
-from src.utils.pid_conversion import pid_conversion_dict
-from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
-
-
-from src.models.energy_correction_NN import (
-    EnergyCorrection
-)
+from src.layers.utils_training import obtain_batch_numbers
+from src.models.energy_correction_NN import EnergyCorrection
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
-from src.utils.nn.tools import log_losses_wandb_tracking
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
-from src.layers.inference_oc_tracks import (
-    evaluate_efficiency_tracks,
-    store_at_batch_end,
-)
 from xformers.ops.fmha import BlockDiagonalMask
 import os
 import wandb
 from torch.optim.lr_scheduler import CosineAnnealingLR
-
-# from src.layers.obtain_statistics import (
-#     obtain_statistics_graph_tracking,
-#     create_stats_dict,
-#     save_stat_dict,
-#     plot_distributions,
-# )
 from src.utils.nn.tools import log_losses_wandb
 import torch.nn.functional as F
 
@@ -49,21 +27,6 @@ import torch.nn.functional as F
 
 
 class ExampleWrapper(L.LightningModule):
-    """Example wrapper around a GATr model.
-
-    Expects input data that consists of a point cloud: one 3D point for each item in the data.
-    Returns outputs that consists of one scalar number for the whole dataset.
-
-    Parameters
-    ----------
-    blocks : int
-        Number of transformer blocks
-    hidden_mv_channels : int
-        Number of hidden multivector channels
-    hidden_s_channels : int
-        Number of hidden scalar channels
-    """
-
     def __init__(
         self,
         args,
@@ -148,14 +111,10 @@ class ExampleWrapper(L.LightningModule):
         scalars = torch.zeros((inputs.shape[0], 1))
         scalars = torch.cat((g.ndata["e_hits"].float(), g.ndata["p_hits"].float()), dim=1)  
         # Pass data through GATr
-        forward_time_start = time()
         embedded_outputs, scalar_outputs = self.gatr(
             embedded_inputs, scalars=scalars, attention_mask=mask
         )  # (..., num_points, 1, 16)
-        forward_time_end = time()
-        # wandb.log({"time_gatr_pass": forward_time_end - forward_time_start})
         points = extract_point(embedded_outputs[:, 0, :])
-
         # Extract scalar and aggregate outputs from point cloud
         nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
         x_point = points
@@ -192,22 +151,7 @@ class ExampleWrapper(L.LightningModule):
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
             return x, pred_energy_corr, 0, 0
 
-
-
     def build_attention_mask(self, g):
-        """Construct attention mask from pytorch geometric batch.
-
-        Parameters
-        ----------
-        inputs : torch_geometric.data.Batch
-            Data batch.
-
-        Returns
-        -------
-        attention_mask : xformers.ops.fmha.BlockDiagonalMask
-            Block-diagonal attention mask: within each sample, each token can attend to each other
-            token.
-        """
         batch_numbers = obtain_batch_numbers(g)
         return BlockDiagonalMask.from_seqlens(
             torch.bincount(batch_numbers.long()).tolist()
@@ -216,14 +160,13 @@ class ExampleWrapper(L.LightningModule):
     def training_step(self, batch, batch_idx):
         y = batch[1]
         batch_g = batch[0]
-        initial_time = time()
         if self.trainer.is_global_zero:
             result = self(batch_g, y, batch_idx)
         else:
             result = self(batch_g, y, 1)
+
         model_output = result[0]
         e_cor = result[1]
-        loss_time_start = time()
         (loss, losses,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -240,32 +183,24 @@ class ExampleWrapper(L.LightningModule):
             use_average_cc_pos=self.args.use_average_cc_pos,
             loss_type=self.args.losstype,
         )
-        loss_time_end = time()
-        misc_time_start = time()
         if self.args.correction:
-            loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid = self.energy_correction.get_loss(batch_g, y, result)
-            loss = loss + loss_EC + loss_pos + loss_neutral_pid + loss_charged_pid
+            self.energy_correction.global_step = self.global_step
+            loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score= self.energy_correction.get_loss(batch_g, y, result)
+            loss = loss_EC  + loss_neutral_pid + loss_charged_pid + loss_score
+        else:
+            loss_score = 0
         if self.trainer.is_global_zero:
-            log_losses_wandb(True, batch_idx, 0, losses, loss, 0)
+            log_losses_wandb(True, batch_idx, 0, losses, loss, loss_score)
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
+        # print(loss_EC,loss_neutral_pid, loss_charged_pid)
         del model_output
         del e_cor
         del losses
-        # final_time = time()
-        # wandb.log({"misc_time_inside_training": final_time - misc_time_start})
-        # wandb.log({"training_step_time": final_time - initial_time, "loss_time_inside_training": loss_time_end - loss_time_start})
         return loss
-
+    
     def validation_step(self, batch, batch_idx):
-        cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
-        show_df_eval_path = os.path.join(
-            self.args.model_prefix, "showers_df_evaluation"
-        )
-        if not os.path.exists(show_df_eval_path):
-            os.makedirs(show_df_eval_path)
-        if not os.path.exists(cluster_features_path):
-            os.makedirs(cluster_features_path)
+        self.create_paths()
         self.validation_step_outputs = []
         y = batch[1]
         batch_g = batch[0]
@@ -277,6 +212,7 @@ class ExampleWrapper(L.LightningModule):
             # np.save(filename, model_output.cpu().numpy())
             outputs = self.energy_correction.get_validation_step_outputs(batch_g, y, result)
             loss_ll = 0
+
             e_cor1, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features, fakes_labels = outputs
             e_cor = e_cor1
         #################################################################
@@ -290,10 +226,6 @@ class ExampleWrapper(L.LightningModule):
             pred_ref_pt = None
             num_fakes = None
             extra_features = None
-        # if self.global_step < 200:
-        #     self.args.losstype = "hgcalimplementation"
-        # else:
-        #     self.args.losstype = "vrepweighted"
         (loss, losses,) = object_condensation_loss2(
             batch_g,
             model_output,
@@ -311,7 +243,6 @@ class ExampleWrapper(L.LightningModule):
             loss_type=self.args.losstype,
         )
         loss_ec = 0
-        print("Starting validation step", batch_idx, loss)
         if self.trainer.is_global_zero:
             log_losses_wandb(
                 True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
@@ -330,6 +261,7 @@ class ExampleWrapper(L.LightningModule):
             else:
                 model_output1 = torch.cat((model_output, e_cor.view(-1, 1)), dim=1)
                 e_corr = None
+            
             (
                 df_batch_pandora,
                 df_batch1,
@@ -341,7 +273,7 @@ class ExampleWrapper(L.LightningModule):
                 0,
                 batch_idx,
                 0,
-                path_save=show_df_eval_path,
+                path_save=self.show_df_eval_path,
                 store=True,
                 predict=True,
                 e_corr=e_corr,
@@ -365,7 +297,16 @@ class ExampleWrapper(L.LightningModule):
         del losses
         del loss
         del model_output
-
+    def create_paths(self):
+        cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
+        show_df_eval_path = os.path.join(
+            self.args.model_prefix, "showers_df_evaluation"
+        )
+        if not os.path.exists(show_df_eval_path):
+            os.makedirs(show_df_eval_path)
+        if not os.path.exists(cluster_features_path):
+            os.makedirs(cluster_features_path)
+        self.show_df_eval_path = show_df_eval_path
     def on_train_epoch_end(self):
         self.log("train_loss_epoch", self.loss_final / self.number_b)
 
@@ -401,11 +342,10 @@ class ExampleWrapper(L.LightningModule):
                 # self.df_showers = pd.concat(self.df_showers)
                 self.df_showers_pandora = pd.concat(self.df_showers_pandora)
                 self.df_showes_db = pd.concat(self.df_showes_db)
-                print(self.df_showes_db.keys())
                 store_at_batch_end(
                     path_save=os.path.join(
                         self.args.model_prefix, "showers_df_evaluation"
-                    ),
+                    )+"/"+self.args.name_output,
                     # df_batch=self.df_showers,
                     df_batch_pandora=self.df_showers_pandora,
                     df_batch1=self.df_showes_db,
@@ -474,7 +414,14 @@ class ExampleWrapper(L.LightningModule):
         # Manually step the scheduler
         scheduler.step()
    
+    def correction_training_step(self, e_cor, e_true, neutral_idx):
+        if self.args.correction:
+            loss_EC_neutrals = torch.nn.L1Loss()(
+                e_cor[neutral_idx], e_true[neutral_idx]
+            )
+            wandb.log({"loss_EC_neutrals": loss_EC_neutrals})
 
+            loss = loss + loss_EC_neutrals
 
 
 def obtain_batch_numbers(g):
@@ -527,3 +474,18 @@ class CosineAnnealingThenFixedScheduler:
         # Restore step count and cosine scheduler state
         self.step_count = state_dict["step_count"]
         self.cosine_scheduler.load_state_dict(state_dict["cosine_scheduler_state"])
+
+def criterion(ypred, ytrue, step):
+    if True or step < 5000:  # Always use the L1 loss!!
+        #### ! using L1 loss for this training only!
+        return F.l1_loss(ypred, ytrue)
+    else:
+        losses = F.l1_loss(ypred, ytrue, reduction="none") / ytrue.abs()
+        if len(losses.shape) > 0:
+            if int(losses.size(0) * 0.05) > 1:
+                top_percentile = torch.kthvalue(
+                    losses, int(losses.size(0) * 0.95)
+                ).values
+                mask = losses > top_percentile
+                losses[mask] = 0.0
+        return losses.mean()

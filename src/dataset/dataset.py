@@ -192,11 +192,11 @@ class _SimpleIter(object):
 
     def get_data(self, i):
         # inputs
+        self.args_parse.prediction = (not self.for_training)
         # X = {k: self.table["_" + k][i].copy() for k in self._data_config.input_names}
         X = {k: self.table[k][i] for k in self.table.fields}
-
         [g, features_partnn], graph_empty = create_graph(
-            X, self.for_training
+            X, self.for_training, self.args_parse
         )
 
         return [g, features_partnn], graph_empty
@@ -243,10 +243,8 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         infinity_mode=False,
         in_memory=False,
         name="",
-        laplace=False,
-        edges=False,
-        diffs=False,
         dataset_cap=None,
+        args_parse=None
     ):
         self._iters = {} if infinity_mode or in_memory else None
         _init_args = set(self.__dict__.keys())
@@ -261,6 +259,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self._name = name
         self.dataset_cap = dataset_cap  # used to cap the dataset to some fixed number of events - used for debugging purposes
         self.for_training = for_training
+        self.args_parse = args_parse
         # ==== sampling parameters ====
         self._sampler_options = {
             "up_sample": up_sample,
@@ -273,6 +272,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         else:
             self._sampler_options.update(training=False, shuffle=False, reweight=False)
         self._init_args = set(self.__dict__.keys()) - _init_args
+        
 
 
     def __iter__(self):

@@ -34,12 +34,12 @@ class Hits:
 
     
     @classmethod
-    def from_data(cls, output, number_hits, prediction, number_part):
+    def from_data(cls, output, number_hits, args, number_part):
         hit_particle_link_hits = torch.tensor(output["ygen_hit"])
         hit_particle_link_tracks= torch.tensor(output["ygen_track"])
         hit_particle_link = torch.cat((hit_particle_link_hits, hit_particle_link_tracks), dim=0)
         # hit_particle_link_calomother = torch.cat((hit_particle_link_hits_calomother, hit_particle_link_tracks), dim=0)
-        if prediction:
+        if (args.prediction) and (not args.allegro):
             pandora_features = PandoraFeatures()
             X_pandora = torch.tensor(output["X_pandora"])
             pfo_link_hits = torch.tensor(output["pfo_calohit"])
@@ -97,6 +97,5 @@ class Hits:
             hit_type_one_hot = hit_type_one_hot, 
             # hit_particle_link_calomother = hit_particle_link_calomother
         )
-
 
 

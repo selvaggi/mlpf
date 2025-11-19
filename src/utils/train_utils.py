@@ -213,11 +213,9 @@ def train_load(args):
         fetch_step=args.fetch_step,
         infinity_mode=args.steps_per_epoch is not None,
         in_memory=args.in_memory,
-        laplace=args.laplace,
-        diffs=args.diffs,
-        edges=args.class_edges,
         name="train" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.train_cap,
+        args_parse=args
     )
     val_data = SimpleIterDataset(
         val_file_dict,
@@ -230,11 +228,9 @@ def train_load(args):
         fetch_step=args.fetch_step,
         infinity_mode=args.steps_per_epoch_val is not None,
         in_memory=args.in_memory,
-        laplace=args.laplace,
-        diffs=args.diffs,
-        edges=args.class_edges,
         name="val" + ("" if args.local_rank is None else "_rank%d" % args.local_rank),
         dataset_cap=args.val_cap,
+        args_parse=args
     )
 
     collator_func = graph_batch_func
@@ -328,6 +324,7 @@ def test_load(args):
             fetch_by_files=True,
             fetch_step=1,
             name="test_" + name,
+            args_parse=args
         )
         test_loader = DataLoader(
             test_data,
