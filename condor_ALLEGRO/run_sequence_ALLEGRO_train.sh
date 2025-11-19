@@ -20,14 +20,6 @@ cd ${DIR}/${SEED}
 pwd
 SAMPLE="gun" 
 
-# Path to the ALLEGRO configuration files (needed for the reconstruction and ddsim)
-# PATH_FCCCONFIG=$HOMEDIR/FCC-config/
-PATH_ALLEGRO_DATA=$HOMEDIR/condor_ALLEGRO/data/
-if [ ! -d "$PATH_ALLEGRO_DATA" ]; then
-    cd $HOMEDIR/condor_ALLEGRO
-    python downloadFilesForReco.py
-    cd ${DIR}/${SEED}
-fi
 
 cp $HOMEDIR/condor/make_pftree_clic_bindings.py ./
 cp $HOMEDIR/condor_ALLEGRO/tree_tools.py ./
@@ -37,7 +29,14 @@ wrapperfunction() {
 }
 wrapperfunction
 
-
+# Path to the ALLEGRO configuration files (needed for the reconstruction and ddsim)
+# PATH_FCCCONFIG=$HOMEDIR/FCC-config/
+PATH_ALLEGRO_DATA=$HOMEDIR/condor_ALLEGRO/data/
+if [ ! -d "$PATH_ALLEGRO_DATA" ]; then
+    cd $HOMEDIR/condor_ALLEGRO
+    python downloadFilesForReco.py
+    cd ${DIR}/${SEED}
+fi
 
 # Build gun  or Zcard
 if [[ "${gen}" -ne 0 ]]
@@ -65,13 +64,13 @@ then
     fi
 fi
 
-if [[ "${sim}" -ne 0 ]]
+if [[ "${sim}" -ne 0 && -f "events.hepmc" ]]
 then
     # ddsim --compactFile $K4GEO/FCCee/ALLEGRO/compact/ALLEGRO_o1_v03/ALLEGRO_o1_v03.xml --outputFile out_sim_edm4hep.root --steeringFile ${PATH_FCCCONFIG}/FCCee/FullSim/ALLEGRO/ALLEGRO_o1_v03/allegro_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
     ddsim --compactFile $K4GEO/FCCee/ALLEGRO/compact/ALLEGRO_o1_v03/ALLEGRO_o1_v03.xml --outputFile out_sim_edm4hep.root --steeringFile ${HOMEDIR}/condor_ALLEGRO/allegro_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
 fi
 
-if [[ "${rec}" -ne 0 ]]
+if [[ "${rec}" -ne 0 && -f "out_sim_edm4hep.root" ]]
 then
     ln -f -s $PATH_ALLEGRO_DATA .
     cp ${HOMEDIR}/condor_ALLEGRO/run_ALLEGRO_reco.py .
@@ -79,10 +78,12 @@ then
     k4run run_ALLEGRO_reco.py -n ${NEV} --IOSvc.Input out_sim_edm4hep.root --IOSvc.Output out_reco_edm4hep.root --includeHCal --includeMuon --saveCells --addTracks
     # --saveHits
     # save a lot of space by getting rid of sim file
-    rm -f out_sim_edm4hep.root
+    if [ -f "out_reco_edm4hep.root" ]; then
+        rm -f out_sim_edm4hep.root
+    fi
 fi
 
-if [[ "${flatten}" -ne 0 ]]
+if [[ "${flatten}" -ne 0 && -f "out_reco_edm4hep.root" ]]
 then
     # arguments are: input_file output_file store_pandora_hits isCLIC
     python make_pftree_clic_bindings.py out_reco_edm4hep.root tree5.root False False
