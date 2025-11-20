@@ -88,13 +88,13 @@ def main():
     njobs = int(args.njobs)
     nev = args.nev
     queue = args.queue
-    homedir = os.path.abspath(os.getcwd()) + "/../"
+    homedir = os.path.abspath(os.getcwd()) + "/../../"
 
     os.system("mkdir -p {}".format(outdir))
 
     # find list of already produced files:
     list_of_outfiles = []
-    for name in glob.glob("{}/*.root".format(outdir)):
+    for name in glob.glob("{}/*.parquet".format(outdir)):
         list_of_outfiles.append(name)
 
     script = "run_sequence_CLD_train.sh"
@@ -119,7 +119,7 @@ log                   = std/condor.$(ClusterId).log
     for job in range(njobs):
         if (job>  0):
             seed = str(job + 1)
-            basename = "pf_tree_" + seed + ".root"
+            basename = "pf_tree_" + seed + ".parquet"
             outputFile = outdir + "/" + basename
 
             # print outdir, basename, outputFile

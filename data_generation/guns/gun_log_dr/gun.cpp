@@ -64,7 +64,7 @@ double get_mass_G4(int pid) {
     G4ParticleDefinition* particle = G4ParticleTable::GetParticleTable()->FindParticle(particle_name);
     G4double particle_mass = particle->GetPDGMass();
     particle_mass = particle_mass / 1e3;
-    // std::cout << "particle_mass: " << particle_mass << std::endl;
+    std::cout << "particle_mass: " << particle_mass << std::endl;
     return particle_mass;
 }
 
@@ -96,7 +96,7 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
     GenVertexPtr v = std::make_shared<GenVertex>();
 
     GenParticlePtr p1 = make_shared<GenParticle>(FourVector (0.0,    0.0,   125.0,  125.0  ),11,  3);
-    GenParticlePtr p2 = make_shared<GenParticle>(FourVector (0.0,    0.0,   -125.0,  125.0  ),11,  3);
+    GenParticlePtr p2 = make_shared<GenParticle>(FourVector (0.0,    0.0,   -125.0,  125.0  ),-11,  3);
 
     v->add_particle_in(p1);
     v->add_particle_in(p2);
@@ -133,7 +133,7 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
         std::uniform_real_distribution<> log_mom_dist(log(mom_range[0]), log(mom_range[1]));
         float momp = exp(log_mom_dist(gen));
 
-         //std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<etap<<","<<phip<<"\n";
+        std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<mass<<"\n";
         // Compute px, py, pz, E
         float px = momp * sin(theta) * cos(phip);
         float py = momp * sin(theta) * sin(phip);
