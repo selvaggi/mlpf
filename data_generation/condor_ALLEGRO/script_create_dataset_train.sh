@@ -1,6 +1,11 @@
 #!/bin/bash
 # execute it from the directory containing the script
 # to have python: source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
+# Check if python is available; if not, source Key4HEP environment
+if ! command -v python &> /dev/null; then
+    echo "python not found in PATH, loading Key4HEP environment..."
+    source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
+fi
 
 # gun
 python submit_jobs.py --mode train --config config_spread_211125.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_211125/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_211125/  --njobs 300 --nev 1000 --queue workday
