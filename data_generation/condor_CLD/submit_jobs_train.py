@@ -127,7 +127,7 @@ log                   = std/condor.$(ClusterId).log
                 print("{} : missing output file ".format(outputFile))
                 jobCount += 1
 
-                argts = "{} {} {} {} {} {} {}".format(
+                argts = "{} {} {} {} {} {} {} {} {}".format(
                     homedir, config, nev, seed, outdir, condor_dir, sample, cldgeo, cldconfig
                 )
 

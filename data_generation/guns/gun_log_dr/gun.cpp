@@ -133,14 +133,16 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
         std::uniform_real_distribution<> log_mom_dist(log(mom_range[0]), log(mom_range[1]));
         float momp = exp(log_mom_dist(gen));
 
-        std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<mass<<"\n";
+        // std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<mass<<"\n";
         // Compute px, py, pz, E
-        float px = momp * sin(theta) * cos(phip);
-        float py = momp * sin(theta) * sin(phip);
-        float pz = momp * cos(theta);
-        float e = sqrt(px*px + py*py + pz*pz + mass*mass);
-
+        double px = momp * sin(theta) * cos(phip);
+        double py = momp * sin(theta) * sin(phip);
+        double pz = momp * cos(theta);
+        double e = sqrt(px*px + py*py + pz*pz + mass*mass);
+        std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<mass<<","<<px<<","<<py<<","<<pz<<","<<e<<"\n";
         // Create the particle
+        double mass_calc = sqrt(e*e - (px*px+py*py+pz*pz)*(px*px+py*py+pz*pz));
+        std::cout<<mass_calc<<"\n";
         GenParticlePtr particle = make_shared<GenParticle>(FourVector(px, py, pz, e), pid, 1);
 
         // add the particle to the vertex
