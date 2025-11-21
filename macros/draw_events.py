@@ -4,34 +4,43 @@ import numpy as np
 import plotly.graph_objects as go
 
 # Open ROOT file
-filename = "output/290825/pf_tree_1.root"
-tree = uproot.open(filename)["events"]
+filename = "/eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_211125_test/out_reco_edm4hep_1_0.parquet"
+output = ak.from_parquet(filename)
 
-# Load jagged arrays (per event, do NOT flatten yet)
-hit_x = tree["hit_x"].array()
-hit_y = tree["hit_y"].array()
-hit_z = tree["hit_z"].array()
-hit_e = tree["hit_e"].array()
-hit_type = tree["hit_type"].array()
-hit_genlink0 = tree["hit_genlink0"].array()
-hit_genlink1 = tree["hit_genlink3"].array()
 
 # Symbol mapping
 symbols = ["cross", "x", "circle", "square", "diamond"]
 
-n_events = len(hit_x)
+n_events = 100
 print(f"Total events: {n_events}")
 
-for i in range(n_events):
+for i in range(1):
     print(f"\nShowing event {i+1}/{n_events} ... (press Enter for next, q to quit)")
-
     # Convert this event?s hits to numpy
-    x = np.array(hit_x[i])
-    y = np.array(hit_y[i])
-    z = np.array(hit_z[i])
-    e = np.array(hit_e[i])
-    t = np.array(hit_type[i])
-    g = np.array(hit_genlink1[i])
+
+    # Load jagged arrays (per event, do NOT flatten yet)
+    X_hit = output["X_hit"][i]
+    X_track = output["X_track"][i]
+
+    hit_x = np.concatenate((np.array(X_hit[:,6]), np.array(X_track[:,12])), axis=0)
+    hit_y = np.concatenate((np.array(X_hit[:,7]), np.array(X_track[:,13])), axis=0)
+    hit_z = np.concatenate((np.array(X_hit[:,8]), np.array(X_track[:,14])), axis=0)
+    hit_e = np.concatenate((np.array(X_hit[:,5]),np.array(X_track[:,5])), axis=0)# for tracks this is p
+    hit_type_hit = np.array(X_hit[:,-2])+1
+    hit_type_track = np.array(X_track[:,0])
+
+    hit_type = np.concatenate((hit_type_hit,hit_type_track), axis=0)
+ 
+    hit_genlink_hits =  np.array(output["ygen_hit"][i])
+    hit_genlink_tracks =  np.array(output["ygen_track"][i])
+    genlink = np.concatenate((hit_genlink_hits,hit_genlink_tracks), axis=0)
+
+    x = hit_x
+    y = hit_y
+    z = hit_z
+    e = hit_e
+    t = hit_type
+    g = np.array(genlink)
 
     if len(x) == 0:
         print("No hits in this event.")
@@ -49,7 +58,7 @@ for i in range(n_events):
 
     # Build figure with one trace per hit_type
     fig = go.Figure()
-
+    print(hit_genlink_tracks)
     for tval in np.unique(t):
         mask = t == tval
         fig.add_trace(
