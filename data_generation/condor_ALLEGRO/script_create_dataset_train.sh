@@ -3,10 +3,10 @@
 # to have python: source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh
 
 # gun
-# python submit_jobs.py --mode train --config config_spread_031224_fair.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_v0_010925/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_v0_010925/  --njobs 1600 --nev 1000 --queue nextweek
+python submit_jobs.py --mode train --config config_spread_211125.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_211125/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_211125/  --njobs 300 --nev 1000 --queue workday
 # --queue tomorrow
 
-python submit_jobs.py --mode train --config config_spread_211125.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_211125_test/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_211125_test/  --njobs 2 --nev 1000 --queue workday --output parquet
+# python submit_jobs.py --mode train --config config_spread_211125.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_211125_test/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_211125_test/  --njobs 2 --nev 1000 --queue workday
 
 # test, 1 job
 # python submit_jobs.py --mode train --config config_spread_031224_fair_test.gun --outdir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/train/gun_dr_logE_v0_010925/  --condordir /eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/mlpf/condor/gun_dr_logE_v0_010925/  --njobs 1 --nev 10 --queue longlunch

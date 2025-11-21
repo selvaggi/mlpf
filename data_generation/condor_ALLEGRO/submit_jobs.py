@@ -73,7 +73,7 @@ def main():
     njobs = int(args.njobs)
     nev = args.nev
     queue = args.queue
-    homedir = os.path.abspath(os.getcwd()) + "/../"
+    homedir = os.path.abspath(os.getcwd()) + "/../../"
     mode = args.mode
 
     os.system("mkdir -p {}".format(outdir))
