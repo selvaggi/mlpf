@@ -1,0 +1,5 @@
+*~
+data/
+*.sub
+std/
+*.cc

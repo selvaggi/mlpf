@@ -119,7 +119,7 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
             std::uniform_real_distribution<> dphi_dist(-drmax, drmax);
             etap = eta + deta_dist(gen);
             phip = phi + dphi_dist(gen);
-        } while (sqrt(pow(etap - eta, 2) + pow(phip - phi, 2)) > drmax);
+        } while (std::sqrt(pow(etap - eta, 2) + pow(phip - phi, 2)) > drmax);
 
         // Create the particle
 
@@ -138,10 +138,10 @@ void generate_event(WriterAscii& writer, const std::vector<int>& pid_list,
         double px = momp * sin(theta) * cos(phip);
         double py = momp * sin(theta) * sin(phip);
         double pz = momp * cos(theta);
-        double e = sqrt(px*px + py*py + pz*pz + mass*mass);
+        double e = std::sqrt(px*px + py*py + pz*pz + mass*mass);
         std::cout<<"  "<<i<<","<<pid<<","<<momp<<","<<mass<<","<<px<<","<<py<<","<<pz<<","<<e<<"\n";
         // Create the particle
-        double mass_calc = sqrt(e*e - (px*px+py*py+pz*pz)*(px*px+py*py+pz*pz));
+        double mass_calc = std::sqrt(e*e - (px*px+py*py+pz*pz));
         std::cout<<mass_calc<<"\n";
         GenParticlePtr particle = make_shared<GenParticle>(FourVector(px, py, pz, e), pid, 1);
 
