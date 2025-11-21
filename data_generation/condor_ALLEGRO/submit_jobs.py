@@ -23,7 +23,7 @@ def main():
     parser.add_argument(
         "--outdir",
         help="output directory ",
-        default="/eos/experiment/fcc/ee/simulation/ClicDet/test/",
+        default="/eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/"
     )
 
     parser.add_argument(
@@ -35,7 +35,7 @@ def main():
     parser.add_argument(
         "--condordir",
         help="output directory ",
-        default="/eos/experiment/fcc/ee/simulation/ClicDet/test/",
+        default="/eos/experiment/fcc/users/g/gmarchio/ALLEGRO_o1_v03/"
     )
 
     parser.add_argument("--njobs", help="max number of jobs", default=2)
@@ -48,15 +48,21 @@ def main():
         "--queue",
         help="queue for condor",
         choices=[
-            "espresso",
-            "microcentury",
-            "longlunch",
-            "workday",
-            "tomorrow",
-            " ",
-            "nextweek",
+            "espresso",      # 20 minutes
+            "microcentury",  # 1 hour
+            "longlunch",     # 2 hours
+            "workday",       # 8 hours
+            "tomorrow",      # 1 day
+            "testmatch",     # 3 days
+            "nextweek",      # 1 week
         ],
-        default="longlunch",
+        default="workday",
+    )
+
+    parser.add_argument(
+        '--mode', 
+        choices=['train', 'eval'],
+        help='Mode of operation: train or eval'
     )
 
     args = parser.parse_args()
@@ -67,16 +73,21 @@ def main():
     njobs = int(args.njobs)
     nev = args.nev
     queue = args.queue
-    homedir = os.path.abspath(os.getcwd()) + "/../"
+    homedir = os.path.abspath(os.getcwd()) + "/../../"
+    mode = args.mode
 
     os.system("mkdir -p {}".format(outdir))
 
     # find list of already produced files:
     list_of_outfiles = []
-    for name in glob.glob("{}/*_caloinfo.parquet".format(outdir)):
+    reg_expr = "{}/*.parquet".format(outdir)
+    for name in glob.glob(reg_expr):
         list_of_outfiles.append(name)
 
-    script = "run_sequence_train.sh"
+    if mode == "train":
+        script = "run_sequence_ALLEGRO_train.sh"
+    else:
+        script = "run_sequence_ALLEGRO_eval.sh"
 
     jobCount = 0
 
@@ -88,7 +99,7 @@ output                = std/condor.$(ClusterId).$(ProcId).out
 error                 = std/condor.$(ClusterId).$(ProcId).err
 log                   = std/condor.$(ClusterId).log
 
-+AccountingGroup = "group_u_CMST3.all"
+# +AccountingGroup = ""
 +JobFlavour    = "{}"
 """.format(
         script, queue
@@ -96,27 +107,26 @@ log                   = std/condor.$(ClusterId).log
 
     print(njobs)
     for job in range(njobs):
-        if (job>  0):
-            seed = str(job + 1)
-            basename = "pf_tree_" + seed + ".parquet"
-            outputFile = outdir + "/" + basename
+        seed = str(job + 1)
+        basename = "out_reco_edm4hep_0.parquet"
+        outputFile = outdir + "/" + basename
 
-            # print outdir, basename, outputFile
-            if not outputFile in list_of_outfiles:
-                print("{} : missing output file ".format(outputFile))
-                jobCount += 1
+        # print outdir, basename, outputFile
+        if not outputFile in list_of_outfiles:
+            print("{} : missing output file ".format(outputFile))
+            jobCount += 1
 
-                argts = "{} {} {} {} {} {}".format(
-                    homedir, config, nev, seed, outdir, condor_dir
-                )
+            argts = "{} {} {} {} {} {}".format(
+                homedir, config, nev, seed, outdir, condor_dir
+            )
 
-                cmdfile += 'arguments="{}"\n'.format(argts)
-                cmdfile += "queue\n"
+            cmdfile += 'arguments="{}"\n'.format(argts)
+            cmdfile += "queue\n"
 
-                cmd = "rm -rf job*; ./{} {}".format(script, argts)
-                if jobCount == 1:
-                    print("")
-                    print(cmd)
+            cmd = "rm -rf job*; ./{} {}".format(script, argts)
+            if jobCount == 1:
+                print("")
+                print(cmd)
 
     with open("condor_gun.sub", "w") as f:
         f.write(cmdfile)
