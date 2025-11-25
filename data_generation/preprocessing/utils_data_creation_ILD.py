@@ -6,8 +6,8 @@ import uproot
 import vector
 import tqdm
 from scipy.sparse import coo_matrix
-track_coll = "SiTracks_Refitted"
-mc_coll = "MCParticles"
+track_coll = "MarlinTrkTracks"
+mc_coll = "MCParticle"
 
 particle_feature_order = [
 "PDG", 
@@ -83,6 +83,7 @@ hit_feature_order = [
     "time",
     "subdetector",
     "type",
+    #TODO: "time_smeared",
 ]
 
 def get_feature_matrix(feature_dict, features):
@@ -249,6 +250,7 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
         gp_to_calohit_beforecalomother
     ), dic 
 
+# TODO: CHANGE FOR ILD GEOMETRY
 def isProducedInCalo(vertices, BarrelRadius=2150, EndCapZ=2307):
 
     x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
@@ -300,7 +302,7 @@ def gen_to_features(prop_data, iev):
         awkward.zip({"mass": gen_arr["mass"], "x": gen_arr["momentum.x"], "y": gen_arr["momentum.y"], "z": gen_arr["momentum.z"]})
     )
 
-    parents = prop_data["_MCParticles_parents/_MCParticles_parents.index"][iev]
+    parents = prop_data["_MCParticle_parents/_MCParticle_parents.index"][iev]
     gen_arr["pt"] = MCParticles_p4.pt
     gen_arr["p"] = np.sqrt(gen_arr["momentum.x"]**2 + gen_arr["momentum.y"]**2 + gen_arr["momentum.z"]**2)
     gen_arr["eta"] = MCParticles_p4.eta
@@ -348,7 +350,7 @@ def gen_to_features(prop_data, iev):
     }
 
 
-    ret["index"] = prop_data["_MCParticles_daughters/_MCParticles_daughters.index"][iev]
+    ret["index"] = prop_data["_MCParticle_daughters/_MCParticle_daughters.index"][iev]
     
     return ret
 
@@ -434,6 +436,9 @@ def hits_to_features(hit_data, iev, coll, feats):
     feat_arr["sin_phi"] = py / feat_arr["energy"]
     feat_arr["cos_phi"] = px / feat_arr["energy"]
 
+    # TODO: smear time a bit
+    # feat_arr["time_smeared"] = feat_arr["time"] + np.random.normal(0, 0.1, size=len(feat_arr["time"]))
+
     return awkward.Record(feat_arr)
 
 
@@ -449,14 +454,14 @@ def track_to_features(prop_data, iev):
     trackstate_idx = prop_data[track_coll][track_coll + ".trackStates_begin"][iev]
     # get the properties of the track at the first track state (at the origin)
     for k in ["tanLambda", "D0", "phi", "omega", "Z0", "time", "referencePoint.x", "referencePoint.y", "referencePoint.z"]:
-        ret[k] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates." + k][iev][trackstate_idx])
+        ret[k] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates." + k][iev][trackstate_idx])
     
-    ret["referencePoint_calo.x"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.referencePoint.x"][iev][trackstate_idx+3])
-    ret["referencePoint_calo.y"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.referencePoint.y"][iev][trackstate_idx+3])
-    ret["referencePoint_calo.z"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.referencePoint.z"][iev][trackstate_idx+3])
-    ret["phi_calo"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.phi"][iev][trackstate_idx+3])
-    ret["tanLambda_calo"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.tanLambda"][iev][trackstate_idx+3])
-    ret["omega_calo"] = awkward.to_numpy(prop_data["_SiTracks_Refitted_trackStates"]["_SiTracks_Refitted_trackStates.omega"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.x"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.x"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.y"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.y"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.z"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.z"][iev][trackstate_idx+3])
+    ret["phi_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.phi"][iev][trackstate_idx+3])
+    ret["tanLambda_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.tanLambda"][iev][trackstate_idx+3])
+    ret["omega_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.omega"][iev][trackstate_idx+3])
 
     ret["pt"] = awkward.to_numpy(track_pt(ret["omega"]))
     # from the track state at IP (location 1)
@@ -492,14 +497,9 @@ def track_pt(omega):
 
 def genparticle_track_adj(sitrack_links, iev, truth_tracking):
     print("here", truth_tracking)
-    if truth_tracking:
-        trk_to_gen_trkidx = sitrack_links["_SiTracks_Refitted_Relation_from/_SiTracks_Refitted_Relation_from.index"][iev]
-        trk_to_gen_genidx = sitrack_links["_SiTracks_Refitted_Relation_to/_SiTracks_Refitted_Relation_to.index"][iev]
-        trk_to_gen_w = sitrack_links["SiTracks_Refitted_Relation.weight"][iev]
-    else:
-        trk_to_gen_trkidx = sitrack_links["_SiTracksMCTruthLink_from/_SiTracksMCTruthLink_from.index"][iev]
-        trk_to_gen_genidx = sitrack_links["_SiTracksMCTruthLink_to/_SiTracksMCTruthLink_to.index"][iev]
-        trk_to_gen_w = sitrack_links["SiTracksMCTruthLink.weight"][iev]
+    trk_to_gen_trkidx = sitrack_links["_MarlinTrkTracksMCTruthLink_from/_MarlinTrkTracksMCTruthLink_from.index"][iev]
+    trk_to_gen_genidx = sitrack_links["_MarlinTrkTracksMCTruthLink_to/_MarlinTrkTracksMCTruthLink_to.index"][iev]
+    trk_to_gen_w = sitrack_links["MarlinTrkTracksMCTruthLink.weight"][iev]
 
     genparticle_to_track_matrix_coo0 = awkward.to_numpy(trk_to_gen_genidx)
     genparticle_to_track_matrix_coo1 = awkward.to_numpy(trk_to_gen_trkidx)

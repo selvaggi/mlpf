@@ -3,12 +3,12 @@ import numpy as np
 import awkward
 import uproot
 import tqdm
-from preprocessing.utils_data_creation import get_feature_matrix, sanitize, get_reco_properties, build_dummy_array
-from preprocessing.utils_data_creation import track_feature_order, hit_feature_order, particle_feature_order, PandoraPFO_feature_order
-from preprocessing.utils_data_creation import  get_genparticles_and_adjacencies, mc_coll, track_coll
+from preprocessing.utils_data_creation_ILD import get_feature_matrix, sanitize, get_reco_properties, build_dummy_array
+from preprocessing.utils_data_creation_ILD import track_feature_order, hit_feature_order, particle_feature_order, PandoraPFO_feature_order
+from preprocessing.utils_data_creation_ILD import  get_genparticles_and_adjacencies, mc_coll, track_coll
 import time 
 
-def process_one_file(fn, ofn, eval_dataset, truth_tracking):
+def process_one_file(fn, ofn, eval_dataset):
 
     # output exists, do not recreate
     # if os.path.isfile(ofn):
@@ -28,27 +28,27 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
     prop_data = arrs.arrays(
         [
             mc_coll,
-            "MCParticles.PDG",
-            "MCParticles.momentum.x",
-            "MCParticles.momentum.y",
-            "MCParticles.momentum.z",
-            "MCParticles.mass",
-            "MCParticles.charge",
-            "MCParticles.generatorStatus",
-            "MCParticles.simulatorStatus",
-            "MCParticles.daughters_begin",
-            "MCParticles.daughters_end",
-            "_MCParticles_daughters/_MCParticles_daughters.index",  # similar to "MCParticles#1.index" in clic
-            "_MCParticles_parents/_MCParticles_parents.index",  # similar to "MCParticles#1.index" in clic
+            "MCParticle.PDG",
+            "MCParticle.momentum.x",
+            "MCParticle.momentum.y",
+            "MCParticle.momentum.z",
+            "MCParticle.mass",
+            "MCParticle.charge",
+            "MCParticle.generatorStatus",
+            "MCParticle.simulatorStatus",
+            "MCParticle.daughters_begin",
+            "MCParticle.daughters_end",
+            "_MCParticle_daughters/_MCParticle_daughters.index",  # similar to "MCParticle#1.index" in clic
+            "_MCParticle_parents/_MCParticle_parents.index",  # similar to "MCParticle#1.index" in clic
             track_coll,
-            "_SiTracks_Refitted_trackStates",
+            "_MarlinTrkTracks_trackStates",
             "_PandoraPFOs_tracks/_PandoraPFOs_tracks.index",
             "PandoraClusters",
             "_PandoraClusters_hits/_PandoraClusters_hits.index",
             "_PandoraClusters_hits/_PandoraClusters_hits.collectionID",
             "PandoraPFOs",
             "_PandoraPFOs_clusters/_PandoraPFOs_clusters.index",
-            # "SiTracks_Refitted_dQdx",
+            # "MarlinTrkTracks_dQdx",
         ]
     )
     calohit_links = arrs.arrays(
@@ -60,26 +60,14 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
             "_CalohitMCTruthLink_from/_CalohitMCTruthLink_from.index",
         ]
     )
-    if truth_tracking:
         sitrack_links = arrs.arrays(
-            [
-                "SiTracks_Refitted_Relation.weight",
-                "_SiTracks_Refitted_Relation_to/_SiTracks_Refitted_Relation_to.collectionID",
-                "_SiTracks_Refitted_Relation_to/_SiTracks_Refitted_Relation_to.index",
-                "_SiTracks_Refitted_Relation_from/_SiTracks_Refitted_Relation_from.collectionID",
-                "_SiTracks_Refitted_Relation_from/_SiTracks_Refitted_Relation_from.index",
-            ]
-        )
-    else:
-         sitrack_links = arrs.arrays(
-        [
-            "SiTracksMCTruthLink.weight",
-            "_SiTracksMCTruthLink_to/_SiTracksMCTruthLink_to.collectionID",
-            "_SiTracksMCTruthLink_to/_SiTracksMCTruthLink_to.index",
-            "_SiTracksMCTruthLink_from/_SiTracksMCTruthLink_from.collectionID",
-            "_SiTracksMCTruthLink_from/_SiTracksMCTruthLink_from.index",
-        ]
-    )
+    [
+        "MCTruthMarlinTrkTracksLink.weight",
+        "_MCTruthMarlinTrkTracksLink_to/_MCTruthMarlinTrkTracksLink_to.collectionID",
+        "_MCTruthMarlinTrkTracksLink_to/_MCTruthMarlinTrkTracksLink_to.index",
+        "_MCTruthMarlinTrkTracksLink_from/_MCTruthMarlinTrkTracksLink_from.collectionID",
+        "_MCTruthMarlinTrkTracksLink_from/_MCTruthMarlinTrkTracksLink_from.index",
+    ]
 
     # maps the recoparticle track/cluster index (in tracks_begin,end and clusters_begin,end)
     # to the index in the track/cluster collection
@@ -87,12 +75,14 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
     idx_rp_to_track = arrs["_PandoraPFOs_tracks/_PandoraPFOs_tracks.index"].array()
 
     hit_data = {
-        "ECALBarrel": arrs["ECALBarrel"].array(),
-        "ECALEndcap": arrs["ECALEndcap"].array(),
-        "HCALBarrel": arrs["HCALBarrel"].array(),
-        "HCALEndcap": arrs["HCALEndcap"].array(),
-        "HCALOther": arrs["HCALOther"].array(),
+        "EcalBarrelCollectionRec": arrs["EcalBarrelCollectionRec"].array(),
+        "EcalEndcapsCollectionRec": arrs["EcalEndcapsCollectionRec"].array(),
+        "HcalBarrelCollectionRec": arrs["HcalBarrelCollectionRec"].array(),
+        "HcalEndcapsCollectionRec": arrs["HcalEndcapsCollectionRec"].array(),
         "MUON": arrs["MUON"].array(),
+        # "LCAL": arrs["LCAL"].array(),
+        # "LHCAL": arrs["LHCAL"].array(),
+        # "BCAL": arrs["BCAL"].array(),
     }
     ret = []
     i =0 
@@ -111,7 +101,7 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
     
     
         # get the genparticles and the links between genparticles and tracks/clusters
-        gpdata, dic  = get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrack_links, iev, collectionIDs, eval_dataset, dic, truth_tracking)
+        gpdata, dic  = get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrack_links, iev, collectionIDs, eval_dataset, dic)
 
 
         n_tracks = len(gpdata.track_features["type"])
@@ -178,18 +168,16 @@ def parse_args():
     parser.add_argument("--input", type=str, help="Input file ROOT file", required=True)
     parser.add_argument("--outpath", type=str, default="raw", help="output path")
     parser.add_argument("--dataset", action="store_true", default=False, help="is dataset for eval")
-    parser.add_argument("--truth", action="store_true", default=False, help="do tracks come from gen")
     args = parser.parse_args()
     return args
 
 
 def process(args):
     infile = args.input
-    truth_tracking = args.truth
     outfile = os.path.join(args.outpath, os.path.basename(infile).split(".")[0] + ".parquet")
     eval_dataset = args.dataset 
     tic = time.time()
-    process_one_file(infile, outfile, eval_dataset,truth_tracking)
+    process_one_file(infile, outfile, eval_dataset)
     toc = time.time()
     print("Processing time: ", toc - tic)
 
