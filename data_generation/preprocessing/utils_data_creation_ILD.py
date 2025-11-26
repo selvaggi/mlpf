@@ -6,8 +6,30 @@ import uproot
 import vector
 import tqdm
 from scipy.sparse import coo_matrix
-track_coll = "MarlinTrkTracks"
-mc_coll = "MCParticle"
+
+# Configure all Collection names
+# NOTE: Should be in the configuration file
+MC_PARTICLE_COL = "MCParticles"
+PANDORA_PFO_COL = "PandoraPFOs"
+TRACKS_COL = "MarlinTrkTracks"
+CLUSTERS_COL = "PandoraClusters"
+CALOHIT_TO_MC_LINK_COL = "CalohitMCTruthLink"
+TRACK_TO_MC_LINK_COL = "MCTruthMarlinTrkTracksLink"
+CALO_HIT_COLS = [
+    "EcalBarrelCollectionRec",
+    "EcalEndcapsCollectionRec",
+    "HcalBarrelCollectionRec",
+    "HcalEndcapsCollectionRec",
+    "MUON",
+    # "LCAL",
+    # "LHCAL",
+    # "BCAL",
+]
+
+# Configure detector geometry parameters
+# https://github.com/key4hep/k4geo/tree/a473d3fd3d7fb182530636f64d033f277d1c185d/ILD/compact/ILD_common_v02
+BARREL_RADIUS = 1804.8  # top_TPC_outer_radius + Ecal_Tpc_gap = 1769.8*mm + 35*mm
+ENDCAP_Z = 2411.8       # TPC_Ecal_Hcal_barrel_halfZ + 61.8*mm = 2350.0*mm + 61.8*mm
 
 particle_feature_order = [
 "PDG", 
@@ -81,9 +103,12 @@ hit_feature_order = [
     "position.y",
     "position.z",
     "time",
+    "time_10ps",
+    "time_50ps",
+    "time_100ps",
+    "time_1000ps",
     "subdetector",
     "type",
-    #TODO: "time_smeared",
 ]
 
 def get_feature_matrix(feature_dict, features):
@@ -102,8 +127,8 @@ def sanitize(arr):
 
 
 def get_reco_properties(prop_data, iev):
-    reco_arr = prop_data["PandoraPFOs"][iev]
-    reco_arr = {k.replace("PandoraPFOs.", ""): reco_arr[k] for k in reco_arr.fields}
+    reco_arr = prop_data[PANDORA_PFO_COL][iev]
+    reco_arr = {k.replace(PANDORA_PFO_COL + ".", ""): reco_arr[k] for k in reco_arr.fields}
 
     reco_p4 = vector.awk(
         awkward.zip({"mass": reco_arr["mass"], "x": reco_arr["momentum.x"], "y": reco_arr["momentum.y"], "z": reco_arr["momentum.z"]})
@@ -250,8 +275,8 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
         gp_to_calohit_beforecalomother
     ), dic 
 
-# TODO: CHANGE FOR ILD GEOMETRY
-def isProducedInCalo(vertices, BarrelRadius=2150, EndCapZ=2307):
+# HACK: CHANGE FOR ILD GEOMETRY
+def isProducedInCalo(vertices, BarrelRadius, EndCapZ):
 
     x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
     radius = np.sqrt(x**2 + y**2 + z**2)
@@ -264,7 +289,7 @@ def define_produced_before_calo_map(MCParticles_p4, gen_arr, parents):
         particle_idx_search = particle_idx
         while isproducedincalo:
             vertex = np.array([gen_arr["vertex.x"][particle_idx_search],gen_arr["vertex.y"][particle_idx_search],gen_arr["vertex.z"][particle_idx_search]]).reshape(1,3)
-            isproducedincalo = isProducedInCalo(vertex)
+            isproducedincalo = isProducedInCalo(vertex, BARREL_RADIUS, ENDCAP_Z)
             if isproducedincalo:
                 parents_begin = gen_arr["parents_begin"][particle_idx_search]
                 parents_end = gen_arr["parents_end"][particle_idx_search]
@@ -275,8 +300,8 @@ def define_produced_before_calo_map(MCParticles_p4, gen_arr, parents):
 
 
 def pandora_to_features(prop_data, iev):
-    pandora_arr = prop_data["PandoraPFOs"][iev]
-    pandora_arr = {k.replace("PandoraPFOs" + ".", ""): pandora_arr[k] for k in pandora_arr.fields}
+    pandora_arr = prop_data[PANDORA_PFO_COL][iev]
+    pandora_arr = {k.replace(PANDORA_PFO_COL + ".", ""): pandora_arr[k] for k in pandora_arr.fields}
     pandora_arr["p"] = np.sqrt(pandora_arr["momentum.x"]**2 + pandora_arr["momentum.x"]**2 + pandora_arr["momentum.z"]**2)
     ret = {
         "energy": pandora_arr["energy"],
@@ -294,15 +319,15 @@ def pandora_to_features(prop_data, iev):
 def gen_to_features(prop_data, iev):
 
     
-    gen_arr = prop_data[mc_coll][iev]
+    gen_arr = prop_data[MC_PARTICLE_COL][iev]
 
-    gen_arr = {k.replace(mc_coll + ".", ""): gen_arr[k] for k in gen_arr.fields}
+    gen_arr = {k.replace(MC_PARTICLE_COL + ".", ""): gen_arr[k] for k in gen_arr.fields}
 
     MCParticles_p4 = vector.awk(
         awkward.zip({"mass": gen_arr["mass"], "x": gen_arr["momentum.x"], "y": gen_arr["momentum.y"], "z": gen_arr["momentum.z"]})
     )
 
-    parents = prop_data["_MCParticle_parents/_MCParticle_parents.index"][iev]
+    parents = prop_data[f"_{MC_PARTICLE_COL}_parents/_{MC_PARTICLE_COL}_parents.index"][iev]
     gen_arr["pt"] = MCParticles_p4.pt
     gen_arr["p"] = np.sqrt(gen_arr["momentum.x"]**2 + gen_arr["momentum.y"]**2 + gen_arr["momentum.z"]**2)
     gen_arr["eta"] = MCParticles_p4.eta
@@ -350,7 +375,7 @@ def gen_to_features(prop_data, iev):
     }
 
 
-    ret["index"] = prop_data["_MCParticle_daughters/_MCParticle_daughters.index"][iev]
+    ret["index"] = prop_data[f"_{MC_PARTICLE_COL}_daughters/_{MC_PARTICLE_COL}_daughters.index"][iev]
     
     return ret
 
@@ -376,12 +401,12 @@ def get_calohit_matrix_and_genadj(hit_data, calohit_links, iev, collectionIDs):
     )
 
     # add all edges from genparticle to calohit
-    calohit_to_gen_weight = calohit_links["CalohitMCTruthLink.weight"][iev]
+    calohit_to_gen_weight = calohit_links[f"{CALOHIT_TO_MC_LINK_COL}.weight"][iev]
     
-    calohit_to_gen_calo_colid = calohit_links["_CalohitMCTruthLink_from/_CalohitMCTruthLink_from.collectionID"][iev]
-    calohit_to_gen_gen_colid = calohit_links["_CalohitMCTruthLink_to/_CalohitMCTruthLink_to.collectionID"][iev]
-    calohit_to_gen_calo_idx = calohit_links["_CalohitMCTruthLink_from/_CalohitMCTruthLink_from.index"][iev]
-    calohit_to_gen_gen_idx = calohit_links["_CalohitMCTruthLink_to/_CalohitMCTruthLink_to.index"][iev]
+    calohit_to_gen_calo_colid = calohit_links[f"_{CALOHIT_TO_MC_LINK_COL}_from/_{CALOHIT_TO_MC_LINK_COL}_from.collectionID"][iev]
+    calohit_to_gen_gen_colid = calohit_links[f"_{CALOHIT_TO_MC_LINK_COL}_to/_{CALOHIT_TO_MC_LINK_COL}_to.collectionID"][iev]
+    calohit_to_gen_calo_idx = calohit_links[f"_{CALOHIT_TO_MC_LINK_COL}_from/_{CALOHIT_TO_MC_LINK_COL}_from.index"][iev]
+    calohit_to_gen_gen_idx = calohit_links[f"_{CALOHIT_TO_MC_LINK_COL}_to/_{CALOHIT_TO_MC_LINK_COL}_to.index"][iev]
 
     genparticle_to_hit_matrix_coo0 = []
     genparticle_to_hit_matrix_coo1 = []
@@ -436,8 +461,10 @@ def hits_to_features(hit_data, iev, coll, feats):
     feat_arr["sin_phi"] = py / feat_arr["energy"]
     feat_arr["cos_phi"] = px / feat_arr["energy"]
 
-    # TODO: smear time a bit
-    # feat_arr["time_smeared"] = feat_arr["time"] + np.random.normal(0, 0.1, size=len(feat_arr["time"]))
+    feat_arr["time_10ps"] = feat_arr["time"] + np.random.normal(0, 0.01, size=len(feat_arr["time"]))
+    feat_arr["time_50ps"] = feat_arr["time"] + np.random.normal(0, 0.05, size=len(feat_arr["time"]))
+    feat_arr["time_100ps"] = feat_arr["time"] + np.random.normal(0, 0.1, size=len(feat_arr["time"]))
+    feat_arr["time_1000ps"] = feat_arr["time"] + np.random.normal(0, 1.0, size=len(feat_arr["time"]))
 
     return awkward.Record(feat_arr)
 
@@ -445,23 +472,23 @@ def hits_to_features(hit_data, iev, coll, feats):
 
 
 def track_to_features(prop_data, iev):
-    track_arr = prop_data[track_coll][iev]
+    track_arr = prop_data[TRACKS_COL][iev]
     feats_from_track = ["type", "chi2", "ndf"]
-    ret = {feat: track_arr[track_coll + "." + feat] for feat in feats_from_track}
+    ret = {feat: track_arr[TRACKS_COL + "." + feat] for feat in feats_from_track}
     n_tr = len(ret["type"])
 
     # get the index of the first track state
-    trackstate_idx = prop_data[track_coll][track_coll + ".trackStates_begin"][iev]
+    trackstate_idx = prop_data[TRACKS_COL][TRACKS_COL + ".trackStates_begin"][iev]
     # get the properties of the track at the first track state (at the origin)
     for k in ["tanLambda", "D0", "phi", "omega", "Z0", "time", "referencePoint.x", "referencePoint.y", "referencePoint.z"]:
-        ret[k] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates." + k][iev][trackstate_idx])
+        ret[k] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates." + k][iev][trackstate_idx])
     
-    ret["referencePoint_calo.x"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.x"][iev][trackstate_idx+3])
-    ret["referencePoint_calo.y"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.y"][iev][trackstate_idx+3])
-    ret["referencePoint_calo.z"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.referencePoint.z"][iev][trackstate_idx+3])
-    ret["phi_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.phi"][iev][trackstate_idx+3])
-    ret["tanLambda_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.tanLambda"][iev][trackstate_idx+3])
-    ret["omega_calo"] = awkward.to_numpy(prop_data["_MarlinTrkTracks_trackStates"]["_MarlinTrkTracks_trackStates.omega"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.x"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.referencePoint.x"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.y"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.referencePoint.y"][iev][trackstate_idx+3])
+    ret["referencePoint_calo.z"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.referencePoint.z"][iev][trackstate_idx+3])
+    ret["phi_calo"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.phi"][iev][trackstate_idx+3])
+    ret["tanLambda_calo"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.tanLambda"][iev][trackstate_idx+3])
+    ret["omega_calo"] = awkward.to_numpy(prop_data[f"_{TRACKS_COL}_trackStates"][f"_{TRACKS_COL}_trackStates.omega"][iev][trackstate_idx+3])
 
     ret["pt"] = awkward.to_numpy(track_pt(ret["omega"]))
     # from the track state at IP (location 1)
@@ -497,9 +524,9 @@ def track_pt(omega):
 
 def genparticle_track_adj(sitrack_links, iev, truth_tracking):
     print("here", truth_tracking)
-    trk_to_gen_trkidx = sitrack_links["_MarlinTrkTracksMCTruthLink_from/_MarlinTrkTracksMCTruthLink_from.index"][iev]
-    trk_to_gen_genidx = sitrack_links["_MarlinTrkTracksMCTruthLink_to/_MarlinTrkTracksMCTruthLink_to.index"][iev]
-    trk_to_gen_w = sitrack_links["MarlinTrkTracksMCTruthLink.weight"][iev]
+    trk_to_gen_trkidx = sitrack_links[f"_{TRACK_TO_MC_LINK_COL}_from/_{TRACK_TO_MC_LINK_COL}_from.index"][iev]
+    trk_to_gen_genidx = sitrack_links[f"_{TRACK_TO_MC_LINK_COL}_to/_{TRACK_TO_MC_LINK_COL}_to.index"][iev]
+    trk_to_gen_w = sitrack_links[f"{TRACK_TO_MC_LINK_COL}.weight"][iev]
 
     genparticle_to_track_matrix_coo0 = awkward.to_numpy(trk_to_gen_genidx)
     genparticle_to_track_matrix_coo1 = awkward.to_numpy(trk_to_gen_trkidx)
@@ -555,13 +582,13 @@ class EventData:
 def hit_pfo_adj(prop_data, hit_idx_local_to_global, iev):
 
 
-    clusters_begin = prop_data["PandoraPFOs"]["PandoraPFOs.clusters_begin"][iev]
-    clusters_end = prop_data["PandoraPFOs"]["PandoraPFOs.clusters_end"][iev]
-    idx_arr_cluster = prop_data["_PandoraPFOs_clusters/_PandoraPFOs_clusters.index"][iev]
-    coll_arr = prop_data["_PandoraClusters_hits/_PandoraClusters_hits.collectionID"][iev]
-    idx_arr = prop_data["_PandoraClusters_hits/_PandoraClusters_hits.index"][iev]
-    hits_begin = prop_data["PandoraClusters"]["PandoraClusters.hits_begin"][iev]
-    hits_end = prop_data["PandoraClusters"]["PandoraClusters.hits_end"][iev]
+    clusters_begin = prop_data[f"{PANDORA_PFO_COL}"][f"{PANDORA_PFO_COL}.clusters_begin"][iev]
+    clusters_end = prop_data[f"{PANDORA_PFO_COL}"][f"{PANDORA_PFO_COL}.clusters_end"][iev]
+    idx_arr_cluster = prop_data[f"_{PANDORA_PFO_COL}_clusters/_{PANDORA_PFO_COL}_clusters.index"][iev]
+    coll_arr = prop_data[f"_{CLUSTERS_COL}_hits/_{CLUSTERS_COL}_hits.collectionID"][iev]
+    idx_arr = prop_data[f"_{CLUSTERS_COL}_hits/_{CLUSTERS_COL}_hits.index"][iev]
+    hits_begin = prop_data[f"{CLUSTERS_COL}"][f"{CLUSTERS_COL}.hits_begin"][iev]
+    hits_end = prop_data[f"{CLUSTERS_COL}"][f"{CLUSTERS_COL}.hits_end"][iev]
     # index in the array of all hits
     hit_to_cluster_matrix_coo0 = []
     # index in the cluster array
@@ -591,9 +618,9 @@ def hit_pfo_adj(prop_data, hit_idx_local_to_global, iev):
 
 
 def track_pfo_adj(prop_data, hit_idx_local_to_global, iev):
-    tracks_begin = prop_data["PandoraPFOs"]["PandoraPFOs.tracks_begin"][iev]
-    tracks_end = prop_data["PandoraPFOs"]["PandoraPFOs.tracks_end"][iev]
-    idx_arr_track = prop_data["_PandoraPFOs_tracks/_PandoraPFOs_tracks.index"][iev]
+    tracks_begin = prop_data[PANDORA_PFO_COL][f"{PANDORA_PFO_COL}.tracks_begin"][iev]
+    tracks_end = prop_data[PANDORA_PFO_COL][f"{PANDORA_PFO_COL}.tracks_end"][iev]
+    idx_arr_track = prop_data[f"_{PANDORA_PFO_COL}_tracks/_{PANDORA_PFO_COL}_tracks.index"][iev]
    
     # index in the array of all hits
     track_to_pfo_matrix_coo0 = []
