@@ -9,7 +9,7 @@ error = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster).$(Process).err
 
 request_cpus = 1
 request_memory = 5GB
-request_disk = 1MB
+request_disk = 2GB
 
 
 # energy=40
