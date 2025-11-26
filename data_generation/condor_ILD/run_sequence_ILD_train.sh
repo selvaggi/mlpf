@@ -8,13 +8,13 @@ SEED=${4} # 1
 OUTPUTDIR=${5} # dir where the final file is copied
 DIR=${6} # dir where intermidiate files are created 
 SAMPLE=${7} # can be "gun" or "Zcard"
-CLDGEO=${8} # default is CLD_o2_v06 (CLD+ARC is CLD_o3_v01 https://github.com/key4hep/k4geo/blob/main/FCCee/CLD/compact/CLD_o3_v01/CLD_o3_v01.xml)
-PATHCLDCONFIG=${9} # path to CLD config 
-if [ -z "$CLDGEO" ]; then
-    echo "Will use default CLD geometry version CLD_o2_v06"
-    CLDGEO=CLD_o2_v06
+GEO=${8} # default is ILD_l5_o1_v02
+ILDCCONFIG=${9} # path to ILDConfig
+if [ -z "$GEO" ]; then
+    echo "Will use default geometry version ILD_l5_o1_v02"
+    GEO=ILD_l5_o1_v02
 else
-    echo "Will use CLD geometry version $CLDGEO"
+    echo "Will use geometry version $GEO"
 fi
 # git clone the CLDConfig 
 
@@ -56,14 +56,13 @@ fi
 
 
 
-ddsim --compactFile $K4GEO/FCCee/CLD/compact/$CLDGEO/$CLDGEO.xml --outputFile out_sim_edm4hep.root --steeringFile ${PATHCLDCONFIG}/cld_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
+ddsim --compactFile $K4GEO/ILD/compact/$GEO/$GEO.xml --outputFile out_sim_edm4hep.root --steeringFile ${ILDCCONFIG}/ddsim_steer.py --inputFiles events.hepmc --numberOfEvents ${NEV} --random.seed ${SEED}
 
 # copy large input files via xrootd (recommended)
-xrdcp -r ${PATHCLDCONFIG}/* .
+xrdcp -r ${ILDCCONFIG}/* .
 
-# running both gen tracking and CT tracking
-k4run CLDReconstruction.py -n ${NEV}  --inputFiles out_sim_edm4hep.root --outputBasename out_reco_edm4hep_GT --truthTracking
-k4run CLDReconstruction.py -n ${NEV}  --inputFiles out_sim_edm4hep.root --outputBasename out_reco_edm4hep
+# running standard reconstruction
+k4run ILDReconstruction.py -n ${NEV}  --inputFiles out_sim_edm4hep.root --outputBasename out_reco_edm4hep
 
 
 wrapperfunction() {
@@ -74,14 +73,11 @@ wrapperfunction
 if [ ! -f "out_reco_edm4hep_REC.parquet" ]; then
     cp -r ${HOMEDIR}/data_generation/preprocessing/ .
     python  -m preprocessing.dataset_creation --input  out_reco_edm4hep_REC.edm4hep.root  --outpath . 
-    python  -m preprocessing.dataset_creation --input  out_reco_edm4hep_GT_REC.edm4hep.root  --outpath .  --truth
 fi
 
 mkdir -p ${OUTPUTDIR}
 mkdir -p ${OUTPUTDIR}/hepmc_files/
 
-# python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py out_reco_edm4hep_REC.edm4hep.root ${OUTPUTDIR}/out_reco_edm4hep_REC_${SEED}.edm4hep.root
 python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py out_reco_edm4hep_REC.parquet ${OUTPUTDIR}/pf_tree_${SEED}.parquet
-python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py out_reco_edm4hep_GT_REC.parquet ${OUTPUTDIR}/pf_tree_${SEED}_gentracking.parquet
 python /afs/cern.ch/work/f/fccsw/public/FCCutils/eoscopy.py  events.hepmc ${OUTPUTDIR}/hepmc_files/events_${SEED}.hepmc
 rm -r ${DIR}/${SEED}
