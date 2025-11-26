@@ -5,8 +5,13 @@ import uproot
 import tqdm
 from preprocessing.utils_data_creation_ILD import get_feature_matrix, sanitize, get_reco_properties, build_dummy_array
 from preprocessing.utils_data_creation_ILD import track_feature_order, hit_feature_order, particle_feature_order, PandoraPFO_feature_order
-from preprocessing.utils_data_creation_ILD import  get_genparticles_and_adjacencies, mc_coll, track_coll
+from preprocessing.utils_data_creation_ILD import  get_genparticles_and_adjacencies
+
+from preprocessing.utils_data_creation_ILD import MC_PARTICLE_COL, PANDORA_PFO_COL, CLUSTERS_COL
+from preprocessing.utils_data_creation_ILD import TRACKS_COL, TRACK_TO_MC_LINK_COL
+from preprocessing.utils_data_creation_ILD import CALO_HIT_COLS, CALOHIT_TO_MC_LINK_COL
 import time 
+
 
 def process_one_file(fn, ofn, eval_dataset):
 
@@ -25,65 +30,59 @@ def process_one_file(fn, ofn, eval_dataset):
             fi.get("podio_metadata").arrays("events___CollectionTypeInfo.collectionID")["events___CollectionTypeInfo.collectionID"][0]
         )
     }
+
     prop_data = arrs.arrays(
         [
-            mc_coll,
-            "MCParticle.PDG",
-            "MCParticle.momentum.x",
-            "MCParticle.momentum.y",
-            "MCParticle.momentum.z",
-            "MCParticle.mass",
-            "MCParticle.charge",
-            "MCParticle.generatorStatus",
-            "MCParticle.simulatorStatus",
-            "MCParticle.daughters_begin",
-            "MCParticle.daughters_end",
-            "_MCParticle_daughters/_MCParticle_daughters.index",  # similar to "MCParticle#1.index" in clic
-            "_MCParticle_parents/_MCParticle_parents.index",  # similar to "MCParticle#1.index" in clic
-            track_coll,
-            "_MarlinTrkTracks_trackStates",
-            "_PandoraPFOs_tracks/_PandoraPFOs_tracks.index",
-            "PandoraClusters",
-            "_PandoraClusters_hits/_PandoraClusters_hits.index",
-            "_PandoraClusters_hits/_PandoraClusters_hits.collectionID",
-            "PandoraPFOs",
-            "_PandoraPFOs_clusters/_PandoraPFOs_clusters.index",
-            # "MarlinTrkTracks_dQdx",
+            MC_PARTICLE_COL,
+            f"{MC_PARTICLE_COL}.PDG",
+            f"{MC_PARTICLE_COL}.momentum.x",
+            f"{MC_PARTICLE_COL}.momentum.y",
+            f"{MC_PARTICLE_COL}.momentum.z",
+            f"{MC_PARTICLE_COL}.mass",
+            f"{MC_PARTICLE_COL}.charge",
+            f"{MC_PARTICLE_COL}.generatorStatus",
+            f"{MC_PARTICLE_COL}.simulatorStatus",
+            f"{MC_PARTICLE_COL}.daughters_begin",
+            f"{MC_PARTICLE_COL}.daughters_end",
+            f"_{MC_PARTICLE_COL}_daughters/_{MC_PARTICLE_COL}_daughters.index",  # similar to f"{MC_PARTICLE_COL}#1.index" in clic
+            f"_{MC_PARTICLE_COL}_parents/_{MC_PARTICLE_COL}_parents.index",  # similar to f"{MC_PARTICLE_COL}#1.index" in clic
+            TRACKS_COL,
+            f"_{TRACKS_COL}_trackStates",
+            f"_{PANDORA_PFO_COL}_tracks/_{PANDORA_PFO_COL}_tracks.index",
+            f"{CLUSTERS_COL}",
+            f"_{CLUSTERS_COL}_hits/_{CLUSTERS_COL}_hits.index",
+            f"_{CLUSTERS_COL}_hits/_{CLUSTERS_COL}_hits.collectionID",
+            f"{PANDORA_PFO_COL}",
+            f"_{PANDORA_PFO_COL}_clusters/_{PANDORA_PFO_COL}_clusters.index",
+            # f"{TRACKS_COL}_dQdx",
         ]
     )
     calohit_links = arrs.arrays(
         [
-            "CalohitMCTruthLink.weight",
-            "_CalohitMCTruthLink_to/_CalohitMCTruthLink_to.collectionID",
-            "_CalohitMCTruthLink_to/_CalohitMCTruthLink_to.index",
-            "_CalohitMCTruthLink_from/_CalohitMCTruthLink_from.collectionID",
-            "_CalohitMCTruthLink_from/_CalohitMCTruthLink_from.index",
+            f"{CALOHIT_TO_MC_LINK_COL}.weight",
+            f"_{CALOHIT_TO_MC_LINK_COL}_to/_{CALOHIT_TO_MC_LINK_COL}_to.collectionID",
+            f"_{CALOHIT_TO_MC_LINK_COL}_to/_{CALOHIT_TO_MC_LINK_COL}_to.index",
+            f"_{CALOHIT_TO_MC_LINK_COL}_from/_{CALOHIT_TO_MC_LINK_COL}_from.collectionID",
+            f"_{CALOHIT_TO_MC_LINK_COL}_from/_{CALOHIT_TO_MC_LINK_COL}_from.index",
         ]
     )
-        sitrack_links = arrs.arrays(
-    [
-        "MCTruthMarlinTrkTracksLink.weight",
-        "_MCTruthMarlinTrkTracksLink_to/_MCTruthMarlinTrkTracksLink_to.collectionID",
-        "_MCTruthMarlinTrkTracksLink_to/_MCTruthMarlinTrkTracksLink_to.index",
-        "_MCTruthMarlinTrkTracksLink_from/_MCTruthMarlinTrkTracksLink_from.collectionID",
-        "_MCTruthMarlinTrkTracksLink_from/_MCTruthMarlinTrkTracksLink_from.index",
-    ]
-
+    sitrack_links = arrs.arrays(
+        [
+            f"{TRACK_TO_MC_LINK_COL}.weight",
+            f"_{TRACK_TO_MC_LINK_COL}_to/_{TRACK_TO_MC_LINK_COL}_to.collectionID",
+            f"_{TRACK_TO_MC_LINK_COL}_to/_{TRACK_TO_MC_LINK_COL}_to.index",
+            f"_{TRACK_TO_MC_LINK_COL}_from/_{TRACK_TO_MC_LINK_COL}_from.collectionID",
+            f"_{TRACK_TO_MC_LINK_COL}_from/_{TRACK_TO_MC_LINK_COL}_from.index",
+        ]
+    )
     # maps the recoparticle track/cluster index (in tracks_begin,end and clusters_begin,end)
     # to the index in the track/cluster collection
-    idx_rp_to_cluster = arrs["_PandoraPFOs_clusters/_PandoraPFOs_clusters.index"].array()
-    idx_rp_to_track = arrs["_PandoraPFOs_tracks/_PandoraPFOs_tracks.index"].array()
+    idx_rp_to_cluster = arrs[f"_{PANDORA_PFO_COL}_clusters/_{PANDORA_PFO_COL}_clusters.index"].array()
+    idx_rp_to_track = arrs[f"_{PANDORA_PFO_COL}_tracks/_{PANDORA_PFO_COL}_tracks.index"].array()
 
-    hit_data = {
-        "EcalBarrelCollectionRec": arrs["EcalBarrelCollectionRec"].array(),
-        "EcalEndcapsCollectionRec": arrs["EcalEndcapsCollectionRec"].array(),
-        "HcalBarrelCollectionRec": arrs["HcalBarrelCollectionRec"].array(),
-        "HcalEndcapsCollectionRec": arrs["HcalEndcapsCollectionRec"].array(),
-        "MUON": arrs["MUON"].array(),
-        # "LCAL": arrs["LCAL"].array(),
-        # "LHCAL": arrs["LHCAL"].array(),
-        # "BCAL": arrs["BCAL"].array(),
-    }
+    hit_data = {}
+    for CALO_HIT_COL in CALO_HIT_COLS:
+        hit_data[CALO_HIT_COL] = arrs[CALO_HIT_COL].array() 
     ret = []
     i =0 
     dic = {}

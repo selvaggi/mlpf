@@ -1,0 +1,27 @@
+PROJECT_ROOT="/data/dust/user/dudarboh/calo5d/mlpf"
+
+executable = $PROJECT_ROOT/data_generation/condor_ILD/run_sequence_ILD_train.sh
+arguments = $(file) $(energy) $(Process)
+
+log = $PROJECT_ROOT/data/ILD/intermediate/logs/$(Cluster)_$(Process).log
+output = $PROJECT_ROOT/data/ILD/intermediate/logs/$(Cluster)_$(Process).out
+error = $PROJECT_ROOT/data/ILD/intermediate/logs/$(Cluster)_$(Process).err
+
+request_cpus = 1
+request_memory = 5GB
+request_disk = 1MB
+
+
+# energy=40
+# queue file from $PROJECT_ROOT/data/ILD/external/test.txt
+
+energy=40
+queue file from $PROJECT_ROOT/data/ILD/external/e40_uds.txt
+energy=91
+queue file from $PROJECT_ROOT/data/ILD/external/e91_uds.txt
+energy=200
+queue file from $PROJECT_ROOT/data/ILD/external/e200_uds.txt
+energy=350
+queue file from $PROJECT_ROOT/data/ILD/external/e350_uds.txt
+energy=500
+queue file from $PROJECT_ROOT/data/ILD/external/e500_uds.txt
