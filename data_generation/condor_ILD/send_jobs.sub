@@ -3,9 +3,9 @@ PROJECT_ROOT=/data/dust/user/dudarboh/calo5d/mlpf
 executable = $(PROJECT_ROOT)/data_generation/condor_ILD/run_sequence_ILD_train.sh
 arguments = $(file) $(energy) $(Process)
 
-log = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster)_$(Process).log
-output = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster)_$(Process).out
-error = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster)_$(Process).err
+log = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster).$(Process).log
+output = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster).$(Process).out
+error = $(PROJECT_ROOT)/data/ILD/intermediate/logs/$(Cluster).$(Process).err
 
 request_cpus = 1
 request_memory = 5GB
