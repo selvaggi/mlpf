@@ -17,8 +17,10 @@ CALOHIT_TO_MC_LINK_COL = "CalohitMCTruthLink"
 TRACK_TO_MC_LINK_COL = "MCTruthMarlinTrkTracksLink"
 CALO_HIT_COLS = [
     "EcalBarrelCollectionRec",
+    "EcalEndcapRingCollectionRec",
     "EcalEndcapsCollectionRec",
     "HcalBarrelCollectionRec",
+    "HcalEndcapRingCollectionRec",
     "HcalEndcapsCollectionRec",
     "MUON",
     # "LCAL",
