@@ -16,13 +16,14 @@ max_materialize=400
 # energy=test
 # queue file from $(PROJECT_ROOT)/data/ILD/external/test.txt
 
+# Each job takes around 1-2 Gb space. Be mindful of disk quota exceeding, that can crash a job.
 energy=40
 queue file from $(PROJECT_ROOT)/data/ILD/external/e40_uds.txt
-energy=91
-queue file from $(PROJECT_ROOT)/data/ILD/external/e91_uds.txt
-energy=200
-queue file from $(PROJECT_ROOT)/data/ILD/external/e200_uds.txt
-energy=350
-queue file from $(PROJECT_ROOT)/data/ILD/external/e350_uds.txt
-energy=500
-queue file from $(PROJECT_ROOT)/data/ILD/external/e500_uds.txt
+# energy=91
+# queue file from $(PROJECT_ROOT)/data/ILD/external/e91_uds.txt
+# energy=200
+# queue file from $(PROJECT_ROOT)/data/ILD/external/e200_uds.txt
+# energy=350
+# queue file from $(PROJECT_ROOT)/data/ILD/external/e350_uds.txt
+# energy=500
+# queue file from $(PROJECT_ROOT)/data/ILD/external/e500_uds.txt
