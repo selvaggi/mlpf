@@ -17,7 +17,7 @@ rm -rf ${TEMP_DATA_DIR}
 mkdir -p ${TEMP_DATA_DIR}
 
 # Patch missing CaloHit-MCTruth links and convert to edm4hep
-source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh -r 2025-11-26
+source /cvmfs/sw-nightlies.hsf.org/key4hep/setup.sh -r 2025-12-03
 k4run ${PROJECT_ROOT}/data_generation/condor_ILD/old_ild_prod_to_edm4hep.py --inputFiles=${file} --outputFileBase=${TEMP_DATA_DIR}/${process}
 
 # Run dataset creation script
