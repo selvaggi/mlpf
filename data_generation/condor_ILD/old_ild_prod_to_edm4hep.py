@@ -1,4 +1,4 @@
-from Gaudi.Configuration import *
+from Gaudi.Configuration import INFO, WARNING, DEBUG
 from Configurables import EventDataSvc, MarlinProcessorWrapper, LcioEvent
 from k4FWCore import ApplicationMgr, IOSvc
 from k4MarlinWrapper.io_helpers import IOHandlerHelper
@@ -59,10 +59,28 @@ CaloHitToMcTruthLinker.Parameters = {
 
   # excluding LumiCal, BeamCal, and LHCal collections for now, because their time needs manual fixing.
   # "BeamCalCollection", "LHCalCollection", "LumiCalCollection", 
-  "SimCaloHitCollections": ["ECalBarrelSimHitCollections", "ECalEndcapSimHitCollections", "ECalRingSimHitCollections", "HCalBarrelSimHitCollections", "HCalEndcapSimHitCollections", "HCalRingSimHitCollections", "YokeBarrelCollection", "YokeEndcapsCollection"],
+  "SimCaloHitCollections": ["ECalBarrelSiHitsEven",
+                            "ECalBarrelSiHitsOdd",
+                            "ECalEndcapSiHitsEven",
+                            "ECalEndcapSiHitsOdd",
+                            "EcalEndcapRingCollection",
+                            "HcalBarrelRegCollection",
+                            "HcalEndcapsCollection",
+                            "HcalEndcapRingCollection",
+                            "YokeBarrelCollection",
+                            "YokeEndcapsCollection"
+                            ],
+
 
   # "RelationLHcalHit", "RelationLcalHit", "RelationBCalHit"
-  "SimCalorimeterHitRelationNames": [ "EcalBarrelRelationsSimRec", "EcalEndcapRingRelationsSimRec", "EcalEndcapsRelationsSimRec", "HcalBarrelRelationsSimRec", "HcalEndcapRingRelationsSimRec", "HcalEndcapsRelationsSimRec", "RelationMuonHit"],
+  "SimCalorimeterHitRelationNames": [ "EcalBarrelRelationsSimRec",
+                                      "EcalEndcapRingRelationsSimRec",
+                                      "EcalEndcapsRelationsSimRec",
+                                      "HcalBarrelRelationsSimRec",
+                                      "HcalEndcapRingRelationsSimRec",
+                                      "HcalEndcapsRelationsSimRec",
+                                      "RelationMuonHit"
+                                    ],
 
 
   ### output collections
@@ -100,5 +118,5 @@ ApplicationMgr(TopAlg=alg_list,
                EvtSel="NONE",
                EvtMax=-1,
                ExtSvc=svc_list,
-               OutputLevel=INFO,
+               OutputLevel=WARNING,
                )
