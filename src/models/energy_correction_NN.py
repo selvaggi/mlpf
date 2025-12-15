@@ -99,7 +99,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     in_mv_channels=1,
                     out_mv_channels=1,
                     hidden_mv_channels=4,
-                    in_s_channels=3,
+                    in_s_channels=2,
                     out_s_channels=None,
                     hidden_s_channels=4,
                     num_blocks=3,
@@ -115,7 +115,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                         in_mv_channels=1,
                         out_mv_channels=1,
                         hidden_mv_channels=4,
-                        in_s_channels=3,
+                        in_s_channels=2,
                         out_s_channels=None,
                         hidden_s_channels=4,
                         num_blocks=3,
@@ -242,7 +242,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 hit_type.view(-1, 1)
             )
             extra_scalars = torch.cat(
-                [betas.unsqueeze(1), p.unsqueeze(1), e.unsqueeze(1)], dim=1
+                [ p.unsqueeze(1), e.unsqueeze(1)], dim=1
             )
             mask = self.build_attention_mask(graphs_new)
             embedded_inputs = embedded_inputs.unsqueeze(-2)
@@ -445,6 +445,7 @@ class EnergyCorrection():
             self.main_model.trainer.global_rank,
             use_gt_clusters=self.args.use_gt_clusters,
             add_fakes=add_fakes,
+            truth_tracks=self.args.truth_tracking
         )
         time_matching_end = time()
         # wandb.log({"time_clustering_matching": time_matching_end - time_matching_start})
@@ -727,7 +728,7 @@ class EnergyCorrection():
     def criterion(ypred, ytrue, step):
         return F.l1_loss(ypred, ytrue)
 
-    def get_loss(self, batch_g, y, result):
+    def get_loss(self, batch_g, y, result, stats, fixed):
         (
             model_output,
             dic_e_cor,
@@ -744,18 +745,29 @@ class EnergyCorrection():
         e_cor = dic_e_cor["pred_energy_corr"]
 
         ############ loss EC of neutral only  ###########
-        e_true_neutrals = e_true[dic_e_cor["neutrals_idx"]]
-        e_pred_neutrals = e_cor[dic_e_cor["neutrals_idx"]]
-        in_distribution = (torch.abs(e_true_neutrals-e_pred_neutrals)/e_true_neutrals)<0.3
+        
+        mask_neutral_for_loss = correct_mass_neutral(torch.tensor(pid_true_matched), dic_e_cor["neutrals_idx"])
+
+        e_true_neutrals = e_true[mask_neutral_for_loss]
+        e_pred_neutrals = e_cor[mask_neutral_for_loss]
+        e_reco_neutrals = e_sum_hits[mask_neutral_for_loss]
+        in_distribution = (torch.abs(e_true_neutrals-e_reco_neutrals)/e_true_neutrals)<0.6
+        # print("distribution", torch.abs(e_true_neutrals-e_reco_neutrals)/e_true_neutrals)
         # loss_EC_neutrals = torch.nn.L1Loss()(
         #     e_pred_neutrals[in_distribution], e_true_neutrals[in_distribution]
         # )
-        print(e_pred_neutrals.shape)
+        # print(e_pred_neutrals.shape)
         ypred = e_pred_neutrals[in_distribution]
         ybatch = e_true_neutrals[in_distribution]
-        print(ypred)
-        loss_EC_neutrals = criterion_E_cor(ypred.flatten(), ybatch.flatten(), self.global_step)
-
+        if len(ypred)>0:
+            pid_neutrals = torch.tensor(pid_true_matched)[mask_neutral_for_loss.cpu()].to(ypred.device)
+            # print(pid_neutrals)
+            # print(torch.sum(in_distribution))
+            # print(in_distribution)
+            # print(pid_neutrals[in_distribution])
+            loss_EC_neutrals, stats = criterion_E_cor(ypred.flatten(), ybatch.flatten(), self.global_step, torch.abs(pid_neutrals[in_distribution]), stats, frozen=fixed)
+        else:
+            loss_EC_neutrals = 0
         filt_neutrons = (e_true[dic_e_cor["neutrals_idx"]] < 5).cpu() & (torch.tensor(pid_true_matched)[dic_e_cor["neutrals_idx"].cpu()] == 2112)
         loss_EC_neutrons = torch.nn.L1Loss()(
             e_cor[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu(), e_true[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu()
@@ -765,6 +777,7 @@ class EnergyCorrection():
             e_cor[dic_e_cor["neutrals_idx"]][filt_KL].detach().cpu(), e_true[dic_e_cor["neutrals_idx"]][filt_KL].detach().cpu()
         )
         loss_pos, loss_pos_neutrals, loss_pos_charged = loss_position(part_coords_matched, dic_e_cor["pred_pos"], self.args, dic_e_cor["neutrals_idx"], dic_e_cor["charged_idx"])
+    
         wandb.log({
             "loss_EC_neutrals": loss_EC_neutrals, 
             "loss_p_neutrals": loss_pos_neutrals, "loss_p_charged": loss_pos_charged,
@@ -780,45 +793,48 @@ class EnergyCorrection():
             neutral_PID_pred, neutral_PID_true_onehot, mask_neutral = obtain_PID_neutral(dic_e_cor,pid_true_matched, self.pids_neutral, self.args, self.pid_conversion_dict)
         
         if len(self.pids_charged):
-            if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:
-                # Batch size must be big enough
-                weights = charged_PID_true_onehot.sum(dim=0)
-                weights[weights == 0] = 1  # to avoid issues
-                weights = 1 / weights  # maybe choose something else?
-            else:
-                weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
-            if len(charged_PID_pred):
-                mask_charged = mask_charged.bool()
-                loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-                    charged_PID_pred[mask_charged], charged_PID_true_onehot[mask_charged]
-                )
-            else:
-                loss_charged_pid = 0
+            loss_charged_pid, stats= pid_loss_weighted(charged_PID_pred, charged_PID_true_onehot, mask_charged, stats, fixed, "charged")
+            # if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:
+            #     # Batch size must be big enough
+            #     weights = charged_PID_true_onehot.sum(dim=0)
+            #     weights[weights == 0] = 1  # to avoid issues
+            #     weights = 1 / weights  # maybe choose something else?
+            # else:
+            #     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
+            # if len(charged_PID_pred):
+            #     mask_charged = mask_charged.bool()
+            #     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
+            #         charged_PID_pred[mask_charged], charged_PID_true_onehot[mask_charged]
+            #     )
+            # else:
+            #     loss_charged_pid = 0
+            
             wandb.log({"loss_charged_pid": loss_charged_pid})
         if len(self.pids_neutral):
-            if self.args.balance_pid_classes and neutral_PID_true_onehot.shape[0] > 20:
-                # Batch size must be big enough
-                weights = neutral_PID_true_onehot.sum(dim=0)
-                weights[weights == 0] = 1  # To avoid issues
-                weights = 1 / weights  # Maybe choose something else?
-            else:
-                weights = torch.ones(len(self.pids_neutral)).to(charged_PID_pred.device)
-            if len(neutral_PID_pred):
-                mask_neutral = mask_neutral.bool()
-                loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-                    neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
-                )
-                # print("Neutral PID pred:\n", neutral_PID_pred[mask_neutral][:4])
-                # print("Neutral PID true:\n", neutral_PID_true_onehot[mask_neutral][:4])
-            else:
-                loss_neutral_pid = 0
+            loss_neutral_pid, stats = pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot, mask_neutral, stats, fixed, "neutral")
+            # if self.args.balance_pid_classes and neutral_PID_true_onehot.shape[0] > 20:
+            #     # Batch size must be big enough
+            #     weights = neutral_PID_true_onehot.sum(dim=0)
+            #     weights[weights == 0] = 1  # To avoid issues
+            #     weights = 1 / weights  # Maybe choose something else?
+            # else:
+            #     weights = torch.ones(len(self.pids_neutral)).to(charged_PID_pred.device)
+            # if len(neutral_PID_pred):
+            #     mask_neutral = mask_neutral.bool()
+            #     loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
+            #         neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
+            #     )
+            #     # print("Neutral PID pred:\n", neutral_PID_pred[mask_neutral][:4])
+            #     # print("Neutral PID true:\n", neutral_PID_true_onehot[mask_neutral][:4])
+            # else:
+            #     loss_neutral_pid = 0
             wandb.log({"loss_neutral_pid": loss_neutral_pid})
         ########### loss score ###########
         if self.fake_score_network:
             loss_score = loss_score_func(dic_e_cor)
         else:
             loss_score = 0
-        return loss_EC_neutrals, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score
+        return loss_EC_neutrals, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score, stats
 
     def get_validation_step_outputs(self, batch_g, y, result):
         if self.args.explain_ec:
@@ -889,16 +905,109 @@ class EnergyCorrection():
 
 
 
-def criterion_E_cor(ypred, ytrue, step):
-    if step < 1000:
-        return F.l1_loss(ypred, ytrue)
+def criterion_E_cor(ypred, ytrue, step, pid_neutrals, stats, frozen=False):
+    # count occurrences of each PID
+    # Initialize stats container if first call
+    # ==============================================================
+    # 1) Update stats only if not frozen
+    # ==============================================================   
+    if len(ypred)>0:
+        pid_neutrals = pid_neutrals.reshape(-1)
+        if not frozen:
+            unique_pids, counts = pid_neutrals.unique(return_counts=True)
+            for pid, cnt in zip(unique_pids.tolist(), counts.tolist()):
+                stats["counts"][pid] = stats["counts"].get(pid, 0) + cnt
+        # ==============================================================
+        # 2) Convert stats to tensors for computing weights
+        # ==============================================================    
+        all_pids = list(stats["counts"].keys())
+        all_counts = torch.tensor([stats["counts"][p] for p in all_pids], dtype=torch.float)
+
+        freq = all_counts / all_counts.sum()
+        raw_weights = 1.0 / freq                      # rarity → higher weight
+        weights = raw_weights / raw_weights.mean()    # optional normalization
+        # build weight tensor for each sample
+        pid_weight_map = {str(int(pid)): w for pid, w in zip(all_pids, weights)}
+        
+        w_tensor = torch.tensor([pid_weight_map[str(int(p))] for p in pid_neutrals], 
+                            device=ypred.device)
+        # w_tensor = w_tensor/torch.sum(w_tensor)*len(w_tensor)
+
+        w_tensor = w_tensor.to(ypred.device)
+        mask_nans = torch.isnan(w_tensor)
+        w_tensor[mask_nans] =0 
+        mean_penalty = torch.abs(ypred.mean() - ytrue.mean()) * 5.0 
+        return torch.mean(F.l1_loss(ypred, ytrue, reduction='none')*w_tensor), stats
+        # if step < 1000:
+        #     return F.l1_loss(ypred, ytrue, weight=w_tensor)
+        # else:
+        #     # cut the top 5 % of losses by setting them to 0
+        #     #losses = F.l1_loss(ypred, ytrue, reduction='none') #+ F.l1_loss(ypred, ytrue, reduction = 'none') / ytrue.abs()
+        #     losses = F.l1_loss(ypred, ytrue, reduction = 'none', weight=w_tensor) / ytrue.abs()
+        #     if len(losses.shape) > 0:
+        #         if int(losses.size(0) * 0.05) > 1:
+        #             top_percentile = torch.kthvalue(losses, int(losses.size(0) * 0.95)).values
+        #             mask = (losses > top_percentile)
+        #             losses[mask] = 0.0
+        #     return losses.mean()
     else:
-        # cut the top 5 % of losses by setting them to 0
-        #losses = F.l1_loss(ypred, ytrue, reduction='none') #+ F.l1_loss(ypred, ytrue, reduction = 'none') / ytrue.abs()
-        losses = F.l1_loss(ypred, ytrue, reduction = 'none') / ytrue.abs()
-        if len(losses.shape) > 0:
-            if int(losses.size(0) * 0.05) > 1:
-                top_percentile = torch.kthvalue(losses, int(losses.size(0) * 0.95)).values
-                mask = (losses > top_percentile)
-                losses[mask] = 0.0
-        return losses.mean()
+        return 0, stats
+
+
+def pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot, mask_neutral, stats, frozen=False, name=""):
+    if len(neutral_PID_pred):
+        """CrossEntropyLoss with PID class balancing based on accumulated stats."""
+        # if "counts_pid" not in stats:
+        #     stats["counts_pid"+name] = {}
+        # Must have enough events
+        mask_neutral = mask_neutral.bool()
+        if neutral_PID_true_onehot.shape[0] <= 20:
+            return torch.nn.CrossEntropyLoss()(
+                neutral_PID_pred[mask_neutral],
+                neutral_PID_true_onehot[mask_neutral]
+            )
+
+        # Update statistics unless frozen
+        if not frozen:
+            true_labels = neutral_PID_true_onehot.argmax(dim=1)
+            for c in true_labels.tolist():
+                stats["counts_pid_"+name][c] = stats["counts_pid_"+name].get(c, 0) + 1
+
+        # Build global weight tensor
+        num_classes = neutral_PID_true_onehot.shape[1]
+        counts = torch.tensor([stats["counts_pid_"+name].get(i,1) for i in range(num_classes)],
+                            dtype=torch.float, device=neutral_PID_pred.device)
+        counts[counts==0]=1
+        weights = 1.0 / counts
+        weights = weights / weights.mean()          # optional normalization
+
+        return torch.nn.CrossEntropyLoss(weight=weights)(
+            neutral_PID_pred[mask_neutral],
+            neutral_PID_true_onehot[mask_neutral]
+        ), stats 
+    else:
+        return 0, stats
+
+
+def correct_mass_neutral(pid_neutral, neural_mask):
+    """
+    pid_neutral: tensor of PIDs (shape [N])
+    neural_mask: tensor of indices of neutral candidates (e.g. LongTensor)
+
+    we remove indices where pid is in remove list
+    """
+    pid_neutral = pid_neutral.to(neural_mask.device)
+    pid_neutral = torch.abs(pid_neutral)
+    # PIDs to remove
+    #remove_list = torch.tensor([-211, 211, -11, 11, 13, -13, 2212, 321], device=pid_neutral.device)
+    keep_list = torch.tensor([22, 130, 2112], device=pid_neutral.device)
+
+    # get PIDs corresponding to the given indices
+    selected_pids = pid_neutral[neural_mask]          # <- index access
+    # build mask: True = keep, False = remove
+    keep_mask = torch.isin(selected_pids, keep_list)
+
+    # filter indices
+    corrected_indices = neural_mask[keep_mask.to(neural_mask.device)]
+
+    return corrected_indices

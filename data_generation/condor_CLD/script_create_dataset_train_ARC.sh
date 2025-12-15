@@ -1,0 +1,2 @@
+#!/bin/bash
+python submit_jobs_train_ARC.py --sample Zcard --cldgeo  CLD_o2_v05 --config p8_ee_Zuds_ecm91 --outdir /eos/experiment/fcc/users/m/mgarciam/mlpf/CLD/train/Z_uds_CLD_o2_v05_eval_v1/ --condordir /eos/experiment/fcc/users/m/mgarciam/mlpf/condor/Z_uds_CLD_o2_v05_eval_v1/  --njobs 11000 --nev 100 --queue tomorrow --cldconfig /afs/cern.ch/work/m/mgarciam/private/CLD_Config_versions/CLDConfig_ARC/CLDConfig/

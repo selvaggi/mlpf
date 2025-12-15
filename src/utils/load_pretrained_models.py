@@ -9,6 +9,12 @@ def load_train_model(args, dev):
 
 
 def load_test_model(args, dev):
+    if args.load_model_weights is not None and (not args.correction):
+            from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
+            model = GravnetModel.load_from_checkpoint(
+                args.load_model_weights, args=args, dev=0, map_location=dev, strict=False
+            )
+           
     if args.load_model_weights is not None and args.correction:
             from src.models.GATr.Gatr_pf_e_noise import ExampleWrapper as GravnetModel
             model = GravnetModel.load_from_checkpoint(

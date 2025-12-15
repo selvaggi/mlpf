@@ -86,6 +86,17 @@ class ExampleWrapper(L.LightningModule):
         #    param.requires_grad = False
         # for param in self.ec_model_wrapper_neutral.model.parameters():
         #    param.requires_grad = False
+        # remove grads first:
+        for p in self.energy_correction.model_charged.parameters():
+            p.requires_grad = False
+
+        # Freeze gatr_pid inside neutral
+        for p in self.energy_correction.model_neutral.gatr_pid.parameters():
+            p.requires_grad = False
+
+        # Freeze pid_head inside neutral
+        for p in self.energy_correction.model_neutral.PID_head.parameters():
+            p.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         inputs = g.ndata["pos_hits_xyz"].float()
@@ -156,6 +167,15 @@ class ExampleWrapper(L.LightningModule):
         return BlockDiagonalMask.from_seqlens(
             torch.bincount(batch_numbers.long()).tolist()
         )
+    def unfreeze_all(self):
+        for p in self.energy_correction.model_charged.parameters():
+            p.requires_grad = True
+
+        for p in self.energy_correction.model_neutral.gatr_pid.parameters():
+            p.requires_grad = True
+
+        for p in self.energy_correction.model_neutral.PID_head.parameters():
+            p.requires_grad = True
 
     def training_step(self, batch, batch_idx):
         y = batch[1]
@@ -185,8 +205,20 @@ class ExampleWrapper(L.LightningModule):
         )
         if self.args.correction:
             self.energy_correction.global_step = self.global_step
-            loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score= self.energy_correction.get_loss(batch_g, y, result)
-            loss = loss_EC  + loss_neutral_pid + loss_charged_pid + loss_score
+            if self.current_epoch  ==0:
+                fixed = False
+
+            else:
+                fixed = True
+            loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score, self.stats= self.energy_correction.get_loss(batch_g, y, result, self.stats,  fixed)
+        
+            if self.scheduler.step_count==1000:
+                self.unfreeze_all()
+            if self.scheduler.step_count<1000:
+                loss = loss_EC
+            else:
+                loss = loss_EC+loss_neutral_pid + loss_charged_pid 
+            
         else:
             loss_score = 0
         if self.trainer.is_global_zero:
@@ -199,6 +231,7 @@ class ExampleWrapper(L.LightningModule):
         del losses
         return loss
     
+            
     def validation_step(self, batch, batch_idx):
         self.create_paths()
         self.validation_step_outputs = []
@@ -226,27 +259,29 @@ class ExampleWrapper(L.LightningModule):
             pred_ref_pt = None
             num_fakes = None
             extra_features = None
-        (loss, losses,) = object_condensation_loss2(
-            batch_g,
-            model_output,
-            e_cor1,
-            y,
-            clust_loss_only=True,
-            add_energy_loss=False,
-            calc_e_frac_loss=False,
-            q_min=self.args.qmin,
-            frac_clustering_loss=self.args.frac_cluster_loss,
-            attr_weight=self.args.L_attractive_weight,
-            repul_weight=self.args.L_repulsive_weight,
-            fill_loss_weight=self.args.fill_loss_weight,
-            use_average_cc_pos=self.args.use_average_cc_pos,
-            loss_type=self.args.losstype,
-        )
+            fakes_labels = None
+        # commented to be ablt to run with tracks and no hits
+        # (loss, losses,) = object_condensation_loss2(
+        #     batch_g,
+        #     model_output,
+        #     e_cor1,
+        #     y,
+        #     clust_loss_only=True,
+        #     add_energy_loss=False,
+        #     calc_e_frac_loss=False,
+        #     q_min=self.args.qmin,
+        #     frac_clustering_loss=self.args.frac_cluster_loss,
+        #     attr_weight=self.args.L_attractive_weight,
+        #     repul_weight=self.args.L_repulsive_weight,
+        #     fill_loss_weight=self.args.fill_loss_weight,
+        #     use_average_cc_pos=self.args.use_average_cc_pos,
+        #     loss_type=self.args.losstype,
+        # )
         loss_ec = 0
-        if self.trainer.is_global_zero:
-            log_losses_wandb(
-                True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
-            )
+        # if self.trainer.is_global_zero:
+        #     log_losses_wandb(
+        #         True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
+        #     )
         if self.args.explain_ec:
             self.validation_step_outputs.append(
                 [model_output, e_cor, batch_g, y, shap_vals, ec_x, num_fakes]
@@ -289,23 +324,25 @@ class ExampleWrapper(L.LightningModule):
                 pids_charged=self.pids_charged,
                 number_of_fakes=num_fakes,
                 extra_features=extra_features,
-                fakes_labels=fakes_labels
+                fakes_labels=fakes_labels, 
+                pandora_available=self.args.pandora,
+                truth_tracks=self.args.truth_tracking
             )
             self.df_showers_pandora.append(df_batch_pandora)
             print("Appending another batch", len(df_batch1))
             self.df_showes_db.append(df_batch1)
-        del losses
-        del loss
+        # del losses
+        # del loss
         del model_output
     def create_paths(self):
         cluster_features_path = os.path.join(self.args.model_prefix, "cluster_features")
         show_df_eval_path = os.path.join(
             self.args.model_prefix, "showers_df_evaluation"
         )
-        if not os.path.exists(show_df_eval_path):
-            os.makedirs(show_df_eval_path)
-        if not os.path.exists(cluster_features_path):
-            os.makedirs(cluster_features_path)
+        # if not os.path.exists(show_df_eval_path):
+        #     os.makedirs(show_df_eval_path)
+        # if not os.path.exists(cluster_features_path):
+        #     os.makedirs(cluster_features_path)
         self.show_df_eval_path = show_df_eval_path
     def on_train_epoch_end(self):
         self.log("train_loss_epoch", self.loss_final / self.number_b)
@@ -314,6 +351,11 @@ class ExampleWrapper(L.LightningModule):
         # if self.trainer.is_global_zero and self.current_epoch == 0:
         #     self.stat_dict = {}
         self.make_mom_zero()
+        if self.current_epoch == 0:
+            self.stats = {}
+            self.stats["counts"] = {}
+            self.stats["counts_pid_neutral"] = {}
+            self.stats["counts_pid_charged"] = {}
 
     def on_validation_epoch_start(self):
         self.total_number_events = 0
@@ -321,6 +363,7 @@ class ExampleWrapper(L.LightningModule):
         self.df_showers = []
         self.df_showers_pandora = []
         self.df_showes_db = []
+
 
     def make_mom_zero(self):
         if self.current_epoch > 1 or self.args.predict:
@@ -340,7 +383,10 @@ class ExampleWrapper(L.LightningModule):
                     torch.save(shap_vals, path_shap_vals)
                     print("SHAP values saved!")
                 # self.df_showers = pd.concat(self.df_showers)
-                self.df_showers_pandora = pd.concat(self.df_showers_pandora)
+                if self.args.pandora:
+                    self.df_showers_pandora = pd.concat(self.df_showers_pandora)
+                else:
+                    self.df_showers_pandora = []
                 self.df_showes_db = pd.concat(self.df_showes_db)
                 store_at_batch_end(
                     path_save=os.path.join(
@@ -352,6 +398,7 @@ class ExampleWrapper(L.LightningModule):
                     step=0,
                     predict=True,
                     store=True,
+                    pandora_available=self.args.pandora
                 )
             # else:
             #     model_output = self.validation_step_outputs[0][0]
@@ -395,13 +442,14 @@ class ExampleWrapper(L.LightningModule):
         self.df_showes_db = []
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.start_lr)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         #     optimizer,
         #     T_max=int(7900*3), # for now for testing
         #     eta_min=1e-6,
         # )
         scheduler = CosineAnnealingThenFixedScheduler(optimizer,T_max=int(36400*2), fixed_lr=1e-5 ) #10000
+        self.scheduler = scheduler
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

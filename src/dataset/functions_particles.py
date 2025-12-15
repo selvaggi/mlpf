@@ -45,9 +45,8 @@ class Particles_GT():
         self.pid = y_pid
         self.vertex=vertex_coord
         self.gen_status = gen_status
-        if args.allegro:
+        if args.allegro or args.truth_tracking:
             self.endpoint=features_particles[:, 18:]
-        
 
     def __len__(self):
         return len(self.E)

@@ -17,9 +17,107 @@ from src.utils.inference.per_particle_metrics import plot_event
 import random
 import string
 import hdbscan
+
+import densitypeakclustering as dc
+def local_density_energy(D, d_c,energies,  normalize=False):
+    """
+    Computes 'rho', the local density for each data point.
+
+    Parameters
+    ----------
+    D : ndarray
+        Distance matrix (samples X samples)
+    d_c : float
+        Cutoff distance
+    normalize : bool, optional
+        Normalize the local density, by default False
+
+    Returns
+    -------
+    ndarray
+        Local density (rho) for each data point
+    """
+
+    # Apply cuttoff
+    D_cuttoff = D<d_c
+    # print("D: \n{}".format(D_cuttoff[:3,:3]))
+
+    # Some fancy weighing magic ... (see matlab script by author, they refer to this as a "Gaussian Kernel")
+    rho = np.zeros((D.shape[0],))
+    for s in range(len(rho)):
+        rho[s] = np.sum(energies[D_cuttoff[s,:]]*np.exp(-(D[s,D_cuttoff[s,:]] / d_c)**2))
+
+    # Normalize
+    if normalize:
+        rho = rho / np.max(rho)
+
+    # Calculate and return the local density vector
+    return rho
+
+def DPC_custom_CLD(X, g, device):
+    d_c = 0.1
+    rho_min = 0.05
+    delta_min = 0.4
+    D = dc.distance_matrix(X.detach().cpu())
+    rho = local_density_energy(D,d_c,g.ndata["e_hits"].view(-1).cpu().numpy()) #dc.local_density
+    delta,nearest = dc.distance_to_larger_density(D, rho)
+    centers = dc.cluster_centers(rho, delta, rho_min=rho_min, delta_min=delta_min)
+    # Assign cluster ID's to all datapoints
+    ids = dc.assign_cluster_id(rho, nearest, centers)
+    core_ids = np.full(len(X), -1)   # default noise / non-core label
+    D[np.isnan(D)]=0
+    for indx, c in enumerate(centers):
+        # points that were assigned to center c AND are closer than d_c
+        idx = np.where((ids == indx) & (D[:, c] < 0.5))[0]
+        core_ids[idx] = indx
+    labels = torch.Tensor(core_ids)+1
+    return labels.long().to(device)
+
+def DPC_custom(X, g, device):
+    d_c = 0.05
+    rho_min = 0.1
+    delta_min = 0.20
+    D = dc.distance_matrix(X.detach().cpu())
+    rho = local_density_energy(D,d_c,g.ndata["e_hits"].view(-1).cpu().numpy())
+    delta,nearest = dc.distance_to_larger_density(D, rho)
+    centers = dc.cluster_centers(rho, delta, rho_min=rho_min, delta_min=delta_min)
+    # Assign cluster ID's to all datapoints
+    ids = dc.assign_cluster_id(rho, nearest, centers)
+    core_ids = np.full(len(X), -1)   # default noise / non-core label
+    D[np.isnan(D)]=0
+    for indx, c in enumerate(centers):
+        # points that were assigned to center c AND are closer than d_c
+        idx = np.where((ids == indx) & (D[:, c] < 0.3))[0]
+        core_ids[idx] = indx
+    labels = torch.Tensor(core_ids)+1
+    return labels.long().to(device)
+
+
+
+def DPC(X, device):
+    d_c = 0.20
+    rho_min = 2
+    delta_min = 0.2
+    D = dc.distance_matrix(X.detach().cpu())
+    rho = dc.local_density(D, d_c)
+    delta,nearest = dc.distance_to_larger_density(D, rho)
+    centers = dc.cluster_centers(rho, delta, rho_min=rho_min, delta_min=delta_min)
+    # Assign cluster ID's to all datapoints
+    ids = dc.assign_cluster_id(rho, nearest, centers)
+    core_ids = np.full(len(X), -1)   # default noise / non-core label
+    D[np.isnan(D)]=0
+    for indx, c in enumerate(centers):
+        # points that were assigned to center c AND are closer than d_c
+        idx = np.where((ids == indx) & (D[:, c] < 0.3))[0]
+        core_ids[idx] = indx
+    labels = torch.Tensor(core_ids)+1
+    return labels.long().to(device)
+
+
 def remove_bad_tracks_from_cluster(g, labels_hdb):
     mask_hit_type_t1 = g.ndata["hit_type"]==2
     mask_hit_type_t2 = g.ndata["hit_type"]==1
+    mask_hit_type_t4 = g.ndata["hit_type"]==4
     labels_hdb_corrected_tracks = labels_hdb.clone()
     # check each cluster
     for i in range(0, torch.max(labels_hdb)+1):
@@ -27,17 +125,22 @@ def remove_bad_tracks_from_cluster(g, labels_hdb):
         if torch.sum(mask_hit_type_t2[mask_labels_i])>0 and i>0:
             e_cluster = torch.sum(g.ndata["e_hits"][mask_labels_i])
             p_track = g.ndata["p_hits"][mask_labels_i*mask_hit_type_t2]
+            chi_s = g.ndata["chi_squared_tracks"][mask_labels_i*mask_hit_type_t2]
+            number_of_hits_muon = torch.sum(mask_labels_i*mask_hit_type_t4)
             diffs = torch.abs(e_cluster-p_track)/p_track
             diffs = diffs.view(-1)
-            bad_diffs = diffs>0.7
+            bad_diffs = diffs>0.65
             pos_track = g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2]
             mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t1], dim=0)
             angles = torch.sum(mean_pos_cluster*g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
             norms = torch.norm(mean_pos_cluster)*torch.norm(g.ndata["pos_hits_xyz"][mask_labels_i*mask_hit_type_t2], dim=1)
             angles_tracks = angles/norms
             distance_track_cluster = torch.norm(mean_pos_cluster-pos_track,dim=1)/1000
-            bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999)+bad_diffs)
-            bad_tracks_ = torch.nonzero(bad_tracks).view(-1)
+            #bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999)+bad_diffs)
+            # bad_tracks_10 = bad_diffs*(p_track.view(-1)>10)*(number_of_hits_muon<1)
+            # bad_tracks_20 = (diffs>0.55)*(p_track.view(-1)>20)*(number_of_hits_muon<1)
+            # bad_tracks_30= (diffs>0.30)*(p_track.view(-1)>30)*(number_of_hits_muon<1)
+            bad_tracks = chi_s>1.5  #bad_tracks_10+bad_tracks_20+bad_tracks_30+(p_track.view(-1)>45)
             cluster_t2_nodes = torch.nonzero(mask_labels_i & mask_hit_type_t2).view(-1)
             bad_tracks_nodes = cluster_t2_nodes[bad_tracks]
             labels_hdb_corrected_tracks[bad_tracks_nodes] = 0
@@ -75,7 +178,9 @@ def create_and_store_graph_output(
     pred_xyz_track=None,
     number_of_fakes=None,
     extra_features=None,
-    fakes_labels=None
+    fakes_labels=None,
+    pandora_available=False,
+    truth_tracks=False
 ):
     number_of_showers_total = 0
     number_of_showers_total1 = 0
@@ -110,7 +215,8 @@ def create_and_store_graph_output(
         if use_gt_clusters:
             labels_hdb = dic["graph"].ndata["particle_number"].type(torch.int64)
         else:
-            labels_hdb = hfdb_obtain_labels(X, model_output.device)
+            #labels_hdb = hfdb_obtain_labels(X, model_output.device)
+            labels_hdb =DPC_custom_CLD(X, dic["graph"], model_output.device)
             #labels_hdb = labels_clustering 
             # betas = torch.sigmoid(dic["graph"].ndata["beta"])
             # labels_clustering = clustering_obtain_labels(
@@ -118,12 +224,13 @@ def create_and_store_graph_output(
             # )
             # labels_hdb = labels_clustering
 
-            num_clusters = len(labels_hdb.unique())
+            # num_clusters = len(labels_hdb.unique())
             #if labels_hdb.min() == 0 and labels_hdb.sum() == 0:
             #    labels_hdb += 1  # Quick hack
             #    raise Exception("!!!! Labels==0 !!!!")
-            labels_hdb = remove_bad_tracks_from_cluster(dic["graph"], labels_hdb)
-        if predict:
+            if not truth_tracks:
+                labels_hdb = remove_bad_tracks_from_cluster(dic["graph"], labels_hdb)
+        if predict and pandora_available:
             labels_pandora = get_labels_pandora(tracks, dic, model_output.device)
             num_clusters_pandora = len(labels_pandora.unique())
         particle_ids = torch.unique(dic["graph"].ndata["particle_number"])
@@ -140,7 +247,7 @@ def create_and_store_graph_output(
             tracks=tracks,
             hdbscan=True,
         )
-        if predict:
+        if predict  and pandora_available:
             (
                 shower_p_unique_pandora,
                 row_ind_pandora,
@@ -159,9 +266,6 @@ def create_and_store_graph_output(
                 tracks=tracks,
             )
 
-        # # if len(row_ind_hdb) < len(dic["part_true"]):
-        # print(len(row_ind_hdb), len(dic["part_true"]))
-        # print("storing  event", local_rank, step, i)
         # path_graphs_all_comparing = os.path.join(path_save, "graphs_all_comparing")
         # if not os.path.exists(path_graphs_all_comparing):
         #    os.makedirs(path_graphs_all_comparing)
@@ -176,17 +280,17 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
         #  )'''
-        # torch.save(
-        #     dic,
-        #     path_save
-        #     + "/graphs_3M_Hss/"
-        #     + str(local_rank)
-        #     + "_"
-        #     + str(step)
-        #     + "_"
-        #     + str(i)
-        #     + ".pt",
-        #  )
+        #torch.save(
+        #       dic,
+        #       path_save
+        ##       + "/graphs/"
+        #       + str(local_rank)
+        #       + "_"
+        #       + str(step)
+        ##       + "_"
+        #       + str(i)
+        #       + ".pt",
+        #    )
         
         if len(shower_p_unique_hdb) > 1:
             # df_event, number_of_showers_total = generate_showers_data_frame(
@@ -238,7 +342,7 @@ def create_and_store_graph_output(
             )
             if len(df_event1) > 1:
                 df_list1.append(df_event1)
-            if predict:
+            if predict and pandora_available:
                 df_event_pandora = generate_showers_data_frame(
                     labels_pandora,
                     dic,
@@ -259,12 +363,9 @@ def create_and_store_graph_output(
                 else:
                     print("Not appending to df_list_pandora")
             total_number_events = total_number_events + 1
-        # print("number of showers total", number_of_showers_total)
-        # number_of_showers_total = number_of_showers_total + len(shower_p_unique_hdb)
-        # print("number of showers total", number_of_showers_total)
 
     df_batch1 = pd.concat(df_list1)
-    if predict:
+    if predict and pandora_available:
         df_batch_pandora = pd.concat(df_list_pandora)
     else:
         df_batch = []
@@ -281,6 +382,7 @@ def create_and_store_graph_output(
             epoch,
             predict=predict,
             store=store_epoch,
+            pandora_available=pandora_available
         )
     if predict:
         return df_batch_pandora, df_batch1, total_number_events
@@ -298,6 +400,7 @@ def store_at_batch_end(
     epoch=None,
     predict=False,
     store=False,
+    pandora_available=False
 ):
     if predict:
         path_save_ = (
@@ -309,9 +412,7 @@ def store_at_batch_end(
             + str(epoch)
             + ".pt"
         )
-        # if store and predict:
-        #     df_batch.to_pickle(path_save_)
-        # log_efficiency(df_batch, clustering=True)
+       
     path_save_ = (
         path_save
         + str(local_rank)
@@ -323,7 +424,7 @@ def store_at_batch_end(
     )
     if store and predict:
         df_batch1.to_pickle(path_save_)
-    if predict:
+    if predict and pandora_available:
         path_save_pandora = (
             path_save
             + str(local_rank)
@@ -336,7 +437,7 @@ def store_at_batch_end(
         if store and predict:
             df_batch_pandora.to_pickle(path_save_pandora)
     log_efficiency(df_batch1)
-    if predict:
+    if predict and pandora_available:
         log_efficiency(df_batch_pandora, pandora=True)
 
 
@@ -487,6 +588,10 @@ def generate_showers_data_frame(
         dic["graph"].ndata["e_hits"].view(-1),
         dic["graph"].ndata["particle_number"].long(),
     )
+    e_label_showers = scatter_max(
+        labels.view(-1),
+        dic["graph"].ndata["particle_number"].long(),
+    )[0]
     is_track_in_MC = scatter_add(
         1*(dic["graph"].ndata["hit_type"].view(-1)==1),
         dic["graph"].ndata["particle_number"].long(),
@@ -510,6 +615,9 @@ def generate_showers_data_frame(
     energy_t = (
         dic["part_true"].E_corrected.view(-1).to(e_pred_showers.device)
     ).float()  # dic["part_true"][:, 3].to(e_pred_showers.device)
+    gen_status = (
+        dic["part_true"].gen_status.view(-1).to(e_pred_showers.device)
+    ).float()
     vertex = dic["part_true"].vertex.to(e_pred_showers.device)
     pos_t = dic["part_true"].coord.to(e_pred_showers.device)
     pid_t = dic["part_true"].pid.to(e_pred_showers.device)
@@ -702,6 +810,10 @@ def generate_showers_data_frame(
             (energy_t, fake_showers_showers_e_truw),
             dim=0,
         )
+        gen_status = torch.cat(
+            (gen_status, fake_showers_showers_e_truw),
+            dim=0,
+        )
         vertex = torch.cat((vertex, fake_showers_vertex), dim=0)
         pid_t = torch.cat(
             (pid_t.view(-1), fake_showers_showers_e_truw),
@@ -712,6 +824,7 @@ def generate_showers_data_frame(
             dim=0,
         )
         e_reco = torch.cat((e_reco_showers[1:], fake_showers_showers_e_truw), dim=0)
+        e_labels=torch.cat((e_label_showers[1:], 0*fake_showers_showers_e_truw), dim=0)
         is_track_in_MC = torch.cat((is_track_in_MC[1:], fake_showers_num_tracks.to(e_reco.device)), dim=0)
         distance_to_cluster_MC = torch.cat((distance_to_cluster_all[1:], fake_showers_distance_to_cluster.to(e_reco.device)), dim=0)
         e_pred = torch.cat((matched_es, fake_showers_e), dim=0)
@@ -790,6 +903,7 @@ def generate_showers_data_frame(
                 "vertex": vertex.detach().cpu().tolist(), 
                 "ECAL_hits": e_pred_ECAL.detach().cpu(),
                 "HCAL_hits": e_pred_HCAL.detach().cpu(),
+                "labels":e_labels.detach().cpu(),
             }
         else:
             d = {
@@ -810,6 +924,8 @@ def generate_showers_data_frame(
                 "vertex": vertex.detach().cpu().tolist(), 
                 "ECAL_hits": e_pred_ECAL.detach().cpu(),
                 "HCAL_hits": e_pred_HCAL.detach().cpu(),
+                "gen_status": gen_status.detach().cpu(),
+                "labels":e_labels.detach().cpu(),
             }
             if pred_pos is not None:
                 pred_pos1 = e_pred_pos.detach().cpu()
@@ -821,13 +937,13 @@ def generate_showers_data_frame(
                 d["pred_pid_matched"] = pred_pid1.tolist()
                 d["pred_ref_pt_matched"] = pred_ref_pt1.tolist()
                 d["matched_extra_features"] = extra_features_all.detach().cpu().tolist()
-        """if shap:
-            print("Adding ec_x and shap_values to the DataFrame")
-            d["ec_x"] = ec_x_t
-            d["shap_values"] = shap_vals_t"""
-        if shap:
-            d["shap_values"] = matched_shap_vals.tolist()
-            d["ec_x"] = matched_ec_x.tolist()
+        # """if shap:
+        #     print("Adding ec_x and shap_values to the DataFrame")
+        #     d["ec_x"] = ec_x_t
+        #     d["shap_values"] = shap_vals_t"""
+        # if shap:
+        #     d["shap_values"] = matched_shap_vals.tolist()
+        #     d["ec_x"] = matched_ec_x.tolist()
         d["true_pos"] = pos_t.detach().cpu().tolist()
         df = pd.DataFrame(data=d)
         #event_list = [40]   # Fill with the list of selected events that we want to investigate

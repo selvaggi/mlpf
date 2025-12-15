@@ -130,7 +130,7 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
     hit_features, genparticle_to_hit, hit_idx_local_to_global = get_calohit_matrix_and_genadj(hit_data, calohit_links, iev, collectionIDs)
     track_features = track_to_features(prop_data, iev)
     genparticle_to_trk = genparticle_track_adj( sitrack_links, iev, truth_tracking)
-    print(genparticle_to_trk)
+
     n_gp = awkward.count(gen_features["PDG"])
     n_track = awkward.count(track_features["type"])
     n_hit = awkward.count(hit_features["type"])
@@ -170,8 +170,6 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
         gp_to_track_matrix = coo_matrix((genparticle_to_trk[2], (genparticle_to_trk[0], genparticle_to_trk[1])), shape=(n_gp, n_track))
         gp_to_track = gp_to_track_matrix.max(axis=1).todense()
         gp_to_track_index = gp_to_track_matrix.toarray().argmax(axis=0).reshape(-1)
-
-        print("gp_to_track_index",gp_to_track_index)
     else:
         gp_to_track = np.zeros((n_gp, 1))
     # one hit has contribution from different MCs
@@ -200,27 +198,23 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
 
     # particle has more than 10 MeV enegy in the calo
     gp_in_calo = np.array(gp_to_recoE>0.01) 
-    gp_in_tracker = np.array(gp_to_track >= 0.1)[:, 0]
-    gp_in_tracker_not = np.array(gp_to_track == 0.0)[:, 0]
+    gp_in_tracker = gp_in_calo*0 #np.array(gp_to_track >= 0.1)[:, 0]
+    gp_in_tracker[gp_to_track_index] = 1
+    gp_in_tracker = gp_in_tracker==1
     gp_interacted_with_detector = gp_in_tracker*gp_in_calo+gp_in_calo
-    gp_electrons_without_track_but_E = gp_in_calo*gp_in_tracker_not*(np.abs(gen_features["PDG"])==11)
-    gp_electrons_with_track = gp_in_calo*gp_in_tracker*(np.abs(gen_features["PDG"])==11)
-    mask_visible = awkward.to_numpy( gp_interacted_with_detector)
-    mask_visible_notrack = awkward.to_numpy( gp_electrons_without_track_but_E)
-    mask_visible_track = awkward.to_numpy( gp_electrons_with_track)
+    #store particles that left only track, track+calo, calo and generator status 1 (reconstructable particles)
+    gp_interacted_with_detector_2 = (gp_in_tracker+gp_in_calo)
+    gp_interacted_with_detector_with_daughters = add_daughters_to_status1(gen_features,gp_interacted_with_detector_2 )
+    gp_interacted_with_detector_status1 = gp_interacted_with_detector_with_daughters*((np.abs(gen_features["generatorStatus"])==1)+(np.abs(gen_features["generatorStatus"])==2))
+    gp_interacted_with_tracker_no_calo = gp_in_tracker*(~gp_in_calo)
+    mask_visible_true = awkward.to_numpy( gp_interacted_with_detector_status1)
+    gp_interacted_with_tracker_no_calo = gp_interacted_with_tracker_no_calo[mask_visible_true]
+    idx_all_masked_true = np.where(mask_visible_true)[0]
+    mask_visible = awkward.to_numpy(gp_interacted_with_detector)
     idx_all_masked = np.where(mask_visible)[0]
-    # idx_all_masked_notrack = np.where(mask_visible_notrack)[0]
-    # idx_all_masked_track = np.where(mask_visible_track)[0]
-    # gen_features_np =  awkward.to_numpy(gen_features["energy"])
-    # gen_features_phi =  awkward.to_numpy(gen_features["phi"])
-    # if len (gen_features_np[idx_all_masked_notrack])>0:
-    #     dic["index_no_track"].append(np.where(idx_all_masked_notrack))
-    #     dic["energy_no_track"].append(gen_features_np[idx_all_masked_notrack])
-    #     dic["phi_no_track"].append(gen_features_phi[idx_all_masked_notrack])
-    # if len(gen_features_np[idx_all_masked_track])>0:
-    #     dic["energy_track"].append( gen_features_np[idx_all_masked_track])
-    #     dic["phi_track"].append(gen_features_phi[idx_all_masked_track])
+
     genpart_idx_all_to_filtered = {idx_all: idx_filtered for idx_filtered, idx_all in enumerate(idx_all_masked)}
+    genpart_idx_all_to_filtered_true = {idx_all: idx_filtered for idx_filtered, idx_all in enumerate(idx_all_masked_true)}
     if np.array(mask_visible).sum() == 0:
         print("event does not have even one 'visible' particle. will skip event")
         return None
@@ -228,17 +222,27 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
 
     if len(np.array(mask_visible)) == 1:
         # event has only one particle (then index will be empty because no daughters)
-        gen_features = awkward.Record({feat: (gen_features[feat][mask_visible] if feat != "index" else None) for feat in gen_features.keys()})
+        gen_features_rec = awkward.Record({feat: (gen_features[feat][mask_visible] if feat != "index" else None) for feat in gen_features.keys()})
     else:
-        gen_features = awkward.Record({feat: gen_features[feat][mask_visible] for feat in gen_features.keys()})
+        gen_features_rec = awkward.Record({feat: gen_features[feat][mask_visible] for feat in gen_features.keys()})
+    if len(np.array(mask_visible_true)) == 1:
+        # event has only one particle (then index will be empty because no daughters)
+        gen_features_true = awkward.Record({feat: (gen_features[feat][mask_visible_true] if feat != "index" else None) for feat in gen_features.keys()})
+    else:
+        gen_features_true = awkward.Record({feat: gen_features[feat][mask_visible_true] for feat in gen_features.keys()})
+
 
     # get the track/cluster -> genparticle map
     # assign 0,..N indices to adjacency, -1 if genparticle not in filtered list
     hit_to_gp = index_to_range(gp_to_calohit, genpart_idx_all_to_filtered)
-    track_to_gp = index_to_range(gp_to_track_index, genpart_idx_all_to_filtered)
+    if len(genparticle_to_trk[0]) > 0:
+        track_to_gp = index_to_range(gp_to_track_index, genpart_idx_all_to_filtered)
+    else:
+        track_to_gp = []
 
     return EventData(
-        gen_features,
+        gen_features_rec,
+        gen_features_true,
         hit_features,
         track_features,
         hit_to_gp,
@@ -246,7 +250,7 @@ def get_genparticles_and_adjacencies( prop_data, hit_data, calohit_links, sitrac
         pandora_features, 
         pfo_to_calohit, 
         pfo_to_track, 
-        gp_to_calohit_beforecalomother
+        gp_interacted_with_tracker_no_calo
     ), dic 
 
 def isProducedInCalo(vertices, BarrelRadius=2150, EndCapZ=2307):
@@ -491,7 +495,6 @@ def track_pt(omega):
     return a * np.abs(b / omega)
 
 def genparticle_track_adj(sitrack_links, iev, truth_tracking):
-    print("here", truth_tracking)
     if truth_tracking:
         trk_to_gen_trkidx = sitrack_links["_SiTracks_Refitted_Relation_from/_SiTracks_Refitted_Relation_from.index"][iev]
         trk_to_gen_genidx = sitrack_links["_SiTracks_Refitted_Relation_to/_SiTracks_Refitted_Relation_to.index"][iev]
@@ -504,7 +507,6 @@ def genparticle_track_adj(sitrack_links, iev, truth_tracking):
     genparticle_to_track_matrix_coo0 = awkward.to_numpy(trk_to_gen_genidx)
     genparticle_to_track_matrix_coo1 = awkward.to_numpy(trk_to_gen_trkidx)
     genparticle_to_track_matrix_w = awkward.to_numpy(trk_to_gen_w)
-    print(genparticle_to_track_matrix_coo0)
     return genparticle_to_track_matrix_coo0, genparticle_to_track_matrix_coo1, genparticle_to_track_matrix_w
 
 
@@ -531,7 +533,8 @@ def index_to_range(arr, mapping):
 class EventData:
     def __init__(
         self,
-        gen_features,
+        gen_features_target,
+        gen_features_true,
         hit_features,
         track_features,
         hit_to_gp,
@@ -541,7 +544,8 @@ class EventData:
         pfo_to_track = None, 
         gp_to_calohit_beforecalomother = None
     ):
-        self.gen_features = gen_features  # feature matrix of the genparticles
+        self.gen_features_target = gen_features_target  # feature matrix of the genparticles
+        self.gen_features_true = gen_features_true
         self.hit_features = hit_features  # feature matrix of the calo hits
         self.track_features = track_features  # feature matrix of the tracks
         self.hit_to_gp = hit_to_gp  # array linking hit to gen MC
@@ -612,3 +616,27 @@ def track_pfo_adj(prop_data, hit_idx_local_to_global, iev):
             track_to_pfo_matrix_coo1.append(ipfo)
             track_to_pfo_matrix_w.append(1.0)
     return track_to_pfo_matrix_coo0, track_to_pfo_matrix_coo1, track_to_pfo_matrix_w
+
+def add_daughters_to_status1(gen_features, gp_interacted_with_detector_2 ):
+    mask_status1 = gen_features["generatorStatus"] == 1
+    dau_beg = gen_features["daughters_begin"]
+    dau_end = gen_features["daughters_end"]
+    dau_ind = gen_features["index"]
+    genparticle_to_hit_additional_gp = []
+    genparticle_to_hit_additional_hit = []
+    genparticle_to_hit_additional_w = []
+    genparticle_to_trk_additional_gp = []
+    genparticle_to_trk_additional_trk = []
+    genparticle_to_trk_additional_w = []
+    for idx_st1 in np.where(mask_status1)[0]:
+        pdg = abs(gen_features["PDG"][idx_st1])
+        if pdg not in [12, 14, 16]:
+            db = dau_beg[idx_st1]
+            de = dau_end[idx_st1]
+            daus = dau_ind[db:de]
+            for dau in daus:
+                if gp_interacted_with_detector_2[dau]:
+                    gp_interacted_with_detector_2[idx_st1] =True
+    
+    return gp_interacted_with_detector_2
+                

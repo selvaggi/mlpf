@@ -66,11 +66,17 @@ def create_graph(
         g = calculate_distance_to_boundary(g)
         g.ndata["hit_type"] = hits.hit_type_feature.float()
         g.ndata["e_hits"] = hits.e_hits.float()  
-
-        g.ndata["chi_squared_tracks"] = hits.chi_squared_tracks.float()
+        if not args.ILD:
+            g.ndata["chi_squared_tracks"] = hits.chi_squared_tracks.float()
         g.ndata["particle_number"] = hits.hit_particle_link.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
         # g.ndata["particle_number_calomother"] = hits.hit_particle_link_calomother.float()+1 #(noise idx is 0 and particle MC 0 starts at 1)
-        if prediction and (not args.allegro):
+        if args.ILD:
+            g.ndata["time"]=hits.time_v[0].float()
+            g.ndata["time_10ps"]=hits.time_v[1].float()
+            g.ndata["time_50ps"]=hits.time_v[2].float()
+            g.ndata["time_100ps"]=hits.time_v[3].float()
+            g.ndata["time_1000ps"]=hits.time_v[4].float()
+        if prediction and (args.pandora):
             # g.ndata["pandora_cluster"] = hits.pandora_features.pandora_cluster
             g.ndata["pandora_pfo"] = hits.pandora_features.pandora_pfo_link.float()
             # g.ndata["pandora_cluster_energy"] = hits.pandora_features.pandora_cluster_energy
@@ -87,9 +93,9 @@ def create_graph(
         if hits.pos_xyz_hits.shape[0] < 10:
             graph_empty = True
     
-    if (not args.allegro) and (not args.truth_tracking):
+    if ( not args.truth_tracking)and (not  args.ILD) and (not args.predict):
         g = make_bad_tracks_noise_tracks(g, y_data_graph)
-    if args.allegro or args.truth_tracking:
+    if args.truth_tracking:
         g = remove_hits_outside_cone(g,y_data_graph, args.allegro)
         g = remove_tracks_in_noise_collection(g)
         
@@ -121,11 +127,17 @@ def remove_hits_outside_cone(g,y, allegro=False):
                 g.ndata['particle_number'][index_modify]=0
         
     return g 
+
 def remove_tracks_in_noise_collection(g):
-    mask = (g.ndata["hit_type"]==1)* (g.ndata["particle_number"]==0)
+    # remove all hits in the noise collection 
+    # tracks (for evaluation we should put back in these tracks as pandora has to deal with them)
+    # hits (better to remove for eval as well)
+    # currently not removing double tracks 
+    mask = (g.ndata["particle_number"]==0)
     g = dgl.remove_nodes(
         g, torch.where(mask)[0]
     )
+
     return g 
 
 def connect_mask():
@@ -251,4 +263,61 @@ def make_bad_tracks_noise_tracks(g, y ):
         index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
         
         g.ndata["particle_number"][index_bad_tracks]= 0 
+    return g
+
+
+def make_double_tracks(g, y):
+    mask_hit_type_t2 = g.ndata["hit_type"] == 1
+    pos_track = g.ndata["pos_hits_xyz"][mask_hit_type_t2]
+    p_tracks = g.ndata["p_hits"][mask_hit_type_t2]
+    particle_track = g.ndata["particle_number"][mask_hit_type_t2]
+    
+    # Process each particle track
+    if len(particle_track) > 0:
+        for index, i in enumerate(particle_track):
+            if i == 0:
+                mean_pos_cluster_all.append(torch.zeros((1, 3)).view(-1, 3))
+                E_cluster.append(torch.zeros((1)).view(-1))
+            else:
+                mask_labels_i = g.ndata["particle_number"] == i
+                mean_pos_cluster = torch.mean(g.ndata["pos_hits_xyz"][mask_labels_i * (g.ndata["hit_type"] == 2)], dim=0)
+                mean_pos_cluster_all.append(mean_pos_cluster.view(-1, 3))
+
+                # Sum the energy for this particle's tracks
+                E_cluster.append(torch.sum(g.ndata["e_hits"][mask_labels_i]).view(-1))
+
+        # Combine lists into tensors
+        mean_pos_cluster_all = torch.cat(mean_pos_cluster_all, dim=0)
+        E_cluster = torch.cat(E_cluster, dim=0)
+
+        # Calculate the energy difference between the particle's momentum and the cluster energy
+        diffs = torch.abs(E_cluster - p_tracks.view(-1)) / p_tracks.view(-1)
+
+        # Calculate the angles between the track position and the cluster position
+        angles = torch.sum(mean_pos_cluster_all * pos_track, dim=1) / (torch.norm(mean_pos_cluster_all, dim=1) * torch.norm(pos_track, dim=1))
+        angles[torch.isnan(angles)] = 0
+
+        # Calculate the distance between the track and cluster
+        distance_track_cluster = torch.norm(mean_pos_cluster_all - pos_track, dim=1) / 1000
+
+        # Identify "bad" tracks based on distance, angle, and energy difference
+        bad_tracks = (distance_track_cluster > 0.24) + (angles < 0.9998)
+        bad_tracks = bad_tracks + ((distance_track_cluster > 0.5) + (angles < 0.99)) + (diffs > 0.75)
+
+        # Find indices of bad tracks
+        index_bad_tracks = mask_hit_type_t2.nonzero().view(-1)[bad_tracks]
+
+        # Remove tracks with the highest energy difference if there are multiple tracks for the same particle
+        for i in range(len(particle_track)):
+            track_indices = (particle_track == particle_track[i]).nonzero().view(-1)
+            if len(track_indices) > 1:
+                # Calculate energy differences for multiple tracks of the same particle
+                track_diffs = diffs[track_indices]
+                max_diff_index = track_diffs.argmax()  # Get the index of the track with the max energy diff
+                # Mark the track with the max diff as bad
+                index_bad_tracks = torch.cat((index_bad_tracks, track_indices[max_diff_index].view(1)))
+
+        # Set the particle_number of the bad tracks to 0
+        g.ndata["particle_number"][index_bad_tracks] = 0
+    
     return g

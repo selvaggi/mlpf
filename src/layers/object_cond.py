@@ -63,6 +63,7 @@ def calc_LV_Lbeta(
     tracking=False,
     dis=False,
 ) -> Union[Tuple[torch.Tensor, torch.Tensor], dict]:
+    loss_type ="baseline"
     """
     Calculates the L_V and L_beta object condensation losses.
     Concepts:
@@ -141,7 +142,7 @@ def calc_LV_Lbeta(
     # L_V term
 
     # Calculate q
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted" or loss_type=="baseline":
         q = (beta.clip(0.0, 1 - 1e-4).arctanh() / 1.01) ** 2 + qmin
     elif beta_stabilizing == "paper":
         q = beta.arctanh() ** 2 + qmin
@@ -229,7 +230,7 @@ def calc_LV_Lbeta(
     # w.r.t. the object they belong to, i.e. no noise hits and no noise clusters.
     # First select all norms of all signal hits w.r.t. all objects, mask out later
     testing_object_cond= False
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
+    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted" or loss_type == "baseline":
         # if dis:
         #     N_k = torch.sum(M, dim=0)  # number of hits per object
         #     norms = torch.sum(
@@ -272,7 +273,12 @@ def calc_LV_Lbeta(
     norms_att *= M[is_sig]
 
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum over events
-    if loss_type == "hgcalimplementation":
+    if loss_type == "baseline":
+        V_attractive = (q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
+        V_attractive = V_attractive.sum(dim=0)  # K objects
+        V_attractive = V_attractive.view(-1) / (N_k.view(-1) + 1e-3)
+        L_V_attractive = torch.mean(V_attractive)
+    elif loss_type == "hgcalimplementation":
 
         V_attractive = (q[is_sig]).unsqueeze(-1) * q_alpha.unsqueeze(0) * norms_att
         assert V_attractive.size() == (n_hits_sig, n_objects)
@@ -363,7 +369,9 @@ def calc_LV_Lbeta(
     # We do however want to keep norms of noise hits w.r.t. objects
     # Power-scale the norms: Gaussian scaling term instead of a cone
     # Mask out the norms of hits w.r.t. the cluster they belong to
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
+    if loss_type == "baseline":
+        norms_rep = torch.relu(1. - torch.sqrt(norms + 1e-6))* M_inv
+    elif loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         if dis:
             norms = norms / (2 * phi_alpha.unsqueeze(0) ** 2 + 1e-6)
             norms_rep = torch.exp(-(norms)) * M_inv
@@ -387,7 +395,15 @@ def calc_LV_Lbeta(
     # Sum over hits, then sum per event, then divide by n_hits_per_event, then sum up events
     nope = n_objects_per_event - 1
     nope[nope == 0] = 1
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
+    if loss_type == "baseline":
+        L_V_repulsive = V_repulsive.sum(dim=0)
+        number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
+        L_V_repulsive = L_V_repulsive.view(
+            -1
+        ) / number_of_repulsive_terms_per_object.view(-1)
+        L_V_repulsive = torch.mean(L_V_repulsive)
+        L_V_repulsive2 = L_V_repulsive
+    elif loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
         #! sum each object repulsive terms
         L_V_repulsive = V_repulsive.sum(dim=0)  # size number of objects
         number_of_repulsive_terms_per_object = torch.sum(M_inv, dim=0)
@@ -437,20 +453,27 @@ def calc_LV_Lbeta(
             scatter_add(V_repulsive.sum(dim=0), batch_object)
             / (n_hits_per_event * nope)
         ).sum()
-    if testing_object_cond:
-        L_V = (
-            L_V_attractive 
-            + L_V_repulsive2 *0.01  #repulsive loss is for all hits per objects 
-            
-        )
-    else:
-        L_V = (
-            L_V_attractive 
-            + L_V_repulsive2 /300  #repulsive loss is for all hits per objects 
-            
-        )
+    if loss_type == "baseline":
+         L_V = (
+                L_V_attractive 
+                + L_V_repulsive   
+                
+            )
+    else:   
+        if testing_object_cond:
+            L_V = (
+                L_V_attractive 
+                + L_V_repulsive2 *0.01  #repulsive loss is for all hits per objects 
+                
+            )
+        else:
+            L_V = (
+                L_V_attractive 
+                + L_V_repulsive2 /300  #repulsive loss is for all hits per objects 
+                
+            )
 
-        
+            
  
 
     n_noise_hits_per_event = scatter_count(batch[is_noise])
@@ -464,7 +487,7 @@ def calc_LV_Lbeta(
     # print("L_beta_noise", L_beta_noise / batch_size)
     # -------
     # L_beta signal term
-    if loss_type == "hgcalimplementation":
+    if (loss_type == "hgcalimplementation") or (loss_type == "baseline"):
         beta_per_object_c = scatter_add(beta[is_sig], object_index)
         beta_alpha = beta[is_sig][index_alpha]
         # hit_type_mask = (g.ndata["hit_type"]==1)*(g.ndata["particle_number"]>0)
@@ -557,7 +580,7 @@ def calc_LV_Lbeta(
    
     L_exp = L_beta
     # print("looooses", L_V, L_beta, L_beta_sig, L_beta_noise, L_V_attractive, L_V_repulsive)
-    if loss_type == "hgcalimplementation" or loss_type == "vrepweighted":
+    if (loss_type == "hgcalimplementation") or (loss_type == "vrepweighted") or (loss_type == "baseline"):
         return (
             L_V,  # 0
             L_beta,

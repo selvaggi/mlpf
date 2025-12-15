@@ -6,7 +6,7 @@ import dgl
 from src.layers.inference_oc import (
     get_clustering,
 )
-from src.layers.inference_oc import hfdb_obtain_labels, clustering_obtain_labels
+from src.layers.inference_oc import hfdb_obtain_labels, clustering_obtain_labels, DPC_custom_CLD
 from src.layers.inference_oc import match_showers
 import torch_cmspepr
 from src.layers.inference_oc import remove_bad_tracks_from_cluster
@@ -60,7 +60,7 @@ def obtain_batch_numbers(x, g):
 
 
 def obtain_clustering_for_matched_showers(
-    batch_g, model_output, y_all, local_rank, use_gt_clusters=False, add_fakes=True
+    batch_g, model_output, y_all, local_rank, use_gt_clusters=False, add_fakes=True, truth_tracks=False
 ):
     if use_gt_clusters:
         print("!!! Using GT clusters for Energy Correction !!!!")
@@ -94,8 +94,10 @@ def obtain_clustering_for_matched_showers(
             if use_gt_clusters:
                 labels = dic["graph"].ndata["particle_number"].type(torch.int64)
             else:
-                labels = hfdb_obtain_labels(X, model_output.device)
-                labels = remove_bad_tracks_from_cluster(dic["graph"], labels)
+                #labels = hfdb_obtain_labels(X, model_output.device)
+                labels =DPC_custom_CLD(X, dic["graph"], model_output.device)
+                if not truth_tracks:
+                    labels = remove_bad_tracks_from_cluster(dic["graph"], labels)
                 # labels = clustering_obtain_labels( X,betas.view(-1), betas.device,  tbeta=0.7, td=0.3)
                 #if labels.min() == 0 and labels.sum() == 0:
                 #    labels += 1  # Quick hack
