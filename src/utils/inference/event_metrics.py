@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib
-
 matplotlib.rc("font", size=35)
 import matplotlib.pyplot as plt
 import torch
@@ -202,11 +201,28 @@ def calculate_event_mass_resolution(df, pandora, perfect_pid=False, mass_zero=Fa
         _,
         _,
     ) = get_sigma_gaussian(dic["mass_over_true_p"], np.linspace(0, 2, 400), epsilon=0.005)
+    (
+        mean_mass_pred,
+        var_mass_pred,
+        _,
+        _,
+    ) = get_sigma_gaussian(mass_pred_p, np.linspace(60, 130, 1400), epsilon=0.005)
+    (
+        mean_mass_true,
+        var_mass_true,
+        _,
+        _,
+    ) = get_sigma_gaussian(mass_true, np.linspace(60, 130, 1400), epsilon=0.005)
     dic["mean_mass"] = mean_mass
     dic["var_mass"] = var_mass
     dic["mass_true"] = mass_true
+    dic["mass_true_mean"] = mean_mass_true
+    dic["mass_true_var"] = var_mass_true
     dic["true_jet_p"]=true_jet_p
+
     dic["mass_pred_p"] = mass_pred_p
+    dic["mass_pred_p_mean"] = mean_mass_pred
+    dic["mass_pred_p_var"] = var_mass_pred
     dic["E_pred"] = pred_E_jet
     dic["E_true"] = true_E_jet
     return dic
@@ -492,17 +508,18 @@ def get_mass_contribution_per_PID(matched_pandora, matched_, perfect_pid=False, 
         pid_true_over_true[pid] = event_energy_PID_true / event_energy_true
     return mass_over_true, mass_over_true_pandora, E_over_true, E_over_true_pandora, pid_model_over_pred, pid_pandora_over_pred, pid_model_over_true, pid_pandora_over_true, pid_true_over_true
 
-def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False):
-    (
-        mean_p,
-        variance_om_p,
-        distr_p,
-        x_p,
-        _,
-        _,
-        _,
-        mass_over_true_pandora,
-    ) = calculate_event_energy_resolution(matched_pandora, True, False)
+def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, mass_zero=False, ML_pid=False, pandora=False):
+    if pandora:
+        (
+            mean_p,
+            variance_om_p,
+            distr_p,
+            x_p,
+            _,
+            _,
+            _,
+            mass_over_true_pandora,
+        ) = calculate_event_energy_resolution(matched_pandora, True, False)
     (
         mean,
         variance_om,
@@ -513,8 +530,8 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
         _,
         mass_over_true_model,
     ) = calculate_event_energy_resolution(matched_, False, False)
-
-    dic_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid, fake=False)
+    if pandora:
+        dic_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid, fake=False)
     
     dic_model = calculate_event_mass_resolution(matched_, False, perfect_pid=perfect_pid, mass_zero=mass_zero, ML_pid=ML_pid, fake=False)
     # mean_mass_perfect_PID, var_mass_perfect_PID, distr_mass_perfect_PID, mass_true_perfect_PID, _, _, E_over_true_perfect_PID, E_over_true_reco_perfect_PID = calculate_event_mass_resolution(matched_, False, perfect_pid=True, mass_zero=False, ML_pid=False,  fake=True)
@@ -524,54 +541,175 @@ def get_response_for_event_energy(matched_pandora, matched_, perfect_pid=False, 
     # matched_pandora.pandora_calibrated_pfo = matched_pandora.pred_showers_E
     # matched_.pred_pos_matched = matched_.true_pos
     dic_perfect_E = calculate_event_mass_resolution(df_copy, False, perfect_pid=False, mass_zero=False, ML_pid=True, fake=False)
-    dic_perfect_E_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=False, mass_zero=False, ML_pid=True, fake=False)
+    if pandora:
+        dic_perfect_E_pandora = calculate_event_mass_resolution(matched_pandora, True, perfect_pid=False, mass_zero=False, ML_pid=True, fake=False)
     (
         mean_energy_over_true,
         var_energy_over_true,
         _,
         _,
     ) = get_sigma_gaussian(dic_model["E_over_true"], np.linspace(0, 2, 400), epsilon=0.005)
-    (
-        mean_energy_over_true_pandora,
-        var_energy_over_true_pandora,
-        _,
-        _,
-    ) = get_sigma_gaussian(dic_pandora["E_over_true"], np.linspace(0, 2, 400), epsilon=0.005)
+    if pandora:
+        (
+            mean_energy_over_true_pandora,
+            var_energy_over_true_pandora,
+            _,
+            _,
+        ) = get_sigma_gaussian(dic_pandora["E_over_true"], np.linspace(0, 2, 400), epsilon=0.005)
     dic = {}
-    dic["mean_p"] = mean_p
-    dic["variance_om_p"] = variance_om_p
+    if pandora:
+        dic["mean_p"] = mean_p
+        dic["variance_om_p"] = variance_om_p
+        dic["energy_resolutions_p"] = x_p
+        dic["distributions_pandora"] = distr_p
+        
+        dic["mass_over_true_model_perfect_E_pandora"] = dic_perfect_E_pandora["mass_over_true_p"]
+        dic["mass_pandora"] = dic_pandora["mass_pred_p"] 
+        dic["mass_pandora_mean"] = dic_pandora["mass_pred_p_mean"]
+        dic["mass_pandora_var"] = dic_pandora["mass_pred_p_var"]
+        dic["mass_true"] =  dic_pandora["mass_true"]
+        dic["mass_true_mean"] =  dic_pandora["mass_true_mean"]
+        dic["mass_true_var"] =  dic_pandora["mass_true_var"]
+        dic["mass_over_true_model_perfect_E"] = dic_perfect_E["mass_over_true_p"]
+        dic["mass_over_true_pandora"] = dic_pandora["mass_over_true_p"]
+        dic["var_mass_pandora"] = dic_pandora["var_mass"]
+        dic["mean_mass_pandora"] = dic_pandora["mean_mass"]
+        dic["energy_over_true_pandora"] = dic_pandora["E_over_true"]
+        dic["energy_over_true_reco_pandora"] = dic_pandora["E_over_true_reco"]
+        dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
+        dic["mean_energy_over_true_pandora"] = mean_energy_over_true_pandora
+
+    dic["mass_over_true_model"] = dic_model["mass_over_true_p"]
     dic["variance_om"] = variance_om
     dic["mean"] = mean
     dic["energy_resolutions"] = x
-    dic["energy_resolutions_p"] = x_p
     dic["mean_baseline"] = mean_baseline
     dic["variance_om_baseline"] = variance_om_baseline
-    dic["distributions_pandora"] = distr_p
     dic["distributions_model"] = distr
-    dic["mass_over_true_model"] = dic_model["mass_over_true_p"]
-    dic["mass_over_true_model_perfect_E_pandora"] = dic_perfect_E_pandora["mass_over_true_p"]
-    dic["mass_over_true_model_perfect_E"] = dic_perfect_E["mass_over_true_p"]
-    dic["mass_over_true_pandora"] = dic_pandora["mass_over_true_p"]
-    dic["mass_model"] = dic_model["mass_over_true_p"] * dic_model["mass_true"]
-    dic["mass_pandora"] = dic_pandora["mass_over_true_p"] * dic_pandora["mass_true"]
-    dic["mass_true"] =  dic_pandora["mass_true"]
+    dic["mass_model"] = dic_model["mass_pred_p"] 
+    dic["mass_model_mean"] = dic_model["mass_pred_p_mean"]
+    dic["mass_model_var"] = dic_model["mass_pred_p_var"]
     dic["mean_mass_model"] = dic_model["mean_mass"]
-    dic["mean_mass_pandora"] = dic_pandora["mean_mass"]
     dic["var_mass_model"] =  dic_model["var_mass"]
-    dic["var_mass_pandora"] = dic_pandora["var_mass"]
     dic["energy_over_true"] = dic_model["E_over_true"]
-    dic["energy_over_true_pandora"] = dic_pandora["E_over_true"]
     dic["mean_energy_over_true"] = mean_energy_over_true
-    dic["mean_energy_over_true_pandora"] = mean_energy_over_true_pandora
     dic["var_energy_over_true"] = var_energy_over_true
-    dic["var_energy_over_true_pandora"] = var_energy_over_true_pandora
     dic["energy_over_true_reco"] = dic_model["E_over_true_reco"]
-    dic["energy_over_true_reco_pandora"] = dic_pandora["E_over_true_reco"]
+    
     return dic
 
 colors = {"ML": "red", "ML GTC": "green"}
 
-def plot_mass_resolution(event_res_dic, PATH_store):
+
+def plot_true_mass(event_res_dic, PATH_store, pandora=False, dic_true_mass=None):
+    neutral = False
+    if neutral:
+        bin_up = 90
+        bin_down = 20
+    else:
+        bin_up = 130
+        bin_down = 60
+    from src.utils.inference.iterative_gaussian_fit import fit_gaussian_iterative, plot_gaussian_with_window
+    matplotlib.rcParams.update({'font.size': 22})
+    pandora_dic = event_res_dic["ML"]
+    fig, ax = plt.subplots(1, 2, figsize=(16,8))
+    # set fontsize to 20
+   
+    
+    # bins_mass = np.linspace(50, 130, 100)
+    bins_mass = np.linspace(bin_down, bin_up,200)
+    for i in range(0,2):
+        for key in event_res_dic:
+            print("mass model___________")
+            mean_tm_over_true, var_tm_over_true, _ = fit_gaussian_iterative(event_res_dic[key]["mass_model"], bins= np.linspace(bin_down, bin_up, 1400))
+            print("___________")
+            resol = var_tm_over_true/mean_tm_over_true
+            ax[i].hist(
+                    event_res_dic[key]["mass_model"],
+                    histtype="step",
+                    bins =bins_mass,
+                    # label="ML $\mu$={}".format(
+                    #     round((event_res_dic[key]["mass_model_mean"]), 4)
+                    # )+"\n"+"$\sigma/\mu$={}".format(round((event_res_dic[key]["mass_model_var"]), 4),
+                    # ),
+                    label="ML $\mu$={}".format(
+                        round((mean_tm_over_true), 4)
+                    )+"\n"+"$\sigma/\mu$={}".format(round((resol), 4),
+                    )
+                    +"\n"+"$\sigma/\mu68$={}".format(round((event_res_dic[key]["mass_model_var"]), 4)),
+                    color=colors[key],
+                    density=True,
+                    linewidth=2
+            )
+            plot_gaussian_with_window(event_res_dic[key]["mass_model"], mean_tm_over_true, var_tm_over_true, ax=ax[i], color=colors[key])
+        if pandora:
+            mean_tm_over_true, var_tm_over_true, _ = fit_gaussian_iterative(pandora_dic["mass_pandora"], bins= np.linspace(bin_down, bin_up, 1400))
+            resol = var_tm_over_true/mean_tm_over_true
+            ax[i].hist(pandora_dic["mass_pandora"],histtype="step",
+                        # label="Pandora $\mu$={}".format(
+                        #     round((pandora_dic["mass_pandora_mean"]), 4)
+                        # )+"\n"+"$\sigma/\mu$={}".format(round((pandora_dic["mass_pandora_var"]), 4),
+                        # ),
+                        label="Pandora $\mu$={}".format(
+                            round((mean_tm_over_true), 4)
+                        )+"\n"+"$\sigma/\mu$={}".format(round((resol), 4),
+                        )
+                        +"\n"+"$\sigma/\mu68$={}".format(round((pandora_dic["mass_pandora_var"]), 4),
+                        ),
+                        bins =bins_mass,
+                        color="blue",
+                        density=True,
+                        linewidth=2)
+            plot_gaussian_with_window(pandora_dic["mass_pandora"], mean_tm_over_true, var_tm_over_true, ax=ax[i], color="blue")
+            mean_tm_over_true, var_tm_over_true, _ = fit_gaussian_iterative(pandora_dic["mass_true"], bins= np.linspace(bin_down, bin_up, 1400))
+            resol = var_tm_over_true/mean_tm_over_true
+      
+            ax[i].hist(pandora_dic["mass_true"],histtype="step",
+                # label="Target $\mu$={}".format(
+                #     round((pandora_dic["mass_true_mean"]), 4)
+                # )+"\n"+"$\sigma/\mu$={}".format(round((pandora_dic["mass_true_var"]), 4),
+                # ),
+                label="Target $\mu$={}".format(
+                    round(mean_tm_over_true, 4)
+                )+"\n"+"$\sigma/\mu$={}".format(round(resol, 4),
+                ),
+                bins =bins_mass,
+                color="black",
+                density=True,
+                linewidth=2)
+            plot_gaussian_with_window(pandora_dic["mass_true"], mean_tm_over_true, var_tm_over_true, ax=ax[i], color="black")
+        # (
+        #     mean_tm_over_true,
+        #     var_tm_over_true,
+        #     _,
+        #     _,
+        # ) = get_sigma_gaussian(dic_true_mass, np.linspace(60, 130, 700), epsilon= 0.005)
+        
+        mean_tm_over_true, var_tm_over_true, _ = fit_gaussian_iterative(dic_true_mass, bins= np.linspace(bin_down, bin_up, 1400))
+        resol = var_tm_over_true/mean_tm_over_true
+        # ax[1].hist(dic_true_mass,histtype="step",
+        #         label="True $\mu$={}".format(
+        #             round(mean_tm_over_true, 4)
+        #         )+"\n"+"$\sigma/\mu$={}".format(round(resol, 4),
+        #         ),
+        #         bins =bins_mass,
+        #         color="green",
+        #         density=True,
+        #         linewidth=2)
+        # plot_gaussian_with_window(dic_true_mass, mean_tm_over_true, var_tm_over_true, ax=ax[1], color="green")
+        ax[i].grid(1)
+        ax[i].legend(loc='upper left')
+        ax[1].set_xlim([70,105])
+    # ax[0].set_ylim([0,0.5])
+    ax[1].set_ylim([0,0.5])
+    ax[0].set_xlim([70,100])
+    # ax[0].set_yscale("log")
+    fig.tight_layout()
+    fig.savefig(os.path.join(PATH_store, "mass_resolution_only.pdf"), bbox_inches="tight")
+
+
+
+def plot_mass_resolution(event_res_dic, PATH_store, pandora=False):
     old_font_size = matplotlib.rcParams['font.size']
     matplotlib.rcParams.update({'font.size': 22})
     pandora_dic = event_res_dic["ML"]
@@ -580,29 +718,30 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     ax[0,0].set_xlabel(r"$M_{pred}/M_{true}$")
     bins = np.linspace(0, 2, 100)
     bins_mass = np.linspace(0, 250, 200)
-    ax[0,0].hist(
-        pandora_dic["mass_over_true_pandora"],
-        bins=bins,
-        histtype="step",
-        label="Pandora $\mu$={}".format(
-            round((pandora_dic["mean_mass_pandora"]), 4)
-        )+"\n"+"$\sigma/\mu$={}".format(round((pandora_dic["var_mass_pandora"]), 4),
-        ),
-        color="blue",
-        density=True,
-        linewidth=1.5
-    )
-    mean_e_over_true_pandora, sigma_e_over_true_pandora = round(pandora_dic["mean_energy_over_true_pandora"], 4), round(
-        pandora_dic["var_energy_over_true_pandora"], 4)
-    ax[0,1].hist(pandora_dic["energy_over_true_pandora"], bins=bins, histtype="step",
-                # label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
-                #                                                   sigma_e_over_true_pandora),
-                label="Pandora  $\mu$={}".format(
-                            mean_e_over_true_pandora
-                        )+"\n"+"$\sigma/\mu$={}".format(sigma_e_over_true_pandora
-                        ),
-                color="blue",
-                density=True)
+    if pandora:
+        ax[0,0].hist(
+            pandora_dic["mass_over_true_pandora"],
+            bins=bins,
+            histtype="step",
+            label="Pandora $\mu$={}".format(
+                round((pandora_dic["mean_mass_pandora"]), 4)
+            )+"\n"+"$\sigma/\mu$={}".format(round((pandora_dic["var_mass_pandora"]), 4),
+            ),
+            color="blue",
+            density=True,
+            linewidth=1.5
+        )
+        mean_e_over_true_pandora, sigma_e_over_true_pandora = round(pandora_dic["mean_energy_over_true_pandora"], 4), round(
+            pandora_dic["var_energy_over_true_pandora"], 4)
+        ax[0,1].hist(pandora_dic["energy_over_true_pandora"], bins=bins, histtype="step",
+                    # label=r"Pandora $\mu$={} $\sigma / \mu$={}".format(mean_e_over_true_pandora,
+                    #                                                   sigma_e_over_true_pandora),
+                    label="Pandora  $\mu$={}".format(
+                                mean_e_over_true_pandora
+                            )+"\n"+"$\sigma/\mu$={}".format(sigma_e_over_true_pandora
+                            ),
+                    color="blue",
+                    density=True)
     for key in event_res_dic:
         ax[0,0].hist(
                 event_res_dic[key]["mass_over_true_model"],
@@ -640,22 +779,22 @@ def plot_mass_resolution(event_res_dic, PATH_store):
                 density=True,
                 linewidth=1.5
         )
-    ax[1,0].hist(pandora_dic["energy_over_true_reco_pandora"], bins=bins, histtype="step",
-                label="Pandora",
-                color="blue",
-                density=True)
-    ax[1,1].hist(pandora_dic["mass_pandora"], histtype="step",
-                label="Pandora",
-                bins =bins_mass,
-                color="blue",
-                density=True)
-    ax[1,1].hist(pandora_dic["mass_true"],histtype="step",
-                label="True",
-                bins =bins_mass,
-                color="black",
-                density=True)
+    if pandora:
+        ax[1,0].hist(pandora_dic["energy_over_true_reco_pandora"], bins=bins, histtype="step",
+                    label="Pandora",
+                    color="blue",
+                    density=True)
+        ax[1,1].hist(pandora_dic["mass_pandora"], histtype="step",
+                    label="Pandora",
+                    bins =bins_mass,
+                    color="blue",
+                    density=True)
+        ax[1,1].hist(pandora_dic["mass_true"],histtype="step",
+                    label="True",
+                    bins =bins_mass,
+                    color="black",
+                    density=True)
     
-    print("energy_over_true_reco_pandora", pandora_dic["energy_over_true_reco_pandora"])
     ax[0,0].grid(1)
     ax[0,0].legend(loc='upper left')
     ax[0,1].grid(1)
@@ -666,6 +805,7 @@ def plot_mass_resolution(event_res_dic, PATH_store):
     ax[1,0].legend(loc='upper left')
     ax[1,1].grid(1)
     ax[1,1].legend(loc='upper left')
+    ax[1,1].set_xlim([50,110])
     fig.tight_layout()
     import os
     fig.savefig(os.path.join(PATH_store, "mass_resolution.pdf"), bbox_inches="tight")

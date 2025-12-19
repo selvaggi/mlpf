@@ -137,10 +137,10 @@ def remove_bad_tracks_from_cluster(g, labels_hdb):
             angles_tracks = angles/norms
             distance_track_cluster = torch.norm(mean_pos_cluster-pos_track,dim=1)/1000
             #bad_tracks = ((distance_track_cluster>0.24)+(angles_tracks<0.999)+bad_diffs)
-            # bad_tracks_10 = bad_diffs*(p_track.view(-1)>10)*(number_of_hits_muon<1)
-            # bad_tracks_20 = (diffs>0.55)*(p_track.view(-1)>20)*(number_of_hits_muon<1)
-            # bad_tracks_30= (diffs>0.30)*(p_track.view(-1)>30)*(number_of_hits_muon<1)
-            bad_tracks = chi_s>1.5  #bad_tracks_10+bad_tracks_20+bad_tracks_30+(p_track.view(-1)>45)
+            bad_tracks_10 = bad_diffs*(p_track.view(-1)>10)*(number_of_hits_muon<1)
+            bad_tracks_20 = (diffs>0.55)*(p_track.view(-1)>20)*(number_of_hits_muon<1)
+            bad_tracks_30= (diffs>0.30)*(p_track.view(-1)>30)*(number_of_hits_muon<1)
+            bad_tracks = bad_tracks_10+bad_tracks_20+bad_tracks_30+(p_track.view(-1)>45)
             cluster_t2_nodes = torch.nonzero(mask_labels_i & mask_hit_type_t2).view(-1)
             bad_tracks_nodes = cluster_t2_nodes[bad_tracks]
             labels_hdb_corrected_tracks[bad_tracks_nodes] = 0
@@ -280,14 +280,14 @@ def create_and_store_graph_output(
             + str(i)
             + ".pt",
         #  )'''
-        #torch.save(
+        # torch.save(
         #       dic,
         #       path_save
-        ##       + "/graphs/"
+        #        + "/graphs_gun_2/"
         #       + str(local_rank)
         #       + "_"
         #       + str(step)
-        ##       + "_"
+        #        + "_"
         #       + str(i)
         #       + ".pt",
         #    )
@@ -904,6 +904,7 @@ def generate_showers_data_frame(
                 "ECAL_hits": e_pred_ECAL.detach().cpu(),
                 "HCAL_hits": e_pred_HCAL.detach().cpu(),
                 "labels":e_labels.detach().cpu(),
+                "gen_status": gen_status.detach().cpu(),
             }
         else:
             d = {

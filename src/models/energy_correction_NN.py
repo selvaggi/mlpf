@@ -4,16 +4,12 @@
     At first the model is fixed and the weights are loaded from earlier training
 """
 import wandb
-
 from xformers.ops.fmha import BlockDiagonalMask
 from gatr.interface  import (
     embed_point,
-    extract_point,
-    extract_translation,
     embed_scalar,
-    extract_scalar
 )
-from src.layers.utils_training import obtain_batch_numbers, obtain_clustering_for_matched_showers
+from src.layers.utils_training import obtain_clustering_for_matched_showers
 from torch_scatter import scatter_add, scatter_mean
 from src.utils.post_clustering_features import (
     get_post_clustering_features,
@@ -21,9 +17,6 @@ from src.utils.post_clustering_features import (
     calculate_eta,
     calculate_phi,
 )
-from src.utils.save_features import save_features
-
-import os
 from time import time
 import numpy as np
 from gatr import GATr, SelfAttentionConfig, MLPConfig
@@ -81,8 +74,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
         self.separate_pid_gatr = args.separate_PID_GATr
         self.n_layers_pid_head = args.n_layers_PID_head
     
-        # if pos_regression:
-        #     out_f += 3
+
         self.ignore_global_features_for_p = ignore_global_features_for_p
         if self.charged:
             self.ignore_global_features_for_p = False
@@ -106,9 +98,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     attention=SelfAttentionConfig(),  # Use default parameters for attention
                     mlp=MLPConfig(),  # Use default parameters for MLP
                 )
-                # self.lin_e = nn.Linear(4, 1)
                 self.gnn = "gatr"
-                # self.lin_final_exp = nn.Linear(16, 4) # e, pxpypz
                 if self.separate_pid_gatr and not self.charged:
                     print("Separate PID GATr")
                     self.gatr_pid = GATr(
@@ -234,10 +224,10 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             x = graphs_new.ndata["h"]
             edge_index = torch.stack(graphs_new.edges())
             hits_points = graphs_new.ndata["h"][:, 0:3]
-            hit_type = graphs_new.ndata["h"][:, 3:7].argmax(dim=1)
-            betas = graphs_new.ndata["h"][:, 9]
-            p = graphs_new.ndata["h"][:, 8]
-            e = graphs_new.ndata["h"][:, 7]
+            hit_type = graphs_new.ndata["h"][:, 4:8].argmax(dim=1)
+            betas = graphs_new.ndata["h"][:, 10]
+            p = graphs_new.ndata["h"][:, 9]
+            e = graphs_new.ndata["h"][:, 8]
             embedded_inputs = embed_point(hits_points) + embed_scalar(
                 hit_type.view(-1, 1)
             )
@@ -249,22 +239,19 @@ class EnergyCorrectionWrapper(torch.nn.Module):
             embedded_outputs, _ = self.gatr(
                 embedded_inputs, scalars=extra_scalars, attention_mask=mask
             )
-            p_vectors = extract_translation(embedded_outputs)
-            p_vectors = p_vectors[:, 0, :]
-            p_vectors_per_batch = scatter_mean(p_vectors, batch_idx, dim=0)
             embedded_outputs_per_batch = scatter_sum(
                 embedded_outputs[:, 0, :], batch_idx, dim=0
             )
+           
             model_x = torch.cat(
                 [x_global_features, embedded_outputs_per_batch], dim=1
             )
             if self.separate_pid_gatr and not self.charged:
+                
                 embedded_outputs, _ = self.gatr_pid(
                     embedded_inputs, scalars=extra_scalars, attention_mask=mask
                 )
-                p_vectors = extract_translation(embedded_outputs)
-                p_vectors = p_vectors[:, 0, :]
-                p_vectors_per_batch = scatter_mean(p_vectors, batch_idx, dim=0)
+               
                 embedded_outputs_per_batch1 = scatter_sum(
                     embedded_outputs[:, 0, :], batch_idx, dim=0
                 )
@@ -273,15 +260,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                 )
             else:
                 model_x_pid = model_x
-        else:
-            # not using GATr features
-            gnn_output = torch.randn(x_global_features.shape[0], 32).to(
-                x_global_features.device
-            )
-        #if not self.use_gatr:
-        #    model_x = torch.cat([x_global_features, gnn_output], dim=1).to(
-        #        self.model.model[0].weight.device
-        #    )
+
         if not self.charged:
             # Predict energy for neutrals using the neural network
             res = self.model(model_x)
@@ -308,7 +287,7 @@ class EnergyCorrectionWrapper(torch.nn.Module):
                     print("nans in betas", torch.sum(torch.isnan(betas)))
                     print("nans in x_global_features", torch.sum(torch.isnan(x_global_features)))   
                     print(x_global_features) 
-                E_pred = torch.clamp(E_pred, min=0, max=None)
+                # E_pred = torch.clamp(E_pred, min=0, max=None)
                 _, _, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
                 if self.neutral_avg:
                     _, p_pred, ref_pt_pred = self.AvgHits.predict(x_global_features, graphs_new)
@@ -746,7 +725,7 @@ class EnergyCorrection():
 
         ############ loss EC of neutral only  ###########
         
-        mask_neutral_for_loss = correct_mass_neutral(torch.tensor(pid_true_matched), dic_e_cor["neutrals_idx"])
+        mask_neutral_for_loss = correct_mask_neutral(torch.tensor(pid_true_matched), dic_e_cor["neutrals_idx"])
 
         e_true_neutrals = e_true[mask_neutral_for_loss]
         e_pred_neutrals = e_cor[mask_neutral_for_loss]
@@ -770,7 +749,7 @@ class EnergyCorrection():
             loss_EC_neutrals = 0
         filt_neutrons = (e_true[dic_e_cor["neutrals_idx"]] < 5).cpu() & (torch.tensor(pid_true_matched)[dic_e_cor["neutrals_idx"].cpu()] == 2112)
         loss_EC_neutrons = torch.nn.L1Loss()(
-            e_cor[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu(), e_true[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu()
+            torch.exp(e_cor[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu()), e_true[dic_e_cor["neutrals_idx"]][filt_neutrons].detach().cpu()
         )
         filt_KL = (e_true[dic_e_cor["neutrals_idx"]] < 5).cpu() & (torch.tensor(pid_true_matched)[dic_e_cor["neutrals_idx"].cpu()] == 130)
         loss_EC_KL = torch.nn.L1Loss()(
@@ -793,41 +772,11 @@ class EnergyCorrection():
             neutral_PID_pred, neutral_PID_true_onehot, mask_neutral = obtain_PID_neutral(dic_e_cor,pid_true_matched, self.pids_neutral, self.args, self.pid_conversion_dict)
         
         if len(self.pids_charged):
-            loss_charged_pid, stats= pid_loss_weighted(charged_PID_pred, charged_PID_true_onehot, mask_charged, stats, fixed, "charged")
-            # if self.args.balance_pid_classes and charged_PID_true_onehot.shape[0] > 20:
-            #     # Batch size must be big enough
-            #     weights = charged_PID_true_onehot.sum(dim=0)
-            #     weights[weights == 0] = 1  # to avoid issues
-            #     weights = 1 / weights  # maybe choose something else?
-            # else:
-            #     weights = torch.ones(len(self.pids_charged)).to(charged_PID_pred.device)
-            # if len(charged_PID_pred):
-            #     mask_charged = mask_charged.bool()
-            #     loss_charged_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-            #         charged_PID_pred[mask_charged], charged_PID_true_onehot[mask_charged]
-            #     )
-            # else:
-            #     loss_charged_pid = 0
-            
+            loss_charged_pid,acc_charged, stats= pid_loss_weighted(charged_PID_pred, charged_PID_true_onehot,e_true[dic_e_cor["charged_idx"]], mask_charged, stats, fixed, "charged")        
             wandb.log({"loss_charged_pid": loss_charged_pid})
+       
         if len(self.pids_neutral):
-            loss_neutral_pid, stats = pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot, mask_neutral, stats, fixed, "neutral")
-            # if self.args.balance_pid_classes and neutral_PID_true_onehot.shape[0] > 20:
-            #     # Batch size must be big enough
-            #     weights = neutral_PID_true_onehot.sum(dim=0)
-            #     weights[weights == 0] = 1  # To avoid issues
-            #     weights = 1 / weights  # Maybe choose something else?
-            # else:
-            #     weights = torch.ones(len(self.pids_neutral)).to(charged_PID_pred.device)
-            # if len(neutral_PID_pred):
-            #     mask_neutral = mask_neutral.bool()
-            #     loss_neutral_pid = torch.nn.CrossEntropyLoss(weight=weights)(
-            #         neutral_PID_pred[mask_neutral], neutral_PID_true_onehot[mask_neutral]
-            #     )
-            #     # print("Neutral PID pred:\n", neutral_PID_pred[mask_neutral][:4])
-            #     # print("Neutral PID true:\n", neutral_PID_true_onehot[mask_neutral][:4])
-            # else:
-            #     loss_neutral_pid = 0
+            loss_neutral_pid,acc_neutral, stats = pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot,e_true, mask_neutral, stats, fixed, "neutral")
             wandb.log({"loss_neutral_pid": loss_neutral_pid})
         ########### loss score ###########
         if self.fake_score_network:
@@ -936,8 +885,11 @@ def criterion_E_cor(ypred, ytrue, step, pid_neutrals, stats, frozen=False):
         w_tensor = w_tensor.to(ypred.device)
         mask_nans = torch.isnan(w_tensor)
         w_tensor[mask_nans] =0 
-        mean_penalty = torch.abs(ypred.mean() - ytrue.mean()) * 5.0 
-        return torch.mean(F.l1_loss(ypred, ytrue, reduction='none')*w_tensor), stats
+        # delta=0.02
+        # log_pred = torch.log(ypred.float().clamp_min(1e-6) )
+        # log_true = torch.log(ytrue.float().clamp_min(1e-6) )
+        # return torch.mean(F.huber_loss(log_pred, log_true, delta=delta, reduction='none')*w_tensor), stats
+        return torch.mean(F.l1_loss(ypred, torch.log(ytrue+1e-6), reduction='none')*w_tensor), stats
         # if step < 1000:
         #     return F.l1_loss(ypred, ytrue, weight=w_tensor)
         # else:
@@ -954,18 +906,19 @@ def criterion_E_cor(ypred, ytrue, step, pid_neutrals, stats, frozen=False):
         return 0, stats
 
 
-def pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot, mask_neutral, stats, frozen=False, name=""):
+def pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot,e_true, mask_neutral, stats, frozen=False, name=""):
     if len(neutral_PID_pred):
         """CrossEntropyLoss with PID class balancing based on accumulated stats."""
         # if "counts_pid" not in stats:
         #     stats["counts_pid"+name] = {}
         # Must have enough events
         mask_neutral = mask_neutral.bool()
-        if neutral_PID_true_onehot.shape[0] <= 20:
-            return torch.nn.CrossEntropyLoss()(
-                neutral_PID_pred[mask_neutral],
-                neutral_PID_true_onehot[mask_neutral]
-            )
+        # if neutral_PID_true_onehot.shape[0] <= 20:
+        #     return torch.nn.CrossEntropyLoss()(
+        #         neutral_PID_pred[mask_neutral],
+        #         neutral_PID_true_onehot[mask_neutral]
+        #     )
+
 
         # Update statistics unless frozen
         if not frozen:
@@ -980,16 +933,52 @@ def pid_loss_weighted(neutral_PID_pred, neutral_PID_true_onehot, mask_neutral, s
         counts[counts==0]=1
         weights = 1.0 / counts
         weights = weights / weights.mean()          # optional normalization
+        pid_pred = neutral_PID_pred[mask_neutral]
+        pid_true = neutral_PID_true_onehot[mask_neutral]
 
-        return torch.nn.CrossEntropyLoss(weight=weights)(
-            neutral_PID_pred[mask_neutral],
-            neutral_PID_true_onehot[mask_neutral]
-        ), stats 
+        if name =="charged":
+            e_true_ = e_true[mask_neutral]
+            mask_muons = ((torch.argmax(pid_true)==2)*(e_true_<1.5)).bool()
+            print("mask_muons", torch.sum(mask_muons))
+            pid_pred = pid_pred[~mask_muons]
+            pid_true = pid_true[~mask_muons]
+
+        if len(pid_pred):
+            acc = torch.sum(pid_pred==pid_true)/len(pid_pred)
+            return torch.nn.CrossEntropyLoss(weight=weights)(
+                pid_pred,
+                pid_true
+            ), acc, stats 
+        else:
+            return 0,0, stats
     else:
-        return 0, stats
+        return 0,0, stats
 
 
-def correct_mass_neutral(pid_neutral, neural_mask):
+def correct_mask_neutral(pid_neutral, neural_mask):
+    """
+    pid_neutral: tensor of PIDs (shape [N])
+    neural_mask: tensor of indices of neutral candidates (e.g. LongTensor)
+
+    we remove indices where pid is in remove list
+    """
+    pid_neutral = pid_neutral.to(neural_mask.device)
+    pid_neutral = torch.abs(pid_neutral)
+    # PIDs to remove
+    #remove_list = torch.tensor([-211, 211, -11, 11, 13, -13, 2212, 321], device=pid_neutral.device)
+    keep_list = torch.tensor([22, 130, 2112], device=pid_neutral.device)
+
+    # get PIDs corresponding to the given indices
+    selected_pids = pid_neutral[neural_mask]          # <- index access
+    # build mask: True = keep, False = remove
+    keep_mask = torch.isin(selected_pids, keep_list)
+
+    # filter indices
+    corrected_indices = neural_mask[keep_mask.to(neural_mask.device)]
+
+    return corrected_indices
+
+def correct_mask_charged(pid_neutral, neural_mask, E):
     """
     pid_neutral: tensor of PIDs (shape [N])
     neural_mask: tensor of indices of neutral candidates (e.g. LongTensor)

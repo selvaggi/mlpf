@@ -87,16 +87,16 @@ class ExampleWrapper(L.LightningModule):
         # for param in self.ec_model_wrapper_neutral.model.parameters():
         #    param.requires_grad = False
         # remove grads first:
-        for p in self.energy_correction.model_charged.parameters():
-            p.requires_grad = False
+        # for p in self.energy_correction.model_charged.parameters():
+        #     p.requires_grad = False
 
-        # Freeze gatr_pid inside neutral
-        for p in self.energy_correction.model_neutral.gatr_pid.parameters():
-            p.requires_grad = False
+        # # Freeze gatr_pid inside neutral
+        # for p in self.energy_correction.model_neutral.gatr_pid.parameters():
+        #     p.requires_grad = False
 
-        # Freeze pid_head inside neutral
-        for p in self.energy_correction.model_neutral.PID_head.parameters():
-            p.requires_grad = False
+        # # Freeze pid_head inside neutral
+        # for p in self.energy_correction.model_neutral.PID_head.parameters():
+        #     p.requires_grad = False
 
     def forward(self, g, y, step_count, eval="", return_train=False):
         inputs = g.ndata["pos_hits_xyz"].float()
@@ -212,12 +212,12 @@ class ExampleWrapper(L.LightningModule):
                 fixed = True
             loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score, self.stats= self.energy_correction.get_loss(batch_g, y, result, self.stats,  fixed)
         
-            if self.scheduler.step_count==1000:
-                self.unfreeze_all()
-            if self.scheduler.step_count<1000:
-                loss = loss_EC
-            else:
-                loss = loss_EC+loss_neutral_pid + loss_charged_pid 
+            # if self.scheduler.step_count==1000:
+            #     self.unfreeze_all()
+            # if self.scheduler.step_count<1000:
+            #     loss = loss_EC
+            # else:
+            loss = loss_EC+loss_neutral_pid + loss_charged_pid 
             
         else:
             loss_score = 0
@@ -277,7 +277,7 @@ class ExampleWrapper(L.LightningModule):
         #     use_average_cc_pos=self.args.use_average_cc_pos,
         #     loss_type=self.args.losstype,
         # )
-        loss_ec = 0
+ 
         # if self.trainer.is_global_zero:
         #     log_losses_wandb(
         #         True, batch_idx, 0, losses, loss, loss_ll, loss_ec, val=True
@@ -286,9 +286,9 @@ class ExampleWrapper(L.LightningModule):
             self.validation_step_outputs.append(
                 [model_output, e_cor, batch_g, y, shap_vals, ec_x, num_fakes]
             )
-        else:
-            if self.args.correction:
-                self.validation_step_outputs.append([model_output, e_cor, batch_g, y, num_fakes])
+        # else:
+        #     if self.args.correction:
+        #         self.validation_step_outputs.append([model_output, e_cor, batch_g, y, num_fakes])
         if self.args.predict:
             if self.args.correction:
                 model_output1 = model_output
