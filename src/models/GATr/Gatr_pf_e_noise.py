@@ -12,7 +12,7 @@ import dgl
 from src.logger.plotting_tools import PlotCoordinates
 from src.layers.object_cond import object_condensation_loss2
 from src.layers.utils_training import obtain_batch_numbers
-from src.models.energy_correction_NN import EnergyCorrection
+from src.models.energy_correction_NN_test import EnergyCorrection
 from src.layers.inference_oc import create_and_store_graph_output
 import lightning as L
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
@@ -31,14 +31,6 @@ class ExampleWrapper(L.LightningModule):
         self,
         args,
         dev,
-        input_dim: int = 5,
-        output_dim: int = 4,
-        n_postgn_dense_blocks: int = 3,
-        n_gravnet_blocks: int = 4,
-        clust_space_norm: str = "twonorm",
-        k_gravnet: int = 7,
-        activation: str = "elu",
-        weird_batchnom=False,
         blocks=10,
         hidden_mv_channels=16,
         hidden_s_channels=64,
@@ -73,7 +65,6 @@ class ExampleWrapper(L.LightningModule):
         # Initialize the energy correction module
         if self.args.correction:
             self.energy_correction = EnergyCorrection(self)
-            # Not a pytorch module! Otherwise it causes a recursion error when loading model weights
             self.ec_model_wrapper_charged = self.energy_correction.model_charged
             self.ec_model_wrapper_neutral = self.energy_correction.model_neutral
             self.pids_neutral = self.energy_correction.pids_neutral
@@ -81,82 +72,60 @@ class ExampleWrapper(L.LightningModule):
         else:
             self.pids_neutral = []
             self.pids_charged = []
-        # freeze these models completely
-        # for param in self.ec_model_wrapper_charged.model.parameters():
-        #    param.requires_grad = False
-        # for param in self.ec_model_wrapper_neutral.model.parameters():
-        #    param.requires_grad = False
-        # remove grads first:
-        # for p in self.energy_correction.model_charged.parameters():
-        #     p.requires_grad = False
-
-        # # Freeze gatr_pid inside neutral
-        # for p in self.energy_correction.model_neutral.gatr_pid.parameters():
-        #     p.requires_grad = False
-
-        # # Freeze pid_head inside neutral
-        # for p in self.energy_correction.model_neutral.PID_head.parameters():
-        #     p.requires_grad = False
-
-    def forward(self, g, y, step_count, eval="", return_train=False):
-        inputs = g.ndata["pos_hits_xyz"].float()
-        if self.trainer.is_global_zero and step_count % 500 == 0:
-            g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
-            PlotCoordinates(
-                g,
-                path="input_coords",
-                outdir=self.args.model_prefix,
-                # features_type="ones",
-                predict=self.args.predict,
-                epoch=str(self.current_epoch) + eval,
-                step_count=step_count,
+    def forward(self, g, y, step_count, eval="", return_train=False,use_gt_clusters=False):
+        if not use_gt_clusters:
+            inputs = g.ndata["pos_hits_xyz"].float()
+            if self.trainer.is_global_zero and step_count % 500 == 0:
+                g.ndata["original_coords"] = g.ndata["pos_hits_xyz"]
+                PlotCoordinates(
+                    g,
+                    path="input_coords",
+                    outdir=self.args.model_prefix,
+                    # features_type="ones",
+                    predict=self.args.predict,
+                    epoch=str(self.current_epoch) + eval,
+                    step_count=step_count,
+                )
+            inputs_scalar = g.ndata["hit_type"].float().view(-1, 1)
+            inputs = self.ScaledGooeyBatchNorm2_1(inputs)
+            embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
+            embedded_inputs = embedded_inputs.unsqueeze(
+                -2
+            )  # (batch_size*num_points, 1, 16)
+            mask = self.build_attention_mask(g)
+            scalars = torch.zeros((inputs.shape[0], 1))
+            scalars = torch.cat((g.ndata["e_hits"].float(), g.ndata["p_hits"].float()), dim=1)  
+            # Pass data through GATr
+            embedded_outputs, scalar_outputs = self.gatr(
+                embedded_inputs, scalars=scalars, attention_mask=mask
+            )  # (..., num_points, 1, 16)
+            points = extract_point(embedded_outputs[:, 0, :])
+            # Extract scalar and aggregate outputs from point cloud
+            nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
+            x_point = points
+            x_scalar = torch.cat(
+                (nodewise_outputs.view(-1, 1), scalar_outputs.view(-1, 1)), dim=1
             )
-        inputs_scalar = g.ndata["hit_type"].float().view(-1, 1)
-        inputs = self.ScaledGooeyBatchNorm2_1(inputs)
-        # inputs = inputs.unsqueeze(0)
-        embedded_inputs = embed_point(inputs) + embed_scalar(inputs_scalar)
-        embedded_inputs = embedded_inputs.unsqueeze(
-            -2
-        )  # (batch_size*num_points, 1, 16)
-        mask = self.build_attention_mask(g)
-        scalars = torch.zeros((inputs.shape[0], 1))
-        scalars = torch.cat((g.ndata["e_hits"].float(), g.ndata["p_hits"].float()), dim=1)  
-        # Pass data through GATr
-        embedded_outputs, scalar_outputs = self.gatr(
-            embedded_inputs, scalars=scalars, attention_mask=mask
-        )  # (..., num_points, 1, 16)
-        points = extract_point(embedded_outputs[:, 0, :])
-        # Extract scalar and aggregate outputs from point cloud
-        nodewise_outputs = extract_scalar(embedded_outputs)  # (..., num_points, 1, 1)
-        x_point = points
-        x_scalar = torch.cat(
-            (nodewise_outputs.view(-1, 1), scalar_outputs.view(-1, 1)), dim=1
-        )
-        x_cluster_coord = self.clustering(x_point)
-        beta = self.beta(x_scalar)
-        # if self.args.tracks:
-        #     mask = g.ndata["hit_type"] == 1
-        #     beta[mask] = 9
-        g.ndata["final_cluster"] = x_cluster_coord
-        g.ndata["beta"] = beta.view(-1)
-        if self.trainer.is_global_zero and step_count % 500 == 0:
-            PlotCoordinates(
-                g,
-                path="final_clustering",
-                outdir=self.args.model_prefix,
-                predict=self.args.predict,
-                epoch=str(self.current_epoch) + eval,
-                step_count=step_count,
-            )
-        x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
-        
-        pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
+            x_cluster_coord = self.clustering(x_point)
+            beta = self.beta(x_scalar)
+            g.ndata["final_cluster"] = x_cluster_coord
+            g.ndata["beta"] = beta.view(-1)
+            if self.trainer.is_global_zero and step_count % 500 == 0:
+                PlotCoordinates(
+                    g,
+                    path="final_clustering",
+                    outdir=self.args.model_prefix,
+                    predict=self.args.predict,
+                    epoch=str(self.current_epoch) + eval,
+                    step_count=step_count,
+                )
+            x = torch.cat((x_cluster_coord, beta.view(-1, 1)), dim=1)
+            
+            pred_energy_corr = torch.ones_like(beta.view(-1, 1)).flatten()
+        else:
+            x = torch.ones_like(g.ndata["h"][:,0:4])
         if self.args.correction:
             result = self.energy_correction.forward_correction(g, x, y, return_train)
-            # loop through params and print the ones without grad
-            #for name, param in self.named_parameters():
-            #    if not param.requires_grad:
-            #        print("doesn't have grad", name)
             return result
         else:
             pred_energy_corr = torch.ones_like(beta.view(-1, 1))
@@ -212,11 +181,6 @@ class ExampleWrapper(L.LightningModule):
                 fixed = True
             loss_EC, loss_pos, loss_neutral_pid, loss_charged_pid, loss_score, self.stats= self.energy_correction.get_loss(batch_g, y, result, self.stats,  fixed)
         
-            # if self.scheduler.step_count==1000:
-            #     self.unfreeze_all()
-            # if self.scheduler.step_count<1000:
-            #     loss = loss_EC
-            # else:
             loss = loss_EC+loss_neutral_pid + loss_charged_pid 
             
         else:
@@ -225,7 +189,6 @@ class ExampleWrapper(L.LightningModule):
             log_losses_wandb(True, batch_idx, 0, losses, loss, loss_score)
         self.loss_final = loss.item() + self.loss_final
         self.number_b = self.number_b + 1
-        # print(loss_EC,loss_neutral_pid, loss_charged_pid)
         del model_output
         del e_cor
         del losses
@@ -239,19 +202,14 @@ class ExampleWrapper(L.LightningModule):
         batch_g = batch[0]
         shap_vals, ec_x = None, None
         if self.args.correction:
-            result = self(batch_g, y, 1)
+            result = self(batch_g, y, 1, self.args.use_gt_clusters)
             model_output = result[0]
-            # filename = f"/afs/cern.ch/work/m/mgarciam/private/mlpf/notebooks/onnx_debug/output_onnx_gatr_{batch_idx}.npy"
-            # np.save(filename, model_output.cpu().numpy())
             outputs = self.energy_correction.get_validation_step_outputs(batch_g, y, result)
-            loss_ll = 0
-
             e_cor1, pred_pos, pred_ref_pt, pred_pid, num_fakes, extra_features, fakes_labels = outputs
             e_cor = e_cor1
         #################################################################
         else:
             model_output, e_cor1, loss_ll, _ = self(batch_g, y, 1)
-            loss_ll = 0
             e_cor1 = torch.ones_like(model_output[:, 0].view(-1, 1))
             e_cor = e_cor1
             pred_pos = None
@@ -329,7 +287,6 @@ class ExampleWrapper(L.LightningModule):
                 truth_tracks=self.args.truth_tracking
             )
             self.df_showers_pandora.append(df_batch_pandora)
-            print("Appending another batch", len(df_batch1))
             self.df_showes_db.append(df_batch1)
         # del losses
         # del loss

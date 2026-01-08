@@ -72,8 +72,9 @@ def obtain_clustering_for_matched_showers(
     energy_true_daughters = []
     y_pids_matched = []
     y_coords_matched = []
-    batch_g.ndata["coords"] = model_output[:, 0:3]
-    batch_g.ndata["beta"] = model_output[:, 3]
+    if not  use_gt_clusters:
+        batch_g.ndata["coords"] = model_output[:, 0:3]
+        batch_g.ndata["beta"] = model_output[:, 3]
     graphs = dgl.unbatch(batch_g)
     batch_id = y_all.batch_number
     for i in range(0, len(graphs)):
@@ -85,8 +86,9 @@ def obtain_clustering_for_matched_showers(
         #    del y.unique_list_particles
         y.mask(mask.flatten())
         dic["part_true"] = y
-        betas = torch.sigmoid(dic["graph"].ndata["beta"])
-        X = dic["graph"].ndata["coords"]
+        if not  use_gt_clusters:
+            betas = torch.sigmoid(dic["graph"].ndata["beta"])
+            X = dic["graph"].ndata["coords"]
         clustering_mode = "dbscan"
         if clustering_mode == "clustering_normal":
             labels = clustering_obtain_labels( X,torch.sigmoid(betas.view(-1)), betas.device,  tbeta=0.2, td=0.05)
@@ -149,21 +151,10 @@ def obtain_clustering_for_matched_showers(
                 mask = labels == unique_showers_label
                 # non_graph = torch.sum(mask)
                 sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
-                k = 7
-                edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
-                g = dgl.graph(
-                    (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
-                )
-                g = dgl.remove_self_loop(g)
-                # g = dgl.DGLGraph().to(graphs[i].device)
-                # g.add_nodes(non_graph.detach().cpu())
-                g.ndata["h"] = torch.cat(
-                    (
-                        graphs[i].ndata["h"][mask],
-                        graphs[i].ndata["beta"][mask].view(-1, 1),
-                    ),
-                    dim=1,
-                )
+                g = dgl.graph(([], []))
+                g.add_nodes(sls_graph.shape[0])
+                g =  g.to(sls_graph.device)
+                g.ndata["h"] = graphs[i].ndata["h"][mask]
                 if "pos_pxpypz" in graphs[i].ndata:
                     g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
                 if "pos_pxpypz_at_vertex" in graphs[i].ndata:
@@ -196,19 +187,13 @@ def obtain_clustering_for_matched_showers(
             for j in fakes_idx:
                 mask = labels == j
                 sls_graph = graphs[i].ndata["pos_hits_xyz"][mask][:, 0:3]
-                k = 7
-                edge_index = torch_cmspepr.knn_graph(sls_graph, k=k)
-                g = dgl.graph(
-                    (edge_index[0], edge_index[1]), num_nodes=sls_graph.shape[0]
-                )
-                g = dgl.remove_self_loop(g)
-                g.ndata["h"] = torch.cat(
-                    (
-                        graphs[i].ndata["h"][mask],
-                        graphs[i].ndata["beta"][mask].view(-1, 1),
-                    ),
-                    dim=1,
-                )
+                g = dgl.graph(([], []))
+                g.add_nodes(sls_graph.shape[0])
+                g =  g.to(sls_graph.device)
+                
+                #g = dgl.remove_self_loop(g)
+                g.ndata["h"] = graphs[i].ndata["h"][mask]
+                   
                 if "pos_pxpypz" in graphs[i].ndata:
                     g.ndata["pos_pxpypz"] = graphs[i].ndata["pos_pxpypz"][mask]
                 if "pos_pxpypz_at_vertex" in graphs[i].ndata:

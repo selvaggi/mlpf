@@ -104,8 +104,8 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
     dic["phi_track"] = []
     for iev in tqdm.tqdm(range(arrs.num_entries), total=arrs.num_entries):
         # print("Processing event ", iev)
-        # if i ==5:
-            # get the reco particles
+        # if i ==1:
+    # get the reco particles
         reco_arr = get_reco_properties( prop_data, iev)
         reco_type = np.abs(reco_arr["PDG"])
     
@@ -116,7 +116,7 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
 
         n_tracks = len(gpdata.track_features["type"])
         n_hits = len(gpdata.hit_features["type"])
-        n_gps = len(gpdata.gen_features["PDG"])
+        n_gps = len(gpdata.gen_features_target["PDG"])
         print("hits={} tracks={} gps={}".format(n_hits, n_tracks, n_gps))
 
         track_to_gp = gpdata.track_to_gp
@@ -125,19 +125,21 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
 
         X_track = get_feature_matrix(gpdata.track_features, track_feature_order)
         X_hit = get_feature_matrix(gpdata.hit_features, hit_feature_order)
-        X_gen = get_feature_matrix(gpdata.gen_features, particle_feature_order)
+        X_target = get_feature_matrix(gpdata.gen_features_target, particle_feature_order)
+        X_gen = get_feature_matrix(gpdata.gen_features_true, particle_feature_order)
         if eval_dataset:
             X_pandora = get_feature_matrix(gpdata.pandora_features, PandoraPFO_feature_order)
-        ygen_track = track_to_gp
-        ygen_hit = hit_to_gp
+        ytarget_track = track_to_gp
+        ytarget_hit = hit_to_gp
     #     ycand_track = rps_track
     #     ycand_hit = rps_hit
 
         sanitize(X_track)
         sanitize(X_hit)
-        sanitize(X_gen)
-        sanitize(ygen_track)
-        sanitize(ygen_hit)
+        sanitize(X_target)
+        if len(ytarget_track)>0:
+            sanitize(ytarget_track)
+        sanitize(ytarget_hit)
         if eval_dataset:
             sanitize(X_pandora) 
             sanitize(gpdata.pfo_to_calohit)
@@ -146,10 +148,11 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
         this_ev = {
             "X_track": X_track,
             "X_hit": X_hit,
-            "X_gen": X_gen, 
-            "ygen_track": ygen_track,
-            "ygen_hit": ygen_hit,
-            "ygen_hit_calomother": gpdata.gp_to_calohit_beforecalomother
+            "X_gen": X_target, 
+            "X_gen_true": X_gen, 
+            "ygen_track": ytarget_track,
+            "ygen_hit": ytarget_hit,
+            "ygen_true_interacted_tracker": gpdata.gp_to_calohit_beforecalomother
         }
         if eval_dataset:
             this_ev["X_pandora"] = X_pandora
@@ -160,7 +163,7 @@ def process_one_file(fn, ofn, eval_dataset, truth_tracking):
         this_ev = awkward.Record(this_ev)
         ret.append(this_ev)
         # i = i +1
- 
+    
        
     ret = {k: awkward.from_iter([r[k] for r in ret]) for k in ret[0].fields}
     for k in ret.keys():
