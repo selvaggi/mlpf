@@ -12,11 +12,12 @@ import pandas as pd
 # import mplhep as hep
 from src.utils.inference.pandas_helpers import open_mlpf_dataframe, concat_with_batch_fix
 from src.utils.inference.per_particle_metrics import (
-    plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora,
-    plot_efficiency_all, calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, analyze_fakes_PID,
+    plot_per_energy_resolution2_multiple, plot_confusion_matrix, plot_confusion_matrix_pandora
+    , calc_unit_circle_dist, plot_per_energy_resolution2, analyze_fakes, analyze_fakes_PID,
     plot_cm_per_energy, plot_fake_and_missed_energy_regions, quick_plot_mass,
     plot_cm_per_energy_on_overview
 )
+from src.utils.inference.efficiency_calc_and_plots import plot_efficiency_all
 from src.utils.inference.track_cluster_eff_plots import plot_track_assignation_eval
 from src.utils.inference.event_Ks import get_decay_type
 import matplotlib.pyplot as plt
@@ -73,57 +74,86 @@ if not os.path.exists(PATH_store_summary_plots):
 
 dir_top = args.path
 
-sd_hgb1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_perfectC_all.pt"), False, False)
-sd_hgb2, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_100_200_gt.pt"), False, False)
-sd_hgb3, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_200_300_gt.pt"), False, False)
-sd_hgb = concat_with_batch_fix([sd_hgb1, sd_hgb2, sd_hgb3])
+sd_hgb1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/test_save_dpc0_0_None.pt"), False, False)
+sd_hgb = sd_hgb1 #concat_with_batch_fix([sd_hgb1, sd_hgb2, sd_hgb3])
 
-sd_pandora1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/pandora_3M.pt"), False, False)
-sd_pandora2, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_None_pandora_100_200.pt"), False, False)
-sd_pandora3, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_None_pandora_200_300.pt"), False, False)
-sd_pandora = concat_with_batch_fix([sd_pandora1, sd_pandora2, sd_pandora3])
+sd_pandora1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/test_save_dpc0_0_None_pandora.pt"), False, False)
+sd_pandora = sd_pandora1 #concat_with_batch_fix([sd_pandora1, sd_pandora2, sd_pandora3])
 
-sd_hgb_gt1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_perfectC_all.pt"), False, False)
-sd_hgb_gt2, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_100_200_gt.pt"), False, False)
-sd_hgb_gt3, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/0_0_Nonetest_200_300_gt.pt"), False, False)
-sd_hgb_gt = concat_with_batch_fix([sd_hgb_gt1, sd_hgb_gt2, sd_hgb_gt3])
+sd_hgb_gt1, _ = open_mlpf_dataframe(os.path.join(dir_top, "showers_df_evaluation/test_gun_um1000_0_None.pt"), False, False)
+sd_hgb_gt = sd_hgb_gt1 #concat_with_batch_fix([sd_hgb_gt1, sd_hgb_gt2, sd_hgb_gt3])
 
 sd_hgb, sd_pandora = preprocess_dataframe(sd_hgb, sd_pandora, args.preprocess.split(","))
 
-sd_hgb = sd_hgb[(np.abs(sd_hgb.reco_showers_E.values)>0.5)+np.isnan(sd_hgb.reco_showers_E.values)]
-sd_pandora = sd_pandora[(np.abs(sd_pandora.reco_showers_E.values)>0.5)+np.isnan(sd_pandora.reco_showers_E.values)]
-sd_hgb_gt= sd_hgb_gt[(np.abs(sd_hgb_gt.reco_showers_E.values)>0.5)]
+mask = (sd_hgb.pred_pid_matched==4)*(sd_hgb.calibrated_E<1.5)
+sd_hgb.loc[mask, "pred_pid_matched"]=1
+
+# mask = (sd_hgb.is_track_in_cluster==1)
+# sd_hgb.loc[mask, "calibrated_E"]=np.log(sd_hgb.loc[mask, "calibrated_E"])
+# sd_hgb.loc[mask, "calibration_factor"]=np.log(sd_hgb.loc[mask, "calibration_factor"])
+
+## cheat photon calibration
+# mask_p = (sd_pandora.pid==22)+(sd_pandora.pid==130)+(sd_pandora.pid==2112)
+# mask = (sd_hgb.pid==22)+ (sd_hgb.pid==130)+ (sd_hgb.pid==2112)
+# sd_hgb.loc[mask, "calibrated_E"] = sd_hgb.loc[mask, "reco_showers_E"]
+# # sd_hgb.loc[mask, "calibrated_E"] = sd_pandora.loc[mask_p, "pandora_calibrated_pfo"]
+
+# check charged only
+# mask = (np.abs(sd_hgb.pid)==11)+ (np.abs(sd_hgb.pid)==211)+ (np.abs(sd_hgb.pid)==13)+ (np.abs(sd_hgb.pid)==321)+ (np.abs(sd_hgb.pid)==2212)
+# #print(len( sd_hgb[mask*(sd_hgb.is_track_in_MC==1)]), len( sd_hgb[mask*(sd_hgb.is_track_in_MC==0)]), len( sd_hgb[mask]))
+# sd_hgb = sd_hgb[mask*(sd_hgb.is_track_in_MC==1)*(sd_hgb.gen_status==1)]
+# mask = (np.abs(sd_pandora.pid)==11)+ (np.abs(sd_pandora.pid)==211)+ (np.abs(sd_pandora.pid)==13)+ (np.abs(sd_pandora.pid)==321)+ (np.abs(sd_pandora.pid)==2212)
+# sd_pandora = sd_pandora[mask*(sd_pandora.is_track_in_MC==1)*(sd_pandora.gen_status==1)]
+# mask = (np.abs(sd_hgb.pid)==130) + (np.abs(sd_hgb.pid)==22) + (np.abs(sd_hgb.pid)==2112)+ (np.abs(sd_hgb.pid)==3212)
+# sd_hgb = sd_hgb[mask]
+# mask = (np.abs(sd_pandora.pid)==130) + (np.abs(sd_pandora.pid)==22) + (np.abs(sd_pandora.pid)==2112)+ (np.abs(sd_pandora.pid)==3212)
+# sd_pandora = sd_pandora[mask]
+# mask = (sd_hgb.reco_showers_E ==0)*(sd_hgb.labels==0)
+# sd_hgb.loc[mask, "calibrated_E"] = sd_hgb.loc[mask, "true_showers_E"]
+# sd_hgb.loc[mask, "pred_pid_matched"] = sd_hgb.loc[mask, "pid_4_class_true"]
+# sd_hgb.loc[mask, "pred_pos_matched"] = sd_hgb.loc[mask, "true_pos"]
+
+# mask = (sd_pandora.reco_showers_E ==0)*(sd_pandora.labels==0)
+# sd_pandora.loc[mask, "pandora_calibrated_pfo"] = sd_pandora.loc[mask, "true_showers_E"]
+# sd_pandora.loc[mask, "pandora_pid"] = sd_pandora.loc[mask, "pid_4_class_true"]
+# sd_pandora.loc[mask, "pandora_calibrated_pos"] = sd_pandora.loc[mask, "true_pos"]
+# mask = (np.abs(sd_hgb1.pid)==211)
+# sd_hgb1.loc[mask, "calibrated_E"] = sd_hgb1.loc[mask, "true_showers_E"]
+# store_logit_max = []
+# for i in range(len(sd_hgb)):
+#     store_logit_max.append(np.max(sd_hgb.matched_extra_features.iloc[i][1:]))
+# sd_hgb["logit_max"] =store_logit_max
+# mask = (sd_hgb.logit_max<1)*(sd_hgb.pred_showers_E<1.5)
+# sd_hgb = sd_hgb[~mask]
+# sd_hgb = sd_hgb[(np.abs(sd_hgb.reco_showers_E.values)>0.5)+np.isnan(sd_hgb.reco_showers_E.values)]
+# sd_pandora = sd_pandora[(np.abs(sd_pandora.reco_showers_E.values)>0.5)+np.isnan(sd_pandora.reco_showers_E.values)]
+# sd_hgb_gt= sd_hgb_gt[(np.abs(sd_hgb_gt.reco_showers_E.values)>0.5)]
 
 # #analyze_fakes(sd_pandora, sd_hgb, PATH_store_individual_plots)
 # # analyze_fakes_PID(sd_pandora, sd_hgb, PATH_store_individual_plots)
 
-plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_summary_plots)
 # charged only 
 if args.mass_only:
-    quick_plot_mass(sd_hgb, sd_pandora, PATH_store_summary_plots)
+    dic_true_mass = np.load("/eos/user/m/mgarciam/datasets_mlpf/models_trained_CLD/041225_arc_05/dic_true_gen_tracks_1.npy")
+    quick_plot_mass(sd_hgb, sd_pandora, PATH_store_summary_plots, dic_true_mass)
     sys.exit(0)
 
+# # _____________________________plot mass contribution_____________________________
+# plot_mass_contribution_per_category(sd_hgb, sd_pandora, sd_hgb_gt, PATH_store_summary_plots)
 
-plot_mass_contribution_per_category(sd_hgb, sd_pandora, sd_hgb_gt, PATH_store_summary_plots)
-# plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[0, 1])
-# plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[1, 10])
-# plot_mass_contribution_per_category(sd_hgb, sd_pandora, PATH_store_summary_plots, energy_bins=[10, 100])
-# plot_mass_contribution_per_PID(sd_hgb, sd_pandora, PATH_store_summary_plots)
-# plot_fake_and_missed_energy_regions(sd_pandora, sd_hgb, PATH_store_summary_plots)
-# pandora_vertex = np.array(sd_pandora.vertex.values.tolist())
-
-# Filter the df based on where decay type is 0
+# _____________________________plot track-cluster link eff _____________________________
 plot_track_assignation_eval(sd_hgb, sd_pandora, PATH_store_individual_plots)
-fig, ax = plt.subplots(4, 8, figsize=(28, 28 * 4 / 8))  # The overview figure of efficiencies #
-fig_eff, ax_eff = plt.subplots(4, 4, figsize=(14, 14))
-# plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots)
+
+## _____________________________plot efficiency plots _____________________________
+fig, ax = plt.subplots(5, 9, figsize=(10*9, 10 * 5 ))  # The overview figure of efficiencies #
+fig_eff, ax_eff = plt.subplots(5, 5, figsize=(17.5, 24))
+plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots)
+plot_cm_per_energy(sd_hgb, sd_pandora, PATH_store_summary_plots, PATH_store_individual_plots, status1=True)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax)
 plot_efficiency_all(sd_pandora, [sd_hgb], PATH_store_individual_plots, ["ML"], ax=ax_eff)
-
-plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 4:6])
-reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
-column_cm_full = 6
-column_cm_full_p = 7
+column_cm_full = 7
+column_cm_full_p = 8
+plot_cm_per_energy_on_overview(sd_hgb, sd_pandora, PATH_store_individual_plots, ax=ax[:, 5:7])
 plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, ax=ax[0, column_cm_full], ax1=ax[1, column_cm_full], ax2=ax[2, column_cm_full])
 plot_confusion_matrix(sd_hgb, PATH_store_individual_plots, add_pie_charts=True, ax=ax[3, column_cm_full])
 plot_confusion_matrix_pandora(sd_pandora, PATH_store_individual_plots, ax=ax[0, column_cm_full_p], ax1=ax[1, column_cm_full_p], ax2=ax[2, column_cm_full_p])
@@ -136,11 +166,11 @@ fig.tight_layout()
 fig_eff.tight_layout()
 fig_eff.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate.pdf"))
 fig.savefig(os.path.join(PATH_store_summary_plots, "overview_Efficiency_FakeRate_ConfusionMatrix.pdf"))
-# x = sd_hgb.pred_ref_pt_matched[sd_hgb.is_track_in_cluster==1].values
-# x = np.stack(x)
-# x = np.linalg.norm(x, axis=1)
 
-e_ranges = [[0, 5], [5, 15], [15, 50]]
+# # # _____________________________plot cm per enegy and reco hist _____________________________
+
+reco_hist(sd_hgb, sd_pandora, PATH_store_individual_plots)
+
 
 current_dir = PATH_store_individual_plots
 current_dir_detailed = PATH_store_summary_plots
@@ -148,7 +178,8 @@ if not os.path.exists(current_dir):
     os.makedirs(current_dir)
 if not os.path.exists(current_dir_detailed):
     os.makedirs(current_dir_detailed)
-print("plot_per_energy_resolution2_multiple")
+
+
 plot_per_energy_resolution2_multiple(
     sd_pandora,
     {"ML": sd_hgb},
@@ -160,13 +191,3 @@ plot_per_energy_resolution2_multiple(
     PATH_store_detailed_plots=current_dir_detailed
 )
 
-print("Done plotting")
-
-# # def save_dict(di_, filename_):
-# #     with open(filename_, "wb") as f:
-# #         pickle.dump(di_, f)
-
-# # def load_dict(filename_):
-# #     with open(filename_, "rb") as f:
-# #         ret_di = pickle.load(f)
-# #     return ret_di
